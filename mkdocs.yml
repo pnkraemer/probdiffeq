@@ -60,10 +60,10 @@ plugins:
             docstring_style: numpy
             show_signature_annotations: true
             show_bases: false
-            show_source: true
-            inherited_members: true
-            merge_init_into_class: true
+            show_source: false
+            inherited_members: false
             show_if_no_docstring: false
+            merge_init_into_class: true
             group_by_category: true
   - exclude:
       glob:

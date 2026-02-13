@@ -39,7 +39,14 @@ T = TypeVar("T")
 @tree_util.register_dataclass
 @containers.dataclass
 class CubaturePositiveWeights:
-    """A datastructure for cubature rules that have positive weights."""
+    """A datastructure for cubature rules that have positive weights.
+
+    Related:
+    [`cubature_gauss_hermite`](#probdiffeq.probdiffeq.cubature_gauss_hermite),
+    [`cubature_third_order_spherical`](#probdiffeq.probdiffeq.cubature_third_order_spherical),
+    [`cubature_unscented_transform`](#probdiffeq.probdiffeq.cubature_unscented_transform).
+
+    """
 
     points: ArrayLike
     """Cubature points."""
@@ -49,7 +56,12 @@ class CubaturePositiveWeights:
 
 
 def cubature_third_order_spherical(input_shape):
-    """Third-order spherical cubature integration."""
+    """Third-order spherical cubature integration.
+
+    Related:
+    [`CubaturePositiveWeights`](#probdiffeq.probdiffeq.CubaturePositiveWeights).
+
+    """
     assert len(input_shape) <= 1
     if len(input_shape) == 1:
         (d,) = input_shape
@@ -72,7 +84,12 @@ def _third_order_spherical_params(*, d):
 
 
 def cubature_unscented_transform(input_shape, r=1.0):
-    """Unscented transform."""
+    """Unscented transform.
+
+    Related:
+    [`CubaturePositiveWeights`](#probdiffeq.probdiffeq.CubaturePositiveWeights).
+
+    """
     assert len(input_shape) <= 1
     if len(input_shape) == 1:
         (d,) = input_shape
@@ -102,6 +119,10 @@ def cubature_gauss_hermite(input_shape, degree=5):
     """(Statistician's) Gauss-Hermite cubature.
 
     The number of cubature points is `prod(input_shape)**degree`.
+
+    Related:
+    [`CubaturePositiveWeights`](#probdiffeq.probdiffeq.CubaturePositiveWeights).
+
     """
     assert len(input_shape) == 1
     (dim,) = input_shape
@@ -139,7 +160,14 @@ def _tensor_points(x, /, *, d):
 
 
 class Constraint(Protocol):
-    """An interface for constraints + linearization in probabilistic solvers."""
+    """An interface for constraints + linearization in probabilistic solvers.
+
+    Related:
+    [`constraint_ode_ts0`](#probdiffeq.probdiffeq.constraint_ode_ts0),
+    [`constraint_ode_ts1`](#probdiffeq.probdiffeq.constraint_ode_ts1),
+    [`constraint_ode_slr0`](#probdiffeq.probdiffeq.constraint_ode_slr0),
+    [`constraint_ode_slr1`](#probdiffeq.probdiffeq.constraint_ode_slr1).
+    """
 
     init_linearization: Callable
     """Initialize the linearization of the constraint."""
@@ -149,12 +177,20 @@ class Constraint(Protocol):
 
 
 def constraint_ode_ts0(ssm, ode_order=1):
-    """Create an ODE constraint with zeroth-order Taylor linearisation."""
+    """Create an ODE constraint with zeroth-order Taylor linearisation.
+
+    Related:
+    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
+    """
     return ssm.linearize.ode_taylor_0th(ode_order=ode_order)
 
 
 def constraint_ode_ts1(*, ssm, ode_order=1, jvp_probes=10, jvp_probes_seed=1):
-    """Create an ODE constraint with first-order Taylor linearisation."""
+    """Create an ODE constraint with first-order Taylor linearisation.
+
+    Related:
+    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
+    """
     # TODO: expose a "jacobian" option to choose between fwd and rev mode
     assert jvp_probes > 0
     return ssm.linearize.ode_taylor_1st(
@@ -163,12 +199,21 @@ def constraint_ode_ts1(*, ssm, ode_order=1, jvp_probes=10, jvp_probes_seed=1):
 
 
 def constraint_ode_slr0(*, ssm, cubature_fun=cubature_third_order_spherical):
-    """Create an ODE constraint with zeroth-order statistical linear regression."""
+    """Create an ODE constraint with zeroth-order statistical linear regression.
+
+    Related:
+    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
+    """
     return ssm.linearize.ode_statistical_0th(cubature_fun)
 
 
 def constraint_ode_slr1(*, ssm, cubature_fun=cubature_third_order_spherical):
-    """Create an ODE constraint with first-order statistical linear regression."""
+    """Create an ODE constraint with first-order statistical linear regression.
+
+    Related:
+    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
+
+    """
     return ssm.linearize.ode_statistical_1st(cubature_fun)
 
 
@@ -183,8 +228,13 @@ class TaylorCoeffTarget(Generic[C, T]):
     """
 
     mean: C
+    """A PyTree describing the mean of the Taylor coefficient."""
+
     std: C
+    """A PyTree describing the standard deviation of the Taylor coefficient."""
+
     marginals: T
+    """The full marginal distribution of the Taylor coefficient."""
 
 
 @tree_util.register_dataclass
@@ -206,7 +256,10 @@ class MarkovSequence(Generic[T]):
 class MarkovStrategy(Generic[T]):
     """An interface for estimation strategies in Markovian state-space models.
 
-    Implemented by all filters and smoothers.
+    Related:
+    [`strategy_filter`](#probdiffeq.probdiffeq.strategy_filter),
+    [`strategy_smoother_fixedpoint`](#probdiffeq.probdiffeq.strategy_smoother_fixedpoint),
+    [`strategy_smoother_fixedinterval`](#probdiffeq.probdiffeq.strategy_smoother_fixedinterval).
     """
 
     def __init__(
@@ -442,7 +495,7 @@ class MarkovStrategy(Generic[T]):
 
 @tree_util.register_dataclass
 @containers.dataclass
-class ProbSolution(Generic[C, T]):
+class ProbabilisticSolution(Generic[C, T]):
     """A datastructure for probabilistic solutions of differential equations."""
 
     t: Array
@@ -476,8 +529,15 @@ class ProbSolution(Generic[C, T]):
     """
 
 
-class ProbSolver:
-    """An interface for probabilistic differential equation solvers."""
+class ProbabilisticSolver:
+    """An interface for probabilistic differential equation solvers.
+
+    Related:
+    [`solver`](#probdiffeq.probdiffeq.solver),
+    [`solver_mle`](#probdiffeq.probdiffeq.solver_mle),
+    [`solver_dynamic`](#probdiffeq.probdiffeq.solver_dynamic).
+
+    """
 
     def __init__(
         self,
@@ -523,17 +583,17 @@ class ProbSolver:
         """
         return self.strategy.is_suitable_for_save_every_step
 
-    def init(self, t, init: TaylorCoeffTarget) -> ProbSolution:
+    def init(self, t, init: TaylorCoeffTarget) -> ProbabilisticSolution:
         """Initialize the probabilistic solution."""
         raise NotImplementedError
 
-    def step(self, state: ProbSolution, *, dt: float, damp: float):
+    def step(self, state: ProbabilisticSolution, *, dt: float, damp: float):
         """Perform a step."""
         raise NotImplementedError
 
     def userfriendly_output(
-        self, *, solution0: ProbSolution, solution: ProbSolution
-    ) -> ProbSolution:
+        self, *, solution0: ProbabilisticSolution, solution: ProbabilisticSolution
+    ) -> ProbabilisticSolution:
         """Make the solutions 'user-friendly'.
 
         This may include calibration, calculation of marginals, and other things.
@@ -593,7 +653,9 @@ class ProbSolver:
         )
         return estimate
 
-    def interpolate(self, *, t, interp_from: ProbSolution, interp_to: ProbSolution):
+    def interpolate(
+        self, *, t, interp_from: ProbabilisticSolution, interp_to: ProbabilisticSolution
+    ):
         """Interpolate between two solution objects."""
         # Domain is (t0, t1]; thus, take the output scale from interp_to
         output_scale = interp_to.output_scale
@@ -609,7 +671,7 @@ class ProbSolver:
         )
         (estimate, interpolated), step_and_interpolate_from = tmp
 
-        step_from = ProbSolution(
+        step_from = ProbabilisticSolution(
             t=interp_to.t,
             # New:
             posterior=step_and_interpolate_from.step_from,
@@ -621,7 +683,7 @@ class ProbSolver:
             fun_evals=interp_to.fun_evals,
         )
 
-        interpolated = ProbSolution(
+        interpolated = ProbabilisticSolution(
             t=t,
             # New:
             posterior=interpolated,
@@ -633,7 +695,7 @@ class ProbSolver:
             fun_evals=interp_to.fun_evals,
         )
 
-        interp_from = ProbSolution(
+        interp_from = ProbabilisticSolution(
             t=t,
             # New:
             posterior=step_and_interpolate_from.interp_from,
@@ -649,14 +711,14 @@ class ProbSolver:
         return interpolated, interp_res
 
     def interpolate_at_t1(
-        self, *, t, interp_from: ProbSolution, interp_to: ProbSolution
+        self, *, t, interp_from: ProbabilisticSolution, interp_to: ProbabilisticSolution
     ):
         """Interpolate the solution near a checkpoint."""
         del t
         tmp = self.strategy.interpolate_at_t1(posterior_t1=interp_to.posterior)
         (estimate, interpolated), step_and_interpolate_from = tmp
 
-        prev = ProbSolution(
+        prev = ProbabilisticSolution(
             t=interp_to.t,
             # New
             posterior=step_and_interpolate_from.interp_from,
@@ -667,7 +729,7 @@ class ProbSolver:
             num_steps=interp_from.num_steps,  # incorrect?
             fun_evals=interp_from.fun_evals,
         )
-        sol = ProbSolution(
+        sol = ProbabilisticSolution(
             t=interp_to.t,
             # New:
             posterior=interpolated,
@@ -678,7 +740,7 @@ class ProbSolver:
             num_steps=interp_to.num_steps,
             fun_evals=interp_to.fun_evals,
         )
-        acc = ProbSolution(
+        acc = ProbabilisticSolution(
             t=interp_to.t,
             # New:
             posterior=step_and_interpolate_from.step_from,
@@ -788,6 +850,10 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
 
     Use this strategy for fixed steps.
     For adaptive steps, consider using a fixed-point smoother instead.
+
+
+    Related:
+    [`MarkovStrategy`](#probdiffeq.probdiffeq.MarkovStrategy).
     """
 
     def __init__(self, ssm):
@@ -932,6 +998,9 @@ class strategy_filter(MarkovStrategy):
     Filter solutions also do not admit computing log-marginal
     likelihoods or joint sampling from the posterior distribution.
     For these use-cases, use smoothers instead.
+
+    Related:
+    [`MarkovStrategy`](#probdiffeq.probdiffeq.MarkovStrategy).
     """
 
     def __init__(self, ssm):
@@ -1049,6 +1118,8 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
             url       = {https://proceedings.mlr.press/v271/kramer25a.html}
         }
         ```
+    Related:
+    [`MarkovStrategy`](#probdiffeq.probdiffeq.MarkovStrategy).
 
 
     """
@@ -1234,10 +1305,15 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         return (estimate, interpolated), interp_res
 
 
-class solver_mle(ProbSolver):
-    """Create a solver that uses maximum-likelihood calibration for the output scale."""
+class solver_mle(ProbabilisticSolver):
+    """Create a solver that uses maximum-likelihood calibration for the output scale.
 
-    def init(self, t, u) -> ProbSolution:
+    Related:
+    [`ProbabilisticSolver`](#probdiffeq.probdiffeq.ProbabilisticSolver).
+
+    """
+
+    def init(self, t, u) -> ProbabilisticSolution:
         estimate, posterior = self.strategy.init_posterior(u=u)
         correction_state = self.constraint.init_linearization()
 
@@ -1250,7 +1326,7 @@ class solver_mle(ProbSolver):
         )
         fun_evals = tree_util.tree_map(np.zeros_like, fun_evals)
         auxiliary = (correction_state, output_scale_running, 0)
-        return ProbSolution(
+        return ProbabilisticSolution(
             t=t,
             u=estimate,
             posterior=posterior,
@@ -1292,7 +1368,7 @@ class solver_mle(ProbSolver):
 
         # Return the state
         auxiliary = (correction_state, output_scale_running, num_data + 1)
-        return ProbSolution(
+        return ProbabilisticSolution(
             t=state.t + dt,
             u=u,
             posterior=posterior,
@@ -1303,8 +1379,8 @@ class solver_mle(ProbSolver):
         )
 
     def userfriendly_output(
-        self, *, solution0: ProbSolution, solution: ProbSolution
-    ) -> ProbSolution:
+        self, *, solution0: ProbabilisticSolution, solution: ProbabilisticSolution
+    ) -> ProbabilisticSolution:
         assert solution.t.ndim > 0
 
         # This is the MLE solver, so we take the calibrated scale
@@ -1320,7 +1396,7 @@ class solver_mle(ProbSolver):
 
         output_scale = ones * output_scale[None, ...]
         ts = np.concatenate([solution0.t[None], solution.t])
-        return ProbSolution(
+        return ProbabilisticSolution(
             t=ts,
             u=estimate,
             posterior=posterior,
@@ -1331,10 +1407,14 @@ class solver_mle(ProbSolver):
         )
 
 
-class solver_dynamic(ProbSolver):
-    """Create a solver that calibrates the output scale dynamically."""
+class solver_dynamic(ProbabilisticSolver):
+    """Create a solver that calibrates the output scale dynamically.
 
-    def init(self, t, u) -> ProbSolution:
+    Related:
+    [`ProbabilisticSolver`](#probdiffeq.probdiffeq.ProbabilisticSolver).
+    """
+
+    def init(self, t, u) -> ProbabilisticSolution:
         estimate, posterior = self.strategy.init_posterior(u=u)
         lin_state = self.constraint.init_linearization()
 
@@ -1346,7 +1426,7 @@ class solver_dynamic(ProbSolver):
         )
         fx = tree_util.tree_map(np.zeros_like, fx)
 
-        return ProbSolution(
+        return ProbabilisticSolution(
             t=t,
             u=estimate,
             posterior=posterior,
@@ -1356,7 +1436,7 @@ class solver_dynamic(ProbSolver):
             fun_evals=fx,
         )
 
-    def step(self, state: ProbSolution, *, dt: float, damp: float):
+    def step(self, state: ProbabilisticSolution, *, dt: float, damp: float):
         lin_state = state.auxiliary
 
         # Calibrate the output scale
@@ -1391,7 +1471,7 @@ class solver_dynamic(ProbSolver):
         u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
         # Return solution
-        return ProbSolution(
+        return ProbabilisticSolution(
             t=t,
             u=u,
             posterior=posterior,
@@ -1401,7 +1481,9 @@ class solver_dynamic(ProbSolver):
             fun_evals=fx0,  # return the initial linearization
         )
 
-    def userfriendly_output(self, *, solution: ProbSolution, solution0: ProbSolution):
+    def userfriendly_output(
+        self, *, solution: ProbabilisticSolution, solution0: ProbabilisticSolution
+    ):
         # This is the dynamic solver,
         # and all covariances have been calibrated already
         ones = np.ones_like(solution.output_scale)
@@ -1416,7 +1498,7 @@ class solver_dynamic(ProbSolver):
         # TODO: stack the calibrated output scales?
         output_scale = ones
         ts = np.concatenate([solution0.t[None], solution.t])
-        return ProbSolution(
+        return ProbabilisticSolution(
             t=ts,
             u=estimate,
             posterior=posterior,
@@ -1427,7 +1509,7 @@ class solver_dynamic(ProbSolver):
         )
 
 
-class solver(ProbSolver):
+class solver(ProbabilisticSolver):
     """Create a solver that does not calibrate the output scale automatically.
 
     This is the text-book implementation of probabilistic solvers.
@@ -1437,9 +1519,14 @@ class solver(ProbSolver):
     - In combination with diffusion tempering.
 
     See the tutorials for example applications.
+
+
+    Related:
+    [`ProbabilisticSolver`](#probdiffeq.probdiffeq.ProbabilisticSolver).
+
     """
 
-    def init(self, t: Array, u: TaylorCoeffTarget) -> ProbSolution:
+    def init(self, t: Array, u: TaylorCoeffTarget) -> ProbabilisticSolution:
         u, posterior = self.strategy.init_posterior(u=u)
         correction_state = self.constraint.init_linearization()
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
@@ -1449,7 +1536,7 @@ class solver(ProbSolver):
             f_wrapped, rv=u.marginals, state=correction_state, damp=0.0
         )
         fun_evals = tree_util.tree_map(np.zeros_like, fun_evals)
-        return ProbSolution(
+        return ProbabilisticSolution(
             t=t,
             u=u,
             posterior=posterior,
@@ -1459,7 +1546,7 @@ class solver(ProbSolver):
             fun_evals=fun_evals,
         )
 
-    def step(self, state: ProbSolution, *, dt, damp):
+    def step(self, state: ProbabilisticSolution, *, dt, damp):
         # Discretize
         output_scale = np.ones_like(state.output_scale)
         transition = self.prior(dt, output_scale)
@@ -1478,7 +1565,7 @@ class solver(ProbSolver):
         u, posterior = self.strategy.apply_updates(prediction, updates=reverted.noise)
 
         # Return solution
-        return ProbSolution(
+        return ProbabilisticSolution(
             t=state.t + dt,
             u=u,
             posterior=posterior,
@@ -1489,8 +1576,8 @@ class solver(ProbSolver):
         )
 
     def userfriendly_output(
-        self, *, solution0: ProbSolution, solution: ProbSolution
-    ) -> ProbSolution:
+        self, *, solution0: ProbabilisticSolution, solution: ProbabilisticSolution
+    ) -> ProbabilisticSolution:
         assert solution.t.ndim > 0
 
         # This is the uncalibrated solver, so scale=1
@@ -1506,7 +1593,7 @@ class solver(ProbSolver):
         output_scale = ones * output_scale[None, ...]
 
         ts = np.concatenate([solution0.t[None], solution.t])
-        return ProbSolution(
+        return ProbabilisticSolution(
             t=ts,
             u=u,
             posterior=posterior,
@@ -1518,7 +1605,13 @@ class solver(ProbSolver):
 
 
 class ErrorEstimator:
-    """An interface for error estimators in probabilistic solvers."""
+    """An interface for error estimators in probabilistic solvers.
+
+    Related:
+    [`errorest_local_residual`](#probdiffeq.probdiffeq.errorest_local_residual),
+    [`errorest_local_residual_cached`](#probdiffeq.probdiffeq.errorest_local_residual_cached).
+
+    """
 
     def init_errorest(self):
         """Initialize the error-estimation state."""
@@ -1527,8 +1620,8 @@ class ErrorEstimator:
     def estimate_error_norm(
         self,
         state: tuple,
-        previous: ProbSolution,
-        proposed: ProbSolution,
+        previous: ProbabilisticSolution,
+        proposed: ProbabilisticSolution,
         *,
         dt: float,
         atol: float,
@@ -1548,7 +1641,6 @@ class ErrorEstimator:
         raise NotImplementedError
 
 
-@containers.dataclass
 class errorest_local_residual_cached(ErrorEstimator):
     """Construct an error estimator based on a **cached** local residual.
 
@@ -1556,13 +1648,17 @@ class errorest_local_residual_cached(ErrorEstimator):
     again, but the linearisation from the step itself is reused.
 
     See the docstring of the non-cached version for more details.
+
+    Related:
+    [`ErrorEstimator`](#probdiffeq.probdiffeq.ErrorEstimator),
+    [`errorest_local_residual`](#probdiffeq.probdiffeq.errorest_local_residual).
+
     """
 
-    # Same as errorest_local_residual, but no additional
-    # vector field evaluations.
-    prior: Any
-    ssm: Any
-    norm_order: Any = None
+    def __init__(self, prior: Any, ssm: Any, norm_order: Any = None):
+        self.prior = prior
+        self.ssm = ssm
+        self.norm_order = norm_order
 
     def init_errorest(self) -> tuple:
         return ()
@@ -1570,8 +1666,8 @@ class errorest_local_residual_cached(ErrorEstimator):
     def estimate_error_norm(
         self,
         state: tuple,
-        previous: ProbSolution,
-        proposed: ProbSolution,
+        previous: ProbabilisticSolution,
+        proposed: ProbabilisticSolution,
         *,
         dt: float,
         atol: float,
@@ -1624,7 +1720,6 @@ class errorest_local_residual_cached(ErrorEstimator):
         return output_scale * error_estimate_unscaled
 
 
-@containers.dataclass
 class errorest_local_residual(ErrorEstimator):
     r"""Construct an error estimator based on a local residual.
 
@@ -1676,14 +1771,24 @@ class errorest_local_residual(ErrorEstimator):
             }
         ```
 
+    Related:
+    [`ErrorEstimator`](#probdiffeq.probdiffeq.ErrorEstimator).
 
     """
 
-    vector_field: Any
-    constraint: Constraint
-    prior: Any
-    ssm: Any
-    norm_order: Any = None
+    def __init__(
+        self,
+        vector_field: Any,
+        constraint: Constraint,
+        prior: Any,
+        ssm: Any,
+        norm_order: Any = None,
+    ):
+        self.vector_field = vector_field
+        self.constraint = constraint
+        self.prior = prior
+        self.ssm = ssm
+        self.norm_order = norm_order
 
     def init_errorest(self):
         return self.constraint.init_linearization()
@@ -1691,8 +1796,8 @@ class errorest_local_residual(ErrorEstimator):
     def estimate_error_norm(
         self,
         state,
-        previous: ProbSolution,
-        proposed: ProbSolution,
+        previous: ProbabilisticSolution,
+        proposed: ProbabilisticSolution,
         *,
         dt: float,
         atol: float,
