@@ -153,7 +153,7 @@ def loss_log_marginal_likelihood(vf, *, t0):
             tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
         )
         ts0 = probdiffeq.correction_ts0(lambda *a, **kw: vf(*a, **kw, p=p), ssm=ssm)
-        strategy = probdiffeq.strategy_smoother(ssm=ssm)
+        strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
         solver_ts0 = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
         # Solve

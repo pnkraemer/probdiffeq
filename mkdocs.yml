@@ -43,7 +43,7 @@ markdown_extensions:
   - admonition
   - toc:
       permalink: ¤
-      toc_depth: 3
+      toc_depth: 2
 extra_javascript:
   # Credit:
   #  https://github.com/patrick-kidger/diffrax
@@ -59,6 +59,12 @@ plugins:
           options:
             docstring_style: numpy
             show_signature_annotations: true
+            show_bases: false
+            show_source: true
+            inherited_members: true
+            merge_init_into_class: true
+            show_if_no_docstring: false
+            group_by_category: true
   - exclude:
       glob:
         - examples*/*.py
@@ -100,9 +106,8 @@ nav:
       - examples_benchmarks/taylor-init-pleiades.ipynb
       - examples_benchmarks/convergence-rates-lotka-volterra.ipynb
   - DOCUMENTATION | API:
+      - probdiffeq: api_docs/probdiffeq.md
       - ivpsolve: api_docs/ivpsolve.md
-      - ivpsolvers: api_docs/ivpsolvers.md
-      - stats: api_docs/stats.md
       - taylor: api_docs/taylor.md
       - impl: api_docs/impl.md
   - DOCUMENTATION | DEVELOPER:

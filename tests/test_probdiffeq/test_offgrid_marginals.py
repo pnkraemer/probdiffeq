@@ -89,7 +89,7 @@ def test_smoother_marginals_close_to_both_boundaries(fact):
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_smoother(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     grid = np.linspace(t0, t1, endpoint=True, num=5)

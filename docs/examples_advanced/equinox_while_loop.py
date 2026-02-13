@@ -43,7 +43,7 @@ def solution_routine(while_loop):
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="isotropic")
     ts0 = probdiffeq.correction_ts0(vf, ode_order=1, ssm=ssm)
 
-    strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
     solve_adaptive = ivpsolve.solve_adaptive_terminal_values(

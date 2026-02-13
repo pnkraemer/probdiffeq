@@ -11,8 +11,8 @@ def case_strategy_filter():
 
 
 @testing.case
-def case_strategy_fixedpoint():
-    return probdiffeq.strategy_fixedpoint
+def case_strategy_smoother_fixedpoint():
+    return probdiffeq.strategy_smoother_fixedpoint
 
 
 @testing.case

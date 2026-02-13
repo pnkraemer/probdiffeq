@@ -13,7 +13,7 @@ def test_output_matches_reference(fact):
     # This test here is only to assert that terminal-value simulation works.
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     init, iwp, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     constraint = probdiffeq.constraint_ode_ts0(ssm=ssm)
     solver = probdiffeq.solver_dynamic(
         vf, strategy=strategy, prior=iwp, constraint=constraint, ssm=ssm

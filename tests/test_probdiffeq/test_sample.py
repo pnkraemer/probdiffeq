@@ -13,7 +13,7 @@ def fixture_approximation_and_strategy(fact):
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 
     errorest = probdiffeq.errorest_local_residual(prior=ibm, correction=ts0, ssm=ssm)

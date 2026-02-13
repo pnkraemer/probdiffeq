@@ -83,8 +83,8 @@ def case_simulate_terminal_values(fact):
     "strategy_fun",
     [
         probdiffeq.strategy_filter,
-        probdiffeq.strategy_smoother,
-        probdiffeq.strategy_fixedpoint,
+        probdiffeq.strategy_smoother_fixedinterval,
+        probdiffeq.strategy_smoother_fixedpoint,
     ],
 )
 def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):

@@ -72,7 +72,7 @@ init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="dense"
 )
 ts1 = probdiffeq.correction_ts1(vector_field, ssm=ssm)
-strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
+strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 solver = probdiffeq.solver(strategy, prior=ibm, correction=ts1, ssm=ssm)
 errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts1, ssm=ssm)
 

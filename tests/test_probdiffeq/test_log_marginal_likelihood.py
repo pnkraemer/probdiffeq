@@ -14,7 +14,7 @@ def fixture_solution(fact):
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
 
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     errorest = probdiffeq.errorest_local_residual(prior=ibm, correction=ts0, ssm=ssm)
     save_at = np.linspace(t0, t1, endpoint=True, num=4)

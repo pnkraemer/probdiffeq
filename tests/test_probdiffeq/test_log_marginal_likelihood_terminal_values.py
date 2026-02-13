@@ -11,13 +11,13 @@ def case_strategy_filter():
 
 
 @testing.case()
-def case_strategy_smoother():
-    return probdiffeq.strategy_smoother
+def case_strategy_smoother_fixedinterval():
+    return probdiffeq.strategy_smoother_fixedinterval
 
 
 @testing.case()
-def case_strategy_fixedpoint():
-    return probdiffeq.strategy_fixedpoint
+def case_strategy_smoother_fixedpoint():
+    return probdiffeq.strategy_smoother_fixedpoint
 
 
 @testing.fixture(name="solution")

@@ -13,7 +13,7 @@ def test_warning_for_fixedpoint_in_save_every_step_mode(fact):
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
 
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=ibm, correction=ts0, ssm=ssm)
     errorest = probdiffeq.errorest_local_residual(prior=ibm, correction=ts0, ssm=ssm)
 
@@ -28,7 +28,7 @@ def test_warning_for_smoother_in_save_at_mode(fact):
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_smoother(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=ibm, correction=ts0, ssm=ssm)
     errorest = probdiffeq.errorest_local_residual(prior=ibm, correction=ts0, ssm=ssm)
     with testing.warns():

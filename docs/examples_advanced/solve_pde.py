@@ -48,7 +48,7 @@ def main():
 
     # Build a solver
     ts = probdiffeq.correction_ts1(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_fixedpoint(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_dynamic(
         ssm=ssm, strategy=strategy, prior=ibm, correction=ts
     )

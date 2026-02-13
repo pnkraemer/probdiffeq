@@ -43,10 +43,10 @@ init, iwp, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
 
 
 # Build a solver
-ts = probdiffeq.correction_ts1(vf, ssm=ssm, ode_order=1)
+ts = probdiffeq.constraint_ode_ts1(ssm=ssm, ode_order=1)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
-solver = probdiffeq.solver_mle(ssm=ssm, strategy=strategy, prior=iwp, correction=ts)
-errorest = probdiffeq.errorest_schober_bosch(prior=iwp, correction=ts, ssm=ssm)
+solver = probdiffeq.solver_mle(vf, ssm=ssm, strategy=strategy, prior=iwp, constraint=ts)
+errorest = probdiffeq.errorest_local_residual_cached(prior=iwp, ssm=ssm)
 
 
 # Solve the ODE
