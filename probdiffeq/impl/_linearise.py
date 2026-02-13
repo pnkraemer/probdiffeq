@@ -187,6 +187,60 @@ class BlockDiagTs0:
         return cond, None
 
 
+@containers.dataclass
+class BlockDiagTs1:
+    ode_order: int
+    unravel: Callable
+    jvp_probes_seed: int
+    jvp_probes: int
+
+    def init_linearization(self):
+        return random.prng_key(seed=self.jvp_probes_seed)
+
+    def linearize(self, fun, rv, state, *, damp: float):
+        key = state
+        mean = rv.mean
+
+        def a1(s):
+            return s[[self.ode_order], ...]
+
+        linop = functools.vmap(functools.jacrev(a1))(mean)
+
+        def vf_flat(u):
+            return tree_util.ravel_pytree(fun(unravel(u)))[0]
+
+        def select_0(s):
+            return tree_util.ravel_pytree(self.unravel(s)[0])
+
+        # Evaluate the linearisation
+        m0, unravel = select_0(rv.mean)
+        fx, Jvp = functools.linearize(vf_flat, m0)
+
+        key, subkey = random.split(key, num=2)
+        sample_shape = (self.jvp_probes, *m0.shape)
+        v = random.rademacher(subkey, shape=sample_shape, dtype=m0.dtype)
+        J_diag = functools.vmap(lambda s: s * Jvp(s))(v)
+        J_diag = J_diag.mean(axis=0)
+        E1 = functools.jacrev(lambda s: s[0])(rv.mean[0])
+        linop = linop - J_diag[:, None, None] * E1[None, None, :]
+
+        fx = rv.mean[:, 1] - fx
+        fx = fx[..., None]
+        diff = functools.vmap(lambda a, b: a @ b)(linop, rv.mean)
+        fx = fx - diff
+
+        d, *_ = linop.shape
+        cov_lower = damp * np.ones((d, 1, 1))
+        bias = _normal.Normal(fx, cov_lower)
+
+        to_latent = np.ones((linop.shape[2],))
+        to_observed = np.ones((linop.shape[1],))
+        cond = _conditional.LatentCond(
+            linop, bias, to_latent=to_latent, to_observed=to_observed
+        )
+        return cond, key
+
+
 class LinearisationBackend(abc.ABC):
     @abc.abstractmethod
     def ode_taylor_0th(self, ode_order: int) -> _Linearization:
@@ -404,58 +458,16 @@ class BlockDiagLinearisation(LinearisationBackend):
     def ode_taylor_0th(self, ode_order) -> _Linearization:
         return BlockDiagTs0(ode_order=ode_order, unravel=self.unravel)
 
-    def ode_taylor_1st(
-        self, ode_order, damp: float, jvp_probes: int, jvp_probes_seed: int
-    ):
+    def ode_taylor_1st(self, ode_order, jvp_probes: int, jvp_probes_seed: int):
         if ode_order > 1:
             raise ValueError
 
-        def init():
-            return random.prng_key(seed=jvp_probes_seed)
-
-        def step(fun, rv, key):
-            mean = rv.mean
-
-            def a1(s):
-                return s[[ode_order], ...]
-
-            linop = functools.vmap(functools.jacrev(a1))(mean)
-
-            def vf_flat(u):
-                return tree_util.ravel_pytree(fun(unravel(u)))[0]
-
-            def select_0(s):
-                return tree_util.ravel_pytree(self.unravel(s)[0])
-
-            # Evaluate the linearisation
-            m0, unravel = select_0(rv.mean)
-            fx, Jvp = functools.linearize(vf_flat, m0)
-
-            key, subkey = random.split(key, num=2)
-            sample_shape = (jvp_probes, *m0.shape)
-            v = random.rademacher(subkey, shape=sample_shape, dtype=m0.dtype)
-            J_diag = functools.vmap(lambda s: s * Jvp(s))(v)
-            J_diag = J_diag.mean(axis=0)
-            E1 = functools.jacrev(lambda s: s[0])(rv.mean[0])
-            linop = linop - J_diag[:, None, None] * E1[None, None, :]
-
-            fx = rv.mean[:, 1] - fx
-            fx = fx[..., None]
-            diff = functools.vmap(lambda a, b: a @ b)(linop, rv.mean)
-            fx = fx - diff
-
-            d, *_ = linop.shape
-            cov_lower = damp * np.ones((d, 1, 1))
-            bias = _normal.Normal(fx, cov_lower)
-
-            to_latent = np.ones((linop.shape[2],))
-            to_observed = np.ones((linop.shape[1],))
-            cond = _conditional.LatentCond(
-                linop, bias, to_latent=to_latent, to_observed=to_observed
-            )
-            return cond, key
-
-        return _Linearization(init, step)
+        return BlockDiagTs1(
+            ode_order=ode_order,
+            unravel=self.unravel,
+            jvp_probes_seed=jvp_probes_seed,
+            jvp_probes=jvp_probes,
+        )
 
     def ode_statistical_0th(self, cubature_fun, damp: float):
         raise NotImplementedError
