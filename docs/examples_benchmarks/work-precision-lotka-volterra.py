@@ -133,7 +133,7 @@ def setup_timeit(*, repeats: int) -> Callable:
     return timer
 
 
-def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Callable:
+def solver_probdiffeq(num_derivatives: int, implementation, constraint) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @jax.jit
@@ -146,27 +146,27 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
     u0 = jnp.asarray((20.0, 20.0))
     t0, t1 = (0.0, 50.0)
 
-    vf_auto = functools.partial(vf_probdiffeq, t=t0)
-    tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
-
-    init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-        tcoeffs, ssm_fact=implementation
-    )
-    strategy = probdiffeq.strategy_filter(ssm=ssm)
-    corr = correction(ssm=ssm)
-    solver = probdiffeq.solver_mle(
-        vf_probdiffeq, strategy=strategy, prior=ibm, constraint=corr, ssm=ssm
-    )
-    errorest = probdiffeq.errorest_schober_bosch_cached(prior=ibm, ssm=ssm)
-
-    control = ivpsolve.control_proportional_integral()
-    solve = ivpsolve.solve_adaptive_terminal_values(
-        errorest=errorest, solver=solver, control=control
-    )
-    dt0 = ivpsolve.dt0(vf_auto, (u0,))
-
     @jax.jit
     def param_to_solution(tol):
+        vf_auto = functools.partial(vf_probdiffeq, t=t0)
+        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
+
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
+            tcoeffs, ssm_fact=implementation
+        )
+        strategy = probdiffeq.strategy_filter(ssm=ssm)
+        corr = constraint(ssm=ssm)
+        solver = probdiffeq.solver_mle(
+            vf_probdiffeq, strategy=strategy, prior=ibm, constraint=corr, ssm=ssm
+        )
+        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+
+        control = ivpsolve.control_proportional_integral()
+        solve = ivpsolve.solve_adaptive_terminal_values(
+            errorest=errorest, solver=solver, control=control
+        )
+        dt0 = ivpsolve.dt0(vf_auto, (u0,))
+
         # Build a solver
         solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-2 * tol, rtol=tol)
 

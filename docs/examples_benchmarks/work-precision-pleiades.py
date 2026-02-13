@@ -191,30 +191,29 @@ def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
 
     t0, t1 = 0.0, 3.0
 
-    # Build a solver
-    vf_auto = functools.partial(vf_probdiffeq, t=t0)
-    tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
-
-    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="isotropic")
-    ts0_or_ts1 = constraint_ode_fun(vf_probdiffeq, ssm=ssm, ode_order=2)
-    strategy = probdiffeq.strategy_filter(ssm=ssm)
-    solver = probdiffeq.solver_dynamic(
-        strategy, prior=ibm, constraint=ts0_or_ts1, ssm=ssm
-    )
-    errorest = probdiffeq.errorest_local_residual_cached(
-        constraint=ts0_or_ts1, prior=ibm, ssm=ssm
-    )
-
-    control = ivpsolve.control_proportional_integral()
-    solve = ivpsolve.solve_adaptive_terminal_values(
-        solver=solver, errorest=errorest, control=control
-    )
-
-    # Solve
-    dt0 = ivpsolve.dt0(vf_auto, (u0, du0))
-
     @jax.jit
     def param_to_solution(tol):
+        # Build a solver
+        vf_auto = functools.partial(vf_probdiffeq, t=t0)
+        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
+
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
+            tcoeffs, ssm_fact="isotropic"
+        )
+        ts0_or_ts1 = constraint_ode_fun(ssm=ssm, ode_order=2)
+        strategy = probdiffeq.strategy_filter(ssm=ssm)
+        solver = probdiffeq.solver_dynamic(
+            vf_probdiffeq, strategy=strategy, prior=ibm, constraint=ts0_or_ts1, ssm=ssm
+        )
+        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+
+        control = ivpsolve.control_proportional_integral()
+        solve = ivpsolve.solve_adaptive_terminal_values(
+            solver=solver, errorest=errorest, control=control
+        )
+
+        # Solve
+        dt0 = ivpsolve.dt0(vf_auto, (u0, du0))
         solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-3 * tol, rtol=tol)
 
         # Return the terminal value

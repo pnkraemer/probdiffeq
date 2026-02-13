@@ -44,10 +44,10 @@ u0 = jnp.asarray([20.0, 20.0])
 # To all users: Try replacing the fixedpoint-smoother with a filter!
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
-ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
+ts = probdiffeq.constraint_ode_ts1(ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-solver = probdiffeq.solver_mle(strategy, prior=ibm, constraint=ts, ssm=ssm)
-errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, constraint=ts, ssm=ssm)
+solver = probdiffeq.solver_mle(vf, strategy=strategy, prior=ibm, constraint=ts, ssm=ssm)
+errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
 
 

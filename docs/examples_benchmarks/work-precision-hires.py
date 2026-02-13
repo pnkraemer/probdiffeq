@@ -156,27 +156,27 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     u0 = jnp.asarray([1.0, 0.0, 0.0, 0, 0, 0, 0, 0.0057])
     t0, t1 = jnp.asarray([0.0, 321.8122])
 
-    # Build a solver
-    vf_auto = functools.partial(vf_probdiffeq, t=t0)
-    tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
-    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
-    ts1 = probdiffeq.constraint_ode_ts1(vf_probdiffeq, ssm=ssm)
-    strategy = probdiffeq.strategy_filter(ssm=ssm)
-    solver = probdiffeq.solver_dynamic(strategy, prior=ibm, constraint=ts1, ssm=ssm)
-    errorest = probdiffeq.errorest_local_residual_cached(
-        prior=ibm, constraint=ts1, ssm=ssm
-    )
-
-    control = ivpsolve.control_proportional_integral()
-    solve = ivpsolve.solve_adaptive_terminal_values(
-        solver=solver, clip_dt=True, control=control, errorest=errorest
-    )
-
-    # Solve
-    dt0 = ivpsolve.dt0(vf_auto, (u0,))
-
     @jax.jit
     def param_to_solution(tol):
+        # Build a solver
+        vf_auto = functools.partial(vf_probdiffeq, t=t0)
+        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
+        ts1 = probdiffeq.constraint_ode_ts1(ssm=ssm)
+        strategy = probdiffeq.strategy_filter(ssm=ssm)
+        solver = probdiffeq.solver_dynamic(
+            vf_probdiffeq, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
+        )
+        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+
+        control = ivpsolve.control_proportional_integral()
+        solve = ivpsolve.solve_adaptive_terminal_values(
+            solver=solver, clip_dt=True, control=control, errorest=errorest
+        )
+
+        # Solve
+        dt0 = ivpsolve.dt0(vf_auto, (u0,))
+
         solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-2 * tol, rtol=tol)
 
         # Return the terminal value
