@@ -244,15 +244,32 @@ def dt0_adaptive(vf, initial_values, /, t0, *, error_contraction_rate, rtol, ato
 
 @tree_util.register_dataclass
 @containers.dataclass
-class TimeStepState:
+class TimeStepState(Generic[T]):
     """State for adaptive time-stepping."""
 
     dt: float
-    step_from: Any
-    interp_from: Any
+    """The time-step-size proposal for the next step."""
+
+    step_from: T
+    """Where to continue time-stepping from.
+
+    This is the right-hand side boundary of the current subinterval.
+    """
+
+    interp_from: T
+    """Where to continue interpolation from.
+
+    This is the left-hand side of the current subinterval.
+    """
+
     control: Any
+    """The controller state."""
+
     errorest_step_from: Any
+    """The error-estimate corresponding to 'step_from'."""
+
     errorest_interp_from: Any
+    """The error-estimate corresponding to 'interp_from'."""
 
 
 @tree_util.register_dataclass
@@ -278,15 +295,22 @@ class RejectionLoop:
     """Implement a rejection loop."""
 
     solver: Any
+    """The solver."""
 
-    clip_dt: bool = containers.dataclass_field(metadata={"static": True})
+    clip_dt: bool
     """Whether or not to clip the timestep before stepping."""
 
-    errorest: Any = containers.dataclass_field(metadata={"static": True})
+    errorest: Any
     """Error estimator."""
 
-    control: Any = containers.dataclass_field(metadata={"static": True})
-    while_loop: Callable = containers.dataclass_field(metadata={"static": True})
+    control: Any
+    """The controller."""
+
+    while_loop: Callable
+    """An implementation of a while-loop to be used for the rejection loop.
+
+    Change this to a bounded while loop to make the solvers reverse-differentiable.
+    """
 
     def init(self, state_solver, dt) -> TimeStepState:
         """Initialise the adaptive solver state."""
@@ -459,7 +483,7 @@ class _Controller(Generic[T]):
     """Initialise the controller state."""
 
     apply: Callable[[float, T, NamedArg(float, "error_power")], tuple[float, T]]
-    r"""Propose a time-step $\Delta t$."""
+    """Propose a time-step-size."""
 
 
 def control_proportional_integral(

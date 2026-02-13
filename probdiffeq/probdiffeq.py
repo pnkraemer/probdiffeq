@@ -31,34 +31,6 @@ C = TypeVar("C", bound=Sequence)
 T = TypeVar("T")
 
 
-# TODO: if we can't expose Normal() or Conditional() types
-#   from the implementation,
-#  maybe we can make these into protocols?
-
-
-# class VectorFieldHighOrder(Protocol[T]):
-
-#     def __call__(self, *ys: T, t: ArrayLike) -> T: ...
-
-
-# class VectorFieldFirstOrder(Protocol[T]):
-
-#     def __call__(self, y: T, /, *, t: ArrayLike) -> T: ...
-
-
-# VectorField: TypeAlias = VectorFieldHighOrder | VectorFieldFirstOrder
-# """The vector field API.
-
-# Any of the following are valid:
-
-# - `vf(u:T, /, *, t: ArrayLike)->T`
-# - `vf(u:T, du: T, /, *, t: ArrayLike)->T`
-# - `vf(u:T, du: T, ddu: T /, *, t: ArrayLike)->T`
-
-# and so on.
-# """
-
-
 class VectorField(Protocol[T]):
     """A protocol for the vector-field type expected by the solvers.
 
