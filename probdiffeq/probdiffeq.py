@@ -36,6 +36,49 @@ T = TypeVar("T")
 #  maybe we can make these into protocols?
 
 
+# class VectorFieldHighOrder(Protocol[T]):
+
+#     def __call__(self, *ys: T, t: ArrayLike) -> T: ...
+
+
+# class VectorFieldFirstOrder(Protocol[T]):
+
+#     def __call__(self, y: T, /, *, t: ArrayLike) -> T: ...
+
+
+# VectorField: TypeAlias = VectorFieldHighOrder | VectorFieldFirstOrder
+# """The vector field API.
+
+# Any of the following are valid:
+
+# - `vf(u:T, /, *, t: ArrayLike)->T`
+# - `vf(u:T, du: T, /, *, t: ArrayLike)->T`
+# - `vf(u:T, du: T, ddu: T /, *, t: ArrayLike)->T`
+
+# and so on.
+# """
+
+
+class VectorField(Protocol[T]):
+    """
+    Vector-field API.
+
+    Accepts one or more positional arguments of type T, plus a keyword-only
+    argument `t: ArrayLike`.
+
+    Examples of valid call signatures:
+
+    - vf(u: T, /, *, t: ArrayLike) -> T
+    - vf(u: T, du: T, /, *, t: ArrayLike) -> T
+    - vf(u: T, du: T, ddu: T, /, *, t: ArrayLike) -> T
+    - vf(u: T, du: T, ddu: T, dddy: T, /, *, t: ArrayLike) -> T
+
+    If a type-checker complains, try jitting the vector field.
+    """
+
+    def __call__(self, *ys: T, t: ArrayLike) -> T: ...
+
+
 @tree_util.register_dataclass
 @containers.dataclass
 class CubaturePositiveWeights:
@@ -541,7 +584,7 @@ class ProbabilisticSolver:
 
     def __init__(
         self,
-        vector_field: Callable,
+        vector_field: VectorField,
         *,
         strategy: MarkovStrategy,
         prior: Callable,
@@ -1414,6 +1457,23 @@ class solver_dynamic(ProbabilisticSolver):
     [`ProbabilisticSolver`](#probdiffeq.probdiffeq.ProbabilisticSolver).
     """
 
+    def __init__(
+        self,
+        vector_field: VectorField,
+        *,
+        strategy: MarkovStrategy,
+        prior: Callable,
+        constraint: Constraint,
+        ssm: Any,
+        re_linearize_after_calibration=False,
+    ):
+        self.ssm = ssm
+        self.vector_field = vector_field
+        self.strategy = strategy
+        self.prior = prior
+        self.constraint = constraint
+        self.re_linearize_after_calibration = re_linearize_after_calibration
+
     def init(self, t, u) -> ProbabilisticSolution:
         estimate, posterior = self.strategy.init_posterior(u=u)
         lin_state = self.constraint.init_linearization()
@@ -1445,14 +1505,12 @@ class solver_dynamic(ProbabilisticSolver):
         mean = self.ssm.stats.mean(state.u.marginals)
         u = self.ssm.conditional.apply(mean, transition)
 
-        t = state.t + dt
-
         # Linearize
-        f_wrapped = functools.partial(self.vector_field, t=t)
-        fx0, lin_state = self.constraint.linearize(
+        f_wrapped = functools.partial(self.vector_field, t=state.t + dt)
+        fx, lin_state = self.constraint.linearize(
             f_wrapped, u, state=lin_state, damp=damp
         )
-        observed = self.ssm.conditional.marginalise(u, fx0)
+        observed = self.ssm.conditional.marginalise(u, fx)
         output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
 
         # Do the full extrapolation with the calibrated output scale
@@ -1460,10 +1518,11 @@ class solver_dynamic(ProbabilisticSolver):
         transition = self.prior(dt, output_scale)
         u, prediction = self.strategy.predict(state.posterior, transition=transition)
 
-        # Relinearize (TODO: optional? Skip entirely?)
-        fx, lin_state = self.constraint.linearize(
-            f_wrapped, u.marginals, state=lin_state, damp=damp
-        )
+        # Relinearize
+        if self.re_linearize_after_calibration:
+            fx, lin_state = self.constraint.linearize(
+                f_wrapped, u.marginals, state=lin_state, damp=damp
+            )
 
         # Complete the update
         _, reverted = self.ssm.conditional.revert(u.marginals, fx)
@@ -1472,13 +1531,13 @@ class solver_dynamic(ProbabilisticSolver):
 
         # Return solution
         return ProbabilisticSolution(
-            t=t,
+            t=state.t + dt,
             u=u,
             posterior=posterior,
             num_steps=state.num_steps + 1,
             auxiliary=lin_state,
             output_scale=output_scale,
-            fun_evals=fx0,  # return the initial linearization
+            fun_evals=fx,  # return the initial linearization
         )
 
     def userfriendly_output(

@@ -26,6 +26,13 @@ def case_solver_mle():
 
 
 @testing.case
+def case_solver_dynamic_without_relinearization():
+    return functools.partial(
+        probdiffeq.solver_dynamic, re_linearize_after_calibration=False
+    )
+
+
+@testing.case
 def case_solver_dynamic():
     return probdiffeq.solver_dynamic
 

@@ -68,7 +68,7 @@ def solve(p):
     ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
     solver = probdiffeq.solver(
-        lambda y, t: vf(y, t, p=p),
+        jax.jit(lambda y, t: vf(y, t, p=p)),
         strategy=strategy,
         prior=ibm,
         constraint=ts0,

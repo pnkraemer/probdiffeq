@@ -32,6 +32,7 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 def solution_routine(while_loop):
     """Construct a parameter-to-solution function and an initial value."""
 
+    @jax.jit
     def vf(y, *, t):  # noqa: ARG001
         """Evaluate the vector field."""
         return 0.5 * y * (1 - y)
