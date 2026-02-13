@@ -41,6 +41,32 @@ def case_constraint_ode_ts1():
 
 
 @testing.case
+def case_constraint_ode_slr0():
+    def constraint(*args, **kwargs):
+        try:
+            return probdiffeq.constraint_ode_slr0(*args, **kwargs)
+        except NotImplementedError:
+            reason = "This linearisation is not implemented"
+            reason += ", likely due to the selected state-space factorisation."
+            testing.skip(reason)
+
+    return constraint
+
+
+@testing.case
+def case_constraint_ode_slr1():
+    def constraint(*args, **kwargs):
+        try:
+            return probdiffeq.constraint_ode_slr1(*args, **kwargs)
+        except NotImplementedError:
+            reason = "This linearisation is not implemented"
+            reason += ", likely due to the selected state-space factorisation."
+            testing.skip(reason)
+
+    return constraint
+
+
+@testing.case
 def case_errorest_local_residual_cached():
     def residual_wrapper(vector_field, constraint, **kw):
         del vector_field

@@ -884,7 +884,7 @@ def constraint_ode_ts0(ssm, ode_order=1) -> _Information:
 def constraint_ode_ts1(
     *, ssm, ode_order=1, jvp_probes=10, jvp_probes_seed=1
 ) -> _Information:
-    """First-order Taylor linearisation."""
+    """ODE constraint with first-order Taylor linearisation."""
     assert jvp_probes > 0
     return ssm.linearise.ode_taylor_1st(
         ode_order=ode_order, jvp_probes=jvp_probes, jvp_probes_seed=jvp_probes_seed
@@ -892,33 +892,17 @@ def constraint_ode_ts1(
 
 
 def constraint_ode_slr0(
-    vector_field, *, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0
+    *, ssm, cubature_fun=cubature_third_order_spherical
 ) -> _Information:
-    """Zeroth-order statistical linear regression."""
-    linearize = ssm.linearise.ode_statistical_0th(cubature_fun, damp=damp)
-    return _Information(
-        ssm=ssm,
-        vector_field=vector_field,
-        ode_order=1,
-        linearize=linearize,
-        name="SLR0",
-        re_linearize=True,
-    )
+    """ODE constraint with zeroth-order statistical linear regression."""
+    return ssm.linearise.ode_statistical_0th(cubature_fun)
 
 
 def constraint_ode_slr1(
-    vector_field, *, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0
+    *, ssm, cubature_fun=cubature_third_order_spherical
 ) -> _Information:
-    """First-order statistical linear regression."""
-    linearize = ssm.linearise.ode_statistical_1st(cubature_fun, damp=damp)
-    return _Information(
-        ssm=ssm,
-        vector_field=vector_field,
-        ode_order=1,
-        linearize=linearize,
-        name="SLR1",
-        re_linearize=True,
-    )
+    """ODE constraint with first-order statistical linear regression."""
+    return ssm.linearise.ode_statistical_1st(cubature_fun)
 
 
 @containers.dataclass
