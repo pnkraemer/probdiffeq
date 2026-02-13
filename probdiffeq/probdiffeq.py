@@ -880,28 +880,18 @@ def constraint_ode_ts0(ssm, ode_order=1) -> _Information:
     return ssm.linearise.ode_taylor_0th(ode_order=ode_order)
 
 
-def correction_ts1(
-    *, ssm, ode_order=1, damp: float = 0.0, jvp_probes=10, jvp_probes_seed=1
+# TODO: expose a "jacobian" option to choose between fwd and rev mode
+def constraint_ode_ts1(
+    *, ssm, ode_order=1, jvp_probes=10, jvp_probes_seed=1
 ) -> _Information:
     """First-order Taylor linearisation."""
     assert jvp_probes > 0
     return ssm.linearise.ode_taylor_1st(
-        ode_order=ode_order,
-        damp=damp,
-        jvp_probes=jvp_probes,
-        jvp_probes_seed=jvp_probes_seed,
-    )
-    return _Information(
-        name="TS1",
-        vector_field=vector_field,
-        ode_order=ode_order,
-        ssm=ssm,
-        linearize=linearize,
-        re_linearize=False,
+        ode_order=ode_order, jvp_probes=jvp_probes, jvp_probes_seed=jvp_probes_seed
     )
 
 
-def correction_slr0(
+def constraint_ode_slr0(
     vector_field, *, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0
 ) -> _Information:
     """Zeroth-order statistical linear regression."""
@@ -916,7 +906,7 @@ def correction_slr0(
     )
 
 
-def correction_slr1(
+def constraint_ode_slr1(
     vector_field, *, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0
 ) -> _Information:
     """First-order statistical linear regression."""

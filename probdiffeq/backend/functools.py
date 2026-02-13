@@ -36,5 +36,9 @@ def jacrev(func):
     return jax.jacrev(func)
 
 
+def jacfwd(func):
+    return jax.jacfwd(func)
+
+
 def grad(func):
     return jax.grad(func)

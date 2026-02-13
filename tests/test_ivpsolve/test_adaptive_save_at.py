@@ -36,8 +36,8 @@ def case_constraint_ode_ts0():
 
 
 @testing.case
-def case_correction_ts1():
-    return probdiffeq.correction_ts1
+def case_constraint_ode_ts1():
+    return probdiffeq.constraint_ode_ts1
 
 
 @testing.case

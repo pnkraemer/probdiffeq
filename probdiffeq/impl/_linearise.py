@@ -42,6 +42,40 @@ class DenseTs0:
 
 
 @containers.dataclass
+class DenseTs1:
+    ode_order: int
+    ode_shape: tuple
+    unravel: Callable
+
+    def init_linearization(self):
+        return None
+
+    def linearize(self, fun, rv, state: None, *, damp: float):
+        del state
+        mean = rv.mean
+
+        # TODO: expose this function somehow. This way, we can
+        #       implement custom information operators easily.
+        def constraint(m):
+            a1 = tree_util.ravel_pytree(self.unravel(m)[self.ode_order])[0]
+            a0 = tree_util.ravel_pytree(fun(*self.unravel(m)[: self.ode_order]))[0]
+            return a1 - a0
+
+        fx = constraint(mean)
+        linop = functools.jacfwd(constraint)(mean)  # todo: fwd or rev?
+        fx = fx - linop @ mean
+
+        cov_lower = damp * np.eye(len(fx))
+        bias = _normal.Normal(fx, cov_lower)
+        to_latent = np.ones(linop.shape[1])
+        to_observed = np.ones(linop.shape[0])
+        cond = _conditional.LatentCond(
+            linop, bias, to_latent=to_latent, to_observed=to_observed
+        )
+        return cond, None
+
+
+@containers.dataclass
 class IsotropicTs0:
     ode_order: int
     unravel: Callable
@@ -68,6 +102,58 @@ class IsotropicTs0:
             linop, bias, to_latent=to_latent, to_observed=to_observed
         )
         return cond, None
+
+
+@containers.dataclass
+class IsotropicTs1:
+    ode_order: int
+    unravel: Callable
+    jvp_probes: int
+    jvp_probes_seed: int
+
+    def init_linearization(self):
+        return random.prng_key(seed=self.jvp_probes_seed)
+
+    def linearize(self, fun, rv, state, *, damp: float):
+        key = state
+        mean = rv.mean
+
+        def a1(m):
+            return m[[self.ode_order], ...]
+
+        linop = functools.jacrev(a1)(mean[..., 0])
+
+        def vf_flat(u):
+            return tree_util.ravel_pytree(fun(unravel(u)))[0]
+
+        def select_0(s):
+            return tree_util.ravel_pytree(self.unravel(s)[0])
+
+        # Evaluate the linearisation
+        m0, unravel = select_0(rv.mean)
+        fx, Jvp = functools.linearize(vf_flat, m0)
+
+        # Estimate the trace using Hutchinson's estimator
+        # J_trace, jacobian_state = jacobian(Jvp, m0, jacobian_state)
+        key, subkey = random.split(key, num=2)
+        sample_shape = (self.jvp_probes, *m0.shape)
+        v = random.rademacher(subkey, shape=sample_shape, dtype=m0.dtype)
+        J_trace = functools.vmap(lambda s: linalg.vector_dot(s, Jvp(s)))(v)
+        J_trace = J_trace.mean(axis=0)
+
+        # Turn fx and J_trace into an observation model
+        E0 = functools.jacrev(lambda s: s[[0], ...])(mean[..., 0])
+        linop = linop - J_trace * E0
+        fx = mean[1, ...] - fx
+        fx = fx - linop @ mean
+        cov_lower = damp * np.eye(1)
+        bias = _normal.Normal(fx, cov_lower)
+        to_latent = np.ones((linop.shape[1],))
+        to_observed = np.ones((linop.shape[0],))
+        cond = _conditional.LatentCond(
+            linop, bias, to_latent=to_latent, to_observed=to_observed
+        )
+        return cond, key
 
 
 @containers.dataclass
@@ -130,39 +216,13 @@ class DenseLinearisation(LinearisationBackend):
         )
 
     def ode_taylor_1st(
-        self, ode_order, damp, jvp_probes: int, jvp_probes_seed: int
+        self, ode_order, jvp_probes: int, jvp_probes_seed: int
     ) -> _Linearization:
         del jvp_probes
         del jvp_probes_seed
-
-        def init():
-            return None
-
-        def step(fun, rv, state):
-            del state
-            mean = rv.mean
-
-            # TODO: expose this function somehow. This way, we can
-            #       implement custom information operators easily.
-            def constraint(m):
-                a1 = tree_util.ravel_pytree(self.unravel(m)[ode_order])[0]
-                a0 = tree_util.ravel_pytree(fun(*self.unravel(m)[:ode_order]))[0]
-                return a1 - a0
-
-            fx = constraint(mean)
-            linop = functools.jacrev(constraint)(mean)
-            fx = fx - linop @ mean
-
-            cov_lower = damp * np.eye(len(fx))
-            bias = _normal.Normal(fx, cov_lower)
-            to_latent = np.ones(linop.shape[1])
-            to_observed = np.ones(linop.shape[0])
-            cond = _conditional.LatentCond(
-                linop, bias, to_latent=to_latent, to_observed=to_observed
-            )
-            return cond, None
-
-        return _Linearization(init, step)
+        return DenseTs1(
+            ode_order=ode_order, ode_shape=self.ode_shape, unravel=self.unravel
+        )
 
     def ode_statistical_1st(self, cubature_fun, damp: float) -> _Linearization:
         cubature_rule = cubature_fun(input_shape=self.ode_shape)
@@ -317,56 +377,15 @@ class IsotropicLinearisation(LinearisationBackend):
     def __init__(self, unravel):
         self.unravel = unravel
 
-    def ode_taylor_1st(
-        self, ode_order, damp: float, jvp_probes: int, jvp_probes_seed: int
-    ):
+    def ode_taylor_1st(self, ode_order, jvp_probes: int, jvp_probes_seed: int):
         if ode_order > 1:
             raise ValueError
-
-        def init():
-            return random.prng_key(seed=jvp_probes_seed)
-
-        def step(fun, rv, key):
-            mean = rv.mean
-
-            def a1(m):
-                return m[[ode_order], ...]
-
-            linop = functools.jacrev(a1)(mean[..., 0])
-
-            def vf_flat(u):
-                return tree_util.ravel_pytree(fun(unravel(u)))[0]
-
-            def select_0(s):
-                return tree_util.ravel_pytree(self.unravel(s)[0])
-
-            # Evaluate the linearisation
-            m0, unravel = select_0(rv.mean)
-            fx, Jvp = functools.linearize(vf_flat, m0)
-
-            # Estimate the trace using Hutchinson's estimator
-            # J_trace, jacobian_state = jacobian(Jvp, m0, jacobian_state)
-            key, subkey = random.split(key, num=2)
-            sample_shape = (jvp_probes, *m0.shape)
-            v = random.rademacher(subkey, shape=sample_shape, dtype=m0.dtype)
-            J_trace = functools.vmap(lambda s: linalg.vector_dot(s, Jvp(s)))(v)
-            J_trace = J_trace.mean(axis=0)
-
-            # Turn fx and J_trace into an observation model
-            E0 = functools.jacrev(lambda s: s[[0], ...])(mean[..., 0])
-            linop = linop - J_trace * E0
-            fx = mean[1, ...] - fx
-            fx = fx - linop @ mean
-            cov_lower = damp * np.eye(1)
-            bias = _normal.Normal(fx, cov_lower)
-            to_latent = np.ones((linop.shape[1],))
-            to_observed = np.ones((linop.shape[0],))
-            cond = _conditional.LatentCond(
-                linop, bias, to_latent=to_latent, to_observed=to_observed
-            )
-            return cond, key
-
-        return _Linearization(init, step)
+        return IsotropicTs1(
+            ode_order=ode_order,
+            unravel=self.unravel,
+            jvp_probes=jvp_probes,
+            jvp_probes_seed=jvp_probes_seed,
+        )
 
     def ode_taylor_0th(self, ode_order) -> _Linearization:
         return IsotropicTs0(ode_order=ode_order, unravel=self.unravel)
