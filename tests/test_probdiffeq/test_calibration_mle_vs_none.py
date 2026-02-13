@@ -17,12 +17,12 @@ def case_solve_fixed_grid(fact):
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
+    ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
     grid = np.linspace(t0, t1, endpoint=True, num=5)
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
-        solver = solver_fun(strategy, prior=ibm, correction=ts0, ssm=ssm)
+        solver = solver_fun(vf, strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
         solve = ivpsolve.solve_fixed_grid(solver=solver)
         return solve(init, grid=grid)
 
@@ -38,15 +38,13 @@ def case_solve_adaptive_save_at(fact):
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
+    ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
     save_at = np.linspace(t0, t1, endpoint=True, num=5)
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
-        solver = solver_fun(strategy, prior=ibm, correction=ts0, ssm=ssm)
-        errorest = probdiffeq.errorest_local_residual(
-            prior=ibm, correction=ts0, ssm=ssm
-        )
+        solver = solver_fun(vf, strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
+        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
         solve = ivpsolve.solve_adaptive_save_at(errorest=errorest, solver=solver)
         return solve(init, save_at=save_at, dt0=dt0, atol=1e-2, rtol=1e-2)
 
@@ -61,14 +59,12 @@ def case_simulate_terminal_values(fact):
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
+    ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
-        solver = solver_fun(strategy=strategy, prior=ibm, correction=ts0, ssm=ssm)
-        errorest = probdiffeq.errorest_local_residual(
-            prior=ibm, correction=ts0, ssm=ssm
-        )
+        solver = solver_fun(vf, strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
+        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
         solve = ivpsolve.solve_adaptive_terminal_values(
             errorest=errorest, solver=solver
         )

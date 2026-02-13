@@ -16,8 +16,10 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = probdiffeq.errorest_local_residual(prior=ibm, correction=ts0, ssm=ssm)
+    solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
+    errorest = probdiffeq.errorest_local_residual_cached(
+        prior=ibm, constraint=ts0, ssm=ssm
+    )
 
     # Compute an adaptive solution and interpolate
     ts = np.linspace(t0, t1, num=15, endpoint=True)
@@ -61,7 +63,7 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
-    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    solver = probdiffeq.solver(strategy, prior=ibm, constraint=ts0, ssm=ssm)
     grid = np.linspace(t0, t1, endpoint=True, num=5)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
     sol = solve(init, grid=grid)
@@ -90,7 +92,7 @@ def test_smoother_marginals_close_to_both_boundaries(fact):
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    solver = probdiffeq.solver(strategy, prior=ibm, constraint=ts0, ssm=ssm)
 
     grid = np.linspace(t0, t1, endpoint=True, num=5)
     solve = ivpsolve.solve_fixed_grid(solver=solver)

@@ -14,9 +14,11 @@ def fixture_approximation_and_strategy(fact):
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    solver = probdiffeq.solver(strategy, prior=ibm, constraint=ts0, ssm=ssm)
 
-    errorest = probdiffeq.errorest_local_residual(prior=ibm, correction=ts0, ssm=ssm)
+    errorest = probdiffeq.errorest_local_residual_cached(
+        prior=ibm, constraint=ts0, ssm=ssm
+    )
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
     save_at = np.linspace(t0, t1, endpoint=True, num=7)
     sol = functools.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)

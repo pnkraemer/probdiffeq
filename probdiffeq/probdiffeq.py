@@ -425,7 +425,7 @@ class MarkovStrategy(Generic[T]):
 @tree_util.register_dataclass
 @containers.dataclass
 class ProbDiffEqSolution(Generic[C, T]):
-    """A datastructure for describing the probabilistic solution of a differential equation."""
+    """A datastructure for probabilistic solutions of differential equations."""
 
     t: Array
     """The current time-step."""
@@ -452,7 +452,7 @@ class ProbDiffEqSolution(Generic[C, T]):
 
     fun_evals: Any
     """Function evaluations.
-    
+
     Used to cache observation models between solver steps
     and error estimates.
     """
@@ -728,14 +728,14 @@ class _InterpRes(Generic[T]):
     At time `t`. Use this as the left-most reference state
     in future interpolations.
 
-    The difference between `interpolated` and `interp_from` 
+    The difference between `interpolated` and `interp_from`
     is important around checkpoints:
-    
+
     - `interpolated` belongs to the just-concluded time interval,
     - `interp_from` belongs to the to-be-started time interval.
-    
+
     Concretely, this means that for fixed-point smoothers,
-    `interp_from` has a unit backward model whereas `interpolated` 
+    `interp_from` has a unit backward model whereas `interpolated`
     remembers how to step back to the previous target location.
     """
 
@@ -1428,6 +1428,14 @@ class ErrorEstimator:
 
 @containers.dataclass
 class errorest_local_residual_cached(ErrorEstimator):
+    """Construct an error estimator based on a **cached** local residual.
+
+    'Cached' refers to the fact that the vector field is not evaluated
+    again, but the linearisation from the step itself is reused.
+
+    See the docstring of the non-cached version for more details.
+    """
+
     # Same as errorest_local_residual, but no additional
     # vector field evaluations.
     prior: Any
@@ -1449,6 +1457,7 @@ class errorest_local_residual_cached(ErrorEstimator):
         damp: float,
     ) -> tuple[float, tuple]:
         del damp  # unused because no additional linearisation
+        del state  # unused because state-free method
 
         # Discretize; The output scale is set to one
         # since the error is multiplied with a local scale estimate anyway
@@ -1458,9 +1467,7 @@ class errorest_local_residual_cached(ErrorEstimator):
         # Estimate the error
         mean = self.ssm.stats.mean(previous.u.marginals)
         mean_extra = self.ssm.conditional.apply(mean, transition)
-        error = self._linearize_and_estimate(
-            mean_extra, t=proposed.t, linearized=proposed.fun_evals
-        )
+        error = self._linearize_and_estimate(mean_extra, linearized=proposed.fun_evals)
 
         # Compute a reference
         u0 = tree_util.tree_leaves(previous.u.mean)[0]
@@ -1486,18 +1493,68 @@ class errorest_local_residual_cached(ErrorEstimator):
         error_power = error_norm ** (-1.0 / error_contraction_rate)
         return error_power, ()
 
-    def _linearize_and_estimate(self, rv, /, t, *, linearized):
+    def _linearize_and_estimate(self, rv, /, *, linearized):
         observed = self.ssm.conditional.marginalise(rv, linearized)
         output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
         stdev = self.ssm.stats.standard_deviation(observed)
 
         error_estimate_unscaled = np.squeeze(stdev)
-        error_estimate = output_scale * error_estimate_unscaled
-        return error_estimate
+        return output_scale * error_estimate_unscaled
 
 
 @containers.dataclass
 class errorest_local_residual(ErrorEstimator):
+    r"""Construct an error estimator based on a local residual.
+
+    This is the common error estimate, proposed by Schober et al. (2019) and
+    further developed by Bosch et al. (2021) and
+    then by Krämer, Bosch, and Schmidt et al. (2022).
+
+
+    ??? note "BibTex for Schober et al. (2019)"
+        ```bibtex
+        @article{schober2019probabilistic,
+            title={A probabilistic model for the numerical
+            solution of initial value problems},
+            author={Schober, Michael and S{\"a}rkk{\"a}, Simo and Hennig, Philipp},
+            journal={Statistics and Computing},
+            volume={29},
+            number={1},
+            pages={99--122},
+            year={2019},
+            publisher={Springer}
+        }
+        ```
+
+    ??? note "BibTex for Bosch et al. (2021)"
+        ```bibtex
+            @inproceedings{bosch2021calibrated,
+                title={Calibrated adaptive probabilistic ODE solvers},
+                author={Bosch, Nathanael and Hennig, Philipp and Tronarp, Filip},
+                booktitle={International Conference on
+                Artificial Intelligence and Statistics},
+                pages={3466--3474},
+                year={2021},
+                organization={PMLR}
+            }
+        ```
+
+    ??? note "BibTex for Krämer, Bosch, and Schmidt et al. (2022)"
+        ```bibtex
+            @inproceedings{kramer2022probabilistic,
+                title={Probabilistic ODE solutions in millions of dimensions},
+                author={Kr{\"a}mer, Nicholas and Bosch, Nathanael and
+                Schmidt, Jonathan and Hennig, Philipp},
+                booktitle={International Conference on Machine Learning},
+                pages={11634--11649},
+                year={2022},
+                organization={PMLR}
+            }
+        ```
+
+
+    """
+
     vector_field: Any
     constraint: Constraint
     prior: Any

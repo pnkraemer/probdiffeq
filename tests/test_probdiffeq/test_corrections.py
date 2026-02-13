@@ -47,8 +47,10 @@ def fixture_solution(correction_impl, fact):
         testing.skip(reason="This type of linearisation has not been implemented.")
 
     strategy = probdiffeq.strategy_filter(ssm=ssm)
-    solver = probdiffeq.solver_mle(strategy, prior=ibm, correction=corr, ssm=ssm)
-    errorest = probdiffeq.errorest_local_residual(prior=ibm, correction=corr, ssm=ssm)
+    solver = probdiffeq.solver_mle(strategy, prior=ibm, constraint=corr, ssm=ssm)
+    errorest = probdiffeq.errorest_local_residual_cached(
+        prior=ibm, constraint=corr, ssm=ssm
+    )
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, errorest=errorest)
     return solve(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2)
 

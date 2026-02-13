@@ -24,11 +24,7 @@ T = TypeVar("T")
 
 
 class Solution(Protocol[T]):
-    """An IVP solution protocol.
-
-    This means that all IVP solutions returned by the present
-    solvers have the following fields.
-    """
+    """An IVP solution protocol."""
 
     t: Array
     u: T
@@ -40,6 +36,8 @@ class Solution(Protocol[T]):
 
 
 class Solver(Protocol[T]):
+    """An IVP solver protocol."""
+
     init: Callable[[ArrayLike, T], Solution[T]]
     step: Callable[[Solution[T]], Solution[T]]
 
@@ -112,7 +110,7 @@ def solve_adaptive_save_at(
     if control is None:
         control = control_proportional_integral()
 
-    loop = RejectionLoop(
+    loop = _RejectionLoop(
         solver=solver,
         clip_dt=clip_dt,
         control=control,
@@ -269,7 +267,7 @@ class _RejectionLoopState:
 
 
 @containers.dataclass
-class RejectionLoop:
+class _RejectionLoop:
     """Implement a rejection loop."""
 
     solver: Any
