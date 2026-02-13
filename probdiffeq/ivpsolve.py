@@ -1,6 +1,13 @@
 """Routines for estimating solutions of initial value problems."""
 
-from probdiffeq.backend import containers, control_flow, linalg, tree_util, warnings
+from probdiffeq.backend import (
+    containers,
+    control_flow,
+    functools,
+    linalg,
+    tree_util,
+    warnings,
+)
 from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import (
     Any,
@@ -51,9 +58,13 @@ def solve_adaptive_terminal_values(
         while_loop=while_loop,
     )
 
-    def solve(u: T, /, *, t0, t1, atol, rtol, dt0=0.1, eps=1e-8) -> Solution[T]:
+    def solve(
+        u: T, /, *, t0, t1, atol, rtol, dt0=0.1, eps=1e-8, damp=0.0
+    ) -> Solution[T]:
         save_at = np.asarray([t0, t1])
-        solution = solver(u, save_at=save_at, atol=atol, rtol=rtol, dt0=dt0, eps=eps)
+        solution = solver(
+            u, save_at=save_at, atol=atol, rtol=rtol, dt0=dt0, eps=eps, damp=damp
+        )
         return tree_util.tree_map(lambda s: s[-1], solution)
 
     return solve
@@ -109,7 +120,9 @@ def solve_adaptive_save_at(
         while_loop=while_loop,
     )
 
-    def solve(u: T, save_at: Array, atol: float, rtol: float, dt0=0.1, eps=1e-8):
+    def solve(
+        u: T, save_at: Array, atol: float, rtol: float, dt0=0.1, eps=1e-8, damp=0.0
+    ):
         def advance(sol_and_state: tuple, t_next) -> tuple[tuple, Any]:
             """Advance the adaptive solver to the next checkpoint.
 
@@ -129,7 +142,7 @@ def solve_adaptive_save_at(
 
             def body_fun(state: AdvanceState) -> AdvanceState:
                 solution, state_new = loop.loop(
-                    state.loopstate, t1=t_next, atol=atol, rtol=rtol, eps=eps
+                    state.loopstate, t1=t_next, atol=atol, rtol=rtol, eps=eps, damp=damp
                 )
                 do_continue = state_new.step_from.t + eps < t_next
                 return AdvanceState(do_continue, solution, state_new)
@@ -284,7 +297,7 @@ class RejectionLoop:
         )
 
     def loop(
-        self, state0: _TimeStepState, *, t1, atol, rtol, eps
+        self, state0: _TimeStepState, *, t1, atol, rtol, eps, damp
     ) -> tuple[Any, _TimeStepState]:
         """Repeatedly attempt a step until the controller is happy.
 
@@ -295,7 +308,7 @@ class RejectionLoop:
         """
         # If t1 is in the future, enter the rejection loop (otherwise do nothing)
         is_before_t1 = state0.step_from.t + eps < t1
-        args = (state0, t1, atol, rtol)
+        args = (state0, t1, atol, rtol, damp)
         state = control_flow.cond(is_before_t1, self.step, lambda s: s[0], args)
 
         # Interpolate
@@ -305,21 +318,22 @@ class RejectionLoop:
         options = (self.interp_skip, self.interp_beyond_t1, self.interp_at_t1)
         return control_flow.switch(branch_idx, options, (state, t1))
 
-    def step(self, s_and_t1_and_tols):
+    def step(self, s_and_t1_and_tols_and_damp):
         """Do a rejection-loop step.
 
         Keep attempting steps until one is accepted.
         """
-        s, t1, atol, rtol = s_and_t1_and_tols
+        s, t1, atol, rtol, damp = s_and_t1_and_tols_and_damp
 
         def cond(state: _RejectionLoopState) -> bool:
             # error_norm_proposed is EEst ** (-1/rate), thus "<"
             return state.error_norm_proposed < 1.0
 
         init = self.step_init_loopstate(s)
-        state_new = self.while_loop(
-            cond, lambda x: self.step_attempt(x, t1=t1, atol=atol, rtol=rtol), init
+        step_attempt = functools.partial(
+            self.step_attempt, t1=t1, atol=atol, rtol=rtol, damp=damp
         )
+        state_new = self.while_loop(cond, step_attempt, init)
         return self.step_extract_timestepstate(state_new)
 
     def step_init_loopstate(self, s0: _TimeStepState) -> _RejectionLoopState:
@@ -340,7 +354,7 @@ class RejectionLoop:
         )
 
     def step_attempt(
-        self, state: _RejectionLoopState, *, t1, atol, rtol
+        self, state: _RejectionLoopState, *, t1, atol, rtol, damp
     ) -> _RejectionLoopState:
         """Attempt a step.
 
@@ -355,7 +369,7 @@ class RejectionLoop:
             dt = np.minimum(dt, t1 - state.step_from.t)
 
         # Perform the actual step.
-        state_proposed = self.solver.step(state=state.step_from, dt=dt)
+        state_proposed = self.solver.step(state=state.step_from, dt=dt, damp=damp)
 
         error_power, errorstate = self.errorest.estimate_error_norm(
             state.errorest_step_from,
@@ -364,6 +378,7 @@ class RejectionLoop:
             dt=dt,
             atol=atol,
             rtol=rtol,
+            damp=damp,
         )
 
         # Propose a new step

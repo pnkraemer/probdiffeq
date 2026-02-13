@@ -28,10 +28,10 @@ def fixture_solution(strategy_func, fact):
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
+    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = strategy_func(ssm=ssm)
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
+    errorest = probdiffeq.errorest_local_residual(prior=ibm, correction=ts0, ssm=ssm)
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, errorest=errorest)
     sol = solve(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2)
     return sol, strategy

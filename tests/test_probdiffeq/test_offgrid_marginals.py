@@ -14,10 +14,10 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     # Generate a solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
+    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
+    errorest = probdiffeq.errorest_local_residual(prior=ibm, correction=ts0, ssm=ssm)
 
     # Compute an adaptive solution and interpolate
     ts = np.linspace(t0, t1, num=15, endpoint=True)
@@ -59,7 +59,7 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
 
     tcoeffs = (u0, vf(u0, t=t0))
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
+    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
     grid = np.linspace(t0, t1, endpoint=True, num=5)
@@ -88,7 +88,7 @@ def test_smoother_marginals_close_to_both_boundaries(fact):
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
+    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_smoother(ssm=ssm)
     solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
 

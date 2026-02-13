@@ -10,28 +10,112 @@ class _Linearization:
     """Linearisation API."""
 
     init: Callable
-    update: Callable
+    apply: Callable
+
+
+@containers.dataclass
+class DenseTs0:
+    ode_order: int
+    ode_shape: tuple
+    unravel: Callable
+
+    def init_linearization(self):
+        return None
+
+    def linearize(self, fun, rv, state: None, *, damp: float):
+        del state
+
+        def a1(m):
+            """Select the 'n'-th derivative."""
+            return tree_util.ravel_pytree(self.unravel(m)[self.ode_order])[0]
+
+        fx = tree_util.ravel_pytree(fun(*self.unravel(rv.mean)[: self.ode_order]))[0]
+        linop = functools.jacrev(a1)(rv.mean)
+        cov_lower = damp * np.eye(len(fx))
+        bias = _normal.Normal(-fx, cov_lower)
+        to_latent = np.ones(linop.shape[1])
+        to_observed = np.ones(linop.shape[0])
+        cond = _conditional.LatentCond(
+            linop, bias, to_latent=to_latent, to_observed=to_observed
+        )
+        return cond, None
+
+
+@containers.dataclass
+class IsotropicTs0:
+    ode_order: int
+    unravel: Callable
+
+    def init_linearization(self):
+        return None
+
+    def linearize(self, fun, rv, state: None, *, damp: float):
+        del state
+        mean = rv.mean
+
+        def a1(m):
+            return m[[self.ode_order], ...]
+
+        linop = functools.jacrev(a1)(mean[..., 0])
+        fx = tree_util.ravel_pytree(fun(*self.unravel(mean)[: self.ode_order]))[0]
+
+        cov_lower = damp * np.eye(1)
+        bias = _normal.Normal(-fx, cov_lower)
+
+        to_latent = np.ones((linop.shape[1],))
+        to_observed = np.ones((linop.shape[0],))
+        cond = _conditional.LatentCond(
+            linop, bias, to_latent=to_latent, to_observed=to_observed
+        )
+        return cond, None
+
+
+@containers.dataclass
+class BlockDiagTs0:
+    ode_order: int
+    unravel: Callable
+
+    def init_linearization(self) -> None:
+        return None
+
+    def linearize(self, fun, rv, state: None, *, damp: float):
+        del state
+
+        mean = rv.mean
+        fx = tree_util.ravel_pytree(fun(*self.unravel(mean)[: self.ode_order]))[0]
+
+        def a1(s):
+            return s[[self.ode_order], ...]
+
+        linop = functools.vmap(functools.jacrev(a1))(mean)
+
+        d, *_ = linop.shape
+        cov_lower = damp * np.ones((d, 1, 1))
+        bias = _normal.Normal(-fx[:, None], cov_lower)
+
+        to_latent = np.ones((linop.shape[2],))
+        to_observed = np.ones((linop.shape[1],))
+        cond = _conditional.LatentCond(
+            linop, bias, to_latent=to_latent, to_observed=to_observed
+        )
+        return cond, None
 
 
 class LinearisationBackend(abc.ABC):
     @abc.abstractmethod
-    def ode_taylor_0th(self, ode_order: int, damp: float) -> _Linearization:
+    def ode_taylor_0th(self, ode_order: int) -> _Linearization:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_taylor_1st(self, ode_order: int, damp: float) -> _Linearization:
+    def ode_taylor_1st(self, ode_order: int) -> _Linearization:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_statistical_1st(
-        self, cubature_fun: Callable, damp: float
-    ) -> _Linearization:
+    def ode_statistical_1st(self, cubature_fun: Callable) -> _Linearization:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_statistical_0th(
-        self, cubature_fun: Callable, damp: float
-    ) -> _Linearization:
+    def ode_statistical_0th(self, cubature_fun: Callable) -> _Linearization:
         raise NotImplementedError
 
 
@@ -40,29 +124,10 @@ class DenseLinearisation(LinearisationBackend):
         self.ode_shape = ode_shape
         self.unravel = unravel
 
-    def ode_taylor_0th(self, ode_order, damp: float) -> _Linearization:
-        def init():
-            return None
-
-        def step(fun, rv, state):
-            del state
-
-            def a1(m):
-                """Select the 'n'-th derivative."""
-                return tree_util.ravel_pytree(self.unravel(m)[ode_order])[0]
-
-            fx = tree_util.ravel_pytree(fun(*self.unravel(rv.mean)[:ode_order]))[0]
-            linop = functools.jacrev(a1)(rv.mean)
-            cov_lower = damp * np.eye(len(fx))
-            bias = _normal.Normal(-fx, cov_lower)
-            to_latent = np.ones(linop.shape[1])
-            to_observed = np.ones(linop.shape[0])
-            cond = _conditional.LatentCond(
-                linop, bias, to_latent=to_latent, to_observed=to_observed
-            )
-            return cond, None
-
-        return _Linearization(init, step)
+    def ode_taylor_0th(self, ode_order) -> _Linearization:
+        return DenseTs0(
+            ode_order=ode_order, ode_shape=self.ode_shape, unravel=self.unravel
+        )
 
     def ode_taylor_1st(
         self, ode_order, damp, jvp_probes: int, jvp_probes_seed: int
@@ -303,31 +368,8 @@ class IsotropicLinearisation(LinearisationBackend):
 
         return _Linearization(init, step)
 
-    def ode_taylor_0th(self, ode_order, damp: float) -> _Linearization:
-        def init():
-            return None
-
-        def step(fun, rv, state):
-            del state
-            mean = rv.mean
-
-            def a1(m):
-                return m[[ode_order], ...]
-
-            linop = functools.jacrev(a1)(mean[..., 0])
-            fx = tree_util.ravel_pytree(fun(*self.unravel(mean)[:ode_order]))[0]
-
-            cov_lower = damp * np.eye(1)
-            bias = _normal.Normal(-fx, cov_lower)
-
-            to_latent = np.ones((linop.shape[1],))
-            to_observed = np.ones((linop.shape[0],))
-            cond = _conditional.LatentCond(
-                linop, bias, to_latent=to_latent, to_observed=to_observed
-            )
-            return cond, None
-
-        return _Linearization(init, step)
+    def ode_taylor_0th(self, ode_order) -> _Linearization:
+        return IsotropicTs0(ode_order=ode_order, unravel=self.unravel)
 
     def ode_statistical_0th(self, cubature_fun, damp: float):
         raise NotImplementedError
@@ -340,33 +382,8 @@ class BlockDiagLinearisation(LinearisationBackend):
     def __init__(self, unravel):
         self.unravel = unravel
 
-    def ode_taylor_0th(self, ode_order, damp: float) -> _Linearization:
-        def init():
-            return None
-
-        def step(fun, rv, state):
-            del state
-
-            mean = rv.mean
-            fx = tree_util.ravel_pytree(fun(*self.unravel(mean)[:ode_order]))[0]
-
-            def a1(s):
-                return s[[ode_order], ...]
-
-            linop = functools.vmap(functools.jacrev(a1))(mean)
-
-            d, *_ = linop.shape
-            cov_lower = damp * np.ones((d, 1, 1))
-            bias = _normal.Normal(-fx[:, None], cov_lower)
-
-            to_latent = np.ones((linop.shape[2],))
-            to_observed = np.ones((linop.shape[1],))
-            cond = _conditional.LatentCond(
-                linop, bias, to_latent=to_latent, to_observed=to_observed
-            )
-            return cond, None
-
-        return _Linearization(init, step)
+    def ode_taylor_0th(self, ode_order) -> _Linearization:
+        return BlockDiagTs0(ode_order=ode_order, unravel=self.unravel)
 
     def ode_taylor_1st(
         self, ode_order, damp: float, jvp_probes: int, jvp_probes_seed: int

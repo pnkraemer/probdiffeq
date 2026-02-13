@@ -620,7 +620,7 @@ class strategy_filter(_Strategy):
     def init_posterior(self, *, u: ProbTaylorCoeffs):
         return u, u.marginals
 
-    def predict(self, *, posterior: T, transition) -> tuple[ProbTaylorCoeffs, T]:
+    def predict(self, posterior: T, *, transition) -> tuple[ProbTaylorCoeffs, T]:
         marginals = self.ssm.conditional.marginalise(posterior, transition)
         u = self.ssm.stats.qoi(marginals)
         std = self.ssm.stats.standard_deviation(marginals)
@@ -702,7 +702,7 @@ class strategy_fixedpoint(_Strategy[MarkovSeq]):
         return u, posterior
 
     def predict(
-        self, *, posterior: MarkovSeq, transition
+        self, posterior: MarkovSeq, *, transition
     ) -> tuple[ProbTaylorCoeffs, MarkovSeq]:
         rv = posterior.init
         bw0 = posterior.conditional
@@ -861,50 +861,28 @@ class strategy_fixedpoint(_Strategy[MarkovSeq]):
 
 
 @containers.dataclass
-class _Correction:
-    """Correction model interface."""
+class _Information:
+    """Information model interface."""
 
-    name: str
-    ode_order: int
-    ssm: Any
-    linearize: Any
-    vector_field: Callable
-    re_linearize: bool  # TODO: remove (it's unused)
+    linearization: Any
 
-    def init(self, /):
+    def init_linearization(self, /):
         """Initialise the state from the solution."""
-        return self.linearize.init()
+        return self.linearization.init()
 
-    def updates(self, rv, linearization_state, /, t):
+    def linearize(self, vf_wrapped, rv, state):
         """Perform the correction step."""
-        # linearization_state,  = correction_state
-
-        f_wrapped = functools.partial(self.vector_field, t=t)
-        cond, linearization_state = self.linearize.update(
-            f_wrapped, rv, linearization_state
-        )
-
-        observed, reverted = self.ssm.conditional.revert(rv, cond)
-        corrected = reverted.noise
-        return corrected, observed, linearization_state
+        return self.linearization.apply(vf_wrapped, rv, state)
 
 
-def correction_ts0(ssm, ode_order=1, damp: float = 0.0) -> _Correction:
-    """Zeroth-order Taylor linearisation."""
-    return ssm.linearise.ode_taylor_0th(ode_order=ode_order, damp=damp)
-    # return _Correction(
-    #     name="TS0",
-    #     vector_field=vector_field,
-    #     ode_order=ode_order,
-    #     ssm=ssm,
-    #     linearize=linearize,
-    #     re_linearize=False,
-    # )
+def constraint_ode_ts0(ssm, ode_order=1) -> _Information:
+    """ODE constraint with zeroth-order Taylor linearisation."""
+    return ssm.linearise.ode_taylor_0th(ode_order=ode_order)
 
 
 def correction_ts1(
     *, ssm, ode_order=1, damp: float = 0.0, jvp_probes=10, jvp_probes_seed=1
-) -> _Correction:
+) -> _Information:
     """First-order Taylor linearisation."""
     assert jvp_probes > 0
     return ssm.linearise.ode_taylor_1st(
@@ -913,7 +891,7 @@ def correction_ts1(
         jvp_probes=jvp_probes,
         jvp_probes_seed=jvp_probes_seed,
     )
-    return _Correction(
+    return _Information(
         name="TS1",
         vector_field=vector_field,
         ode_order=ode_order,
@@ -925,10 +903,10 @@ def correction_ts1(
 
 def correction_slr0(
     vector_field, *, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0
-) -> _Correction:
+) -> _Information:
     """Zeroth-order statistical linear regression."""
     linearize = ssm.linearise.ode_statistical_0th(cubature_fun, damp=damp)
-    return _Correction(
+    return _Information(
         ssm=ssm,
         vector_field=vector_field,
         ode_order=1,
@@ -940,10 +918,10 @@ def correction_slr0(
 
 def correction_slr1(
     vector_field, *, ssm, cubature_fun=cubature_third_order_spherical, damp: float = 0.0
-) -> _Correction:
+) -> _Information:
     """First-order statistical linear regression."""
     linearize = ssm.linearise.ode_statistical_1st(cubature_fun, damp=damp)
-    return _Correction(
+    return _Information(
         ssm=ssm,
         vector_field=vector_field,
         ode_order=1,
@@ -956,10 +934,28 @@ def correction_slr1(
 @containers.dataclass
 class _ProbabilisticSolver:
     vector_field: Callable
+    """The ODE vector field."""
+
     strategy: _Strategy
+    """The estimation strategy. 
+    
+    Usually filter vs fixedpoint (vs smoother).
+    """
+
     prior: Callable
+    """The prior. 
+    
+    Usually an integrated Wiener process.
+    """
+
     ssm: Any
-    correction: _Correction
+    """The state-space model implementation. 
+    
+    Constructed together with the prior.
+    """
+
+    constraint: Any
+    """The constraint + correction model."""
 
     @property
     def error_contraction_rate(self):
@@ -1152,16 +1148,17 @@ class solver_mle(_ProbabilisticSolver):
 
     def init(self, t, u) -> ProbDiffEqSol:
         estimate, posterior = self.strategy.init_posterior(u=u)
-        correction_state = self.correction.init()
+        correction_state = self.constraint.init_linearization()
 
         output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale())
-        output_scale_running = 9 * output_scale_prior
-        auxiliary = (correction_state, output_scale_running, 0)
+        output_scale_running = 0 * output_scale_prior
 
         f_wrapped = functools.partial(self.vector_field, t=t)
-        fun_evals, correction_state = self.correction.update(
-            f_wrapped, estimate.marginals, correction_state
+        fun_evals, correction_state = self.constraint.linearize(
+            f_wrapped, estimate.marginals, correction_state, damp=0.0
         )
+        fun_evals = tree_util.tree_map(np.zeros_like, fun_evals)
+        auxiliary = (correction_state, output_scale_running, 0)
         return ProbDiffEqSol(
             t=t,
             u=estimate,
@@ -1172,44 +1169,25 @@ class solver_mle(_ProbabilisticSolver):
             fun_evals=fun_evals,
         )
 
-    def step(self, state, *, dt):
-        (correction_state, output_scale_running, num_data) = state.auxiliary
-
-        # # Discretise
-        # output_scale = np.ones_like(self.ssm.prototypes.output_scale())
-        # transition = self.prior(dt, state.output_scale)
-
-        # # Do the full extrapolation step (reuse the transition)
-        # hidden, prediction = self.strategy.predict(
-        #     posterior=state.posterior, transition=transition
-        # )
-
-        # t = state.t + dt
-        # updates, _, correction_state = self.correction.updates(
-        #     hidden.marginals, correction_state, t=t
-        # )
-        # u, posterior = self.strategy.apply_updates(
-        #     prediction=prediction, updates=updates
-        # )
-
+    def step(self, state, *, dt: float, damp: float):
         # Discretize
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
         transition = self.prior(dt, output_scale)
 
-        # Do the full prediction step
-        hidden, prediction = self.strategy.predict(
+        # Predict
+        u, prediction = self.strategy.predict(
             posterior=state.posterior, transition=transition
         )
-        t = state.t + dt
 
         # Linearize
-        f_wrapped = functools.partial(self.vector_field, t=t)
-        linearized, correction_state = self.correction.update(
-            f_wrapped, hidden.marginals, correction_state
+        (lin_state, output_scale_running, num_data) = state.auxiliary
+        f_wrapped = functools.partial(self.vector_field, t=state.t + dt)
+        fx, correction_state = self.constraint.linearize(
+            f_wrapped, u.marginals, state=lin_state, damp=damp
         )
 
         # Do the full correction step
-        observed, reverted = self.ssm.conditional.revert(hidden.marginals, linearized)
+        observed, reverted = self.ssm.conditional.revert(u.marginals, fx)
         updates = reverted.noise
         u, posterior = self.strategy.apply_updates(
             prediction=prediction, updates=updates
@@ -1224,13 +1202,13 @@ class solver_mle(_ProbabilisticSolver):
         # Return the state
         auxiliary = (correction_state, output_scale_running, num_data + 1)
         return ProbDiffEqSol(
-            t=t,
+            t=state.t + dt,
             u=u,
             posterior=posterior,
             output_scale=state.output_scale,
             auxiliary=auxiliary,
             num_steps=state.num_steps + 1,
-            fun_evals=linearized,
+            fun_evals=fx,
         )
 
     def userfriendly_output(
@@ -1267,71 +1245,69 @@ class solver_dynamic(_ProbabilisticSolver):
 
     def init(self, t, u) -> ProbDiffEqSol:
         estimate, posterior = self.strategy.init_posterior(u=u)
-        correction_state = self.correction.init()
+        lin_state = self.constraint.init_linearization()
 
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
-        auxiliary = (correction_state,)
 
         f_wrapped = functools.partial(self.vector_field, t=t)
-        fun_evals, correction_state = self.correction.update(
-            f_wrapped, estimate.marginals, correction_state
+        fx, lin_state = self.constraint.linearize(
+            f_wrapped, estimate.marginals, lin_state, damp=0.0
         )
+        fx = tree_util.tree_map(np.zeros_like, fx)
+
         return ProbDiffEqSol(
             t=t,
             u=estimate,
             posterior=posterior,
-            auxiliary=auxiliary,
+            auxiliary=lin_state,
             output_scale=output_scale,
             num_steps=0,
-            fun_evals=fun_evals,
+            fun_evals=fx,
         )
 
-    def step(self, state: ProbDiffEqSol, *, dt):
-        (correction_state,) = state.auxiliary
+    def step(self, state: ProbDiffEqSol, *, dt: float, damp: float):
+        lin_state = state.auxiliary
 
         # Calibrate the output scale
         ones = np.ones_like(self.ssm.prototypes.output_scale())
         transition = self.prior(dt, ones)
         mean = self.ssm.stats.mean(state.u.marginals)
-        hidden = self.ssm.conditional.apply(mean, transition)
+        u = self.ssm.conditional.apply(mean, transition)
 
         t = state.t + dt
 
         # Linearize
         f_wrapped = functools.partial(self.vector_field, t=t)
-        linearized, correction_state = self.correction.update(
-            f_wrapped, hidden, correction_state
+        fx0, lin_state = self.constraint.linearize(
+            f_wrapped, u, state=lin_state, damp=damp
         )
-        observed = self.ssm.conditional.marginalise(hidden, linearized)
+        observed = self.ssm.conditional.marginalise(u, fx0)
         output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
 
         # Do the full extrapolation with the calibrated output scale
+        # (Includes re-discretisation)
         transition = self.prior(dt, output_scale)
-        estimate, prediction = self.strategy.predict(
-            posterior=state.posterior, transition=transition
-        )
+        u, prediction = self.strategy.predict(state.posterior, transition=transition)
 
-        # Relinearise (TODO: optional?)
-        re_linearized, correction_state = self.correction.update(
-            f_wrapped, estimate.marginals, correction_state
+        # Relinearise (TODO: optional? Skip entirely?)
+        fx, lin_state = self.constraint.linearize(
+            f_wrapped, u.marginals, state=lin_state, damp=damp
         )
 
         # Complete the update
-        _, reverted = self.ssm.conditional.revert(estimate.marginals, re_linearized)
+        _, reverted = self.ssm.conditional.revert(u.marginals, fx)
         updates = reverted.noise
-        estimate, posterior = self.strategy.apply_updates(
-            prediction=prediction, updates=updates
-        )
+        u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
         # Return solution
         return ProbDiffEqSol(
             t=t,
-            u=estimate,
+            u=u,
             posterior=posterior,
             num_steps=state.num_steps + 1,
-            auxiliary=(correction_state,),
+            auxiliary=lin_state,
             output_scale=output_scale,
-            fun_evals=linearized0,
+            fun_evals=fx0,  # return the initial linearization
         )
 
     def userfriendly_output(self, *, solution: ProbDiffEqSol, solution0: ProbDiffEqSol):
@@ -1365,44 +1341,51 @@ class solver(_ProbabilisticSolver):
 
     def init(self, t: ArrayLike, u: ProbTaylorCoeffs) -> ProbDiffEqSol:
         u, posterior = self.strategy.init_posterior(u=u)
-        correction_state = self.correction.init()
+        correction_state = self.constraint.init_linearization()
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+
+        f_wrapped = functools.partial(self.vector_field, t=t)
+        fun_evals, correction_state = self.constraint.linearize(
+            f_wrapped, rv=u.marginals, state=correction_state, damp=0.0
+        )
+        fun_evals = tree_util.tree_map(np.zeros_like, fun_evals)
         return ProbDiffEqSol(
             t=t,
             u=u,
             posterior=posterior,
             num_steps=0,
-            auxiliary=(correction_state,),
+            auxiliary=correction_state,
             output_scale=output_scale,
+            fun_evals=fun_evals,
         )
 
-    def step(self, state: ProbDiffEqSol, *, dt):
-        (correction_state,) = state.auxiliary
-
-        # Discretise
+    def step(self, state: ProbDiffEqSol, *, dt, damp):
+        # Discretize
         output_scale = np.ones_like(state.output_scale)
         transition = self.prior(dt, output_scale)
 
-        # Do the full extrapolation step (reuse the transition)
-        hidden, prediction = self.strategy.predict(
-            posterior=state.posterior, transition=transition
+        # Predict
+        u, prediction = self.strategy.predict(state.posterior, transition=transition)
+
+        # Linearize
+        f_eval = functools.partial(self.vector_field, t=state.t + dt)
+        fx, auxiliary = self.constraint.linearize(
+            f_eval, u.marginals, state.auxiliary, damp=damp
         )
 
-        t = state.t + dt
-        updates, _, correction_state = self.correction.updates(
-            hidden.marginals, correction_state, t=t
-        )
-        u, posterior = self.strategy.apply_updates(
-            prediction=prediction, updates=updates
-        )
+        # Update
+        _, reverted = self.ssm.conditional.revert(u.marginals, fx)
+        u, posterior = self.strategy.apply_updates(prediction, updates=reverted.noise)
 
+        # Return solution
         return ProbDiffEqSol(
-            t=t,
+            t=state.t + dt,
             u=u,
             posterior=posterior,
             output_scale=output_scale,
-            auxiliary=(correction_state,),
+            auxiliary=auxiliary,
             num_steps=state.num_steps + 1,
+            fun_evals=fx,
         )
 
     def userfriendly_output(
@@ -1430,14 +1413,19 @@ class solver(_ProbabilisticSolver):
             output_scale=output_scale,
             num_steps=solution.num_steps,
             auxiliary=solution.auxiliary,
+            fun_evals=solution.fun_evals,
         )
 
 
 @containers.dataclass
-class errorest_schober_bosch_cached:
-    # Same as errorest_schober_bosch, but no additional
-    # vector field evaluations.
+class _ErrorEstimator:
+    pass
 
+
+@containers.dataclass
+class errorest_local_residual_cached(_ErrorEstimator):
+    # Same as errorest_local_residual, but no additional
+    # vector field evaluations.
     prior: Any
     ssm: Any
     norm_order: Any = None
@@ -1454,7 +1442,10 @@ class errorest_schober_bosch_cached:
         dt: float,
         atol: float,
         rtol: float,
+        damp: float,
     ) -> tuple[float, tuple]:
+        del damp  # unused because no additional linearisation
+
         # Discretize; The output scale is set to one
         # since the error is multiplied with a local scale estimate anyway
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
@@ -1502,25 +1493,26 @@ class errorest_schober_bosch_cached:
 
 
 @containers.dataclass
-class errorest_schober_bosch:
+class errorest_local_residual(_ErrorEstimator):
     vector_field: Any
-    correction: Any
+    constraint: Any
     prior: Any
     ssm: Any
     norm_order: Any = None
 
-    def init_errorest(self) -> tuple:
-        return (self.correction.init(),)
+    def init_errorest(self):
+        return self.constraint.init_linearization()
 
     def estimate_error_norm(
         self,
-        state: tuple,
+        state,
         previous: ProbDiffEqSol,
         proposed: ProbDiffEqSol,
         *,
         dt: float,
         atol: float,
         rtol: float,
+        damp: float,
     ) -> tuple[float, tuple]:
         # Discretize; The output scale is set to one
         # since the error is multiplied with a local scale estimate anyway
@@ -1530,7 +1522,9 @@ class errorest_schober_bosch:
         # Estimate the error
         mean = self.ssm.stats.mean(previous.u.marginals)
         mean_extra = self.ssm.conditional.apply(mean, transition)
-        error, state = self._linearize_and_estimate(mean_extra, state, t=proposed.t)
+        error, state = self._linearize_and_estimate(
+            mean_extra, state, t=proposed.t, damp=damp
+        )
 
         # Compute a reference
         u0 = tree_util.tree_leaves(previous.u.mean)[0]
@@ -1554,11 +1548,11 @@ class errorest_schober_bosch:
         # Scale the error norm with the error contraction rate and return
         error_contraction_rate = self.ssm.num_derivatives + 1
         error_power = error_norm ** (-1.0 / error_contraction_rate)
-        return error_power, (state,)
+        return error_power, state
 
-    def _linearize_and_estimate(self, rv, state, /, t):
+    def _linearize_and_estimate(self, rv, state, /, t, *, damp):
         f_wrapped = functools.partial(self.vector_field, t=t)
-        linearized, state = self.correction.update(f_wrapped, rv, state)
+        linearized, state = self.constraint.linearize(f_wrapped, rv, state, damp=damp)
 
         observed = self.ssm.conditional.marginalise(rv, linearized)
         output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)

@@ -31,8 +31,8 @@ def case_solver_dynamic():
 
 
 @testing.case
-def case_correction_ts0():
-    return probdiffeq.correction_ts0
+def case_constraint_ode_ts0():
+    return probdiffeq.constraint_ode_ts0
 
 
 @testing.case
@@ -40,22 +40,42 @@ def case_correction_ts1():
     return probdiffeq.correction_ts1
 
 
+@testing.case
+def case_errorest_local_residual_cached():
+    def residual_wrapper(vector_field, constraint, **kw):
+        del vector_field
+        del constraint
+        return probdiffeq.errorest_local_residual_cached(**kw)
+
+    return residual_wrapper
+
+
+@testing.case
+def case_errorest_local_residual():
+    return probdiffeq.errorest_local_residual
+
+
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
 @testing.parametrize_with_cases("strategy_factory", ".", prefix="case_strategy_")
 @testing.parametrize_with_cases("solver_factory", ".", prefix="case_solver_")
-@testing.parametrize_with_cases("correction_factory", ".", prefix="case_correction_")
+@testing.parametrize_with_cases("constraint_factory", ".", prefix="case_constraint_")
+@testing.parametrize_with_cases("errorest_factory", ".", prefix="case_errorest_")
 def test_output_matches_reference(
-    fact, solver_factory, correction_factory, strategy_factory
+    fact, solver_factory, constraint_factory, strategy_factory, errorest_factory
 ):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     # Build a solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     init, iwp, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    strat = strategy_factory(ssm=ssm)
-    corr = correction_factory(vf, ssm=ssm)
-    solver = solver_factory(strategy=strat, prior=iwp, correction=corr, ssm=ssm)
-    errorest = probdiffeq.errorest_schober_bosch(prior=iwp, ssm=ssm, correction=corr)
+    strategy = strategy_factory(ssm=ssm)
+    constraint = constraint_factory(ssm=ssm)
+    solver = solver_factory(
+        vf, strategy=strategy, prior=iwp, constraint=constraint, ssm=ssm
+    )
+    errorest = errorest_factory(
+        prior=iwp, ssm=ssm, vector_field=vf, constraint=constraint
+    )
 
     # Compute the PN solution
     save_at = np.linspace(t0, t1, endpoint=True, num=7)

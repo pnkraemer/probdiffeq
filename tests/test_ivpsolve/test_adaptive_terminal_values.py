@@ -31,8 +31,8 @@ def case_solver_dynamic():
 
 
 @testing.case
-def case_correction_ts0():
-    return probdiffeq.correction_ts0
+def case_constraint_ode_ts0():
+    return probdiffeq.constraint_ode_ts0
 
 
 @testing.case
@@ -55,7 +55,7 @@ def test_output_matches_reference(
     strat = strategy_factory(ssm=ssm)
     corr = correction_factory(vf, ssm=ssm)
     solver = solver_factory(strategy=strat, prior=iwp, correction=corr, ssm=ssm)
-    errorest = probdiffeq.errorest_schober_bosch(prior=iwp, ssm=ssm, correction=corr)
+    errorest = probdiffeq.errorest_local_residual(prior=iwp, ssm=ssm, correction=corr)
 
     # Compute the PN solution
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, errorest=errorest)
