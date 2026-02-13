@@ -1,4 +1,11 @@
-r"""Taylor-expand the solution of an initial value problem (IVP)."""
+r"""Taylor-series estimation in initial value problems.
+
+This module does not contain any probabilistic numerics logic.
+Instead, its sole purpose is to make the probabilistic solvers
+in probdiffeq.probdiffeq easier to access.
+
+See the tutorials for example use cases.
+"""
 
 from probdiffeq.backend import control_flow, functools, ode, tree_util
 from probdiffeq.backend import numpy as np

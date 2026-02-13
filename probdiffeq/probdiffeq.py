@@ -1,4 +1,7 @@
-"""Probabilistic IVP solvers."""
+"""Probabilistic solvers for differential equations.
+
+See the tutorials for example use cases.
+"""
 
 from probdiffeq.backend import (
     containers,
@@ -35,11 +38,14 @@ T = TypeVar("T")
 
 @tree_util.register_dataclass
 @containers.dataclass
-class PositiveCubatureRule:
+class CubaturePositiveWeights:
     """A datastructure for cubature rules that have positive weights."""
 
     points: ArrayLike
+    """Cubature points."""
+
     weights_sqrtm: ArrayLike
+    """Square roots of cubature weights."""
 
 
 def cubature_third_order_spherical(input_shape):
@@ -48,14 +54,14 @@ def cubature_third_order_spherical(input_shape):
     if len(input_shape) == 1:
         (d,) = input_shape
         points_mat, weights_sqrtm = _third_order_spherical_params(d=d)
-        return PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
+        return CubaturePositiveWeights(points=points_mat, weights_sqrtm=weights_sqrtm)
 
     # If input_shape == (), compute weights via input_shape=(1,)
     # and 'squeeze' the points.
     points_mat, weights_sqrtm = _third_order_spherical_params(d=1)
     (S, _) = points_mat.shape
     points = np.reshape(points_mat, (S,))
-    return PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
+    return CubaturePositiveWeights(points=points, weights_sqrtm=weights_sqrtm)
 
 
 def _third_order_spherical_params(*, d):
@@ -71,14 +77,14 @@ def cubature_unscented_transform(input_shape, r=1.0):
     if len(input_shape) == 1:
         (d,) = input_shape
         points_mat, weights_sqrtm = _unscented_transform_params(d=d, r=r)
-        return PositiveCubatureRule(points=points_mat, weights_sqrtm=weights_sqrtm)
+        return CubaturePositiveWeights(points=points_mat, weights_sqrtm=weights_sqrtm)
 
     # If input_shape == (), compute weights via input_shape=(1,)
     # and 'squeeze' the points.
     points_mat, weights_sqrtm = _unscented_transform_params(d=1, r=r)
     (S, _) = points_mat.shape
     points = np.reshape(points_mat, (S,))
-    return PositiveCubatureRule(points=points, weights_sqrtm=weights_sqrtm)
+    return CubaturePositiveWeights(points=points, weights_sqrtm=weights_sqrtm)
 
 
 def _unscented_transform_params(d, *, r):
@@ -112,7 +118,9 @@ def cubature_gauss_hermite(input_shape, degree=5):
     # Build a tensor grid and return class
     tensor_pts = _tensor_points(pts, d=dim)
     tensor_weights_sqrtm = _tensor_weights(weights_sqrtm, d=dim)
-    return PositiveCubatureRule(points=tensor_pts, weights_sqrtm=tensor_weights_sqrtm)
+    return CubaturePositiveWeights(
+        points=tensor_pts, weights_sqrtm=tensor_weights_sqrtm
+    )
 
 
 # TODO: how does this generalise to an input_shape instead of an input_dimension?
@@ -131,19 +139,22 @@ def _tensor_points(x, /, *, d):
 
 
 class Constraint(Protocol):
-    """An interface for constraints in probabilistic solvers."""
+    """An interface for constraints + linearization in probabilistic solvers."""
 
     init_linearization: Callable
+    """Initialize the linearization of the constraint."""
+
     linearize: Callable
+    """Linearize the constraint."""
 
 
 def constraint_ode_ts0(ssm, ode_order=1):
-    """ODE constraint with zeroth-order Taylor linearisation."""
+    """Create an ODE constraint with zeroth-order Taylor linearisation."""
     return ssm.linearize.ode_taylor_0th(ode_order=ode_order)
 
 
 def constraint_ode_ts1(*, ssm, ode_order=1, jvp_probes=10, jvp_probes_seed=1):
-    """ODE constraint with first-order Taylor linearisation."""
+    """Create an ODE constraint with first-order Taylor linearisation."""
     # TODO: expose a "jacobian" option to choose between fwd and rev mode
     assert jvp_probes > 0
     return ssm.linearize.ode_taylor_1st(
@@ -152,12 +163,12 @@ def constraint_ode_ts1(*, ssm, ode_order=1, jvp_probes=10, jvp_probes_seed=1):
 
 
 def constraint_ode_slr0(*, ssm, cubature_fun=cubature_third_order_spherical):
-    """ODE constraint with zeroth-order statistical linear regression."""
+    """Create an ODE constraint with zeroth-order statistical linear regression."""
     return ssm.linearize.ode_statistical_0th(cubature_fun)
 
 
 def constraint_ode_slr1(*, ssm, cubature_fun=cubature_third_order_spherical):
-    """ODE constraint with first-order statistical linear regression."""
+    """Create an ODE constraint with first-order statistical linear regression."""
     return ssm.linearize.ode_statistical_1st(cubature_fun)
 
 
@@ -195,7 +206,7 @@ class MarkovSequence(Generic[T]):
 class MarkovStrategy(Generic[T]):
     """An interface for estimation strategies in Markovian state-space models.
 
-    Implemented by filters and smoothers.
+    Implemented by all filters and smoothers.
     """
 
     def __init__(
@@ -210,34 +221,37 @@ class MarkovStrategy(Generic[T]):
         self.is_suitable_for_save_every_step = is_suitable_for_save_every_step
         self.is_suitable_for_offgrid_marginals = is_suitable_for_offgrid_marginals
 
-    def init_posterior(self, *, u) -> T:
-        """Initialise a state from a solution."""
+    def init_posterior(self, *, u: TaylorCoeffTarget) -> T:
+        """Initialize a posterior distribution."""
         raise NotImplementedError
 
     def predict(self, posterior: T, *, transition) -> tuple[TaylorCoeffTarget, T]:
-        """Extrapolate (also known as prediction)."""
+        """Make a prediction."""
         raise NotImplementedError
 
     def apply_updates(self, prediction: T, *, updates) -> tuple[TaylorCoeffTarget, T]:
-        """Apply a correction to the prediction."""
+        """Apply updates to a prediction."""
         raise NotImplementedError
 
     def interpolate(
         self, *, posterior_t0: T, posterior_t1: T, transition_t0_t, transition_t_t1
     ):
-        """Interpolate."""
+        """Interpolate between two points."""
         raise NotImplementedError
 
     def interpolate_at_t1(self, *, posterior_t1: T):
-        """Process the state at a checkpoint."""
+        """Interpolate at a checkpoint."""
         raise NotImplementedError
 
-    def finalize(self, *, posterior0: T, posterior: T, output_scale):
-        """Postprocess the posterior before returning."""
+    def finalize(self, *, posterior0: T, posterior: T, output_scale) -> T:
+        """Finalize the posterior before returning a solution."""
         raise NotImplementedError
 
-    def markov_marginals(self, markov_seq, *, reverse):
-        """Extract the (time-)marginals from a Markov sequence."""
+    def markov_marginals(self, markov_seq: MarkovSequence, *, reverse: bool):
+        """Extract the (time-)marginals from a Markov sequence.
+
+        This is only needed in combination with smoothing-based strategies.
+        """
         if markov_seq.marginal.mean.ndim == markov_seq.conditional.noise.mean.ndim:
             markov_seq = self._markov_select_terminal(markov_seq)
 
@@ -254,7 +268,9 @@ class MarkovStrategy(Generic[T]):
 
         return tree_array_util.tree_prepend(init, marginals)
 
-    def markov_sample(self, key, markov_seq, *, reverse, shape=()):
+    def markov_sample(
+        self, key, markov_seq: MarkovSequence, *, reverse: bool, shape: tuple = ()
+    ):
         """Sample from a Markov sequence."""
         if markov_seq.marginal.mean.ndim == markov_seq.conditional.noise.mean.ndim:
             markov_seq = self._markov_select_terminal(markov_seq)
@@ -318,7 +334,7 @@ class MarkovStrategy(Generic[T]):
         return functools.vmap(self.ssm.stats.qoi_from_sample)(samples)
 
     def log_marginal_likelihood_terminal_values(
-        self, u, /, *, standard_deviation, posterior
+        self, u, /, *, standard_deviation, posterior: T
     ):
         """Compute the log-marginal-likelihood at the terminal value.
 
@@ -350,8 +366,10 @@ class MarkovStrategy(Generic[T]):
         observed, _conditional = self.ssm.conditional.revert(rv, model)
         return self.ssm.stats.logpdf(data, observed)
 
-    def log_marginal_likelihood(self, u, /, *, standard_deviation, posterior):
+    def log_marginal_likelihood(self, u, /, *, standard_deviation, posterior: T):
         """Compute the log-marginal-likelihood of observations of the IVP solution.
+
+        Only works with smoothing-based estimators.
 
         !!! note
             Use `log_marginal_likelihood_terminal_values`
@@ -459,7 +477,7 @@ class ProbSolution(Generic[C, T]):
 
 
 class ProbSolver:
-    """An interface for describing probabilistic differential equation solvers."""
+    """An interface for probabilistic differential equation solvers."""
 
     def __init__(
         self,
@@ -478,46 +496,61 @@ class ProbSolver:
 
     @property
     def error_contraction_rate(self):
+        """The error-contraction rate of the solver."""
         return self.ssm.num_derivatives + 1
 
     @property
     def is_suitable_for_offgrid_marginals(self):
+        """Whether the solver admits offgrid-marginal calculation.
+
+        Excludes fixed-point smoothers, for example.
+        """
         return self.strategy.is_suitable_for_offgrid_marginals
 
     @property
     def is_suitable_for_save_at(self):
+        """Whether the solver admits adaptive time-stepping with checkpoints.
+
+        Excludes fixed-interval smoothers, for example.
+        """
         return self.strategy.is_suitable_for_save_at
 
     @property
     def is_suitable_for_save_every_step(self):
+        """Whether the solver admits adaptive time-stepping without checkpoints.
+
+        Excludes fixed-point smoothers, for example.
+        """
         return self.strategy.is_suitable_for_save_every_step
 
-    def init(self, t, init) -> ProbSolution:
+    def init(self, t, init: TaylorCoeffTarget) -> ProbSolution:
+        """Initialize the probabilistic solution."""
         raise NotImplementedError
 
     def step(self, state: ProbSolution, *, dt: float, damp: float):
+        """Perform a step."""
         raise NotImplementedError
 
     def userfriendly_output(
         self, *, solution0: ProbSolution, solution: ProbSolution
     ) -> ProbSolution:
-        """Make the solutions user-friendly.
+        """Make the solutions 'user-friendly'.
 
-        This means calibrating, precomputing marginals, etc..
+        This may include calibration, calculation of marginals, and other things.
         """
         raise NotImplementedError
 
     def offgrid_marginals(self, t, *, solution):
-        """Compute off-grid marginals on a dense grid via jax.numpy.searchsorted.
+        """Compute off-grid marginals via jax.numpy.searchsorted.
 
         !!! warning
-            The elements in ts and the elements in the solution grid must be disjoint.
+            The time-point 't' may not be an element in the solution grid.
             Otherwise, anything can happen and the solution will be incorrect.
             At the moment, we do not check this.
 
         !!! warning
-            The elements in ts must be strictly in (t0, t1).
-            They must not lie outside the interval, and they must not coincide
+            The time-point 't' must also be strictly in (t0, t1).
+            It must not lie outside the interval, and it must not coincide
             with the interval boundaries.
             At the moment, we do not check this.
         """
@@ -561,6 +594,7 @@ class ProbSolver:
         return estimate
 
     def interpolate(self, *, t, interp_from: ProbSolution, interp_to: ProbSolution):
+        """Interpolate between two solution objects."""
         # Domain is (t0, t1]; thus, take the output scale from interp_to
         output_scale = interp_to.output_scale
         transition_t0_t = self.prior(t - interp_from.t, output_scale)
@@ -617,7 +651,7 @@ class ProbSolver:
     def interpolate_at_t1(
         self, *, t, interp_from: ProbSolution, interp_to: ProbSolution
     ):
-        """Process the solution in case t=t_n."""
+        """Interpolate the solution near a checkpoint."""
         del t
         tmp = self.strategy.interpolate_at_t1(posterior_t1=interp_to.posterior)
         (estimate, interpolated), step_and_interpolate_from = tmp
@@ -665,16 +699,16 @@ def prior_wiener_integrated(
     ssm_fact: str,
     output_scale: ArrayLike | None = None,
 ):
-    """Construct an adaptive(/continuous-time), multiply-integrated Wiener process.
+    """Construct an repeatedly-integrated Wiener process.
 
-    Increase damping to get visually more pleasing uncertainties
-     and more numerical robustness for
-     high-order solvers in low precision arithmetic
+    Tip: Choose nonzero standard deviations
+    to get visually more pleasing uncertainties and more numerical robustness for
+    high-order solvers in low precision arithmetic. Outside of these cases,
+    leave the standard deviations at zero to improve accuracy.
     """
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
 
     # TODO: should the output_scale be an argument to solve()?
-    # TODO: should the damping mirror the pytree structure of 'tcoeffs'?
     if output_scale is None:
         output_scale = np.ones_like(ssm.prototypes.output_scale())
 
@@ -700,7 +734,7 @@ def prior_wiener_integrated_discrete(
     ssm_fact: str,
     output_scale: ArrayLike | None = None,
 ):
-    """Compute a time-discretized, multiply-integrated Wiener process."""
+    """Compute a time-discretization of an integrated Wiener process."""
     init, discretize, ssm = prior_wiener_integrated(
         tcoeffs, tcoeffs_std=tcoeffs_std, ssm_fact=ssm_fact, output_scale=output_scale
     )
@@ -714,7 +748,7 @@ def prior_wiener_integrated_discrete(
 @tree_util.register_dataclass
 @containers.dataclass
 class _InterpRes(Generic[T]):
-    """Interpolation result.
+    """A datastructure to store interpolation results.
 
     To ensure correct adaptive time-stepping, it is important
     to distinguish step-from variables from interpolate-from variables.
@@ -750,7 +784,11 @@ class _InterpRes(Generic[T]):
 
 
 class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
-    """Construct a smoother."""
+    """Construct a fixed-interval smoother.
+
+    Use this strategy for fixed steps.
+    For adaptive steps, consider using a fixed-point smoother instead.
+    """
 
     def __init__(self, ssm):
         super().__init__(
@@ -825,19 +863,26 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         transition_t0_t,
         transition_t_t1,
     ):
-        """Interpolate.
+        """Interpolate between two Markov sequences.
 
-        A smoother interpolates by_
-        * Extrapolating from t0 to t, which gives the "filtering" marginal
-        and the backward transition from t to t0.
-        * Extrapolating from t to t1, which gives another "filtering" marginal
-        and the backward transition from t1 to t.
-        * Applying the new t1-to-t backward transition to compute the interpolation.
+        Here is how a smoother interpolates:
+
+        - Extrapolate from t0 to t, which gives the filtering distribution
+          and the backward transition from t to t0.
+        - Extrapolate from t to t1, which gives another filtering distribution
+          and the backward transition from t1 to t.
+        - Apply the new t1-to-t backward transition to the posterior
+          to compute the interpolation.
+
         This intermediate result is informed about its "right-hand side" datum.
+        Note how in probdiffeq, all solver subintervals include their right-hand
+        side time-point: in other words, they are (t0, t1].
 
-        Subsequent interpolations continue from the value at 't'.
-        ( TODO: they could also continue from t0)
-        Subsequent IVP solver steps continue from the value at 't1' as before.
+        Specifically, interpolation is not equal to computing offgrid marginals.
+        Interpolation always assumes that the current subinterval is the right-most
+        subinterval, which is the case during the forward pass.
+        After the simulation, if there are observations > t1,
+        which happens when computing offgrid-marginals, do not use `interpolate()`.
         """
         # Extrapolate from t0 to t, and from t to t1.
 
@@ -879,7 +924,15 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
 
 
 class strategy_filter(MarkovStrategy):
-    """Construct a filter."""
+    """Construct a filter.
+
+    Filters work with all timestepping strategies.
+    However, the uncertainties are not informed by the full
+    timeseries, which makes them visually less pleasing.
+    Filter solutions also do not admit computing log-marginal
+    likelihoods or joint sampling from the posterior distribution.
+    For these use-cases, use smoothers instead.
+    """
 
     def __init__(self, ssm):
         super().__init__(
@@ -957,7 +1010,48 @@ class strategy_filter(MarkovStrategy):
 
 
 class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
-    """Construct a fixedpoint-smoother."""
+    r"""Construct a fixedpoint-smoother.
+
+    Fixed-point smoothers are the method of choice for adaptive
+    time-stepping in probabilistic differential equation solvers.
+
+    Concretely, we implement the fixedpoint smoother by Krämer (2025a).
+    Applied to probabilistic solvers, this leads to the algorithm
+    by Krämer (2025b). Please consider citing both papers if you use
+    fixed-point smoothers and ODE solvers in your work.
+
+
+    ??? note "BibTex for Krämer (2025a)"
+        ```bibtex
+        @article{kramer2025numerically,
+            title={Numerically Robust Fixed-Point Smoothing Without State Augmentation},
+            author={Kr{\"a}mer, Nicholas},
+            year={2025},
+            journal={Transactions on Machine Learning Research}
+        }
+        ```
+
+    ??? note "BibTex for Krämer (2025b)"
+        ```bibtex
+            @InProceedings{kramer2024adaptive,
+            title     = {Adaptive Probabilistic ODE Solvers Without Adaptive
+            Memory Requirements},
+            author    = {Kr\"{a}mer, Nicholas},
+            booktitle = {Proceedings of the First International Conference
+            on Probabilistic Numerics},
+            pages     = {12--24},
+            year      = {2025},
+            editor    = {Kanagawa, Motonobu and Cockayne, Jon and Gessner,
+            Alexandra and Hennig, Philipp},
+            volume    = {271},
+            series    = {Proceedings of Machine Learning Research},
+            publisher = {PMLR},
+            url       = {https://proceedings.mlr.press/v271/kramer25a.html}
+        }
+        ```
+
+
+    """
 
     def __init__(self, ssm):
         super().__init__(
@@ -1049,26 +1143,29 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         transition_t0_t,
         transition_t_t1,
     ):
-        """
-        Interpolate using a fixed-point smoother.
+        """Interpolate between two Markov sequences.
 
-        Assuming `state_t0` has seen 'n' collocation points,
-        and `state_t1` has seen 'n+1' collocation points,
-        then interpolation at time `t` is computed as follows:
+        Assuming `state_t0` has seen $n$ collocation points,
+        and `state_t1` has seen $n+1$ collocation points,
+        then interpolation at time $t$ is computed as follows:
 
-        1. Extrapolate from `t0` to `t`. This yields:
-            - the marginal at `t` given `n` observations.
-            - the backward transition from `t` to `t0` given `n` observations.
+        1. Extrapolate from $t_0$ to $t$. This yields:
+            - the marginal at $t$ given $n$ observations.
+            - the backward transition from $t$ to $t_0$ given $n$ observations.
 
-        2. Extrapolate from `t` to `t1`. This yields:
-            - the marginal at `t1` given `n` observations
-              (in contrast, `state_t1` has seen `n+1` observations)
-            - the backward transition from `t1` to `t` given `n` observations.
+        2. Extrapolate from $t$ to $t_1$. This yields:
+            - the marginal at $t_1$ given $n$ observations
+              (in contrast,`state_t1` has seen $n+1$ observations)
+            - the backward transition from $t_1$ to $t$ given $n$ observations.
 
-        3. Apply the backward transition from `t1` to `t`
+        3. Apply the backward transition from $t_1$ to $t$
         to the marginal inside `state_t1`
-        to obtain the marginal at `t` given `n+1` observations. Similarly,
-        the interpolated solution inherits all auxiliary info from the `t_1` state.
+        to obtain the marginal at $t$ given $n+1$ observations. Similarly,
+        the interpolated solution inherits all auxiliary info from the $t_1$ state.
+
+        ---------------------------------------------------------------------
+
+        All comments from fixed-interval smoother interpolation apply.
 
         ---------------------------------------------------------------------
 
@@ -1076,19 +1173,19 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
 
         In the fixed-point smoother, backward transitions are modified
         to ensure that future operations remain correct.
-        Denote the location of the fixed-point with `t_f`. Then,
-        the backward transition at `t` is merged with that at `t0`.
-        This preserves knowledge of how to move from `t` to `t_f`.
+        Denote the location of the fixed-point with $t_f$. Then,
+        the backward transition at $t$ is merged with that at $t_0$.
+        This preserves knowledge of how to move from $t$ to $t_f$.
 
         Then, `t` becomes the new fixed-point location. To ensure
-        that future operations ``find their way back to t`:
+        that future operations "find their way back to $t$":
 
         - Subsequent interpolations do not continue from the raw
         interpolated value. Instead, they continue from a nearly
         identical state where the backward transition is replaced
         by the identity.
 
-        - Subsequent solver steps do not continue from the initial `t1`
+        - Subsequent solver steps do not continue from the initial $t_1$
         state. Instead, they continue from a version whose backward
         model is replaced with the `t-to-t1` transition.
 
@@ -1097,13 +1194,15 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
 
         As a result, each interpolation must return three distinct states:
 
-            1. the interpolated solution,
-            2. the state to continue interpolating from,
-            3. the state to continue solver stepping from.
+        1. the interpolated solution,
+        2. the state to continue interpolating from,
+        3. the state to continue solver stepping from.
 
         These are intentionally different in the fixed-point smoother.
-        Don't attempt to remove any of them. They're all important.
         """
+        # Note to myself: Don't attempt to remove any of them.
+        # They're all important. You will break the code (again) :).
+
         # Extrapolate from t0 to t, and from t to t1.
         # This yields all building blocks.
         _, extrapolated_t = self.predict(
@@ -1136,11 +1235,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
 
 
 class solver_mle(ProbSolver):
-    """Create a solver that calibrates the output scale via maximum-likelihood.
-
-    Warning: needs to be combined with a call to stats.calibrate()
-    after solving if the MLE-calibration shall be *used*.
-    """
+    """Create a solver that uses maximum-likelihood calibration for the output scale."""
 
     def init(self, t, u) -> ProbSolution:
         estimate, posterior = self.strategy.init_posterior(u=u)
@@ -1333,7 +1428,16 @@ class solver_dynamic(ProbSolver):
 
 
 class solver(ProbSolver):
-    """Create a solver that does not calibrate the output scale automatically."""
+    """Create a solver that does not calibrate the output scale automatically.
+
+    This is the text-book implementation of probabilistic solvers.
+    It is typically used in parameter estimation:
+
+    - In combination with gradient-based optimisation of the output scale.
+    - In combination with diffusion tempering.
+
+    See the tutorials for example applications.
+    """
 
     def init(self, t: Array, u: TaylorCoeffTarget) -> ProbSolution:
         u, posterior = self.strategy.init_posterior(u=u)
@@ -1417,6 +1521,7 @@ class ErrorEstimator:
     """An interface for error estimators in probabilistic solvers."""
 
     def init_errorest(self):
+        """Initialize the error-estimation state."""
         raise NotImplementedError
 
     def estimate_error_norm(
@@ -1430,6 +1535,16 @@ class ErrorEstimator:
         rtol: float,
         damp: float,
     ):
+        """Estimate the error norm.
+
+        The error norm is a single scalar that already includes:
+
+        - Absolute and relative tolerances
+        - Error contraction rates
+
+        In the acceptance/rejection step, this error norm is compared
+        to one to determine whether a step has been successful.
+        """
         raise NotImplementedError
 
 
@@ -1513,10 +1628,12 @@ class errorest_local_residual_cached(ErrorEstimator):
 class errorest_local_residual(ErrorEstimator):
     r"""Construct an error estimator based on a local residual.
 
-    This is the common error estimate, proposed by Schober et al. (2019) and
-    further developed by Bosch et al. (2021) and
-    then by Krämer, Bosch, and Schmidt et al. (2022).
-
+    This is the common error estimate, proposed by Schober et al. (2019),
+    extended by Bosch et al. (2021) to different linearization and calibration modes,
+    and then generalised to state-space model factorisations by
+    Krämer, Bosch, and Schmidt et al. (2022).
+    Please consider citing these papers in your work if you use any of
+    these error estimates.
 
     ??? note "BibTex for Schober et al. (2019)"
         ```bibtex

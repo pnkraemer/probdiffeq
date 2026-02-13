@@ -1,4 +1,11 @@
-"""Routines for estimating solutions of initial value problems."""
+"""Initial value problem solver loops.
+
+This module does not contain any probabilistic numerics logic.
+Instead, its sole purpose is to make the probabilistic solvers
+in probdiffeq.probdiffeq easier to access.
+
+See the tutorials for example use cases.
+"""
 
 from probdiffeq.backend import (
     containers,
