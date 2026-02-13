@@ -60,20 +60,17 @@ T = TypeVar("T")
 
 
 class VectorField(Protocol[T]):
-    """
-    Vector-field API.
-
-    Accepts one or more positional arguments of type T, plus a keyword-only
-    argument `t: ArrayLike`.
+    """A protocol for the vector-field type expected by the solvers.
 
     Examples of valid call signatures:
 
-    - vf(u: T, /, *, t: ArrayLike) -> T
-    - vf(u: T, du: T, /, *, t: ArrayLike) -> T
-    - vf(u: T, du: T, ddu: T, /, *, t: ArrayLike) -> T
-    - vf(u: T, du: T, ddu: T, dddy: T, /, *, t: ArrayLike) -> T
+    - `f(u: T, /, *, t: ArrayLike) -> T`
+    - `f(u: T, du: T, /, *, t: ArrayLike) -> T`
+    - `f(u: T, du: T, ddu: T, /, *, t: ArrayLike) -> T`
+    - `f(u: T, du: T, ddu: T, dddy: T, /, *, t: ArrayLike) -> T`
 
     If a type-checker complains, try jitting the vector field.
+    If the error persists, open an issue.
     """
 
     def __call__(self, *ys: T, t: ArrayLike) -> T: ...
