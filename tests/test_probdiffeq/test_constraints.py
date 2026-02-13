@@ -12,47 +12,49 @@ def case_ts0():
 
 @testing.case()
 def case_ts1():
-    return probdiffeq.correction_ts1
+    return probdiffeq.constraint_ode_ts1
 
 
 @testing.case()
 def case_slr0():
-    return probdiffeq.correction_slr0
+    return probdiffeq.constraint_ode_slr0
 
 
 @testing.case()
 def case_slr1():
-    return probdiffeq.correction_slr1
+    return probdiffeq.constraint_ode_slr1
 
 
 @testing.case()
 def case_slr1_gauss_hermite():
     return functools.partial(
-        probdiffeq.correction_slr1, cubature_fun=probdiffeq.cubature_gauss_hermite
+        probdiffeq.constraint_ode_slr1, cubature_fun=probdiffeq.cubature_gauss_hermite
     )
 
 
 @testing.fixture(name="solution")
-@testing.parametrize_with_cases("correction_impl", cases=".", prefix="case_")
+@testing.parametrize_with_cases("constraint_ode_factory", cases=".", prefix="case_")
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def fixture_solution(correction_impl, fact):
+def fixture_solution(constraint_ode_factory, fact):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     try:
         tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-        corr = correction_impl(vf, ssm=ssm, damp=1e-9)
+        constraint = constraint_ode_factory(ssm=ssm)
 
     except NotImplementedError:
-        testing.skip(reason="This type of linearisation has not been implemented.")
+        reason = "No implementation available. Most likely because"
+        reason += " this combo of linearisation + ssm factorisation isn't available."
+        testing.skip(reason=reason)
 
     strategy = probdiffeq.strategy_filter(ssm=ssm)
-    solver = probdiffeq.solver_mle(strategy, prior=ibm, constraint=corr, ssm=ssm)
-    errorest = probdiffeq.errorest_local_residual_cached(
-        prior=ibm, constraint=corr, ssm=ssm
+    solver = probdiffeq.solver_mle(
+        vf, strategy=strategy, prior=ibm, constraint=constraint, ssm=ssm
     )
+    errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, errorest=errorest)
-    return solve(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2)
+    return solve(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2, damp=1e-9)
 
 
 def test_terminal_value_simulation_matches_reference(solution):

@@ -1,13 +1,15 @@
 from probdiffeq.backend import abc, containers, linalg, tree_util
 from probdiffeq.backend import numpy as np
-from probdiffeq.backend.typing import Array, Sequence, TypeVar
+from probdiffeq.backend.typing import Generic, Sequence, TypeVar
+
+T = TypeVar("T")
 
 
 @tree_util.register_dataclass
 @containers.dataclass
-class Normal:
-    mean: Array
-    cholesky: Array
+class Normal(Generic[T]):
+    mean: T
+    cholesky: T
 
 
 C = TypeVar("C", bound=Sequence)

@@ -110,7 +110,7 @@ def solve_adaptive_save_at(
     if control is None:
         control = control_proportional_integral()
 
-    loop = _RejectionLoop(
+    loop = RejectionLoop(
         solver=solver,
         clip_dt=clip_dt,
         control=control,
@@ -237,7 +237,7 @@ def dt0_adaptive(vf, initial_values, /, t0, *, error_contraction_rate, rtol, ato
 
 @tree_util.register_dataclass
 @containers.dataclass
-class _TimeStepState:
+class TimeStepState:
     """State for adaptive time-stepping."""
 
     dt: float
@@ -267,7 +267,7 @@ class _RejectionLoopState:
 
 
 @containers.dataclass
-class _RejectionLoop:
+class RejectionLoop:
     """Implement a rejection loop."""
 
     solver: Any
@@ -281,11 +281,11 @@ class _RejectionLoop:
     control: Any = containers.dataclass_field(metadata={"static": True})
     while_loop: Callable = containers.dataclass_field(metadata={"static": True})
 
-    def init(self, state_solver, dt) -> _TimeStepState:
+    def init(self, state_solver, dt) -> TimeStepState:
         """Initialise the adaptive solver state."""
         state_control = self.control.init(dt)
         state_errorest = self.errorest.init_errorest()
-        return _TimeStepState(
+        return TimeStepState(
             dt=dt,
             step_from=state_solver,
             interp_from=state_solver,
@@ -295,8 +295,8 @@ class _RejectionLoop:
         )
 
     def loop(
-        self, state0: _TimeStepState, *, t1, atol, rtol, eps, damp
-    ) -> tuple[Any, _TimeStepState]:
+        self, state0: TimeStepState, *, t1, atol, rtol, eps, damp
+    ) -> tuple[Any, TimeStepState]:
         """Repeatedly attempt a step until the controller is happy.
 
         Notably:
@@ -332,9 +332,9 @@ class _RejectionLoop:
             self.step_attempt, t1=t1, atol=atol, rtol=rtol, damp=damp
         )
         state_new = self.while_loop(cond, step_attempt, init)
-        return self.step_extract_timestepstate(state_new)
+        return self.step_extract_timestep_state(state_new)
 
-    def step_init_loopstate(self, s0: _TimeStepState) -> _RejectionLoopState:
+    def step_init_loopstate(self, s0: TimeStepState) -> _RejectionLoopState:
         """Initialise the rejection state."""
 
         def _ones_like(tree):
@@ -393,8 +393,9 @@ class _RejectionLoop:
             step_from=state.step_from,
         )
 
-    def step_extract_timestepstate(self, state: _RejectionLoopState) -> _TimeStepState:
-        return _TimeStepState(
+    def step_extract_timestep_state(self, state: _RejectionLoopState) -> TimeStepState:
+        """Extract a time-step-state after a successful rejection loop."""
+        return TimeStepState(
             dt=state.dt,
             step_from=state.proposed,
             interp_from=state.step_from,
@@ -416,7 +417,7 @@ class _RejectionLoop:
             t=t1, interp_from=state.interp_from, interp_to=state.step_from
         )
 
-        new_state = _TimeStepState(
+        new_state = TimeStepState(
             dt=state.dt,
             step_from=interp_res.step_from,
             interp_from=interp_res.interp_from,
@@ -432,7 +433,7 @@ class _RejectionLoop:
         solution, interp_res = self.solver.interpolate_at_t1(
             t=t1, interp_from=state.interp_from, interp_to=state.step_from
         )
-        new_state = _TimeStepState(
+        new_state = TimeStepState(
             dt=state.dt,
             step_from=interp_res.step_from,
             interp_from=interp_res.interp_from,

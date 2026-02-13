@@ -214,11 +214,11 @@ class MarkovStrategy(Generic[T]):
         """Initialise a state from a solution."""
         raise NotImplementedError
 
-    def predict(self, *, posterior: T, transition) -> tuple[TaylorCoeffTarget, T]:
+    def predict(self, posterior: T, *, transition) -> tuple[TaylorCoeffTarget, T]:
         """Extrapolate (also known as prediction)."""
         raise NotImplementedError
 
-    def apply_updates(self, *, prediction: T, updates) -> tuple[TaylorCoeffTarget, T]:
+    def apply_updates(self, prediction: T, *, updates) -> tuple[TaylorCoeffTarget, T]:
         """Apply a correction to the prediction."""
         raise NotImplementedError
 
@@ -282,7 +282,7 @@ class MarkovStrategy(Generic[T]):
         n, *shape_single_sample = self.ssm.stats.hidden_shape(noise)
         return n + 1, *tuple(shape_single_sample)
 
-    def _transform_unit_sample(self, markov_seq, base_sample, /, reverse):
+    def _transform_unit_sample(self, markov_seq, base_sample, *, reverse):
         if base_sample.ndim > len(self._sample_shape(markov_seq)):
             transform = functools.partial(self._transform_unit_sample, reverse=reverse)
             transform_vmap = functools.vmap(transform, in_axes=(None, 0))
@@ -424,7 +424,7 @@ class MarkovStrategy(Generic[T]):
 
 @tree_util.register_dataclass
 @containers.dataclass
-class ProbDiffEqSolution(Generic[C, T]):
+class ProbSolution(Generic[C, T]):
     """A datastructure for probabilistic solutions of differential equations."""
 
     t: Array
@@ -458,21 +458,22 @@ class ProbDiffEqSolution(Generic[C, T]):
     """
 
 
-class ProbDiffEqSolver:
+class ProbSolver:
     """An interface for describing probabilistic differential equation solvers."""
 
     def __init__(
         self,
         vector_field: Callable,
+        *,
         strategy: MarkovStrategy,
         prior: Callable,
-        ssm: Any,
         constraint: Constraint,
+        ssm: Any,
     ):
+        self.ssm = ssm
         self.vector_field = vector_field
         self.strategy = strategy
         self.prior = prior
-        self.ssm = ssm
         self.constraint = constraint
 
     @property
@@ -491,15 +492,15 @@ class ProbDiffEqSolver:
     def is_suitable_for_save_every_step(self):
         return self.strategy.is_suitable_for_save_every_step
 
-    def init(self, t, init) -> ProbDiffEqSolution:
+    def init(self, t, init) -> ProbSolution:
         raise NotImplementedError
 
-    def step(self, state: ProbDiffEqSolution, *, dt):
+    def step(self, state: ProbSolution, *, dt: float, damp: float):
         raise NotImplementedError
 
     def userfriendly_output(
-        self, *, solution0: ProbDiffEqSolution, solution: ProbDiffEqSolution
-    ) -> ProbDiffEqSolution:
+        self, *, solution0: ProbSolution, solution: ProbSolution
+    ) -> ProbSolution:
         """Make the solutions user-friendly.
 
         This means calibrating, precomputing marginals, etc..
@@ -559,9 +560,7 @@ class ProbDiffEqSolver:
         )
         return estimate
 
-    def interpolate(
-        self, *, t, interp_from: ProbDiffEqSolution, interp_to: ProbDiffEqSolution
-    ):
+    def interpolate(self, *, t, interp_from: ProbSolution, interp_to: ProbSolution):
         # Domain is (t0, t1]; thus, take the output scale from interp_to
         output_scale = interp_to.output_scale
         transition_t0_t = self.prior(t - interp_from.t, output_scale)
@@ -576,7 +575,7 @@ class ProbDiffEqSolver:
         )
         (estimate, interpolated), step_and_interpolate_from = tmp
 
-        step_from = ProbDiffEqSolution(
+        step_from = ProbSolution(
             t=interp_to.t,
             # New:
             posterior=step_and_interpolate_from.step_from,
@@ -588,7 +587,7 @@ class ProbDiffEqSolver:
             fun_evals=interp_to.fun_evals,
         )
 
-        interpolated = ProbDiffEqSolution(
+        interpolated = ProbSolution(
             t=t,
             # New:
             posterior=interpolated,
@@ -600,7 +599,7 @@ class ProbDiffEqSolver:
             fun_evals=interp_to.fun_evals,
         )
 
-        interp_from = ProbDiffEqSolution(
+        interp_from = ProbSolution(
             t=t,
             # New:
             posterior=step_and_interpolate_from.interp_from,
@@ -616,14 +615,14 @@ class ProbDiffEqSolver:
         return interpolated, interp_res
 
     def interpolate_at_t1(
-        self, *, t, interp_from: ProbDiffEqSolution, interp_to: ProbDiffEqSolution
+        self, *, t, interp_from: ProbSolution, interp_to: ProbSolution
     ):
         """Process the solution in case t=t_n."""
         del t
         tmp = self.strategy.interpolate_at_t1(posterior_t1=interp_to.posterior)
         (estimate, interpolated), step_and_interpolate_from = tmp
 
-        prev = ProbDiffEqSolution(
+        prev = ProbSolution(
             t=interp_to.t,
             # New
             posterior=step_and_interpolate_from.interp_from,
@@ -634,7 +633,7 @@ class ProbDiffEqSolver:
             num_steps=interp_from.num_steps,  # incorrect?
             fun_evals=interp_from.fun_evals,
         )
-        sol = ProbDiffEqSolution(
+        sol = ProbSolution(
             t=interp_to.t,
             # New:
             posterior=interpolated,
@@ -645,7 +644,7 @@ class ProbDiffEqSolver:
             num_steps=interp_to.num_steps,
             fun_evals=interp_to.fun_evals,
         )
-        acc = ProbDiffEqSolution(
+        acc = ProbSolution(
             t=interp_to.t,
             # New:
             posterior=step_and_interpolate_from.step_from,
@@ -757,7 +756,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         return u, posterior
 
     def predict(
-        self, *, posterior: MarkovSequence, transition
+        self, posterior: MarkovSequence, *, transition
     ) -> tuple[TaylorCoeffTarget, MarkovSequence]:
         marginals, cond = self.ssm.conditional.revert(posterior.marginal, transition)
         posterior = MarkovSequence(marginal=marginals, conditional=cond)
@@ -1126,14 +1125,14 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         return (estimate, interpolated), interp_res
 
 
-class solver_mle(ProbDiffEqSolver):
+class solver_mle(ProbSolver):
     """Create a solver that calibrates the output scale via maximum-likelihood.
 
     Warning: needs to be combined with a call to stats.calibrate()
     after solving if the MLE-calibration shall be *used*.
     """
 
-    def init(self, t, u) -> ProbDiffEqSolution:
+    def init(self, t, u) -> ProbSolution:
         estimate, posterior = self.strategy.init_posterior(u=u)
         correction_state = self.constraint.init_linearization()
 
@@ -1146,7 +1145,7 @@ class solver_mle(ProbDiffEqSolver):
         )
         fun_evals = tree_util.tree_map(np.zeros_like, fun_evals)
         auxiliary = (correction_state, output_scale_running, 0)
-        return ProbDiffEqSolution(
+        return ProbSolution(
             t=t,
             u=estimate,
             posterior=posterior,
@@ -1188,7 +1187,7 @@ class solver_mle(ProbDiffEqSolver):
 
         # Return the state
         auxiliary = (correction_state, output_scale_running, num_data + 1)
-        return ProbDiffEqSolution(
+        return ProbSolution(
             t=state.t + dt,
             u=u,
             posterior=posterior,
@@ -1199,8 +1198,8 @@ class solver_mle(ProbDiffEqSolver):
         )
 
     def userfriendly_output(
-        self, *, solution0: ProbDiffEqSolution, solution: ProbDiffEqSolution
-    ) -> ProbDiffEqSolution:
+        self, *, solution0: ProbSolution, solution: ProbSolution
+    ) -> ProbSolution:
         assert solution.t.ndim > 0
 
         # This is the MLE solver, so we take the calibrated scale
@@ -1216,7 +1215,7 @@ class solver_mle(ProbDiffEqSolver):
 
         output_scale = ones * output_scale[None, ...]
         ts = np.concatenate([solution0.t[None], solution.t])
-        return ProbDiffEqSolution(
+        return ProbSolution(
             t=ts,
             u=estimate,
             posterior=posterior,
@@ -1227,10 +1226,10 @@ class solver_mle(ProbDiffEqSolver):
         )
 
 
-class solver_dynamic(ProbDiffEqSolver):
+class solver_dynamic(ProbSolver):
     """Create a solver that calibrates the output scale dynamically."""
 
-    def init(self, t, u) -> ProbDiffEqSolution:
+    def init(self, t, u) -> ProbSolution:
         estimate, posterior = self.strategy.init_posterior(u=u)
         lin_state = self.constraint.init_linearization()
 
@@ -1242,7 +1241,7 @@ class solver_dynamic(ProbDiffEqSolver):
         )
         fx = tree_util.tree_map(np.zeros_like, fx)
 
-        return ProbDiffEqSolution(
+        return ProbSolution(
             t=t,
             u=estimate,
             posterior=posterior,
@@ -1252,7 +1251,7 @@ class solver_dynamic(ProbDiffEqSolver):
             fun_evals=fx,
         )
 
-    def step(self, state: ProbDiffEqSolution, *, dt: float, damp: float):
+    def step(self, state: ProbSolution, *, dt: float, damp: float):
         lin_state = state.auxiliary
 
         # Calibrate the output scale
@@ -1287,7 +1286,7 @@ class solver_dynamic(ProbDiffEqSolver):
         u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
         # Return solution
-        return ProbDiffEqSolution(
+        return ProbSolution(
             t=t,
             u=u,
             posterior=posterior,
@@ -1297,9 +1296,7 @@ class solver_dynamic(ProbDiffEqSolver):
             fun_evals=fx0,  # return the initial linearization
         )
 
-    def userfriendly_output(
-        self, *, solution: ProbDiffEqSolution, solution0: ProbDiffEqSolution
-    ):
+    def userfriendly_output(self, *, solution: ProbSolution, solution0: ProbSolution):
         # This is the dynamic solver,
         # and all covariances have been calibrated already
         ones = np.ones_like(solution.output_scale)
@@ -1314,7 +1311,7 @@ class solver_dynamic(ProbDiffEqSolver):
         # TODO: stack the calibrated output scales?
         output_scale = ones
         ts = np.concatenate([solution0.t[None], solution.t])
-        return ProbDiffEqSolution(
+        return ProbSolution(
             t=ts,
             u=estimate,
             posterior=posterior,
@@ -1325,10 +1322,10 @@ class solver_dynamic(ProbDiffEqSolver):
         )
 
 
-class solver(ProbDiffEqSolver):
+class solver(ProbSolver):
     """Create a solver that does not calibrate the output scale automatically."""
 
-    def init(self, t: ArrayLike, u: TaylorCoeffTarget) -> ProbDiffEqSolution:
+    def init(self, t: Array, u: TaylorCoeffTarget) -> ProbSolution:
         u, posterior = self.strategy.init_posterior(u=u)
         correction_state = self.constraint.init_linearization()
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
@@ -1338,7 +1335,7 @@ class solver(ProbDiffEqSolver):
             f_wrapped, rv=u.marginals, state=correction_state, damp=0.0
         )
         fun_evals = tree_util.tree_map(np.zeros_like, fun_evals)
-        return ProbDiffEqSolution(
+        return ProbSolution(
             t=t,
             u=u,
             posterior=posterior,
@@ -1348,7 +1345,7 @@ class solver(ProbDiffEqSolver):
             fun_evals=fun_evals,
         )
 
-    def step(self, state: ProbDiffEqSolution, *, dt, damp):
+    def step(self, state: ProbSolution, *, dt, damp):
         # Discretize
         output_scale = np.ones_like(state.output_scale)
         transition = self.prior(dt, output_scale)
@@ -1367,7 +1364,7 @@ class solver(ProbDiffEqSolver):
         u, posterior = self.strategy.apply_updates(prediction, updates=reverted.noise)
 
         # Return solution
-        return ProbDiffEqSolution(
+        return ProbSolution(
             t=state.t + dt,
             u=u,
             posterior=posterior,
@@ -1378,8 +1375,8 @@ class solver(ProbDiffEqSolver):
         )
 
     def userfriendly_output(
-        self, *, solution0: ProbDiffEqSolution, solution: ProbDiffEqSolution
-    ) -> ProbDiffEqSolution:
+        self, *, solution0: ProbSolution, solution: ProbSolution
+    ) -> ProbSolution:
         assert solution.t.ndim > 0
 
         # This is the uncalibrated solver, so scale=1
@@ -1395,7 +1392,7 @@ class solver(ProbDiffEqSolver):
         output_scale = ones * output_scale[None, ...]
 
         ts = np.concatenate([solution0.t[None], solution.t])
-        return ProbDiffEqSolution(
+        return ProbSolution(
             t=ts,
             u=u,
             posterior=posterior,
@@ -1415,8 +1412,8 @@ class ErrorEstimator:
     def estimate_error_norm(
         self,
         state: tuple,
-        previous: ProbDiffEqSolution,
-        proposed: ProbDiffEqSolution,
+        previous: ProbSolution,
+        proposed: ProbSolution,
         *,
         dt: float,
         atol: float,
@@ -1448,8 +1445,8 @@ class errorest_local_residual_cached(ErrorEstimator):
     def estimate_error_norm(
         self,
         state: tuple,
-        previous: ProbDiffEqSolution,
-        proposed: ProbDiffEqSolution,
+        previous: ProbSolution,
+        proposed: ProbSolution,
         *,
         dt: float,
         atol: float,
@@ -1567,8 +1564,8 @@ class errorest_local_residual(ErrorEstimator):
     def estimate_error_norm(
         self,
         state,
-        previous: ProbDiffEqSolution,
-        proposed: ProbDiffEqSolution,
+        previous: ProbSolution,
+        proposed: ProbSolution,
         *,
         dt: float,
         atol: float,

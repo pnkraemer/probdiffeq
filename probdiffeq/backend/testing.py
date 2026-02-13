@@ -62,7 +62,9 @@ def marginals_allclose(
     return jnp.logical_and(means_allclose, covs_allclose)
 
 
-def _allclose(a, b, /, *, atol: float | None, rtol: float | None):
+def _allclose(
+    a, b, /, *, atol: jax.Array | float | None, rtol: jax.Array | float | None
+):
     # promote to float-type to enable finfo.eps
     a = jnp.asarray(1.0 * a)
     b = jnp.asarray(1.0 * b)
