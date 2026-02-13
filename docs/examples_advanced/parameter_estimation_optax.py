@@ -65,9 +65,15 @@ def solve(p):
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, output_scale=10.0, ssm_fact="isotropic"
     )
-    ts0 = probdiffeq.correction_ts0(lambda y, t: vf(y, t, p=p), ssm=ssm)
+    ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
+    solver = probdiffeq.solver(
+        lambda y, t: vf(y, t, p=p),
+        strategy=strategy,
+        prior=ibm,
+        constraint=ts0,
+        ssm=ssm,
+    )
     solve = ivpsolve.solve_fixed_grid(solver=solver)
     return solve(init, grid=ts)
 

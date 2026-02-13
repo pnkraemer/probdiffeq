@@ -55,10 +55,10 @@ def main(start=3.0, stop=12.0, step=1.0, repeats=2, use_diffrax: bool = False):
     timeit_fun = setup_timeit(repeats=repeats)
 
     # Assemble algorithms
-    ts0, ts1 = probdiffeq.correction_ts0, probdiffeq.correction_ts1
-    ts0_iso = solver_probdiffeq(5, correction=ts0, implementation="isotropic")
-    ts0_bd = solver_probdiffeq(5, correction=ts0, implementation="blockdiag")
-    ts1_dense = solver_probdiffeq(8, correction=ts1, implementation="dense")
+    ts0, ts1 = probdiffeq.constraint_ode_ts0, probdiffeq.constraint_ode_ts1
+    ts0_iso = solver_probdiffeq(5, constraint=ts0, implementation="isotropic")
+    ts0_bd = solver_probdiffeq(5, constraint=ts0, implementation="blockdiag")
+    ts1_dense = solver_probdiffeq(8, constraint=ts1, implementation="dense")
     algorithms = {
         r"ProbDiffEq: TS0($5$, isotropic)": ts0_iso,
         r"ProbDiffEq: TS0($5$, blockdiag)": ts0_bd,
@@ -155,7 +155,7 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     corr = correction(ssm=ssm)
     solver = probdiffeq.solver_mle(
-        vf_probdiffeq, strategy=strategy, prior=ibm, correction=corr, ssm=ssm
+        vf_probdiffeq, strategy=strategy, prior=ibm, constraint=corr, ssm=ssm
     )
     errorest = probdiffeq.errorest_schober_bosch_cached(prior=ibm, ssm=ssm)
 

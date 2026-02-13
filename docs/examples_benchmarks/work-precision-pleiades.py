@@ -61,10 +61,10 @@ def main(start=3.0, stop=11.0, step=1.0, repeats=2, use_diffrax: bool = False):
     # Assemble algorithms
     algorithms = {
         r"ProbDiffEq: TS0($5$)": solver_probdiffeq(
-            num_derivatives=5, correction_fun=probdiffeq.correction_ts0
+            num_derivatives=5, constraint_ode_fun=probdiffeq.constraint_ode_ts0
         ),
         r"ProbDiffEq: TS0($8$)": solver_probdiffeq(
-            num_derivatives=8, correction_fun=probdiffeq.correction_ts0
+            num_derivatives=8, constraint_ode_fun=probdiffeq.constraint_ode_ts0
         ),
         "SciPy: 'RK45'": solver_scipy(method="RK45", use_numba=False),
         "SciPy: 'DOP853'": solver_scipy(method="DOP853", use_numba=False),
@@ -159,7 +159,7 @@ def setup_timeit(*, repeats: int) -> Callable:
     return timer
 
 
-def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
+def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
     # fmt: off
     u0 = jnp.asarray(
@@ -196,13 +196,13 @@ def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
     tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
 
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="isotropic")
-    ts0_or_ts1 = correction_fun(vf_probdiffeq, ssm=ssm, ode_order=2)
+    ts0_or_ts1 = constraint_ode_fun(vf_probdiffeq, ssm=ssm, ode_order=2)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver_dynamic(
-        strategy, prior=ibm, correction=ts0_or_ts1, ssm=ssm
+        strategy, prior=ibm, constraint=ts0_or_ts1, ssm=ssm
     )
-    errorest = probdiffeq.errorest_schober_bosch(
-        correction=ts0_or_ts1, prior=ibm, ssm=ssm
+    errorest = probdiffeq.errorest_local_residual_cached(
+        constraint=ts0_or_ts1, prior=ibm, ssm=ssm
     )
 
     control = ivpsolve.control_proportional_integral()

@@ -41,11 +41,13 @@ def solution_routine(while_loop):
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="isotropic")
-    ts0 = probdiffeq.correction_ts0(vf, ode_order=1, ssm=ssm)
+    ts0 = probdiffeq.constraint_ode_ts0(ode_order=1, ssm=ssm)
 
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver = probdiffeq.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
+    solver = probdiffeq.solver(
+        vf, strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
+    )
+    errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
     solve_adaptive = ivpsolve.solve_adaptive_terminal_values(
         solver=solver, errorest=errorest, while_loop=while_loop
     )

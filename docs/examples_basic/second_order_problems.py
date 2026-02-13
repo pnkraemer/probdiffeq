@@ -46,10 +46,12 @@ tcoeffs = taylor.odejet_padded_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="isotropic"
 )
-ts0 = probdiffeq.correction_ts0(vf_1, ssm=ssm)
+ts0 = probdiffeq.constraint_ode_ts0(vf_1, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
-solver_1st = probdiffeq.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-errorest_1st = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
+solver_1st = probdiffeq.solver_mle(strategy, prior=ibm, constraint=ts0, ssm=ssm)
+errorest_1st = probdiffeq.errorest_local_residual_cached(
+    prior=ibm, constraint=ts0, ssm=ssm
+)
 
 
 # -
@@ -79,10 +81,12 @@ tcoeffs = taylor.odejet_padded_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="isotropic"
 )
-ts0 = probdiffeq.correction_ts0(vf_2, ode_order=2, ssm=ssm)
+ts0 = probdiffeq.constraint_ode_ts0(vf_2, ode_order=2, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
-solver_2nd = probdiffeq.solver_mle(strategy, prior=ibm, correction=ts0, ssm=ssm)
-errorest_2nd = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts0, ssm=ssm)
+solver_2nd = probdiffeq.solver_mle(strategy, prior=ibm, constraint=ts0, ssm=ssm)
+errorest_2nd = probdiffeq.errorest_local_residual_cached(
+    prior=ibm, constraint=ts0, ssm=ssm
+)
 
 # -
 

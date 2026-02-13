@@ -47,12 +47,12 @@ def main():
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
 
     # Build a solver
-    ts = probdiffeq.correction_ts1(vf, ssm=ssm)
+    ts = probdiffeq.constraint_ode_ts1(ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_dynamic(
-        ssm=ssm, strategy=strategy, prior=ibm, correction=ts
+        vf, ssm=ssm, strategy=strategy, prior=ibm, constraint=ts
     )
-    errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts, ssm=ssm)
+    errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 
     # Solve the ODE
     save_at = jnp.linspace(t0, t1, num=5, endpoint=True)

@@ -17,7 +17,7 @@ C = TypeVar("C", bound=Sequence)
 
 class NormalBackend(abc.ABC):
     @abc.abstractmethod
-    def from_tcoeffs(self, loc: C, scale: C | None = None, damp: float = 0.0):
+    def from_tcoeffs(self, loc: C, scale: C | None = None):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -33,7 +33,7 @@ class DenseNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, loc: C, scale: C | None = None, damp: float = 0.0):
+    def from_tcoeffs(self, loc: C, scale: C | None = None):
         if scale is None:
             scale = tree_util.tree_map(np.ones_like, loc)
 
@@ -45,9 +45,7 @@ class DenseNormal(NormalBackend):
         num_coeffs = len(loc)
         assert loc_flat.size == num_coeffs * ode_dim
 
-        powers = 1 / np.arange(1, num_coeffs + 1)
-        powers = np.repeat(powers, ode_dim)
-        cholesky_flat = linalg.diagonal_matrix(damp**powers * scale_flat)
+        cholesky_flat = linalg.diagonal_matrix(scale_flat)
         return Normal(loc_flat, cholesky_flat)
 
     def preconditioner_apply(self, rv, p, /):
@@ -67,7 +65,7 @@ class IsotropicNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, loc: C, scale: C | None = None, damp: float = 0.0):
+    def from_tcoeffs(self, loc: C, scale: C | None = None):
         if scale is None:
             scale = tree_util.tree_map(lambda _: np.ones(()), loc)
 
@@ -88,8 +86,7 @@ class IsotropicNormal(NormalBackend):
             msg += f"Received: {scale}"
             raise ValueError(msg)
 
-        powers = 1 / np.arange(1, num_coeffs + 1)
-        cholesky_flat = linalg.diagonal_matrix(damp**powers * scale_flat)
+        cholesky_flat = linalg.diagonal_matrix(scale_flat)
         return Normal(loc_flat, cholesky_flat)
 
     def preconditioner_apply(self, rv, p, /):
@@ -105,7 +102,7 @@ class BlockDiagNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, loc: C, scale: C | None = None, damp: float = 0.0):
+    def from_tcoeffs(self, loc: C, scale: C | None = None):
         if scale is None:
             scale = tree_util.tree_map(np.ones_like, loc)
 
@@ -124,8 +121,8 @@ class BlockDiagNormal(NormalBackend):
 
         # Promote std into covariance matrix and apply damping
         num_coeffs = len(loc)
-        powers = 1 / np.arange(1, num_coeffs + 1)
-        cholesky = linalg.diagonal_matrix(damp**powers)
+        d = np.ones((num_coeffs,))
+        cholesky = linalg.diagonal_matrix(d)
         cholesky_flat = scale_flat[..., None] * cholesky[None, ...]
         return Normal(loc_flat, cholesky_flat)
 

@@ -664,7 +664,6 @@ def prior_wiener_integrated(
     tcoeffs_std: C | None = None,
     ssm_fact: str,
     output_scale: ArrayLike | None = None,
-    damp: float = 0.0,
 ):
     """Construct an adaptive(/continuous-time), multiply-integrated Wiener process.
 
@@ -682,9 +681,10 @@ def prior_wiener_integrated(
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
 
     if tcoeffs_std is None:
-        error_like = np.ones_like(ssm.prototypes.error_estimate())
+        error_like = np.zeros_like(ssm.prototypes.error_estimate())
         tcoeffs_std = tree_util.tree_map(lambda _: error_like, tcoeffs)
-    marginal = ssm.normal.from_tcoeffs(tcoeffs, tcoeffs_std, damp=damp)
+
+    marginal = ssm.normal.from_tcoeffs(tcoeffs, tcoeffs_std)
     u_mean = ssm.stats.qoi(marginal)
     std = ssm.stats.standard_deviation(marginal)
     u_std = ssm.stats.qoi_from_sample(std)
@@ -692,13 +692,23 @@ def prior_wiener_integrated(
     return target, discretize, ssm
 
 
-def prior_wiener_integrated_discrete(ts, *args, **kwargs):
+def prior_wiener_integrated_discrete(
+    ts,
+    tcoeffs: C,
+    *,
+    tcoeffs_std: C | None = None,
+    ssm_fact: str,
+    output_scale: ArrayLike | None = None,
+):
     """Compute a time-discretized, multiply-integrated Wiener process."""
-    init, discretize, ssm = prior_wiener_integrated(*args, **kwargs)
+    init, discretize, ssm = prior_wiener_integrated(
+        tcoeffs, tcoeffs_std=tcoeffs_std, ssm_fact=ssm_fact, output_scale=output_scale
+    )
     scales = np.ones_like(ssm.prototypes.output_scale())
     discretize_vmap = functools.vmap(discretize, in_axes=(0, None))
     conditionals = discretize_vmap(np.diff(ts), scales)
-    return init, conditionals, ssm
+    markov_seq = MarkovSequence(init.marginals, conditionals)
+    return markov_seq, ssm
 
 
 @tree_util.register_dataclass

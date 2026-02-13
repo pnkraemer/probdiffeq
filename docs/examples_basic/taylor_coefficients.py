@@ -57,11 +57,13 @@ def vf(*y, t):  # noqa: ARG001
 def solve(tc):
     """Solve the ODE."""
     init, prior, ssm = probdiffeq.prior_wiener_integrated(tc, ssm_fact="dense")
-    ts0 = probdiffeq.correction_ts0(vf, ssm=ssm)
+    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver = probdiffeq.solver_mle(strategy, prior=prior, correction=ts0, ssm=ssm)
+    solver = probdiffeq.solver_mle(strategy, prior=prior, constraint=ts0, ssm=ssm)
     ts = jnp.linspace(t0, t1, endpoint=True, num=10)
-    errorest = probdiffeq.errorest_schober_bosch(prior=prior, correction=ts0, ssm=ssm)
+    errorest = probdiffeq.errorest_local_residual_cached(
+        prior=prior, constraint=ts0, ssm=ssm
+    )
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
     return solve(init, save_at=ts, atol=1e-2, rtol=1e-2)
 

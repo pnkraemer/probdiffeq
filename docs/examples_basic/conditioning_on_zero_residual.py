@@ -50,20 +50,19 @@ u0 = jnp.asarray([0.1])
 # Assemble the discretised prior (with and without the correct Taylor coefficients)
 
 NUM_DERIVATIVES = 2
-tcoeffs_like = [u0] * (NUM_DERIVATIVES + 1)
+tcoeffs_mean = [u0] * (NUM_DERIVATIVES + 1)
+tcoeffs_std = [jnp.ones_like(u0)] * (NUM_DERIVATIVES + 1)
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
-init_raw, transitions, ssm = probdiffeq.prior_wiener_integrated_discrete(
-    ts, tcoeffs_like, output_scale=100.0, ssm_fact="dense"
+markov_seq_prior, ssm = probdiffeq.prior_wiener_integrated_discrete(
+    ts, tcoeffs_mean, tcoeffs_std=tcoeffs_std, output_scale=100.0, ssm_fact="dense"
 )
-
-markov_seq_prior = probdiffeq.MarkovSeq(init_raw.marginals, transitions)
-
 
 tcoeffs = taylor.odejet_padded_scan(
     lambda y: vector_field(y, t=t0), (u0,), num=NUM_DERIVATIVES
 )
-init_tcoeffs = ssm.normal.from_tcoeffs(tcoeffs)
-markov_seq_tcoeffs = probdiffeq.MarkovSeq(init_tcoeffs, transitions)
+markov_seq_tcoeffs, _ssm = probdiffeq.prior_wiener_integrated_discrete(
+    ts, tcoeffs, output_scale=100.0, ssm_fact="dense"
+)
 
 # +
 # Compute the posterior
@@ -71,14 +70,16 @@ markov_seq_tcoeffs = probdiffeq.MarkovSeq(init_tcoeffs, transitions)
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="dense"
 )
-ts1 = probdiffeq.correction_ts1(vector_field, ssm=ssm)
+ts1 = probdiffeq.constraint_ode_ts1(ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-solver = probdiffeq.solver(strategy, prior=ibm, correction=ts1, ssm=ssm)
-errorest = probdiffeq.errorest_schober_bosch(prior=ibm, correction=ts1, ssm=ssm)
+solver = probdiffeq.solver(
+    vector_field, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
+)
+errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 
 dt0 = ivpsolve.dt0(lambda y: vector_field(y, t=t0), (u0,))
 solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
-sol = solve(init, save_at=ts, dt0=dt0, atol=1e-2, rtol=1e-2)
+sol = solve(init, save_at=ts, dt0=dt0, atol=1e-1, rtol=1e-1)
 markov_seq_posterior = sol.posterior
 
 # +
@@ -114,12 +115,6 @@ axes_state[1].set_title("w/ Initial condition")
 axes_state[2].set_title("Posterior")
 
 sample_style = {"marker": "None", "alpha": 0.99, "linewidth": 0.75}
-mean_style = {
-    "marker": "None",
-    "color": "black",
-    "linestyle": "dashed",
-    "linewidth": 0.99,
-}
 
 
 def residual(x, t):
@@ -159,19 +154,6 @@ for i in range(num_samples):
 def residual_mean(x, t):
     """Evaluate the ODE residual."""
     return x[1] - jax.vmap(vector_field)(x[0], t)
-
-
-# # Plot state means
-axes_state[0].plot(ts, ssm.stats.qoi(margs_prior)[0], **mean_style)
-axes_state[1].plot(ts, ssm.stats.qoi(margs_tcoeffs)[0], **mean_style)
-axes_state[2].plot(ts, ssm.stats.qoi(margs_posterior)[0], **mean_style)
-
-# # Plot residual means
-axes_residual[0].plot(ts, residual_mean(ssm.stats.qoi(margs_prior), ts), **mean_style)
-axes_residual[1].plot(ts, residual_mean(ssm.stats.qoi(margs_tcoeffs), ts), **mean_style)
-axes_residual[2].plot(
-    ts, residual_mean(ssm.stats.qoi(margs_posterior), ts), **mean_style
-)
 
 
 # Set the x- and y-ticks/limits
