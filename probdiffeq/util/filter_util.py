@@ -3,7 +3,7 @@
 Mostly **discrete** filtering and smoothing.
 """
 
-from probdiffeq.backend import containers, flow, tree
+from probdiffeq.backend import flow, structs, tree
 from probdiffeq.backend.typing import Any
 
 
@@ -40,7 +40,7 @@ def fixedpointsmoother_precon(*, ssm):
     """Construct a discrete, preconditioned fixedpoint-smoother."""
 
     @tree.register_dataclass
-    @containers.dataclass
+    @structs.dataclass
     class _FPState:
         rv: Any
         conditional: Any
@@ -78,7 +78,7 @@ def kalmanfilter_with_marginal_likelihood(*, ssm):
     """Construct a Kalman-filter-implementation of computing the marginal likelihood."""
 
     @tree.register_dataclass
-    @containers.dataclass
+    @structs.dataclass
     class _KFState:
         rv: Any
         num_data_points: float

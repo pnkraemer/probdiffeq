@@ -1,7 +1,7 @@
 """Compare solve_fixed_grid to solve_adaptive_save_every_step."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import containers, func, np, ode, testing, tree
+from probdiffeq.backend import func, np, ode, structs, testing, tree
 from probdiffeq.backend.typing import Array
 from probdiffeq.util import test_util
 
@@ -10,7 +10,7 @@ from probdiffeq.util import test_util
 def test_fixed_grid_result_matches_adaptive_grid_result_when_reusing_grid(fact):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
-    class Taylor(containers.NamedTuple):
+    class Taylor(structs.NamedTuple):
         state: Array
         velocity: Array
         acceleration: Array

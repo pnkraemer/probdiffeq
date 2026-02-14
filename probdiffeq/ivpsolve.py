@@ -7,7 +7,7 @@ in probdiffeq.probdiffeq easier to access.
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import containers, flow, func, linalg, np, tree, warnings
+from probdiffeq.backend import flow, func, linalg, np, structs, tree, warnings
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, Protocol, TypeVar
 
 T_contra = TypeVar("T_contra", contravariant=True)
@@ -225,7 +225,7 @@ def solve_adaptive_save_at(
             """
 
             @tree.register_dataclass
-            @containers.dataclass
+            @structs.dataclass
             class AdvanceState:
                 do_continue: bool
                 solution: Any
@@ -332,7 +332,7 @@ def dt0_adaptive(vf, initial_values, /, t0, *, error_contraction_rate, rtol, ato
 
 
 @tree.register_dataclass
-@containers.dataclass
+@structs.dataclass
 class TimeStepState(Generic[T]):
     """A state variable type for adaptive time-stepping."""
 
@@ -359,7 +359,7 @@ class TimeStepState(Generic[T]):
 
 
 @tree.register_dataclass
-@containers.dataclass
+@structs.dataclass
 class _RejectionLoopState:
     """State for a single rejection loop.
 

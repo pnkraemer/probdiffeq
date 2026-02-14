@@ -3,7 +3,7 @@
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import containers, flow, func, linalg, np, random, special, tree
+from probdiffeq.backend import flow, func, linalg, np, random, special, structs, tree
 from probdiffeq.backend.typing import (
     Any,
     Array,
@@ -39,7 +39,7 @@ class VectorField(Protocol[T]):
 
 
 @tree.register_dataclass
-@containers.dataclass
+@structs.dataclass
 class CubaturePositiveWeights:
     """A datastructure for cubature rules that have positive weights.
 
@@ -220,7 +220,7 @@ def constraint_ode_slr1(*, ssm, cubature_fun=cubature_third_order_spherical):
 
 
 @tree.register_dataclass
-@containers.dataclass
+@structs.dataclass
 class TaylorCoeffTarget(Generic[C, T]):
     """A probabilistic description of Taylor coefficients.
 
@@ -240,7 +240,7 @@ class TaylorCoeffTarget(Generic[C, T]):
 
 
 @tree.register_dataclass
-@containers.dataclass
+@structs.dataclass
 class MarkovSequence(Generic[T]):
     """A datastructure for Markov sequences as batches of joint distributions.
 
@@ -492,7 +492,7 @@ class MarkovStrategy(Generic[T]):
 
 
 @tree.register_dataclass
-@containers.dataclass
+@structs.dataclass
 class ProbabilisticSolution(Generic[C, T]):
     """A datastructure for probabilistic solutions of differential equations."""
 
@@ -807,7 +807,7 @@ def prior_wiener_integrated_discrete(
 
 
 @tree.register_dataclass
-@containers.dataclass
+@structs.dataclass
 class _InterpRes(Generic[T]):
     """A datastructure to store interpolation results.
 

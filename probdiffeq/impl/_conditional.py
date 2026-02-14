@@ -1,13 +1,13 @@
 """LatentConds."""
 
-from probdiffeq.backend import abc, containers, func, linalg, np, tree
+from probdiffeq.backend import abc, func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Array
 from probdiffeq.impl import _normal, _stats
 from probdiffeq.util import cholesky_util
 
 
 @tree.register_dataclass
-@containers.dataclass
+@structs.dataclass
 class LatentCond:
     """Conditional distributions in latent space."""
 

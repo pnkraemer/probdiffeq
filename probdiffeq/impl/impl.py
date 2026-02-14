@@ -1,11 +1,11 @@
 """State-space model implementations."""
 
-from probdiffeq.backend import containers, func, tree
+from probdiffeq.backend import func, structs, tree
 from probdiffeq.backend.typing import Callable
 from probdiffeq.impl import _conditional, _linearize, _normal, _prototypes, _stats
 
 
-@containers.dataclass
+@structs.dataclass
 class FactImpl:
     """Implementation of factorized state-space models."""
 

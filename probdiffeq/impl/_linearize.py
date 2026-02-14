@@ -1,4 +1,4 @@
-from probdiffeq.backend import abc, containers, func, linalg, np, random, tree
+from probdiffeq.backend import abc, func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Callable
 from probdiffeq.impl import _conditional, _normal
 from probdiffeq.util import cholesky_util
@@ -14,7 +14,7 @@ class Linearization:
         raise NotImplementedError
 
 
-@containers.dataclass
+@structs.dataclass
 class DenseTs0(Linearization):
     ode_order: int
     ode_shape: tuple
@@ -42,7 +42,7 @@ class DenseTs0(Linearization):
         return cond, None
 
 
-@containers.dataclass
+@structs.dataclass
 class DenseTs1(Linearization):
     ode_order: int
     ode_shape: tuple
@@ -76,7 +76,7 @@ class DenseTs1(Linearization):
         return cond, None
 
 
-@containers.dataclass
+@structs.dataclass
 class DenseSlr0(Linearization):
     cubature_rule: Any
     ode_shape: tuple
@@ -149,7 +149,7 @@ class DenseSlr0(Linearization):
         return _normal.Normal(fx_mean, cov_sqrtm.T)
 
 
-@containers.dataclass
+@structs.dataclass
 class DenseSlr1(Linearization):
     cubature_rule: Any
     ode_shape: tuple
@@ -224,7 +224,7 @@ class DenseSlr1(Linearization):
         return linop_cond, rv_cond
 
 
-@containers.dataclass
+@structs.dataclass
 class IsotropicTs0(Linearization):
     ode_order: int
     unravel: Callable
@@ -253,7 +253,7 @@ class IsotropicTs0(Linearization):
         return cond, None
 
 
-@containers.dataclass
+@structs.dataclass
 class IsotropicTs1(Linearization):
     ode_order: int
     unravel: Callable
@@ -305,7 +305,7 @@ class IsotropicTs1(Linearization):
         return cond, key
 
 
-@containers.dataclass
+@structs.dataclass
 class BlockDiagTs0(Linearization):
     ode_order: int
     unravel: Callable
@@ -336,7 +336,7 @@ class BlockDiagTs0(Linearization):
         return cond, None
 
 
-@containers.dataclass
+@structs.dataclass
 class BlockDiagTs1(Linearization):
     ode_order: int
     unravel: Callable

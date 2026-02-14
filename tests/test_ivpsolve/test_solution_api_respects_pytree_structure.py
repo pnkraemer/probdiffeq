@@ -1,11 +1,11 @@
 """Tests for interaction with the solution API."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import containers, func, np, ode, testing
+from probdiffeq.backend import func, np, ode, structs, testing
 from probdiffeq.backend.typing import Array
 
 
-class Taylor(containers.NamedTuple):
+class Taylor(structs.NamedTuple):
     """A non-standard Taylor-coefficient data structure."""
 
     state: Array

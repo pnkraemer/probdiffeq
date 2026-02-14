@@ -1,11 +1,11 @@
-from probdiffeq.backend import abc, containers, linalg, np, tree
+from probdiffeq.backend import abc, linalg, np, structs, tree
 from probdiffeq.backend.typing import Generic, Sequence, TypeVar
 
 T = TypeVar("T")
 
 
 @tree.register_dataclass
-@containers.dataclass
+@structs.dataclass
 class Normal(Generic[T]):
     mean: T
     cholesky: T
