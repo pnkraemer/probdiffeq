@@ -7,7 +7,7 @@ in probdiffeq.probdiffeq easier to access.
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import control_flow, func, np, ode, tree
+from probdiffeq.backend import flow, func, np, ode, tree
 from probdiffeq.backend.typing import Array, ArrayLike, Callable, Sequence
 from probdiffeq.util import filter_util
 
@@ -126,9 +126,7 @@ def odejet_padded_scan(vf: Callable, inits: Sequence[ArrayLike], /, num: int):
         return taylor_coeffs
 
     # Compute all coefficients with scan().
-    taylor_coeffs, _ = control_flow.scan(
-        body, init=taylor_coeffs, xs=None, length=num - 1
-    )
+    taylor_coeffs, _ = flow.scan(body, init=taylor_coeffs, xs=None, length=num - 1)
     return taylor_coeffs
 
 
@@ -329,7 +327,7 @@ def odejet_coefficient_double(vf):
         cs_padded = np.stack(cs_padded)
 
         xs = [np.arange(0, len(fx[deg : 2 * deg])), fx[deg : 2 * deg]]
-        cs_padded, _ = control_flow.scan(body_fun, xs=xs, init=cs_padded)
+        cs_padded, _ = flow.scan(body_fun, xs=xs, init=cs_padded)
 
         taylor_coefficients.extend(cs_padded)
         return taylor_coefficients

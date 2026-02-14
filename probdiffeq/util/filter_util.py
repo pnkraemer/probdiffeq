@@ -3,7 +3,7 @@
 Mostly **discrete** filtering and smoothing.
 """
 
-from probdiffeq.backend import containers, control_flow, tree
+from probdiffeq.backend import containers, flow, tree
 from probdiffeq.backend.typing import Any
 
 
@@ -19,7 +19,7 @@ def estimate_fwd(data, /, init, prior_transitions, observation_model, *, estimat
     idx_or_slice = slice(1, len(data), 1)
     information = _select((data, observation_model), idx_or_slice=idx_or_slice)
     xs = (prior_transitions, *information)
-    return control_flow.scan(step, init=init, xs=xs, reverse=False)
+    return flow.scan(step, init=init, xs=xs, reverse=False)
 
 
 def estimate_rev(data, /, init, prior_transitions, observation_model, *, estimator):
@@ -33,7 +33,7 @@ def estimate_rev(data, /, init, prior_transitions, observation_model, *, estimat
     # Scan over the remaining data points
     information = _select((data, observation_model), idx_or_slice=slice(0, -1, 1))
     xs = (prior_transitions, *information)
-    return control_flow.scan(step, init=init, xs=xs, reverse=True)
+    return flow.scan(step, init=init, xs=xs, reverse=True)
 
 
 def fixedpointsmoother_precon(*, ssm):

@@ -7,15 +7,7 @@ in probdiffeq.probdiffeq easier to access.
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import (
-    containers,
-    control_flow,
-    func,
-    linalg,
-    np,
-    tree,
-    warnings,
-)
+from probdiffeq.backend import containers, flow, func, linalg, np, tree, warnings
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, Protocol, TypeVar
 
 T_contra = TypeVar("T_contra", contravariant=True)
@@ -147,7 +139,7 @@ def solve_adaptive_terminal_values(
     errorest,
     control: Control | None = None,
     clip_dt: bool = False,
-    while_loop: Callable = control_flow.while_loop,
+    while_loop: Callable = flow.while_loop,
 ) -> Callable[..., Solution]:
     """Simulate the terminal values of an initial value problem."""
     # Turn off warnings because any solver goes for terminal values
@@ -178,7 +170,7 @@ def solve_adaptive_save_at(
     errorest,
     control: Control | None = None,
     clip_dt: bool = False,
-    while_loop: Callable = control_flow.while_loop,
+    while_loop: Callable = flow.while_loop,
     warn=True,
 ) -> Callable[..., Solution]:
     r"""Solve an initial value problem and return the solution at a pre-determined grid.
@@ -261,7 +253,7 @@ def solve_adaptive_save_at(
         # Advance to one checkpoint after the other
         init = (solution0, state)
         xs = save_at[1:]
-        (_solution, _state), solution = control_flow.scan(
+        (_solution, _state), solution = flow.scan(
             advance, init=init, xs=xs, reverse=False
         )
 
@@ -281,7 +273,7 @@ def solve_fixed_grid(*, solver: Solver) -> Callable[..., Solution]:
 
         t0 = grid[0]
         state0 = solver.init(t=t0, u=u)
-        _, result = control_flow.scan(body_fn, init=state0, xs=np.diff(grid))
+        _, result = flow.scan(body_fn, init=state0, xs=np.diff(grid))
 
         return solver.userfriendly_output(solution0=state0, solution=result)
 
@@ -426,14 +418,14 @@ class RejectionLoop:
         # If t1 is in the future, enter the rejection loop (otherwise do nothing)
         is_before_t1 = state0.step_from.t + eps < t1
         args = (state0, t1, atol, rtol, damp)
-        state = control_flow.cond(is_before_t1, self.step, lambda s: s[0], args)
+        state = flow.cond(is_before_t1, self.step, lambda s: s[0], args)
 
         # Interpolate
         is_before_t1 = state.step_from.t + eps < t1
         is_after_t1 = state.step_from.t > t1 + eps
         branch_idx = np.where(is_before_t1, 0, np.where(is_after_t1, 1, 2))
         options = (self.interp_skip, self.interp_beyond_t1, self.interp_at_t1)
-        return control_flow.switch(branch_idx, options, (state, t1))
+        return flow.switch(branch_idx, options, (state, t1))
 
     def step(self, s_and_t1_and_tols_and_damp):
         """Do a rejection-loop step.

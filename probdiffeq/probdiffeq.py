@@ -3,16 +3,7 @@
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import (
-    containers,
-    control_flow,
-    func,
-    linalg,
-    np,
-    random,
-    special,
-    tree,
-)
+from probdiffeq.backend import containers, flow, func, linalg, np, random, special, tree
 from probdiffeq.backend.typing import (
     Any,
     Array,
@@ -324,7 +315,7 @@ class MarkovStrategy(Generic[T]):
             return extrapolated, extrapolated
 
         init, xs = markov_seq.marginal, markov_seq.conditional
-        _, marginals = control_flow.scan(step, init=init, xs=xs, reverse=reverse)
+        _, marginals = flow.scan(step, init=init, xs=xs, reverse=reverse)
 
         if reverse:
             # Append the terminal marginal to the computed ones
@@ -386,9 +377,7 @@ class MarkovStrategy(Generic[T]):
 
         # Loop over backward models and the remaining base samples
         xs = (markov_seq.conditional, base_sample_body)
-        _, samples = control_flow.scan(
-            body_fun, init=init_sample, xs=xs, reverse=reverse
-        )
+        _, samples = flow.scan(body_fun, init=init_sample, xs=xs, reverse=reverse)
 
         if reverse:
             samples = np.concatenate([samples, init_sample[None, ...]])

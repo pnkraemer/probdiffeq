@@ -20,7 +20,7 @@ manipulation of square root matrices.
 
 """
 
-from probdiffeq.backend import control_flow, linalg, np, tree
+from probdiffeq.backend import flow, linalg, np, tree
 
 
 def revert_conditional_noisefree(R_X_F, R_X):
@@ -187,7 +187,7 @@ def cholesky_hilbert(n: int, K: int = 0):
         )
         return f.at[idx].set(val)
 
-    f = control_flow.fori_loop(1, n, f_body, f)
+    f = flow.fori_loop(1, n, f_body, f)
     f = 1.0 / f
 
     U = np.eye(n)
@@ -204,10 +204,10 @@ def cholesky_hilbert(n: int, K: int = 0):
             newval = (g[i + 1] / denom) * factor
             return g.at[i].set(newval)
 
-        g = control_flow.fori_loop(0, j_idx, inner_body, g)
+        g = flow.fori_loop(0, j_idx, inner_body, g)
         return U.at[:, j_idx].set(g)
 
-    U = control_flow.fori_loop(1, n, body_j, U)
+    U = flow.fori_loop(1, n, body_j, U)
 
     # scale columns: U = U .* (dr * f_row)
     U = U * (dr[:, None] * f[None, :])
