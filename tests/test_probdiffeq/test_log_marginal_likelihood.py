@@ -31,7 +31,7 @@ def test_output_is_a_scalar_and_not_nan_and_not_inf(solution):
     data = tree.tree_map(lambda s: s + 0.005, sol.u.mean[0])
     std = tree.tree_map(lambda _s: np.ones_like(sol.t), sol.u.std[0])
     lml = strategy.log_marginal_likelihood(
-        data, standard_deviation=std, posterior=sol.full_solution
+        data, standard_deviation=std, posterior=sol.solution_full
     )
     assert lml.shape == ()
     assert not np.isnan(lml)
@@ -49,7 +49,7 @@ def test_that_function_raises_error_for_wrong_std_shape_too_many(solution):
 
     with testing.raises(ValueError, match="does not match"):
         _ = strategy.log_marginal_likelihood(
-            data, standard_deviation=std, posterior=sol.full_solution
+            data, standard_deviation=std, posterior=sol.solution_full
         )
 
 
@@ -63,7 +63,7 @@ def test_raises_error_for_terminal_values(solution):
     data = tree.tree_map(lambda s: s[-1] + 0.005, sol.u.mean[0])
     std = tree.tree_map(lambda _s: np.ones_like(sol.t[-1]), sol.u.std[0])
 
-    posterior_t1 = tree.tree_map(lambda s: s[-1], sol.full_solution)
+    posterior_t1 = tree.tree_map(lambda s: s[-1], sol.solution_full)
     with testing.raises(ValueError, match="expected"):
         _ = strategy.log_marginal_likelihood(
             data, standard_deviation=std, posterior=posterior_t1
@@ -91,7 +91,7 @@ def test_raises_error_for_filter(fact):
     std = tree.tree_map(np.ones_like, sol.u.std[0])
     with testing.raises(TypeError, match="ilter"):
         _ = strategy.log_marginal_likelihood(
-            data, standard_deviation=std, posterior=sol.full_solution
+            data, standard_deviation=std, posterior=sol.solution_full
         )
 
 
@@ -102,5 +102,5 @@ def test_raise_error_if_structures_dont_match(solution):
 
     with testing.raises(ValueError, match="tree structure"):
         _ = strategy.log_marginal_likelihood(
-            data, standard_deviation=std, posterior=sol.full_solution
+            data, standard_deviation=std, posterior=sol.solution_full
         )

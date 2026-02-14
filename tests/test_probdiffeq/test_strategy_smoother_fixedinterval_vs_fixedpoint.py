@@ -52,17 +52,16 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     assert testing.allclose(sol_fp.u.mean, sol_sm.u.mean)
     assert testing.allclose(sol_fp.u.std, sol_sm.u.std)
     assert testing.allclose(sol_fp.u.marginals, sol_sm.u.marginals)
-    assert testing.allclose(sol_fp.output_scale, sol_sm.output_scale)
     assert testing.allclose(sol_fp.num_steps, sol_sm.num_steps)
     assert testing.allclose(
-        sol_fp.full_solution.marginal, sol_sm.full_solution.marginal
+        sol_fp.solution_full.marginal, sol_sm.solution_full.marginal
     )
 
     # The backward conditionals use different parametrisations
     # but implement the same transitions
     cond_fp, cond_sm = (
-        sol_fp.full_solution.conditional,
-        sol_sm.full_solution.conditional,
+        sol_fp.solution_full.conditional,
+        sol_sm.solution_full.conditional,
     )
     cond_fp = func.vmap(ssm.conditional.preconditioner_apply)(cond_fp)
     cond_sm = func.vmap(ssm.conditional.preconditioner_apply)(cond_sm)

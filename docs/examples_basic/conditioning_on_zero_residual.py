@@ -80,7 +80,7 @@ errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 dt0 = ivpsolve.dt0(lambda y: vector_field(y, t=t0), (u0,))
 solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
 sol = solve(init, save_at=ts, dt0=dt0, atol=1e-1, rtol=1e-1)
-markov_seq_posterior = sol.full_solution
+markov_seq_posterior = sol.solution_full
 
 
 # +

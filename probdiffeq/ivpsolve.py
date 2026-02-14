@@ -38,11 +38,8 @@ class Solution(Protocol, Generic[S]):
     num_steps: int
     """The number of steps taken by the solver."""
 
-    full_solution: Any
+    solution_full: Any
     """A full description of the solution (beyond 'u', e.g. for dense outputs)."""
-
-    hyperparams: Any
-    """A description of (calibrated) hyperparameters."""
 
 
 # Revisit this dependent typing one Python >=3.12 is enforced
