@@ -4,7 +4,7 @@ That is, when called with correct adaptive- and checkpoint-setups.
 """
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import functools, np, ode, testing, tree_util
+from probdiffeq.backend import func, np, ode, testing, tree_util
 from probdiffeq.util import test_util
 
 
@@ -59,8 +59,8 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     # The backward conditionals use different parametrisations
     # but implement the same transitions
     cond_fp, cond_sm = sol_fp.posterior.conditional, sol_sm.posterior.conditional
-    cond_fp = functools.vmap(ssm.conditional.preconditioner_apply)(cond_fp)
-    cond_sm = functools.vmap(ssm.conditional.preconditioner_apply)(cond_sm)
+    cond_fp = func.vmap(ssm.conditional.preconditioner_apply)(cond_fp)
+    cond_sm = func.vmap(ssm.conditional.preconditioner_apply)(cond_sm)
     assert testing.allclose(cond_fp, cond_sm)
 
 
@@ -79,10 +79,10 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
 
     # Compute the offgrid-marginals
     ts = np.linspace(save_at[0], save_at[-1], num=7, endpoint=True)
-    offgrid = functools.partial(
+    offgrid = func.partial(
         solver_smoother.offgrid_marginals, solution=solution_smoother
     )
-    interpolated = functools.vmap(offgrid)(ts[1:-1])
+    interpolated = func.vmap(offgrid)(ts[1:-1])
 
     # Generate a fixedpoint solver and solve (saving at the interpolation points)
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
@@ -108,6 +108,6 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     assert testing.allclose(u_std_fixedpoint, interpolated.std)
 
     # Compare QOI and marginals
-    marginals_allclose_func = functools.partial(testing.marginals_allclose, ssm=ssm)
-    marginals_allclose_func = functools.vmap(marginals_allclose_func)
+    marginals_allclose_func = func.partial(testing.marginals_allclose, ssm=ssm)
+    marginals_allclose_func = func.vmap(marginals_allclose_func)
     assert np.all(marginals_allclose_func(marginals_fixedpoint, interpolated.marginals))

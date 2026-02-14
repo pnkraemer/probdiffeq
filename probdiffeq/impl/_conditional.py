@@ -1,6 +1,6 @@
 """LatentConds."""
 
-from probdiffeq.backend import abc, containers, functools, linalg, np, tree_util
+from probdiffeq.backend import abc, containers, func, linalg, np, tree_util
 from probdiffeq.backend.typing import Array
 from probdiffeq.impl import _normal, _stats
 from probdiffeq.util import cholesky_util
@@ -184,7 +184,7 @@ class DenseConditional(ConditionalBackend):
             return tree_util.ravel_pytree(self.unravel(a)[i])[0]
 
         x = np.zeros(self.flat_shape)
-        linop = functools.jacrev(select)(x)
+        linop = func.jacrev(select)(x)
 
         u_flat, _ = tree_util.ravel_pytree(u)
         stdev, _ = tree_util.ravel_pytree(standard_deviation)
@@ -320,7 +320,7 @@ class IsotropicConditional(ConditionalBackend):
             return tree_util.ravel_pytree(self.unravel_tree(a)[i])[0]
 
         m = np.zeros((self.num_derivatives + 1,))
-        linop = functools.jacrev(select)(m)
+        linop = func.jacrev(select)(m)
 
         u_flat, _ = tree_util.ravel_pytree(u)
 
@@ -361,7 +361,7 @@ class BlockDiagConditional(ConditionalBackend):
             return _normal.Normal(m_new, c_new)
 
         matrix, noise = cond.A, cond.noise
-        return functools.vmap(apply_unbatch)(matrix, x, noise)
+        return func.vmap(apply_unbatch)(matrix, x, noise)
 
     def marginalise(self, rv, cond, /):
         matrix, noise = cond.A, cond.noise
@@ -374,7 +374,7 @@ class BlockDiagConditional(ConditionalBackend):
         chol1 = _transpose(matrix @ cholesky)
         chol2 = _transpose(noise.cholesky)
         R_stack = (chol1, chol2)
-        cholesky = functools.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack)
+        cholesky = func.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack)
 
         mean_new = cond.to_observed[None, :] * mean_marg
         cholesky_new = cond.to_observed[None, :, None] * _transpose(cholesky)
@@ -386,17 +386,17 @@ class BlockDiagConditional(ConditionalBackend):
 
         # Linear operator
         A1, A2 = cond1.A, T[None, :, None] * cond2.A
-        g = functools.vmap(lambda a, b: a @ b)(A1, A2)
+        g = func.vmap(lambda a, b: a @ b)(A1, A2)
 
         # Combined mean
         m1, m2 = T[None, :] * cond2.noise.mean, cond1.noise.mean
-        xi = functools.vmap(lambda a, b, c: a @ b + c)(A1, m1, m2)
+        xi = func.vmap(lambda a, b, c: a @ b + c)(A1, m1, m2)
 
         # Cholesky factor of combined covariance
         C1, C2 = cond1.noise.cholesky, T[None, :, None] * cond2.noise.cholesky
-        R1 = _transpose(functools.vmap(lambda a, b: a @ b)(A1, C2))
+        R1 = _transpose(func.vmap(lambda a, b: a @ b)(A1, C2))
         R2 = _transpose(C1)
-        Xi = functools.vmap(cholesky_util.sum_of_sqrtm_factors)((R1, R2))
+        Xi = func.vmap(cholesky_util.sum_of_sqrtm_factors)((R1, R2))
         Xi = _transpose(Xi)
 
         # Gather and return
@@ -414,7 +414,7 @@ class BlockDiagConditional(ConditionalBackend):
         rv_chol_upper = _transpose(cholesky)
         noise_chol_upper = _transpose(cond.noise.cholesky)
         A_rv_chol_upper = _transpose(cond.A @ cholesky)
-        revert = functools.vmap(cholesky_util.revert_conditional)
+        revert = func.vmap(cholesky_util.revert_conditional)
         r_obs, (r_cor, gain) = revert(A_rv_chol_upper, rv_chol_upper, noise_chol_upper)
         cholesky_obs = np.transpose(r_obs, axes=(0, 2, 1))
         cholesky_cor = np.transpose(r_cor, axes=(0, 2, 1))
@@ -452,7 +452,7 @@ class BlockDiagConditional(ConditionalBackend):
         def discretise(dt, output_scale):
             p, p_inv = precon_fun(dt)
             scale = base_scale * output_scale
-            A_batch, noise_batch = functools.vmap(discretise_1d)(scale)
+            A_batch, noise_batch = func.vmap(discretise_1d)(scale)
             return LatentCond(A_batch, noise_batch, to_latent=p_inv, to_observed=p)
 
         def discretise_1d(scale):
@@ -475,7 +475,7 @@ class BlockDiagConditional(ConditionalBackend):
             return tree_util.ravel_pytree(self.unravel_tree(a)[i])[0]
 
         x = np.zeros((*self.ode_shape, self.num_derivatives + 1))
-        linop = functools.vmap(functools.jacrev(select))(x)
+        linop = func.vmap(func.jacrev(select))(x)
 
         u_flat, _ = tree_util.ravel_pytree(u)
         bias = u_flat[:, None]
@@ -537,8 +537,8 @@ def _pascal(a, /):
 
 
 def _batch_gram(k, /):
-    k_vmapped_x = functools.vmap(k, in_axes=(0, None), out_axes=-1)
-    return functools.vmap(k_vmapped_x, in_axes=(None, 1), out_axes=-1)
+    k_vmapped_x = func.vmap(k, in_axes=(0, None), out_axes=-1)
+    return func.vmap(k_vmapped_x, in_axes=(None, 1), out_axes=-1)
 
 
 def _binom(n, k):

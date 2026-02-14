@@ -1,7 +1,7 @@
 """Assert that the base adaptive solver is accurate."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import functools, np, ode, testing, tree_util
+from probdiffeq.backend import func, np, ode, testing, tree_util
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
@@ -25,7 +25,7 @@ def test_output_matches_reference(fact):
     )
 
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, errorest=errorest)
-    received = functools.jit(solve)(init, t0=t0, t1=t1, dt0=dt0, atol=1e-3, rtol=1e-3)
+    received = func.jit(solve)(init, t0=t0, t1=t1, dt0=dt0, atol=1e-3, rtol=1e-3)
 
     # Compute a reference solution
     save_at = np.asarray([t0, t1])

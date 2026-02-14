@@ -1,7 +1,7 @@
 """Test the exactness of differentiation-based routines on first-order problems."""
 
 from probdiffeq import taylor
-from probdiffeq.backend import functools, np, ode, testing
+from probdiffeq.backend import func, np, ode, testing
 
 
 @testing.case()
@@ -17,7 +17,7 @@ def case_taylor_mode_scan():
 @testing.fixture(name="pb_with_solution")
 def fixture_pb_with_solution():
     vf, (u0, du0), (t0, _) = ode.ivp_van_der_pol_2nd()
-    vf = functools.partial(vf, t=t0)
+    vf = func.partial(vf, t=t0)
 
     solution = np.load("./tests/test_taylor/data/van_der_pol_second_solution.npy")
     return (vf, (u0, du0)), solution

@@ -1,18 +1,18 @@
 """Precompute and save reference solutions. Accelerate testing."""
 
 from probdiffeq import taylor
-from probdiffeq.backend import functools, np, ode
+from probdiffeq.backend import func, np, ode
 
 
 def three_body_first(num_derivatives_max=10):
     vf, (u0,), (t0, _) = ode.ivp_three_body_1st()
-    vf = functools.partial(vf, t=t0)
+    vf = func.partial(vf, t=t0)
     return taylor.odejet_unroll(vf, (u0,), num=num_derivatives_max)
 
 
 def van_der_pol_second(num_derivatives_max=10):
     vf, (u0, du0), (t0, _) = ode.ivp_van_der_pol_2nd()
-    vf = functools.partial(vf, t=t0)
+    vf = func.partial(vf, t=t0)
     return taylor.odejet_unroll(vf, (u0, du0), num=num_derivatives_max)
 
 

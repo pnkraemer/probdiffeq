@@ -1,4 +1,4 @@
-from probdiffeq.backend import abc, containers, functools, linalg, np, random, tree_util
+from probdiffeq.backend import abc, containers, func, linalg, np, random, tree_util
 from probdiffeq.backend.typing import Any, Callable
 from probdiffeq.impl import _conditional, _normal
 from probdiffeq.util import cholesky_util
@@ -31,7 +31,7 @@ class DenseTs0(Linearization):
             return tree_util.ravel_pytree(self.unravel(m)[self.ode_order])[0]
 
         fx = tree_util.ravel_pytree(fun(*self.unravel(rv.mean)[: self.ode_order]))[0]
-        linop = functools.jacrev(a1)(rv.mean)
+        linop = func.jacrev(a1)(rv.mean)
         cov_lower = damp * np.eye(len(fx))
         bias = _normal.Normal(-fx, cov_lower)
         to_latent = np.ones(linop.shape[1])
@@ -63,7 +63,7 @@ class DenseTs1(Linearization):
             return a1 - a0
 
         fx = constraint(mean)
-        linop = functools.jacfwd(constraint)(mean)  # todo: fwd or rev?
+        linop = func.jacfwd(constraint)(mean)  # todo: fwd or rev?
         fx = fx - linop @ mean
 
         cov_lower = damp * np.eye(len(fx))
@@ -93,7 +93,7 @@ class DenseSlr0(Linearization):
 
         m0, unravel = select_0(rv.mean)
 
-        extract_ = functools.vmap(lambda s: select_0(s)[0], in_axes=1, out_axes=1)
+        extract_ = func.vmap(lambda s: select_0(s)[0], in_axes=1, out_axes=1)
         r_0_nonsquare = extract_(rv.cholesky)
 
         # # Extract the linearisation point
@@ -115,7 +115,7 @@ class DenseSlr0(Linearization):
         def select_1(s):
             return tree_util.ravel_pytree(self.unravel(s)[1])
 
-        linop = functools.jacrev(lambda s: select_1(s)[0])(rv.mean)
+        linop = func.jacrev(lambda s: select_1(s)[0])(rv.mean)
         bias = _normal.Normal(-mean, cov_lower)
         to_latent = np.ones(linop.shape[1])
         to_observed = np.ones(linop.shape[0])
@@ -139,7 +139,7 @@ class DenseSlr0(Linearization):
         pts = x.mean[None, :] + pts_centered
 
         # Evaluate the nonlinear function
-        fx = functools.vmap(fn)(pts)
+        fx = func.vmap(fn)(pts)
         fx_mean = self.cubature_rule.weights_sqrtm**2 @ fx
         fx_centered = fx - fx_mean[None, :]
         fx_centered_normed = fx_centered * self.cubature_rule.weights_sqrtm[:, None]
@@ -171,7 +171,7 @@ class DenseSlr1(Linearization):
 
         m0, unravel = select_0(rv.mean)
 
-        extract_ = functools.vmap(lambda s: select_0(s)[0], in_axes=1, out_axes=1)
+        extract_ = func.vmap(lambda s: select_0(s)[0], in_axes=1, out_axes=1)
         r_0_nonsquare = extract_(rv.cholesky)
 
         # # Extract the linearisation point
@@ -188,7 +188,7 @@ class DenseSlr1(Linearization):
         def A(x):
             return select_1(x)[0] - J @ select_0(x)[0]
 
-        linop = functools.jacrev(A)(rv.mean)
+        linop = func.jacrev(A)(rv.mean)
 
         # Include the damping term. (TODO: use a single qr?)
         damping = damp * np.eye(len(cov_lower))
@@ -210,7 +210,7 @@ class DenseSlr1(Linearization):
         pts_centered_normed = pts_centered * self.cubature_rule.weights_sqrtm[:, None]
 
         # Evaluate the nonlinear function
-        fx = functools.vmap(fn)(pts)
+        fx = func.vmap(fn)(pts)
         fx_mean = self.cubature_rule.weights_sqrtm**2 @ fx
         fx_centered = fx - fx_mean[None, :]
         fx_centered_normed = fx_centered * self.cubature_rule.weights_sqrtm[:, None]
@@ -239,7 +239,7 @@ class IsotropicTs0(Linearization):
         def a1(m):
             return m[[self.ode_order], ...]
 
-        linop = functools.jacrev(a1)(mean[..., 0])
+        linop = func.jacrev(a1)(mean[..., 0])
         fx = tree_util.ravel_pytree(fun(*self.unravel(mean)[: self.ode_order]))[0]
 
         cov_lower = damp * np.eye(1)
@@ -270,7 +270,7 @@ class IsotropicTs1(Linearization):
         def a1(m):
             return m[[self.ode_order], ...]
 
-        linop = functools.jacrev(a1)(mean[..., 0])
+        linop = func.jacrev(a1)(mean[..., 0])
 
         def vf_flat(u):
             return tree_util.ravel_pytree(fun(unravel(u)))[0]
@@ -280,18 +280,18 @@ class IsotropicTs1(Linearization):
 
         # Evaluate the linearisation
         m0, unravel = select_0(rv.mean)
-        fx, Jvp = functools.linearize(vf_flat, m0)
+        fx, Jvp = func.linearize(vf_flat, m0)
 
         # Estimate the trace using Hutchinson's estimator
         # J_trace, jacobian_state = jacobian(Jvp, m0, jacobian_state)
         key, subkey = random.split(key, num=2)
         sample_shape = (self.jvp_probes, *m0.shape)
         v = random.rademacher(subkey, shape=sample_shape, dtype=m0.dtype)
-        J_trace = functools.vmap(lambda s: linalg.vector_dot(s, Jvp(s)))(v)
+        J_trace = func.vmap(lambda s: linalg.vector_dot(s, Jvp(s)))(v)
         J_trace = J_trace.mean(axis=0)
 
         # Turn fx and J_trace into an observation model
-        E0 = functools.jacrev(lambda s: s[[0], ...])(mean[..., 0])
+        E0 = func.jacrev(lambda s: s[[0], ...])(mean[..., 0])
         linop = linop - J_trace * E0
         fx = mean[1, ...] - fx
         fx = fx - linop @ mean
@@ -322,7 +322,7 @@ class BlockDiagTs0(Linearization):
         def a1(s):
             return s[[self.ode_order], ...]
 
-        linop = functools.vmap(functools.jacrev(a1))(mean)
+        linop = func.vmap(func.jacrev(a1))(mean)
 
         d, *_ = linop.shape
         cov_lower = damp * np.ones((d, 1, 1))
@@ -353,7 +353,7 @@ class BlockDiagTs1(Linearization):
         def a1(s):
             return s[[self.ode_order], ...]
 
-        linop = functools.vmap(functools.jacrev(a1))(mean)
+        linop = func.vmap(func.jacrev(a1))(mean)
 
         def vf_flat(u):
             return tree_util.ravel_pytree(fun(unravel(u)))[0]
@@ -363,19 +363,19 @@ class BlockDiagTs1(Linearization):
 
         # Evaluate the linearisation
         m0, unravel = select_0(rv.mean)
-        fx, Jvp = functools.linearize(vf_flat, m0)
+        fx, Jvp = func.linearize(vf_flat, m0)
 
         key, subkey = random.split(key, num=2)
         sample_shape = (self.jvp_probes, *m0.shape)
         v = random.rademacher(subkey, shape=sample_shape, dtype=m0.dtype)
-        J_diag = functools.vmap(lambda s: s * Jvp(s))(v)
+        J_diag = func.vmap(lambda s: s * Jvp(s))(v)
         J_diag = J_diag.mean(axis=0)
-        E1 = functools.jacrev(lambda s: s[0])(rv.mean[0])
+        E1 = func.jacrev(lambda s: s[0])(rv.mean[0])
         linop = linop - J_diag[:, None, None] * E1[None, None, :]
 
         fx = rv.mean[:, 1] - fx
         fx = fx[..., None]
-        diff = functools.vmap(lambda a, b: a @ b)(linop, rv.mean)
+        diff = func.vmap(lambda a, b: a @ b)(linop, rv.mean)
         fx = fx - diff
 
         d, *_ = linop.shape

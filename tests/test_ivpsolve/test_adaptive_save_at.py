@@ -1,7 +1,7 @@
 """Assert that the base adaptive solver is accurate."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import functools, np, ode, testing, tree_util
+from probdiffeq.backend import func, np, ode, testing, tree_util
 
 
 @testing.case
@@ -26,9 +26,7 @@ def case_solver_mle():
 
 @testing.case
 def case_solver_dynamic_without_relinearization():
-    return functools.partial(
-        probdiffeq.solver_dynamic, re_linearize_after_calibration=False
-    )
+    return func.partial(probdiffeq.solver_dynamic, re_linearize_after_calibration=False)
 
 
 @testing.case
@@ -112,7 +110,7 @@ def test_output_matches_reference(
     # Compute the PN solution
     save_at = np.linspace(t0, t1, endpoint=True, num=7)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
-    received = functools.jit(solve)(init, save_at=save_at, atol=1e-3, rtol=1e-3)
+    received = func.jit(solve)(init, save_at=save_at, atol=1e-3, rtol=1e-3)
 
     # Compute a reference solution
     expected = ode.odeint_and_save_at(vf, u0, save_at=save_at, atol=1e-7, rtol=1e-7)

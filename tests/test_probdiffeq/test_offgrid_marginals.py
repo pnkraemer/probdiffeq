@@ -1,7 +1,7 @@
 """Tests for IVP solvers."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import functools, np, ode, testing, tree_util
+from probdiffeq.backend import func, np, ode, testing, tree_util
 from probdiffeq.util import test_util
 
 
@@ -24,7 +24,7 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     ts = np.linspace(t0, t1, num=15, endpoint=True)
     solve = test_util.solve_adaptive_save_every_step(errorest=errorest, solver=solver)
     save_every = solve(init, t0=t0, t1=t1, dt0=0.1, atol=1e-2, rtol=1e-2)
-    offgrid = functools.vmap(lambda s: solver.offgrid_marginals(s, solution=save_every))
+    offgrid = func.vmap(lambda s: solver.offgrid_marginals(s, solution=save_every))
     u_interpolated = offgrid(ts[1:-1])
 
     # Compute a save-at solution and remove the edge-points
@@ -40,8 +40,8 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     for ui, us in zip(u_interpolated.std, u_save_at.std):
         assert testing.allclose(ui, us)
 
-    marginals_allclose_func = functools.partial(testing.marginals_allclose, ssm=ssm)
-    marginals_allclose_func = functools.vmap(marginals_allclose_func)
+    marginals_allclose_func = func.partial(testing.marginals_allclose, ssm=ssm)
+    marginals_allclose_func = func.vmap(marginals_allclose_func)
     assert np.all(
         marginals_allclose_func(u_interpolated.marginals, u_save_at.marginals)
     )
@@ -72,8 +72,8 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
     # Extrapolate from the left: close-to-left boundary must be similar,
     # but close-to-right boundary needs not be similar
     ts = np.linspace(sol.t[-2] + 1e-4, sol.t[-1] - 1e-4, num=5, endpoint=True)
-    offgrid_marginals = functools.partial(solver.offgrid_marginals, solution=sol)
-    u = functools.vmap(offgrid_marginals)(ts)
+    offgrid_marginals = func.partial(solver.offgrid_marginals, solution=sol)
+    u = func.vmap(offgrid_marginals)(ts)
     for u1, u2 in zip(u.mean, sol.u.mean):
         u1_ = tree_util.tree_map(lambda s: s[0], u1)
         u2_ = tree_util.tree_map(lambda s: s[-2], u2)
@@ -104,8 +104,8 @@ def test_smoother_marginals_close_to_both_boundaries(fact):
     # Extrapolate from the left: close-to-left boundary must be similar,
     # and close-to-right boundary must be similar
     ts = np.linspace(sol.t[-2] + 1e-4, sol.t[-1] - 1e-4, num=5, endpoint=True)
-    offgrid_marginals = functools.partial(solver.offgrid_marginals, solution=sol)
-    u = functools.vmap(offgrid_marginals)(ts)
+    offgrid_marginals = func.partial(solver.offgrid_marginals, solution=sol)
+    u = func.vmap(offgrid_marginals)(ts)
 
     for u1, u2 in zip(u.mean, sol.u.mean):
         u1_ = tree_util.tree_map(lambda s: s[0], u1)

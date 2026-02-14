@@ -1,7 +1,7 @@
 """Tests for sampling behaviour."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import functools, np, ode, random, testing, tree_util
+from probdiffeq.backend import func, np, ode, random, testing, tree_util
 
 
 @testing.fixture(name="approximation_and_strategy")
@@ -20,7 +20,7 @@ def fixture_approximation_and_strategy(fact):
     errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
     save_at = np.linspace(t0, t1, endpoint=True, num=7)
-    sol = functools.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
+    sol = func.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
     return sol, strategy
 
 

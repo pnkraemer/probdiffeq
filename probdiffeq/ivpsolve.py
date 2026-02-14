@@ -10,7 +10,7 @@ See the tutorials for example use cases.
 from probdiffeq.backend import (
     containers,
     control_flow,
-    functools,
+    func,
     linalg,
     np,
     tree_util,
@@ -375,7 +375,7 @@ class RejectionLoop:
             return state.error_norm_proposed < 1.0
 
         init = self.step_init_loopstate(s)
-        step_attempt = functools.partial(
+        step_attempt = func.partial(
             self.step_attempt, t1=t1, atol=atol, rtol=rtol, damp=damp
         )
         state_new = self.while_loop(cond, step_attempt, init)

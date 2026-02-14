@@ -1,7 +1,7 @@
 """Tests for interaction with the solution API."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import containers, functools, np, ode, testing
+from probdiffeq.backend import containers, func, np, ode, testing
 from probdiffeq.backend.typing import Array
 
 
@@ -30,7 +30,7 @@ def fixture_pn_solution(fact):
     errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
     save_at = np.linspace(t0, t1, endpoint=True, num=5)
-    return functools.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
+    return func.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
 
 
 def test_u_inherits_data_structure(pn_solution):

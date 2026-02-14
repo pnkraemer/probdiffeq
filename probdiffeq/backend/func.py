@@ -1,7 +1,5 @@
 """Function transformation tools."""
 
-import functools
-
 import jax
 import jax.experimental.jet
 
@@ -11,7 +9,7 @@ def vmap(func, /, in_axes=0, out_axes=0):
 
 
 def partial(func, *args, **kwargs):
-    return functools.partial(func, *args, **kwargs)
+    return func.partial(func, *args, **kwargs)
 
 
 def jit(func, /, static_argnums=None, static_argnames=None):

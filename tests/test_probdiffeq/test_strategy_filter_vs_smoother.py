@@ -1,7 +1,7 @@
 """The RMSE of the smoother should be (slightly) lower than the RMSE of the filter."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import functools, linalg, np, ode, testing, tree_util
+from probdiffeq.backend import func, linalg, np, ode, testing, tree_util
 
 
 @testing.fixture(name="solver_setup")
@@ -48,7 +48,7 @@ def test_compare_filter_smoother_rmse(filter_solution, smoother_solution):
     assert testing.allclose(filter_solution.t, smoother_solution.t)  # sanity check
 
     reference = _reference_solution(filter_solution.t)
-    vmap_tree_ravel = functools.vmap(lambda s: tree_util.ravel_pytree(s)[0])
+    vmap_tree_ravel = func.vmap(lambda s: tree_util.ravel_pytree(s)[0])
     u_fi = vmap_tree_ravel(filter_solution.u.mean[0])
     u_sm = vmap_tree_ravel(smoother_solution.u.mean[0])
     u_re = vmap_tree_ravel(reference)

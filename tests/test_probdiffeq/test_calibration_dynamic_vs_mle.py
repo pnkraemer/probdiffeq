@@ -6,7 +6,7 @@ but not for the dynamic solver.
 """
 
 from probdiffeq import ivpsolve, probdiffeq
-from probdiffeq.backend import functools, linalg, np, ode, testing, tree_util
+from probdiffeq.backend import func, linalg, np, ode, testing, tree_util
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
@@ -23,12 +23,12 @@ def test_exponential_approximated_well(fact):
 
     grid = np.linspace(t0, t1, num=20)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
-    approximation = functools.jit(solve)(init, grid=grid)
+    approximation = func.jit(solve)(init, grid=grid)
 
     solution = ode.odeint_and_save_at(
         vf, u0, save_at=np.asarray([t0, t1]), atol=1e-5, rtol=1e-5
     )
-    vmap_ravel = functools.vmap(lambda s: tree_util.ravel_pytree(s)[0])
+    vmap_ravel = func.vmap(lambda s: tree_util.ravel_pytree(s)[0])
     u = vmap_ravel(approximation.u.mean[0])
     sol = vmap_ravel(solution)
     rmse = _rmse(u[-1], sol[-1])

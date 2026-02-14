@@ -6,7 +6,7 @@ See the tutorials for example use cases.
 from probdiffeq.backend import (
     containers,
     control_flow,
-    functools,
+    func,
     linalg,
     np,
     random,
@@ -365,8 +365,8 @@ class MarkovStrategy(Generic[T]):
 
     def _transform_unit_sample(self, markov_seq, base_sample, *, reverse):
         if base_sample.ndim > len(self._sample_shape(markov_seq)):
-            transform = functools.partial(self._transform_unit_sample, reverse=reverse)
-            transform_vmap = functools.vmap(transform, in_axes=(None, 0))
+            transform = func.partial(self._transform_unit_sample, reverse=reverse)
+            transform_vmap = func.vmap(transform, in_axes=(None, 0))
             return transform_vmap(markov_seq, base_sample)
 
         # Compute a single unit sample.
@@ -396,7 +396,7 @@ class MarkovStrategy(Generic[T]):
         else:
             samples = np.concatenate([init_sample[None, ...], samples])
 
-        return functools.vmap(self.ssm.stats.qoi_from_sample)(samples)
+        return func.vmap(self.ssm.stats.qoi_from_sample)(samples)
 
     def log_marginal_likelihood_terminal_values(
         self, u, /, *, standard_deviation, posterior: T
@@ -483,9 +483,7 @@ class MarkovStrategy(Generic[T]):
 
         # Generate an observation-model for the QOI
 
-        model_fun = functools.vmap(
-            self.ssm.conditional.to_derivative, in_axes=(None, 0, 0)
-        )
+        model_fun = func.vmap(self.ssm.conditional.to_derivative, in_axes=(None, 0, 0))
         models = model_fun(0, u, standard_deviation)
 
         # Select the terminal variable
@@ -813,7 +811,7 @@ def prior_wiener_integrated_discrete(
         tcoeffs, tcoeffs_std=tcoeffs_std, ssm_fact=ssm_fact, output_scale=output_scale
     )
     scales = np.ones_like(ssm.prototypes.output_scale())
-    discretize_vmap = functools.vmap(discretize, in_axes=(0, None))
+    discretize_vmap = func.vmap(discretize, in_axes=(0, None))
     conditionals = discretize_vmap(np.diff(ts), scales)
     markov_seq = MarkovSequence(init.marginals, conditionals)
     return markov_seq, ssm
@@ -1332,7 +1330,7 @@ class solver_mle(ProbabilisticSolver):
         output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale())
         output_scale_running = 0 * output_scale_prior
 
-        f_wrapped = functools.partial(self.vector_field, t=t)
+        f_wrapped = func.partial(self.vector_field, t=t)
         fun_evals, correction_state = self.constraint.linearize(
             f_wrapped, estimate.marginals, correction_state, damp=0.0
         )
@@ -1360,7 +1358,7 @@ class solver_mle(ProbabilisticSolver):
 
         # Linearize
         (lin_state, output_scale_running, num_data) = state.auxiliary
-        f_wrapped = functools.partial(self.vector_field, t=state.t + dt)
+        f_wrapped = func.partial(self.vector_field, t=state.t + dt)
         fx, correction_state = self.constraint.linearize(
             f_wrapped, u.marginals, state=lin_state, damp=damp
         )
@@ -1449,7 +1447,7 @@ class solver_dynamic(ProbabilisticSolver):
 
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
 
-        f_wrapped = functools.partial(self.vector_field, t=t)
+        f_wrapped = func.partial(self.vector_field, t=t)
         fx, lin_state = self.constraint.linearize(
             f_wrapped, estimate.marginals, lin_state, damp=0.0
         )
@@ -1475,7 +1473,7 @@ class solver_dynamic(ProbabilisticSolver):
         u = self.ssm.conditional.apply(mean, transition)
 
         # Linearize
-        f_wrapped = functools.partial(self.vector_field, t=state.t + dt)
+        f_wrapped = func.partial(self.vector_field, t=state.t + dt)
         fx, lin_state = self.constraint.linearize(
             f_wrapped, u, state=lin_state, damp=damp
         )
@@ -1559,7 +1557,7 @@ class solver(ProbabilisticSolver):
         correction_state = self.constraint.init_linearization()
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
 
-        f_wrapped = functools.partial(self.vector_field, t=t)
+        f_wrapped = func.partial(self.vector_field, t=t)
         fun_evals, correction_state = self.constraint.linearize(
             f_wrapped, rv=u.marginals, state=correction_state, damp=0.0
         )
@@ -1583,7 +1581,7 @@ class solver(ProbabilisticSolver):
         u, prediction = self.strategy.predict(state.posterior, transition=transition)
 
         # Linearize
-        f_eval = functools.partial(self.vector_field, t=state.t + dt)
+        f_eval = func.partial(self.vector_field, t=state.t + dt)
         fx, auxiliary = self.constraint.linearize(
             f_eval, u.marginals, state.auxiliary, damp=damp
         )
@@ -1869,7 +1867,7 @@ class errorest_local_residual(ErrorEstimator):
         return error_power, state
 
     def _linearize_and_estimate(self, rv, state, /, t, *, damp):
-        f_wrapped = functools.partial(self.vector_field, t=t)
+        f_wrapped = func.partial(self.vector_field, t=t)
         linearized, state = self.constraint.linearize(f_wrapped, rv, state, damp=damp)
 
         observed = self.ssm.conditional.marginalise(rv, linearized)

@@ -3,7 +3,7 @@
 Necessary because the implementation has been faulty in the past. Never again.
 """
 
-from probdiffeq.backend import functools, np, random, stats, testing, tree_util
+from probdiffeq.backend import func, np, random, stats, testing, tree_util
 from probdiffeq.impl import impl
 
 
@@ -26,7 +26,7 @@ def test_grad_not_none(fact):
     rv, ssm = random_variable(fact=fact)
     u = np.ones_like(ssm.stats.mean(rv))
 
-    pdf = functools.jacrev(ssm.stats.logpdf)(u, rv)
+    pdf = func.jacrev(ssm.stats.logpdf)(u, rv)
     assert not np.any(np.isinf(pdf))
     assert not np.any(np.isnan(pdf))
 

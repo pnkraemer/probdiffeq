@@ -1,6 +1,6 @@
 """State-space model implementations."""
 
-from probdiffeq.backend import containers, functools, tree_util
+from probdiffeq.backend import containers, func, tree_util
 from probdiffeq.backend.typing import Callable
 from probdiffeq.impl import _conditional, _linearize, _normal, _prototypes, _stats
 
@@ -80,7 +80,7 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
     _, unravel_leaf = tree_util.ravel_pytree(leaves[0])
 
     def unravel(z):
-        tree = functools.vmap(unravel_tree, in_axes=1, out_axes=0)(z)
+        tree = func.vmap(unravel_tree, in_axes=1, out_axes=0)(z)
         return tree_util.tree_map(unravel_leaf, tree)
 
     prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
@@ -113,7 +113,7 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
     _, unravel_leaf = tree_util.ravel_pytree(leaves[0])
 
     def unravel(z):
-        tree = functools.vmap(unravel_tree, in_axes=0, out_axes=0)(z)
+        tree = func.vmap(unravel_tree, in_axes=0, out_axes=0)(z)
         return tree_util.tree_map(unravel_leaf, tree)
 
     prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)

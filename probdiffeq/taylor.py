@@ -7,7 +7,7 @@ in probdiffeq.probdiffeq easier to access.
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import control_flow, functools, np, ode, tree_util
+from probdiffeq.backend import control_flow, func, np, ode, tree_util
 from probdiffeq.backend.typing import Array, ArrayLike, Callable, Sequence
 from probdiffeq.util import filter_util
 
@@ -48,12 +48,12 @@ def runge_kutta_starter(dt, *, num: int, prior, ssm, atol=1e-12, rtol=1e-10):
 
         # Discretised prior
         scale = ssm.prototypes.output_scale()
-        prior_vmap = functools.vmap(prior, in_axes=(0, None))
+        prior_vmap = func.vmap(prior, in_axes=(0, None))
         ibm_transitions = prior_vmap(np.diff(ts), scale)
 
         # Generate an observation-model for the QOI
         # (1e-7 observation noise for nuggets and for reusing existing code)
-        model_fun = functools.vmap(ssm.conditional.to_derivative, in_axes=(None, 0, 0))
+        model_fun = func.vmap(ssm.conditional.to_derivative, in_axes=(None, 0, 0))
         std = tree_util.tree_map(lambda s: 1e-7 * np.ones((len(s),)), ys)
         models = model_fun(0, ys, std)
 
@@ -242,7 +242,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
         vals = (*args, fun_0(*args))
         primals_in, tangents_in = vals[:-1], vals[1:]
 
-        _, tangents_out = functools.jvp(fun_n, primals_in, tangents_in)
+        _, tangents_out = func.jvp(fun_n, primals_in, tangents_in)
         return tangents_out
 
     return tree_util.Partial(df)
@@ -290,7 +290,7 @@ def odejet_coefficient_increment(vf, *, num_arguments):
 
     def increment(taylor_coeffs):
         primals, series = jet_unpack_series(taylor_coeffs, num_arguments)
-        p, s_new = functools.jet(vf, primals=primals, series=series)
+        p, s_new = func.jet(vf, primals=primals, series=series)
         return [*primals, p, *s_new]
 
     return increment
@@ -304,7 +304,7 @@ def odejet_coefficient_double(vf):
         deg = len(taylor_coefficients)
 
         jet_embedded_deg = tree_util.Partial(jet_embedded, degree=deg)
-        fx, jvp = functools.linearize(jet_embedded_deg, *taylor_coefficients)
+        fx, jvp = func.linearize(jet_embedded_deg, *taylor_coefficients)
 
         def body_fun(cs_padded, i_and_fx_i):
             # The Jacobian of the embedded jet is block-banded,
@@ -349,7 +349,7 @@ def odejet_coefficient_double(vf):
 
         coeffs_emb = [*c] + [zeros] * degree
         p, *s = coeffs_emb
-        p_new, s_new = functools.jet(vf, (p,), (s,), is_tcoeff=True)
+        p_new, s_new = func.jet(vf, (p,), (s,), is_tcoeff=True)
         return np.stack([p_new, *s_new])
 
     return double
@@ -384,7 +384,7 @@ def odejet_affine(vf: Callable, inits: Sequence[Array], /, num: int):
         tcoeffs = odejet_affine(vf_wrapped, inits_flat, num=num)
         return tree_util.tree_map(unravel, tcoeffs)
 
-    fx, jvp_fn = functools.linearize(vf, *inits)
+    fx, jvp_fn = func.linearize(vf, *inits)
 
     tmp = fx
     fx_evaluations = [tmp := jvp_fn(tmp) for _ in range(num - 1)]

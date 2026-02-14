@@ -1,7 +1,7 @@
 """Assert that every recipe yields a decent ODE approximation."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import functools, np, ode, testing, tree_util
+from probdiffeq.backend import func, np, ode, testing, tree_util
 
 
 @testing.case()
@@ -26,7 +26,7 @@ def case_slr1():
 
 @testing.case()
 def case_slr1_gauss_hermite():
-    return functools.partial(
+    return func.partial(
         probdiffeq.constraint_ode_slr1, cubature_fun=probdiffeq.cubature_gauss_hermite
     )
 
@@ -62,7 +62,7 @@ def test_terminal_value_simulation_matches_reference(solution):
     assert testing.allclose(received, expected, rtol=1e-2)
 
 
-@functools.jit
+@func.jit
 def reference_solution(t1):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
     ts = np.asarray([t0, t1])

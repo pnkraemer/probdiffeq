@@ -1,7 +1,7 @@
 """Compare solve_fixed_grid to solve_adaptive_save_every_step."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import containers, functools, np, ode, testing, tree_util
+from probdiffeq.backend import containers, func, np, ode, testing, tree_util
 from probdiffeq.backend.typing import Array
 from probdiffeq.util import test_util
 
@@ -33,7 +33,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result_when_reusing_grid(fact):
 
     grid_adaptive = solution_adaptive.t
     solve = ivpsolve.solve_fixed_grid(solver=solver)
-    solution_fixed = functools.jit(solve)(init, grid=grid_adaptive)
+    solution_fixed = func.jit(solve)(init, grid=grid_adaptive)
     assert testing.allclose(solution_adaptive, solution_fixed)
 
     # Assert u and u_std have matching shapes (that was wrong before)
