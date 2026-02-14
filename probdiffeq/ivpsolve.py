@@ -35,6 +35,15 @@ class Solution(Protocol, Generic[S]):
     This is the usually the same type as the initial condition.
     """
 
+    num_steps: int
+    """The number of steps taken by the solver."""
+
+    full_solution: Any
+    """A full description of the solution (beyond 'u', e.g. for dense outputs)."""
+
+    hyperparams: Any
+    """A description of (calibrated) hyperparameters."""
+
 
 # Revisit this dependent typing one Python >=3.12 is enforced
 # Concretely, Something like Solver[T, S: Solution[T]](Protocol):...
@@ -142,7 +151,7 @@ def solve_adaptive_terminal_values(
     control: Control | None = None,
     clip_dt: bool = False,
     while_loop: Callable = control_flow.while_loop,
-) -> Callable:
+) -> Callable[..., Solution]:
     """Simulate the terminal values of an initial value problem."""
     # Turn off warnings because any solver goes for terminal values
     solve_save_at = solve_adaptive_save_at(
@@ -174,7 +183,7 @@ def solve_adaptive_save_at(
     clip_dt: bool = False,
     while_loop: Callable = control_flow.while_loop,
     warn=True,
-) -> Callable:
+) -> Callable[..., Solution]:
     r"""Solve an initial value problem and return the solution at a pre-determined grid.
 
     This algorithm implements the method by Krämer (2025). Please consider citing it
@@ -265,7 +274,7 @@ def solve_adaptive_save_at(
     return solve
 
 
-def solve_fixed_grid(*, solver: Solver) -> Callable:
+def solve_fixed_grid(*, solver: Solver) -> Callable[..., Solution]:
     """Solve an initial value problem on a fixed, pre-determined grid."""
 
     def solve(u: T, /, *, grid, damp: float = 0.0) -> Solution[T]:

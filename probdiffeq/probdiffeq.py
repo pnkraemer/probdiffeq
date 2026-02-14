@@ -513,9 +513,10 @@ class ProbabilisticSolution(Generic[C, T]):
     u: TaylorCoeffTarget[C, T]
     """The current ODE solution estimate."""
 
-    posterior: T | MarkovSequence[T]
+    full_solution: T | MarkovSequence[T]
     """The current posterior estimate."""
 
+    # Todo: merge 'output_scale' and 'auxiliary'?
     output_scale: Any
     """The current output scale."""
 
@@ -630,16 +631,16 @@ class ProbabilisticSolver:
 
         # Extract the LHS
 
-        def _extract_previous(tree):
-            return tree.tree_map(lambda s: s[index - 1, ...], tree)
+        def _extract_previous(pytree):
+            return tree.tree_map(lambda s: s[index - 1, ...], pytree)
 
-        posterior_t0 = _extract_previous(solution.posterior)
+        posterior_t0 = _extract_previous(solution.full_solution)
         t0 = _extract_previous(solution.t)
 
         # Extract the RHS
 
-        def _extract(tree):
-            return tree.tree_map(lambda s: s[index, ...], tree)
+        def _extract(pytree):
+            return tree.tree_map(lambda s: s[index, ...], pytree)
 
         t1 = _extract(solution.t)
         output_scale = _extract(solution.output_scale)
@@ -673,8 +674,8 @@ class ProbabilisticSolver:
 
         # Interpolate
         tmp = self.strategy.interpolate(
-            posterior_t0=interp_from.posterior,
-            posterior_t1=interp_to.posterior,
+            posterior_t0=interp_from.full_solution,
+            posterior_t1=interp_to.full_solution,
             transition_t0_t=transition_t0_t,
             transition_t_t1=transition_t_t1,
         )
@@ -683,7 +684,7 @@ class ProbabilisticSolver:
         step_from = ProbabilisticSolution(
             t=interp_to.t,
             # New:
-            posterior=step_and_interpolate_from.step_from,
+            full_solution=step_and_interpolate_from.step_from,
             # Old:
             u=interp_to.u,
             output_scale=interp_to.output_scale,
@@ -695,7 +696,7 @@ class ProbabilisticSolver:
         interpolated = ProbabilisticSolution(
             t=t,
             # New:
-            posterior=interpolated,
+            full_solution=interpolated,
             u=estimate,
             # Taken from the rhs point
             output_scale=interp_to.output_scale,
@@ -707,7 +708,7 @@ class ProbabilisticSolver:
         interp_from = ProbabilisticSolution(
             t=t,
             # New:
-            posterior=step_and_interpolate_from.interp_from,
+            full_solution=step_and_interpolate_from.interp_from,
             # Old:
             u=interp_from.u,
             output_scale=interp_from.output_scale,
@@ -724,13 +725,13 @@ class ProbabilisticSolver:
     ):
         """Interpolate the solution near a checkpoint."""
         del t
-        tmp = self.strategy.interpolate_at_t1(posterior_t1=interp_to.posterior)
+        tmp = self.strategy.interpolate_at_t1(posterior_t1=interp_to.full_solution)
         (estimate, interpolated), step_and_interpolate_from = tmp
 
         prev = ProbabilisticSolution(
             t=interp_to.t,
             # New
-            posterior=step_and_interpolate_from.interp_from,
+            full_solution=step_and_interpolate_from.interp_from,
             # Old
             u=interp_from.u,  # incorrect?
             output_scale=interp_from.output_scale,  # incorrect?
@@ -741,7 +742,7 @@ class ProbabilisticSolver:
         sol = ProbabilisticSolution(
             t=interp_to.t,
             # New:
-            posterior=interpolated,
+            full_solution=interpolated,
             u=estimate,
             # Old:
             output_scale=interp_to.output_scale,
@@ -752,7 +753,7 @@ class ProbabilisticSolver:
         acc = ProbabilisticSolution(
             t=interp_to.t,
             # New:
-            posterior=step_and_interpolate_from.step_from,
+            full_solution=step_and_interpolate_from.step_from,
             # Old
             u=interp_to.u,
             output_scale=interp_to.output_scale,
@@ -1338,7 +1339,7 @@ class solver_mle(ProbabilisticSolver):
         return ProbabilisticSolution(
             t=t,
             u=estimate,
-            posterior=posterior,
+            full_solution=posterior,
             auxiliary=auxiliary,
             output_scale=output_scale_prior,
             num_steps=0,
@@ -1352,7 +1353,7 @@ class solver_mle(ProbabilisticSolver):
 
         # Predict
         u, prediction = self.strategy.predict(
-            posterior=state.posterior, transition=transition
+            posterior=state.full_solution, transition=transition
         )
 
         # Linearize
@@ -1380,7 +1381,7 @@ class solver_mle(ProbabilisticSolver):
         return ProbabilisticSolution(
             t=state.t + dt,
             u=u,
-            posterior=posterior,
+            full_solution=posterior,
             output_scale=state.output_scale,
             auxiliary=auxiliary,
             num_steps=state.num_steps + 1,
@@ -1397,8 +1398,8 @@ class solver_mle(ProbabilisticSolver):
         ones = np.ones_like(output_scale)
         output_scale = output_scale[-1]
 
-        init = solution0.posterior
-        posterior = solution.posterior
+        init = solution0.full_solution
+        posterior = solution.full_solution
         estimate, posterior = self.strategy.finalize(
             posterior0=init, posterior=posterior, output_scale=output_scale
         )
@@ -1408,7 +1409,7 @@ class solver_mle(ProbabilisticSolver):
         return ProbabilisticSolution(
             t=ts,
             u=estimate,
-            posterior=posterior,
+            full_solution=posterior,
             output_scale=output_scale,
             num_steps=solution.num_steps,
             auxiliary=solution.auxiliary,
@@ -1455,7 +1456,7 @@ class solver_dynamic(ProbabilisticSolver):
         return ProbabilisticSolution(
             t=t,
             u=estimate,
-            posterior=posterior,
+            full_solution=posterior,
             auxiliary=lin_state,
             output_scale=output_scale,
             num_steps=0,
@@ -1482,7 +1483,9 @@ class solver_dynamic(ProbabilisticSolver):
         # Do the full extrapolation with the calibrated output scale
         # (Includes re-discretisation)
         transition = self.prior(dt, output_scale)
-        u, prediction = self.strategy.predict(state.posterior, transition=transition)
+        u, prediction = self.strategy.predict(
+            state.full_solution, transition=transition
+        )
 
         # Relinearize
         if self.re_linearize_after_calibration:
@@ -1499,7 +1502,7 @@ class solver_dynamic(ProbabilisticSolver):
         return ProbabilisticSolution(
             t=state.t + dt,
             u=u,
-            posterior=posterior,
+            full_solution=posterior,
             num_steps=state.num_steps + 1,
             auxiliary=lin_state,
             output_scale=output_scale,
@@ -1514,8 +1517,8 @@ class solver_dynamic(ProbabilisticSolver):
         ones = np.ones_like(solution.output_scale)
         output_scale = ones[-1, ...]
 
-        init = solution0.posterior
-        posterior = solution.posterior
+        init = solution0.full_solution
+        posterior = solution.full_solution
         estimate, posterior = self.strategy.finalize(
             posterior0=init, posterior=posterior, output_scale=output_scale
         )
@@ -1526,7 +1529,7 @@ class solver_dynamic(ProbabilisticSolver):
         return ProbabilisticSolution(
             t=ts,
             u=estimate,
-            posterior=posterior,
+            full_solution=posterior,
             output_scale=output_scale,
             num_steps=solution.num_steps,
             auxiliary=solution.auxiliary,
@@ -1564,7 +1567,7 @@ class solver(ProbabilisticSolver):
         return ProbabilisticSolution(
             t=t,
             u=u,
-            posterior=posterior,
+            full_solution=posterior,
             num_steps=0,
             auxiliary=correction_state,
             output_scale=output_scale,
@@ -1577,7 +1580,9 @@ class solver(ProbabilisticSolver):
         transition = self.prior(dt, output_scale)
 
         # Predict
-        u, prediction = self.strategy.predict(state.posterior, transition=transition)
+        u, prediction = self.strategy.predict(
+            state.full_solution, transition=transition
+        )
 
         # Linearize
         f_eval = func.partial(self.vector_field, t=state.t + dt)
@@ -1593,7 +1598,7 @@ class solver(ProbabilisticSolver):
         return ProbabilisticSolution(
             t=state.t + dt,
             u=u,
-            posterior=posterior,
+            full_solution=posterior,
             output_scale=output_scale,
             auxiliary=auxiliary,
             num_steps=state.num_steps + 1,
@@ -1609,8 +1614,8 @@ class solver(ProbabilisticSolver):
         ones = np.ones_like(solution.output_scale)
         output_scale = np.ones_like(solution.output_scale[-1])
 
-        init = solution0.posterior
-        posterior = solution.posterior
+        init = solution0.full_solution
+        posterior = solution.full_solution
         u, posterior = self.strategy.finalize(
             posterior0=init, posterior=posterior, output_scale=output_scale
         )
@@ -1621,7 +1626,7 @@ class solver(ProbabilisticSolver):
         return ProbabilisticSolution(
             t=ts,
             u=u,
-            posterior=posterior,
+            full_solution=posterior,
             output_scale=output_scale,
             num_steps=solution.num_steps,
             auxiliary=solution.auxiliary,

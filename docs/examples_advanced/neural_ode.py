@@ -170,7 +170,7 @@ def loss_log_marginal_likelihood(vf, *, t0):
         marginal_likelihood = strategy.log_marginal_likelihood(
             data[:, None],
             standard_deviation=jnp.ones_like(grid) * stdev,
-            posterior=sol.posterior,
+            posterior=sol.full_solution,
         )
         return -1 * marginal_likelihood, {"sol": sol}
 

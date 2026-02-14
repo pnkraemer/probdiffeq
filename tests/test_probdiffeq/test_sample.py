@@ -30,7 +30,7 @@ def test_sample_shape(approximation_and_strategy, shape):
 
     key = random.prng_key(seed=15)
     samples = strategy.markov_sample(
-        key, approximation.posterior, shape=shape, reverse=True
+        key, approximation.full_solution, shape=shape, reverse=True
     )
     for s, u in zip(samples, approximation.u.mean):
         s_shape = tree.tree_map(lambda x: x.shape, s)

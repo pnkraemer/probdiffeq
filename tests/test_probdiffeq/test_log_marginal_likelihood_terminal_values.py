@@ -49,7 +49,7 @@ def test_output_is_scalar_and_not_inf_and_not_nan(solution):
     std = tree.tree_map(lambda _s: 1e-2 * np.ones(()), sol.u.std[0])
 
     mll = strategy.log_marginal_likelihood_terminal_values(
-        data, standard_deviation=std, posterior=sol.posterior
+        data, standard_deviation=std, posterior=sol.full_solution
     )
 
     assert mll.shape == ()
@@ -64,5 +64,5 @@ def test_raise_error_if_structures_dont_match(solution):
 
     with testing.raises(ValueError, match="structure"):
         _ = strategy.log_marginal_likelihood_terminal_values(
-            data, standard_deviation=std, posterior=sol.posterior
+            data, standard_deviation=std, posterior=sol.full_solution
         )

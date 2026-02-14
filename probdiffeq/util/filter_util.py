@@ -70,8 +70,8 @@ def fixedpointsmoother_precon(*, ssm):
     return _initialise, _step
 
 
-def _select(tree, idx_or_slice):
-    return tree.tree_map(lambda s: s[idx_or_slice, ...], tree)
+def _select(pytree, idx_or_slice):
+    return tree.tree_map(lambda s: s[idx_or_slice, ...], pytree)
 
 
 def kalmanfilter_with_marginal_likelihood(*, ssm):
