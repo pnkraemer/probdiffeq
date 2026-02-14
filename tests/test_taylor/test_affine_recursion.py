@@ -1,8 +1,7 @@
 """Tests for the affine recursion."""
 
 from probdiffeq import taylor
-from probdiffeq.backend import numpy as np
-from probdiffeq.backend import testing
+from probdiffeq.backend import np, testing
 
 
 @testing.parametrize("num", [1, 2, 4])

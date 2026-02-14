@@ -1,8 +1,7 @@
 """Tests for interaction with the solution API."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import containers, functools, ode, testing
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import containers, functools, np, ode, testing
 from probdiffeq.backend.typing import Array
 
 

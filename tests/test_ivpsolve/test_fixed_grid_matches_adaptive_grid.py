@@ -1,8 +1,7 @@
 """Compare solve_fixed_grid to solve_adaptive_save_every_step."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import containers, functools, ode, testing, tree_util
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import containers, functools, np, ode, testing, tree_util
 from probdiffeq.backend.typing import Array
 from probdiffeq.util import test_util
 

@@ -1,5 +1,4 @@
-from probdiffeq.backend import abc
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import abc, np
 from probdiffeq.impl import _normal
 
 

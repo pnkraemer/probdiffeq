@@ -7,8 +7,7 @@ in probdiffeq.probdiffeq easier to access.
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import control_flow, functools, ode, tree_util
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import control_flow, functools, np, ode, tree_util
 from probdiffeq.backend.typing import Array, ArrayLike, Callable, Sequence
 from probdiffeq.util import filter_util
 

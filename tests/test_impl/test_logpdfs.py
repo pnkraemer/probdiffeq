@@ -3,8 +3,7 @@
 Necessary because the implementation has been faulty in the past. Never again.
 """
 
-from probdiffeq.backend import functools, random, stats, testing, tree_util
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import functools, np, random, stats, testing, tree_util
 from probdiffeq.impl import impl
 
 

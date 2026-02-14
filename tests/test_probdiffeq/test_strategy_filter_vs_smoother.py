@@ -1,8 +1,7 @@
 """The RMSE of the smoother should be (slightly) lower than the RMSE of the filter."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import functools, linalg, ode, testing, tree_util
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import functools, linalg, np, ode, testing, tree_util
 
 
 @testing.fixture(name="solver_setup")

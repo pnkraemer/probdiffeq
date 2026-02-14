@@ -1,5 +1,4 @@
-from probdiffeq.backend import abc, containers, linalg, tree_util
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import abc, containers, linalg, np, tree_util
 from probdiffeq.backend.typing import Generic, Sequence, TypeVar
 
 T = TypeVar("T")

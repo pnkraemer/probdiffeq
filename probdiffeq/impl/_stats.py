@@ -1,5 +1,4 @@
-from probdiffeq.backend import abc, functools, linalg
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import abc, functools, linalg, np
 from probdiffeq.backend.typing import Callable
 from probdiffeq.impl import _normal
 from probdiffeq.util import cholesky_util

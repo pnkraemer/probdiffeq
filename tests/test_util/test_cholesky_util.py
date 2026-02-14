@@ -3,8 +3,7 @@
 These are so crucial and annoying to debug that they need their own test set.
 """
 
-from probdiffeq.backend import functools, linalg, random, testing, tree_util
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import functools, linalg, np, random, testing, tree_util
 from probdiffeq.util import cholesky_util
 
 _SHAPES = ([(4, 3), (3, 3), (4, 4)], [(2, 3), (3, 3), (2, 2)])

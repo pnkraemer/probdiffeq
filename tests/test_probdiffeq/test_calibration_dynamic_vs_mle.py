@@ -6,8 +6,7 @@ but not for the dynamic solver.
 """
 
 from probdiffeq import ivpsolve, probdiffeq
-from probdiffeq.backend import functools, linalg, ode, testing, tree_util
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import functools, linalg, np, ode, testing, tree_util
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])

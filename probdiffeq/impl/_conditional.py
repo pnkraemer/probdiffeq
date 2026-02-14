@@ -1,7 +1,6 @@
 """LatentConds."""
 
-from probdiffeq.backend import abc, containers, functools, linalg, tree_util
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import abc, containers, functools, linalg, np, tree_util
 from probdiffeq.backend.typing import Array
 from probdiffeq.impl import _normal, _stats
 from probdiffeq.util import cholesky_util

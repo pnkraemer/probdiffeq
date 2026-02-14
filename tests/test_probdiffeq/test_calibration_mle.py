@@ -6,8 +6,7 @@ After applying stats.calibrate(), the posterior is different.
 """
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import numpy as np
-from probdiffeq.backend import ode, testing
+from probdiffeq.backend import np, ode, testing
 
 
 @testing.case()

@@ -20,8 +20,7 @@ manipulation of square root matrices.
 
 """
 
-from probdiffeq.backend import control_flow, linalg, tree_util
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import control_flow, linalg, np, tree_util
 
 
 def revert_conditional_noisefree(R_X_F, R_X):

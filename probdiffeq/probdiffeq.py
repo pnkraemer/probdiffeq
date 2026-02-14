@@ -8,12 +8,12 @@ from probdiffeq.backend import (
     control_flow,
     functools,
     linalg,
+    np,
     random,
     special,
     tree_array_util,
     tree_util,
 )
-from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import (
     Any,
     Array,

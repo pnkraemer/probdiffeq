@@ -1,8 +1,7 @@
 """Test the exactness of differentiation-based routines on first-order problems."""
 
 from probdiffeq import taylor
-from probdiffeq.backend import functools, ode, testing
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import functools, np, ode, testing
 
 
 @testing.case()

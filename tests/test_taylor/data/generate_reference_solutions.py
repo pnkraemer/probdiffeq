@@ -1,8 +1,7 @@
 """Precompute and save reference solutions. Accelerate testing."""
 
 from probdiffeq import taylor
-from probdiffeq.backend import config, functools, ode
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import config, functools, np, ode
 
 
 def three_body_first(num_derivatives_max=10):

@@ -12,10 +12,10 @@ from probdiffeq.backend import (
     control_flow,
     functools,
     linalg,
+    np,
     tree_util,
     warnings,
 )
-from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import (
     Any,
     Array,

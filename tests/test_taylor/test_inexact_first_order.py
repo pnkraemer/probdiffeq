@@ -1,8 +1,7 @@
 """Tests for inexact approximations for first-order problems."""
 
 from probdiffeq import probdiffeq, taylor
-from probdiffeq.backend import functools, ode, testing, tree_util
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import functools, np, ode, testing, tree_util
 
 
 @testing.parametrize("num", [0, 1, 3])

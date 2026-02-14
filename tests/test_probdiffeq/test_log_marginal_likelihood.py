@@ -1,8 +1,7 @@
 """Tests for log-marginal-likelihood functionality."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import numpy as np
-from probdiffeq.backend import ode, testing, tree_util
+from probdiffeq.backend import np, ode, testing, tree_util
 
 
 @testing.fixture(name="solution")

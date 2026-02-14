@@ -1,8 +1,7 @@
 """Tests for IVP solvers."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import functools, ode, testing, tree_util
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import functools, np, ode, testing, tree_util
 from probdiffeq.util import test_util
 
 

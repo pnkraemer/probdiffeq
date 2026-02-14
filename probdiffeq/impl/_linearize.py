@@ -1,5 +1,4 @@
-from probdiffeq.backend import abc, containers, functools, linalg, random, tree_util
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import abc, containers, functools, linalg, np, random, tree_util
 from probdiffeq.backend.typing import Any, Callable
 from probdiffeq.impl import _conditional, _normal
 from probdiffeq.util import cholesky_util
