@@ -236,7 +236,7 @@ cov = jnp.eye(2) * 30  # fairly uninformed prior
 def logposterior_fn(theta, *, data, ts, obs_stdev=0.1):
     """Evaluate the logposterior-function of the data."""
     solution = solve_fixed(theta, ts=ts)
-    y_T = jax.tree.map(lambda s: s[-1], solution.posterior)
+    y_T = jax.tree.map(lambda s: s[-1], solution.solution_full)
     logpdf_data = strategy.log_marginal_likelihood_terminal_values(
         data, standard_deviation=obs_stdev, posterior=y_T
     )

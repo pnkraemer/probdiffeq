@@ -113,7 +113,7 @@ def parameter_to_data_fit(parameters_, /, standard_deviation=1e-1):
     return -1.0 * strategy.log_marginal_likelihood(
         data,
         standard_deviation=jnp.ones_like(sol_.t) * standard_deviation,
-        posterior=sol_.posterior,
+        posterior=sol_.solution_full,
     )
 
 

@@ -115,7 +115,7 @@ print(jax.tree.map(jnp.shape, solution.u))
 key = jax.random.PRNGKey(seed=15)
 _, _, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
 strategy = probdiffeq.strategy_filter(ssm)
-posterior = solution.posterior
+posterior = solution.solution_full
 sample_one = strategy.markov_sample(key, posterior, reverse=True)
 sample_many = strategy.markov_sample(key, posterior, shape=(1, 2, 3), reverse=True)
 
