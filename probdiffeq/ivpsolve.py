@@ -24,7 +24,7 @@ S = TypeVar("S")
 
 
 class Solution(Protocol, Generic[S]):
-    """An IVP solution protocol."""
+    """An protocol that defines expected solution types."""
 
     t: Array
     """The timepoints that the solution is expressed on."""
@@ -42,7 +42,7 @@ class Solution(Protocol, Generic[S]):
 
 
 class Solver(Protocol, Generic[T_contra, S]):
-    """An IVP solver protocol."""
+    """An protocol that defines expected solver types."""
 
     def init(self, *, t, u: T_contra) -> S:
         """Initialise the solver's state."""
@@ -336,7 +336,7 @@ def dt0_adaptive(vf, initial_values, /, t0, *, error_contraction_rate, rtol, ato
 @tree.register_dataclass
 @containers.dataclass
 class TimeStepState(Generic[T]):
-    """State for adaptive time-stepping."""
+    """A state variable type for adaptive time-stepping."""
 
     dt: float
     """The time-step-size proposal for the next step."""
@@ -379,7 +379,7 @@ class _RejectionLoopState:
 
 
 class RejectionLoop:
-    """Implement a rejection loop."""
+    """An implementation of a rejection loop."""
 
     def __init__(
         self,
