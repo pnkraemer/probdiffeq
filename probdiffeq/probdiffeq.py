@@ -12,7 +12,6 @@ from probdiffeq.backend import (
     random,
     special,
     tree,
-    tree_array_util,
 )
 from probdiffeq.backend.typing import (
     Any,
@@ -329,9 +328,9 @@ class MarkovStrategy(Generic[T]):
 
         if reverse:
             # Append the terminal marginal to the computed ones
-            return tree_array_util.tree_append(marginals, init)
+            return tree.tree_array_append(marginals, init)
 
-        return tree_array_util.tree_prepend(init, marginals)
+        return tree.tree_array_prepend(init, marginals)
 
     def markov_sample(
         self, key, markov_seq: MarkovSequence, *, reverse: bool, shape: tuple = ()
@@ -921,7 +920,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         marginals = self.markov_marginals(posterior, reverse=True)
 
         # Prepend the initial condition to the filtering distributions
-        init = tree_array_util.tree_prepend(posterior0.marginal, posterior.marginal)
+        init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
         posterior = MarkovSequence(marginal=init, conditional=posterior.conditional)
 
         # Extract targets
@@ -1051,7 +1050,7 @@ class strategy_filter(MarkovStrategy):
         posterior = self.ssm.stats.rescale_cholesky(posterior, output_scale)
 
         # Stack
-        posterior = tree_array_util.tree_prepend(posterior0, posterior)
+        posterior = tree.tree_array_prepend(posterior0, posterior)
 
         marginals = posterior
         u = self.ssm.stats.qoi(marginals)
@@ -1193,7 +1192,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         marginals = self.markov_marginals(posterior, reverse=True)
 
         # Prepend the initial condition to the filtering distributions
-        init = tree_array_util.tree_prepend(posterior0.marginal, posterior.marginal)
+        init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
         posterior = MarkovSequence(marginal=init, conditional=posterior.conditional)
 
         # Extract targets

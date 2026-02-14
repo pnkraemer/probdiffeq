@@ -1,7 +1,7 @@
 """Test utilities."""
 
 import probdiffeq.ivpsolve
-from probdiffeq.backend import control_flow, func, tree_array_util, warnings
+from probdiffeq.backend import control_flow, func, tree, warnings
 from probdiffeq.backend.typing import TypeVar
 
 T = TypeVar("T")
@@ -53,7 +53,7 @@ def solve_adaptive_save_every_step(solver, errorest, control=None, clip_dt=False
             )
             solutions.append(solution)
 
-        solutions = tree_array_util.tree_stack(solutions)
+        solutions = tree.tree_array_stack(solutions)
         return func.jit(solver.userfriendly_output)(
             solution0=solution0, solution=solutions
         )
