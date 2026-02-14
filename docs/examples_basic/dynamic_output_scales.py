@@ -97,8 +97,6 @@ fig, (axes_linear, axes_log) = plt.subplots(ncols=2, nrows=2, sharex=True, share
 
 u_dynamic = solution_dynamic.u.mean[0]
 u_mle = solution_mle.u.mean[0]
-scale_dynamic = solution_dynamic.output_scale
-scale_mle = jnp.ones_like(solution_mle.output_scale) * solution_mle.output_scale[-1]
 
 style_target = {
     "marker": "None",
@@ -115,14 +113,7 @@ style_approx = {
     "linewidth": 1.5,
     "alpha": 0.75,
 }
-style_scale = {
-    "marker": "None",
-    "color": "C3",
-    "linestyle": "solid",
-    "label": "Output scale",
-    "linewidth": 1.5,
-    "alpha": 0.75,
-}
+
 
 axes_linear[0].set_title("Time-varying model")
 axes_linear[0].plot(ts, jnp.exp(ts * 2), **style_target)

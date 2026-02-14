@@ -21,8 +21,12 @@ def test_output_matches_reference(fact):
     errorest = probdiffeq.errorest_local_residual_cached(prior=iwp, ssm=ssm)
 
     # Compute the PN solution
+    dt0 = ivpsolve.dt0_adaptive(
+        vf, u0, t0, error_contraction_rate=5, rtol=1e-3, atol=1e-3
+    )
+
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, errorest=errorest)
-    received = functools.jit(solve)(init, t0=t0, t1=t1, atol=1e-3, rtol=1e-3)
+    received = functools.jit(solve)(init, t0=t0, t1=t1, dt0=dt0, atol=1e-3, rtol=1e-3)
 
     # Compute a reference solution
     save_at = np.asarray([t0, t1])

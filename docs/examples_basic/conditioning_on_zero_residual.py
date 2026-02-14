@@ -82,12 +82,6 @@ solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
 sol = solve(init, save_at=ts, dt0=dt0, atol=1e-1, rtol=1e-1)
 markov_seq_posterior = sol.posterior
 
-# +
-# Compute marginals
-
-margs_prior = strategy.markov_marginals(markov_seq_prior, reverse=False)
-margs_tcoeffs = strategy.markov_marginals(markov_seq_tcoeffs, reverse=False)
-margs_posterior = strategy.markov_marginals(markov_seq_posterior, reverse=True)
 
 # +
 # Compute samples
@@ -148,12 +142,6 @@ for i in range(num_samples):
     axes_log_abs[2].plot(
         ts, jnp.log10(jnp.abs(residual_posterior))[i, ...], **sample_style, color="C2"
     )
-#
-
-
-def residual_mean(x, t):
-    """Evaluate the ODE residual."""
-    return x[1] - jax.vmap(vector_field)(x[0], t)
 
 
 # Set the x- and y-ticks/limits

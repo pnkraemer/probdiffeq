@@ -19,7 +19,6 @@ from probdiffeq.backend import numpy as np
 from probdiffeq.backend.typing import (
     Any,
     Array,
-    ArrayLike,
     Callable,
     Generic,
     NamedArg,
@@ -27,14 +26,21 @@ from probdiffeq.backend.typing import (
     TypeVar,
 )
 
-T = TypeVar("T")
+T = TypeVar("T", contravariant=True)
+S = TypeVar("S")
 
 
-class Solution(Protocol[T]):
+class Solution(Protocol, Generic[S]):
     """An IVP solution protocol."""
 
     t: Array
-    u: T
+    """The timepoints that the solution is expressed on."""
+
+    u: S
+    """The IVP solution state.
+
+    This is the usually the same type as the initial condition.
+    """
 
 
 # Revisit this dependent typing one Python >=3.12 is enforced
@@ -42,19 +48,33 @@ class Solution(Protocol[T]):
 # can now be written.
 
 
-class Solver(Protocol[T]):
+class Solver(Protocol, Generic[T, S]):
     """An IVP solver protocol."""
 
-    init: Callable[[ArrayLike, T], Solution[T]]
-    step: Callable[[Solution[T]], Solution[T]]
+    def init(self, *, t, u: T) -> S:
+        """Initialise the solver's state."""
+
+    def step(self, state: S, *, dt: float, damp: float) -> S:
+        """Perform a step."""
+
+    @property
+    def is_suitable_for_save_at(self) -> bool:
+        """Whether or not the solver can be used with adaptive time-stepping."""
+
+    def userfriendly_output(self, *, solution: S, solution0: S) -> S:
+        """Postprocess the solution before returning."""
 
 
 def solve_adaptive_terminal_values(
-    solver, errorest, control=None, clip_dt=False, while_loop=control_flow.while_loop
+    solver: Solver,
+    errorest,
+    control=None,
+    clip_dt=False,
+    while_loop=control_flow.while_loop,
 ) -> Callable:
     """Simulate the terminal values of an initial value problem."""
     # Turn off warnings because any solver goes for terminal values
-    solver = solve_adaptive_save_at(
+    solve_save_at = solve_adaptive_save_at(
         solver=solver,
         errorest=errorest,
         control=control,
@@ -67,7 +87,7 @@ def solve_adaptive_terminal_values(
         u: T, /, *, t0, t1, atol, rtol, dt0=0.1, eps=1e-8, damp=0.0
     ) -> Solution[T]:
         save_at = np.asarray([t0, t1])
-        solution = solver(
+        solution = solve_save_at(
             u, save_at=save_at, atol=atol, rtol=rtol, dt0=dt0, eps=eps, damp=damp
         )
         return tree_util.tree_map(lambda s: s[-1], solution)
@@ -77,7 +97,7 @@ def solve_adaptive_terminal_values(
 
 def solve_adaptive_save_at(
     *,
-    solver,
+    solver: Solver,
     errorest,
     control=None,
     clip_dt=False,
@@ -174,7 +194,7 @@ def solve_adaptive_save_at(
     return solve
 
 
-def solve_fixed_grid(*, solver) -> Callable:
+def solve_fixed_grid(*, solver: Solver) -> Callable:
     """Solve an initial value problem on a fixed, pre-determined grid."""
 
     def solve(u: T, /, *, grid, damp: float = 0.0) -> Solution[T]:
@@ -268,9 +288,6 @@ class TimeStepState(Generic[T]):
     errorest_step_from: Any
     """The error-estimate corresponding to 'step_from'."""
 
-    errorest_interp_from: Any
-    """The error-estimate corresponding to 'interp_from'."""
-
 
 @tree_util.register_dataclass
 @containers.dataclass
@@ -322,7 +339,6 @@ class RejectionLoop:
             interp_from=state_solver,
             control=state_control,
             errorest_step_from=state_errorest,
-            errorest_interp_from=state_errorest,
         )
 
     def loop(
@@ -432,7 +448,6 @@ class RejectionLoop:
             interp_from=state.step_from,
             control=state.control,
             errorest_step_from=state.errorest_proposed,
-            errorest_interp_from=state.errorest_step_from,
         )
 
     def interp_skip(self, args):
@@ -454,7 +469,6 @@ class RejectionLoop:
             interp_from=interp_res.interp_from,
             control=state.control,
             errorest_step_from=state.errorest_step_from,
-            errorest_interp_from=state.errorest_step_from,
         )
         return solution, new_state
 
@@ -470,7 +484,6 @@ class RejectionLoop:
             interp_from=interp_res.interp_from,
             control=state.control,
             errorest_step_from=state.errorest_step_from,
-            errorest_interp_from=state.errorest_step_from,
         )
         return solution, new_state
 
