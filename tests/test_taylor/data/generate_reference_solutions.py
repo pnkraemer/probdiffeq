@@ -1,7 +1,7 @@
 """Precompute and save reference solutions. Accelerate testing."""
 
 from probdiffeq import taylor
-from probdiffeq.backend import config, functools, np, ode
+from probdiffeq.backend import functools, np, ode
 
 
 def three_body_first(num_derivatives_max=10):
@@ -17,9 +17,6 @@ def van_der_pol_second(num_derivatives_max=10):
 
 
 if __name__ == "__main__":
-    # Double precision
-    config.update("enable_x64", True)
-
     solution1 = three_body_first()
     np.save("./tests/test_taylor/data/three_body_first_solution.npy", solution1)
 
