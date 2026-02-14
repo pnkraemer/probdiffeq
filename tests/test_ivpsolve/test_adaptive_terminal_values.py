@@ -1,7 +1,7 @@
 """Assert that the base adaptive solver is accurate."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import func, np, ode, testing, tree_util
+from probdiffeq.backend import func, np, ode, testing, tree
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
@@ -30,13 +30,13 @@ def test_output_matches_reference(fact):
     # Compute a reference solution
     save_at = np.asarray([t0, t1])
     expected = ode.odeint_and_save_at(vf, u0, save_at=save_at, atol=1e-7, rtol=1e-7)
-    expected = tree_util.tree_map(lambda s: s[-1], expected)
+    expected = tree.tree_map(lambda s: s[-1], expected)
 
     # The results should be very similar
     assert testing.allclose(received.u.mean[0], expected)
 
     # Assert u and u_std have matching shapes (that was wrong before)
-    u_shape = tree_util.tree_map(np.shape, received.u.mean)
-    u_std_shape = tree_util.tree_map(np.shape, received.u.std)
-    match = tree_util.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
-    assert tree_util.tree_all(match)
+    u_shape = tree.tree_map(np.shape, received.u.mean)
+    u_std_shape = tree.tree_map(np.shape, received.u.std)
+    match = tree.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
+    assert tree.tree_all(match)

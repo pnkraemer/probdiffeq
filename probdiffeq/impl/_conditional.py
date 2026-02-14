@@ -1,12 +1,12 @@
 """LatentConds."""
 
-from probdiffeq.backend import abc, containers, func, linalg, np, tree_util
+from probdiffeq.backend import abc, containers, func, linalg, np, tree
 from probdiffeq.backend.typing import Array
 from probdiffeq.impl import _normal, _stats
 from probdiffeq.util import cholesky_util
 
 
-@tree_util.register_dataclass
+@tree.register_dataclass
 @containers.dataclass
 class LatentCond:
     """Conditional distributions in latent space."""
@@ -181,13 +181,13 @@ class DenseConditional(ConditionalBackend):
 
     def to_derivative(self, i, u, standard_deviation):
         def select(a):
-            return tree_util.ravel_pytree(self.unravel(a)[i])[0]
+            return tree.ravel_pytree(self.unravel(a)[i])[0]
 
         x = np.zeros(self.flat_shape)
         linop = func.jacrev(select)(x)
 
-        u_flat, _ = tree_util.ravel_pytree(u)
-        stdev, _ = tree_util.ravel_pytree(standard_deviation)
+        u_flat, _ = tree.ravel_pytree(u)
+        stdev, _ = tree.ravel_pytree(standard_deviation)
         assert stdev.shape == (1,)
 
         (s,) = stdev
@@ -317,14 +317,14 @@ class IsotropicConditional(ConditionalBackend):
 
     def to_derivative(self, i, u, standard_deviation):
         def select(a):
-            return tree_util.ravel_pytree(self.unravel_tree(a)[i])[0]
+            return tree.ravel_pytree(self.unravel_tree(a)[i])[0]
 
         m = np.zeros((self.num_derivatives + 1,))
         linop = func.jacrev(select)(m)
 
-        u_flat, _ = tree_util.ravel_pytree(u)
+        u_flat, _ = tree.ravel_pytree(u)
 
-        stdev, _ = tree_util.ravel_pytree(standard_deviation)
+        stdev, _ = tree.ravel_pytree(standard_deviation)
 
         assert stdev.shape == (1,)
         cholesky = linalg.diagonal_matrix(stdev)
@@ -472,16 +472,16 @@ class BlockDiagConditional(ConditionalBackend):
 
     def to_derivative(self, i, u, standard_deviation):
         def select(a):
-            return tree_util.ravel_pytree(self.unravel_tree(a)[i])[0]
+            return tree.ravel_pytree(self.unravel_tree(a)[i])[0]
 
         x = np.zeros((*self.ode_shape, self.num_derivatives + 1))
         linop = func.vmap(func.jacrev(select))(x)
 
-        u_flat, _ = tree_util.ravel_pytree(u)
+        u_flat, _ = tree.ravel_pytree(u)
         bias = u_flat[:, None]
 
         eye = np.ones((*self.ode_shape, 1, 1)) * np.eye(1)[None, ...]
-        stdev, _ = tree_util.ravel_pytree(standard_deviation)
+        stdev, _ = tree.ravel_pytree(standard_deviation)
         assert stdev.shape == (1,)
         (s,) = stdev
         cholesky = eye * s

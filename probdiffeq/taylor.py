@@ -7,7 +7,7 @@ in probdiffeq.probdiffeq easier to access.
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import control_flow, func, np, ode, tree_util
+from probdiffeq.backend import control_flow, func, np, ode, tree
 from probdiffeq.backend.typing import Array, ArrayLike, Callable, Sequence
 from probdiffeq.util import filter_util
 
@@ -54,7 +54,7 @@ def runge_kutta_starter(dt, *, num: int, prior, ssm, atol=1e-12, rtol=1e-10):
         # Generate an observation-model for the QOI
         # (1e-7 observation noise for nuggets and for reusing existing code)
         model_fun = func.vmap(ssm.conditional.to_derivative, in_axes=(None, 0, 0))
-        std = tree_util.tree_map(lambda s: 1e-7 * np.ones((len(s),)), ys)
+        std = tree.tree_map(lambda s: 1e-7 * np.ones((len(s),)), ys)
         models = model_fun(0, ys, std)
 
         zeros = np.zeros_like(models.noise.mean)
@@ -86,17 +86,17 @@ def odejet_padded_scan(vf: Callable, inits: Sequence[ArrayLike], /, num: int):
     The differences should be small.
     Consult the benchmarks if performance is critical.
     """
-    inits = tree_util.tree_map(np.asarray, inits)
+    inits = tree.tree_map(np.asarray, inits)
     if not isinstance(inits[0], Array):
-        _, unravel = tree_util.ravel_pytree(inits[0])
-        inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
+        _, unravel = tree.ravel_pytree(inits[0])
+        inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
 
         def vf_wrapped(*ys, **kwargs):
-            ys = tree_util.tree_map(unravel, ys)
-            return tree_util.ravel_pytree(vf(*ys, **kwargs))[0]
+            ys = tree.tree_map(unravel, ys)
+            return tree.ravel_pytree(vf(*ys, **kwargs))[0]
 
         tcoeffs = odejet_padded_scan(vf_wrapped, inits_flat, num=num)
-        return tree_util.tree_map(unravel, tcoeffs)
+        return tree.tree_map(unravel, tcoeffs)
 
     # Number of positional arguments in f
     num_arguments = len(inits)
@@ -151,17 +151,17 @@ def odejet_unroll(vf: Callable, inits: Sequence[Array], /, num: int):
         JIT-compiling this function unrolls a loop.
 
     """
-    inits = tree_util.tree_map(np.asarray, inits)
+    inits = tree.tree_map(np.asarray, inits)
     if not isinstance(inits[0], Array):
-        _, unravel = tree_util.ravel_pytree(inits[0])
-        inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
+        _, unravel = tree.ravel_pytree(inits[0])
+        inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
 
         def vf_wrapped(*ys, **kwargs):
-            ys = tree_util.tree_map(unravel, ys)
-            return tree_util.ravel_pytree(vf(*ys, **kwargs))[0]
+            ys = tree.tree_map(unravel, ys)
+            return tree.ravel_pytree(vf(*ys, **kwargs))[0]
 
         tcoeffs = odejet_unroll(vf_wrapped, inits_flat, num=num)
-        return tree_util.tree_map(unravel, tcoeffs)
+        return tree.tree_map(unravel, tcoeffs)
 
     # Number of positional arguments in f
     num_arguments = len(inits)
@@ -214,17 +214,17 @@ def odejet_via_jvp(vf: Callable, inits: Sequence[Array], /, num: int):
         JIT-compiling this function unrolls a loop.
 
     """
-    inits = tree_util.tree_map(np.asarray, inits)
+    inits = tree.tree_map(np.asarray, inits)
     if not isinstance(inits[0], Array):
-        _, unravel = tree_util.ravel_pytree(inits[0])
-        inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
+        _, unravel = tree.ravel_pytree(inits[0])
+        inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
 
         def vf_wrapped(*ys, **kwargs):
-            ys = tree_util.tree_map(unravel, ys)
-            return tree_util.ravel_pytree(vf(*ys, **kwargs))[0]
+            ys = tree.tree_map(unravel, ys)
+            return tree.ravel_pytree(vf(*ys, **kwargs))[0]
 
         tcoeffs = odejet_via_jvp(vf_wrapped, inits_flat, num=num)
-        return tree_util.tree_map(unravel, tcoeffs)
+        return tree.tree_map(unravel, tcoeffs)
 
     g_n, g_0 = vf, vf
     taylor_coeffs = [*inits, vf(*inits)]
@@ -245,7 +245,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
         _, tangents_out = func.jvp(fun_n, primals_in, tangents_in)
         return tangents_out
 
-    return tree_util.Partial(df)
+    return tree.Partial(df)
 
 
 def odejet_doubling_unroll(vf: Callable, inits: Sequence[Array], /, num_doublings: int):
@@ -261,21 +261,21 @@ def odejet_doubling_unroll(vf: Callable, inits: Sequence[Array], /, num_doubling
         JIT-compiling this function unrolls a loop.
 
     """
-    inits = tree_util.tree_map(np.asarray, inits)
+    inits = tree.tree_map(np.asarray, inits)
     if not isinstance(inits[0], Array):
         # If the Pytree elements are matrices or scalars,
         # promote and unpromote accordingly
-        _, unravel = tree_util.ravel_pytree(inits[0])
-        inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
+        _, unravel = tree.ravel_pytree(inits[0])
+        inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
 
         def vf_wrapped(*ys, **kwargs):
-            ys = tree_util.tree_map(unravel, ys)
-            return tree_util.ravel_pytree(vf(*ys, **kwargs))[0]
+            ys = tree.tree_map(unravel, ys)
+            return tree.ravel_pytree(vf(*ys, **kwargs))[0]
 
         tcoeffs = odejet_doubling_unroll(
             vf_wrapped, inits_flat, num_doublings=num_doublings
         )
-        return tree_util.tree_map(unravel, tcoeffs)
+        return tree.tree_map(unravel, tcoeffs)
 
     double = odejet_coefficient_double(vf)
     (u0,) = inits  # This asserts ODEs are first-order only. High order is a todo
@@ -303,7 +303,7 @@ def odejet_coefficient_double(vf):
         zeros = np.zeros_like(taylor_coefficients[0])
         deg = len(taylor_coefficients)
 
-        jet_embedded_deg = tree_util.Partial(jet_embedded, degree=deg)
+        jet_embedded_deg = tree.Partial(jet_embedded, degree=deg)
         fx, jvp = func.linearize(jet_embedded_deg, *taylor_coefficients)
 
         def body_fun(cs_padded, i_and_fx_i):
@@ -368,21 +368,21 @@ def odejet_affine(vf: Callable, inits: Sequence[Array], /, num: int):
         JIT-compiling this function unrolls a loop of length `num`.
 
     """
-    inits = tree_util.tree_map(np.asarray, inits)
+    inits = tree.tree_map(np.asarray, inits)
 
     if num == 0:
         return inits
 
     if not isinstance(inits[0], Array):
-        _, unravel = tree_util.ravel_pytree(inits[0])
-        inits_flat = [tree_util.ravel_pytree(m)[0] for m in inits]
+        _, unravel = tree.ravel_pytree(inits[0])
+        inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
 
         def vf_wrapped(*ys, **kwargs):
-            ys = tree_util.tree_map(unravel, ys)
-            return tree_util.ravel_pytree(vf(*ys, **kwargs))[0]
+            ys = tree.tree_map(unravel, ys)
+            return tree.ravel_pytree(vf(*ys, **kwargs))[0]
 
         tcoeffs = odejet_affine(vf_wrapped, inits_flat, num=num)
-        return tree_util.tree_map(unravel, tcoeffs)
+        return tree.tree_map(unravel, tcoeffs)
 
     fx, jvp_fn = func.linearize(vf, *inits)
 

@@ -3,7 +3,7 @@
 Necessary because the implementation has been faulty in the past. Never again.
 """
 
-from probdiffeq.backend import func, np, random, stats, testing, tree_util
+from probdiffeq.backend import func, np, random, stats, testing, tree
 from probdiffeq.impl import impl
 
 
@@ -39,7 +39,7 @@ def random_variable(fact):
     rv = discretize(0.1, output_scale)
 
     key = random.prng_key(seed=1)
-    noise_flat, unravel = tree_util.ravel_pytree(rv.noise)
+    noise_flat, unravel = tree.ravel_pytree(rv.noise)
     noise_flat = random.normal(key, shape=noise_flat.shape)
     noise = unravel(noise_flat)
     return noise, ssm

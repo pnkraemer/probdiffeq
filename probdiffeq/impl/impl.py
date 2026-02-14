@@ -1,6 +1,6 @@
 """State-space model implementations."""
 
-from probdiffeq.backend import containers, func, tree_util
+from probdiffeq.backend import containers, func, tree
 from probdiffeq.backend.typing import Callable
 from probdiffeq.impl import _conditional, _linearize, _normal, _prototypes, _stats
 
@@ -42,8 +42,8 @@ def choose(which: str, /, *, tcoeffs_like) -> FactImpl:
 
 
 def _select_dense(*, tcoeffs_like) -> FactImpl:
-    ode_shape = tree_util.ravel_pytree(tcoeffs_like[0])[0].shape
-    flat, unravel = tree_util.ravel_pytree(tcoeffs_like)
+    ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
+    flat, unravel = tree.ravel_pytree(tcoeffs_like)
 
     num_derivatives = len(tcoeffs_like) - 1
 
@@ -70,18 +70,18 @@ def _select_dense(*, tcoeffs_like) -> FactImpl:
 
 
 def _select_isotropic(*, tcoeffs_like) -> FactImpl:
-    ode_shape = tree_util.ravel_pytree(tcoeffs_like[0])[0].shape
+    ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
     num_derivatives = len(tcoeffs_like) - 1
 
-    tcoeffs_tree_only = tree_util.tree_map(lambda *_a: 0.0, tcoeffs_like)
-    _, unravel_tree = tree_util.ravel_pytree(tcoeffs_tree_only)
+    tcoeffs_tree_only = tree.tree_map(lambda *_a: 0.0, tcoeffs_like)
+    _, unravel_tree = tree.ravel_pytree(tcoeffs_tree_only)
 
-    leaves, _ = tree_util.tree_flatten(tcoeffs_like)
-    _, unravel_leaf = tree_util.ravel_pytree(leaves[0])
+    leaves, _ = tree.tree_flatten(tcoeffs_like)
+    _, unravel_leaf = tree.ravel_pytree(leaves[0])
 
     def unravel(z):
         tree = func.vmap(unravel_tree, in_axes=1, out_axes=0)(z)
-        return tree_util.tree_map(unravel_leaf, tree)
+        return tree.tree_map(unravel_leaf, tree)
 
     prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
     normal = _normal.IsotropicNormal(ode_shape=ode_shape)
@@ -103,18 +103,18 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
 
 
 def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
-    ode_shape = tree_util.ravel_pytree(tcoeffs_like[0])[0].shape
+    ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
     num_derivatives = len(tcoeffs_like) - 1
 
-    tcoeffs_tree_only = tree_util.tree_map(lambda *_a: 0.0, tcoeffs_like)
-    _, unravel_tree = tree_util.ravel_pytree(tcoeffs_tree_only)
+    tcoeffs_tree_only = tree.tree_map(lambda *_a: 0.0, tcoeffs_like)
+    _, unravel_tree = tree.ravel_pytree(tcoeffs_tree_only)
 
-    leaves, _ = tree_util.tree_flatten(tcoeffs_like)
-    _, unravel_leaf = tree_util.ravel_pytree(leaves[0])
+    leaves, _ = tree.tree_flatten(tcoeffs_like)
+    _, unravel_leaf = tree.ravel_pytree(leaves[0])
 
     def unravel(z):
         tree = func.vmap(unravel_tree, in_axes=0, out_axes=0)(z)
-        return tree_util.tree_map(unravel_leaf, tree)
+        return tree.tree_map(unravel_leaf, tree)
 
     prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)
     normal = _normal.BlockDiagNormal(ode_shape=ode_shape)

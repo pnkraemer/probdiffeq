@@ -4,7 +4,7 @@ That is, when called with correct adaptive- and checkpoint-setups.
 """
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import func, np, ode, testing, tree_util
+from probdiffeq.backend import func, np, ode, testing, tree
 from probdiffeq.util import test_util
 
 
@@ -98,9 +98,9 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
 
     # Extract the interior points of the save_at solution
     # (because only there is the interpolated solution defined)
-    u_fixedpoint = tree_util.tree_map(lambda s: s[1:-1], solution_fixedpoint.u.mean)
-    u_std_fixedpoint = tree_util.tree_map(lambda s: s[1:-1], solution_fixedpoint.u.std)
-    marginals_fixedpoint = tree_util.tree_map(
+    u_fixedpoint = tree.tree_map(lambda s: s[1:-1], solution_fixedpoint.u.mean)
+    u_std_fixedpoint = tree.tree_map(lambda s: s[1:-1], solution_fixedpoint.u.std)
+    marginals_fixedpoint = tree.tree_map(
         lambda s: s[1:-1], solution_fixedpoint.u.marginals
     )
 

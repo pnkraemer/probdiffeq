@@ -1,7 +1,7 @@
 """Assert that every recipe yields a decent ODE approximation."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import func, np, ode, testing, tree_util
+from probdiffeq.backend import func, np, ode, testing, tree
 
 
 @testing.case()
@@ -67,4 +67,4 @@ def reference_solution(t1):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
     ts = np.asarray([t0, t1])
     sol = ode.odeint_and_save_at(vf, (u0,), save_at=ts, atol=1e-10, rtol=1e-10)
-    return tree_util.tree_map(lambda s: s[-1], sol)
+    return tree.tree_map(lambda s: s[-1], sol)

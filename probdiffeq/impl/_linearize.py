@@ -1,4 +1,4 @@
-from probdiffeq.backend import abc, containers, func, linalg, np, random, tree_util
+from probdiffeq.backend import abc, containers, func, linalg, np, random, tree
 from probdiffeq.backend.typing import Any, Callable
 from probdiffeq.impl import _conditional, _normal
 from probdiffeq.util import cholesky_util
@@ -28,9 +28,9 @@ class DenseTs0(Linearization):
 
         def a1(m):
             """Select the 'n'-th derivative."""
-            return tree_util.ravel_pytree(self.unravel(m)[self.ode_order])[0]
+            return tree.ravel_pytree(self.unravel(m)[self.ode_order])[0]
 
-        fx = tree_util.ravel_pytree(fun(*self.unravel(rv.mean)[: self.ode_order]))[0]
+        fx = tree.ravel_pytree(fun(*self.unravel(rv.mean)[: self.ode_order]))[0]
         linop = func.jacrev(a1)(rv.mean)
         cov_lower = damp * np.eye(len(fx))
         bias = _normal.Normal(-fx, cov_lower)
@@ -58,8 +58,8 @@ class DenseTs1(Linearization):
         # TODO: expose this function somehow. This way, we can
         #       implement custom information operators easily.
         def constraint(m):
-            a1 = tree_util.ravel_pytree(self.unravel(m)[self.ode_order])[0]
-            a0 = tree_util.ravel_pytree(fun(*self.unravel(m)[: self.ode_order]))[0]
+            a1 = tree.ravel_pytree(self.unravel(m)[self.ode_order])[0]
+            a0 = tree.ravel_pytree(fun(*self.unravel(m)[: self.ode_order]))[0]
             return a1 - a0
 
         fx = constraint(mean)
@@ -89,7 +89,7 @@ class DenseSlr0(Linearization):
         del state
 
         def select_0(s):
-            return tree_util.ravel_pytree(self.unravel(s)[0])
+            return tree.ravel_pytree(self.unravel(s)[0])
 
         m0, unravel = select_0(rv.mean)
 
@@ -101,7 +101,7 @@ class DenseSlr0(Linearization):
         linearisation_pt = _normal.Normal(m0, r_0_square.T)
 
         def vf_flat(u):
-            return tree_util.ravel_pytree(fun(unravel(u)))[0]
+            return tree.ravel_pytree(fun(unravel(u)))[0]
 
         # linearize
         noise = self.slr0(vf_flat, linearisation_pt)
@@ -113,7 +113,7 @@ class DenseSlr0(Linearization):
         cov_lower = cholesky_util.triu_via_qr(stack).T
 
         def select_1(s):
-            return tree_util.ravel_pytree(self.unravel(s)[1])
+            return tree.ravel_pytree(self.unravel(s)[1])
 
         linop = func.jacrev(lambda s: select_1(s)[0])(rv.mean)
         bias = _normal.Normal(-mean, cov_lower)
@@ -164,10 +164,10 @@ class DenseSlr1(Linearization):
         # TODO: we can make this a lot more general (yet a little less efficient)
         #       if we mirror the TS1 implementation more closely.
         def select_0(s):
-            return tree_util.ravel_pytree(self.unravel(s)[0])
+            return tree.ravel_pytree(self.unravel(s)[0])
 
         def select_1(s):
-            return tree_util.ravel_pytree(self.unravel(s)[1])
+            return tree.ravel_pytree(self.unravel(s)[1])
 
         m0, unravel = select_0(rv.mean)
 
@@ -179,7 +179,7 @@ class DenseSlr1(Linearization):
         linearisation_pt = _normal.Normal(m0, r_0_square.T)
 
         def vf_flat(u):
-            return tree_util.ravel_pytree(fun(unravel(u)))[0]
+            return tree.ravel_pytree(fun(unravel(u)))[0]
 
         # Gather the variables and return
         J, noise = self.slr1(vf_flat, linearisation_pt)
@@ -240,7 +240,7 @@ class IsotropicTs0(Linearization):
             return m[[self.ode_order], ...]
 
         linop = func.jacrev(a1)(mean[..., 0])
-        fx = tree_util.ravel_pytree(fun(*self.unravel(mean)[: self.ode_order]))[0]
+        fx = tree.ravel_pytree(fun(*self.unravel(mean)[: self.ode_order]))[0]
 
         cov_lower = damp * np.eye(1)
         bias = _normal.Normal(-fx, cov_lower)
@@ -273,10 +273,10 @@ class IsotropicTs1(Linearization):
         linop = func.jacrev(a1)(mean[..., 0])
 
         def vf_flat(u):
-            return tree_util.ravel_pytree(fun(unravel(u)))[0]
+            return tree.ravel_pytree(fun(unravel(u)))[0]
 
         def select_0(s):
-            return tree_util.ravel_pytree(self.unravel(s)[0])
+            return tree.ravel_pytree(self.unravel(s)[0])
 
         # Evaluate the linearisation
         m0, unravel = select_0(rv.mean)
@@ -317,7 +317,7 @@ class BlockDiagTs0(Linearization):
         del state
 
         mean = rv.mean
-        fx = tree_util.ravel_pytree(fun(*self.unravel(mean)[: self.ode_order]))[0]
+        fx = tree.ravel_pytree(fun(*self.unravel(mean)[: self.ode_order]))[0]
 
         def a1(s):
             return s[[self.ode_order], ...]
@@ -356,10 +356,10 @@ class BlockDiagTs1(Linearization):
         linop = func.vmap(func.jacrev(a1))(mean)
 
         def vf_flat(u):
-            return tree_util.ravel_pytree(fun(unravel(u)))[0]
+            return tree.ravel_pytree(fun(unravel(u)))[0]
 
         def select_0(s):
-            return tree_util.ravel_pytree(self.unravel(s)[0])
+            return tree.ravel_pytree(self.unravel(s)[0])
 
         # Evaluate the linearisation
         m0, unravel = select_0(rv.mean)

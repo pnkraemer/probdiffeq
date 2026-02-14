@@ -1,7 +1,7 @@
 """Tests for marginal log likelihood functionality (terminal values)."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import np, ode, testing, tree_util
+from probdiffeq.backend import np, ode, testing, tree
 
 
 @testing.case()
@@ -45,8 +45,8 @@ def test_output_is_scalar_and_not_inf_and_not_nan(solution):
     """
     sol, strategy = solution
 
-    data = tree_util.tree_map(lambda s: s + 0.005, sol.u.mean[0])
-    std = tree_util.tree_map(lambda _s: 1e-2 * np.ones(()), sol.u.std[0])
+    data = tree.tree_map(lambda s: s + 0.005, sol.u.mean[0])
+    std = tree.tree_map(lambda _s: 1e-2 * np.ones(()), sol.u.std[0])
 
     mll = strategy.log_marginal_likelihood_terminal_values(
         data, standard_deviation=std, posterior=sol.posterior
@@ -59,7 +59,7 @@ def test_output_is_scalar_and_not_inf_and_not_nan(solution):
 
 def test_raise_error_if_structures_dont_match(solution):
     sol, strategy = solution
-    data = tree_util.tree_map(lambda s: s + 0.005, sol.u.mean[0])
+    data = tree.tree_map(lambda s: s + 0.005, sol.u.mean[0])
     std = 1.0  # not the correct pytree
 
     with testing.raises(ValueError, match="structure"):

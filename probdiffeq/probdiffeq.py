@@ -11,8 +11,8 @@ from probdiffeq.backend import (
     np,
     random,
     special,
+    tree,
     tree_array_util,
-    tree_util,
 )
 from probdiffeq.backend.typing import (
     Any,
@@ -48,7 +48,7 @@ class VectorField(Protocol[T]):
     def __call__(self, *ys: T, t: ArrayLike) -> T: ...
 
 
-@tree_util.register_dataclass
+@tree.register_dataclass
 @containers.dataclass
 class CubaturePositiveWeights:
     """A datastructure for cubature rules that have positive weights.
@@ -167,7 +167,7 @@ def _tensor_weights(*args, **kwargs):
 
 def _tensor_points(x, /, *, d):
     x_mesh = np.meshgrid(*([x] * d))
-    y_mesh = tree_util.tree_map(lambda s: np.reshape(s, (-1,)), x_mesh)
+    y_mesh = tree.tree_map(lambda s: np.reshape(s, (-1,)), x_mesh)
     return np.stack(y_mesh).T
 
 
@@ -229,7 +229,7 @@ def constraint_ode_slr1(*, ssm, cubature_fun=cubature_third_order_spherical):
     return ssm.linearize.ode_statistical_1st(cubature_fun)
 
 
-@tree_util.register_dataclass
+@tree.register_dataclass
 @containers.dataclass
 class TaylorCoeffTarget(Generic[C, T]):
     """A probabilistic description of Taylor coefficients.
@@ -249,7 +249,7 @@ class TaylorCoeffTarget(Generic[C, T]):
     """The full marginal distribution of the Taylor coefficient."""
 
 
-@tree_util.register_dataclass
+@tree.register_dataclass
 @containers.dataclass
 class MarkovSequence(Generic[T]):
     """A datastructure for Markov sequences as batches of joint distributions.
@@ -354,7 +354,7 @@ class MarkovStrategy(Generic[T]):
         This function is useful to convert a smoothing-solution into a Markov sequence
         that is compatible with sampling or marginalisation.
         """
-        init = tree_util.tree_map(lambda x: x[-1, ...], markov_seq.marginal)
+        init = tree.tree_map(lambda x: x[-1, ...], markov_seq.marginal)
         return MarkovSequence(init, markov_seq.conditional)
 
     def _sample_shape(self, markov_seq):
@@ -413,8 +413,8 @@ class MarkovStrategy(Generic[T]):
             Posterior distribution.
             Expected to correspond to a solution of an ODE with shape (d,).
         """
-        [u_leaves], u_structure = tree_util.tree_flatten(u)
-        [std_leaves], std_structure = tree_util.tree_flatten(standard_deviation)
+        [u_leaves], u_structure = tree.tree_flatten(u)
+        [std_leaves], std_structure = tree.tree_flatten(standard_deviation)
 
         if u_structure != std_structure:
             msg = (
@@ -451,8 +451,8 @@ class MarkovStrategy(Generic[T]):
             Posterior distribution.
             Expected to correspond to a solution of an ODE with shape (d,).
         """
-        [u_leaves], u_structure = tree_util.tree_flatten(u)
-        [std_leaves], std_structure = tree_util.tree_flatten(standard_deviation)
+        [u_leaves], u_structure = tree.tree_flatten(u)
+        [std_leaves], std_structure = tree.tree_flatten(standard_deviation)
 
         if u_structure != std_structure:
             msg = (
@@ -461,7 +461,7 @@ class MarkovStrategy(Generic[T]):
             )
             raise ValueError(msg)
 
-        qoi_flat, _ = tree_util.ravel_pytree(self.ssm.prototypes.qoi())
+        qoi_flat, _ = tree.ravel_pytree(self.ssm.prototypes.qoi())
         if np.ndim(std_leaves) < 1 or np.ndim(u_leaves) != np.ndim(qoi_flat) + 1:
             msg = (
                 f"Time-series solution expected. "
@@ -487,7 +487,7 @@ class MarkovStrategy(Generic[T]):
         models = model_fun(0, u, standard_deviation)
 
         # Select the terminal variable
-        rv = tree_util.tree_map(lambda s: s[-1, ...], posterior.marginal)
+        rv = tree.tree_map(lambda s: s[-1, ...], posterior.marginal)
 
         # Run the reverse Kalman filter
         estimator = filter_util.kalmanfilter_with_marginal_likelihood(ssm=self.ssm)
@@ -503,7 +503,7 @@ class MarkovStrategy(Generic[T]):
         return result.logpdf
 
 
-@tree_util.register_dataclass
+@tree.register_dataclass
 @containers.dataclass
 class ProbabilisticSolution(Generic[C, T]):
     """A datastructure for probabilistic solutions of differential equations."""
@@ -632,7 +632,7 @@ class ProbabilisticSolver:
         # Extract the LHS
 
         def _extract_previous(tree):
-            return tree_util.tree_map(lambda s: s[index - 1, ...], tree)
+            return tree.tree_map(lambda s: s[index - 1, ...], tree)
 
         posterior_t0 = _extract_previous(solution.posterior)
         t0 = _extract_previous(solution.t)
@@ -640,7 +640,7 @@ class ProbabilisticSolver:
         # Extract the RHS
 
         def _extract(tree):
-            return tree_util.tree_map(lambda s: s[index, ...], tree)
+            return tree.tree_map(lambda s: s[index, ...], tree)
 
         t1 = _extract(solution.t)
         output_scale = _extract(solution.output_scale)
@@ -788,7 +788,7 @@ def prior_wiener_integrated(
 
     if tcoeffs_std is None:
         error_like = np.zeros_like(ssm.prototypes.error_estimate())
-        tcoeffs_std = tree_util.tree_map(lambda _: error_like, tcoeffs)
+        tcoeffs_std = tree.tree_map(lambda _: error_like, tcoeffs)
 
     marginal = ssm.normal.from_tcoeffs(tcoeffs, tcoeffs_std)
     u_mean = ssm.stats.qoi(marginal)
@@ -817,7 +817,7 @@ def prior_wiener_integrated_discrete(
     return markov_seq, ssm
 
 
-@tree_util.register_dataclass
+@tree.register_dataclass
 @containers.dataclass
 class _InterpRes(Generic[T]):
     """A datastructure to store interpolation results.
@@ -1334,7 +1334,7 @@ class solver_mle(ProbabilisticSolver):
         fun_evals, correction_state = self.constraint.linearize(
             f_wrapped, estimate.marginals, correction_state, damp=0.0
         )
-        fun_evals = tree_util.tree_map(np.zeros_like, fun_evals)
+        fun_evals = tree.tree_map(np.zeros_like, fun_evals)
         auxiliary = (correction_state, output_scale_running, 0)
         return ProbabilisticSolution(
             t=t,
@@ -1451,7 +1451,7 @@ class solver_dynamic(ProbabilisticSolver):
         fx, lin_state = self.constraint.linearize(
             f_wrapped, estimate.marginals, lin_state, damp=0.0
         )
-        fx = tree_util.tree_map(np.zeros_like, fx)
+        fx = tree.tree_map(np.zeros_like, fx)
 
         return ProbabilisticSolution(
             t=t,
@@ -1561,7 +1561,7 @@ class solver(ProbabilisticSolver):
         fun_evals, correction_state = self.constraint.linearize(
             f_wrapped, rv=u.marginals, state=correction_state, damp=0.0
         )
-        fun_evals = tree_util.tree_map(np.zeros_like, fun_evals)
+        fun_evals = tree.tree_map(np.zeros_like, fun_evals)
         return ProbabilisticSolution(
             t=t,
             u=u,
@@ -1714,13 +1714,13 @@ class errorest_local_residual_cached(ErrorEstimator):
         error = self._linearize_and_estimate(mean_extra, linearized=proposed.fun_evals)
 
         # Compute a reference
-        u0 = tree_util.tree_leaves(previous.u.mean)[0]
-        u1 = tree_util.tree_leaves(proposed.u.mean)[0]
+        u0 = tree.tree_leaves(previous.u.mean)[0]
+        u1 = tree.tree_leaves(proposed.u.mean)[0]
         reference = np.maximum(np.abs(u0), np.abs(u1))
 
         # Turn the unscaled absolute error into a relative one
-        error = tree_util.ravel_pytree(error)[0]
-        reference = tree_util.ravel_pytree(reference)[0]
+        error = tree.ravel_pytree(error)[0]
+        reference = tree.ravel_pytree(reference)[0]
         error_abs = dt * error
         normalize = atol + rtol * np.abs(reference)
         error_rel = error_abs / normalize
@@ -1843,13 +1843,13 @@ class errorest_local_residual(ErrorEstimator):
         )
 
         # Compute a reference
-        u0 = tree_util.tree_leaves(previous.u.mean)[0]
-        u1 = tree_util.tree_leaves(proposed.u.mean)[0]
+        u0 = tree.tree_leaves(previous.u.mean)[0]
+        u1 = tree.tree_leaves(proposed.u.mean)[0]
         reference = np.maximum(np.abs(u0), np.abs(u1))
 
         # Turn the unscaled absolute error into a relative one
-        error = tree_util.ravel_pytree(error)[0]
-        reference = tree_util.ravel_pytree(reference)[0]
+        error = tree.ravel_pytree(error)[0]
+        reference = tree.ravel_pytree(reference)[0]
         error_abs = dt * error
         normalize = atol + rtol * np.abs(reference)
         error_rel = error_abs / normalize

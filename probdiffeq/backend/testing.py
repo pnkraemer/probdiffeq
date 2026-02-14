@@ -11,7 +11,7 @@ This is not good for extendability of the test suite.
 
 import jax
 import jax.numpy as jnp
-import jax.tree_util
+import jax.tree
 import pytest
 import pytest_cases
 
@@ -41,14 +41,14 @@ def allclose(tree1, tree2, /, *, atol: float | None = None, rtol: float | None =
       (It adjusts atol and rtol to the floating-point precision of the leaves.)
     """
     trees_is_allclose = _tree_allclose(tree1, tree2, atol=atol, rtol=rtol)
-    return jax.tree_util.tree_all(trees_is_allclose)
+    return jax.tree.tree_all(trees_is_allclose)
 
 
 def _tree_allclose(tree1, tree2, /, *, atol, rtol):
     def allclose_partial(t1, t2, /):
         return _allclose(t1, t2, atol=atol, rtol=rtol)
 
-    return jax.tree_util.tree_map(allclose_partial, tree1, tree2)
+    return jax.tree.tree_map(allclose_partial, tree1, tree2)
 
 
 def marginals_allclose(

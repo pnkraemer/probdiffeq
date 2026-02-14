@@ -1,10 +1,10 @@
-from probdiffeq.backend import abc, containers, linalg, np, tree_util
+from probdiffeq.backend import abc, containers, linalg, np, tree
 from probdiffeq.backend.typing import Generic, Sequence, TypeVar
 
 T = TypeVar("T")
 
 
-@tree_util.register_dataclass
+@tree.register_dataclass
 @containers.dataclass
 class Normal(Generic[T]):
     mean: T
@@ -34,10 +34,10 @@ class DenseNormal(NormalBackend):
 
     def from_tcoeffs(self, loc: C, scale: C | None = None):
         if scale is None:
-            scale = tree_util.tree_map(np.ones_like, loc)
+            scale = tree.tree_map(np.ones_like, loc)
 
-        loc_flat, _ = tree_util.ravel_pytree(loc)
-        scale_flat, _ = tree_util.ravel_pytree(scale)
+        loc_flat, _ = tree.ravel_pytree(loc)
+        scale_flat, _ = tree.ravel_pytree(scale)
         assert loc_flat.shape == scale_flat.shape
 
         (ode_dim,) = self.ode_shape
@@ -66,16 +66,16 @@ class IsotropicNormal(NormalBackend):
 
     def from_tcoeffs(self, loc: C, scale: C | None = None):
         if scale is None:
-            scale = tree_util.tree_map(lambda _: np.ones(()), loc)
+            scale = tree.tree_map(lambda _: np.ones(()), loc)
 
         def ravel(s):
-            return tree_util.ravel_pytree(s)[0]
+            return tree.ravel_pytree(s)[0]
 
-        loc_leaves, _ = tree_util.tree_flatten(loc)
-        leaves_flat = tree_util.tree_map(ravel, loc_leaves)
+        loc_leaves, _ = tree.tree_flatten(loc)
+        leaves_flat = tree.tree_map(ravel, loc_leaves)
         loc_flat = np.stack(leaves_flat)
 
-        scale_leaves, _ = tree_util.tree_flatten(scale)
+        scale_leaves, _ = tree.tree_flatten(scale)
         scale_flat = np.stack(scale_leaves)
 
         num_coeffs = len(loc)
@@ -103,19 +103,19 @@ class BlockDiagNormal(NormalBackend):
 
     def from_tcoeffs(self, loc: C, scale: C | None = None):
         if scale is None:
-            scale = tree_util.tree_map(np.ones_like, loc)
+            scale = tree.tree_map(np.ones_like, loc)
 
         def ravel(s):
-            return tree_util.ravel_pytree(s)[0]
+            return tree.ravel_pytree(s)[0]
 
         # Flatten and reshape the mean
-        loc_leaves, _ = tree_util.tree_flatten(loc)
-        loc_leaves_flat = tree_util.tree_map(ravel, loc_leaves)
+        loc_leaves, _ = tree.tree_flatten(loc)
+        loc_leaves_flat = tree.tree_map(ravel, loc_leaves)
         loc_flat = np.stack(loc_leaves_flat).T
 
         # Flatten and reshape the standard deviation
-        scale_leaves, _ = tree_util.tree_flatten(scale)
-        scale_leaves_flat = tree_util.tree_map(ravel, scale_leaves)
+        scale_leaves, _ = tree.tree_flatten(scale)
+        scale_leaves_flat = tree.tree_map(ravel, scale_leaves)
         scale_flat = np.stack(scale_leaves_flat).T
 
         # Promote std into covariance matrix and apply damping

@@ -1,7 +1,7 @@
 """Tests for IVP solvers."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import func, np, ode, testing, tree_util
+from probdiffeq.backend import func, np, ode, testing, tree
 from probdiffeq.util import test_util
 
 
@@ -30,7 +30,7 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     # Compute a save-at solution and remove the edge-points
     solve = ivpsolve.solve_adaptive_save_at(errorest=errorest, solver=solver)
     save_at = solve(init, atol=1e-2, rtol=1e-2, save_at=ts, dt0=0.1)
-    u_save_at = tree_util.tree_map(lambda s: s[1:-1], save_at.u)
+    u_save_at = tree.tree_map(lambda s: s[1:-1], save_at.u)
 
     # Assert similarity
 
@@ -47,10 +47,10 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     )
 
     # Assert u and u_std have matching shapes (that was wrong before)
-    u_shape = tree_util.tree_map(np.shape, u_save_at.mean)
-    u_std_shape = tree_util.tree_map(np.shape, u_save_at.std)
-    match = tree_util.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
-    assert tree_util.tree_all(match)
+    u_shape = tree.tree_map(np.shape, u_save_at.mean)
+    u_std_shape = tree.tree_map(np.shape, u_save_at.std)
+    match = tree.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
+    assert tree.tree_all(match)
 
 
 @testing.parametrize("fact", ["isotropic", "dense", "blockdiag"])
@@ -75,12 +75,12 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
     offgrid_marginals = func.partial(solver.offgrid_marginals, solution=sol)
     u = func.vmap(offgrid_marginals)(ts)
     for u1, u2 in zip(u.mean, sol.u.mean):
-        u1_ = tree_util.tree_map(lambda s: s[0], u1)
-        u2_ = tree_util.tree_map(lambda s: s[-2], u2)
+        u1_ = tree.tree_map(lambda s: s[0], u1)
+        u2_ = tree.tree_map(lambda s: s[-2], u2)
         assert testing.allclose(u1_, u2_, atol=1e-3, rtol=1e-3)
 
-        u1_ = tree_util.tree_map(lambda s: s[-1], u1)
-        u2_ = tree_util.tree_map(lambda s: s[-1], u2)
+        u1_ = tree.tree_map(lambda s: s[-1], u1)
+        u2_ = tree.tree_map(lambda s: s[-1], u2)
         assert not testing.allclose(u1_, u2_, atol=1e-3, rtol=1e-3)
 
 
@@ -108,10 +108,10 @@ def test_smoother_marginals_close_to_both_boundaries(fact):
     u = func.vmap(offgrid_marginals)(ts)
 
     for u1, u2 in zip(u.mean, sol.u.mean):
-        u1_ = tree_util.tree_map(lambda s: s[0], u1)
-        u2_ = tree_util.tree_map(lambda s: s[-2], u2)
+        u1_ = tree.tree_map(lambda s: s[0], u1)
+        u2_ = tree.tree_map(lambda s: s[-2], u2)
         assert testing.allclose(u1_, u2_, atol=1e-3, rtol=1e-3)
 
-        u1_ = tree_util.tree_map(lambda s: s[-1], u1)
-        u2_ = tree_util.tree_map(lambda s: s[-1], u2)
+        u1_ = tree.tree_map(lambda s: s[-1], u1)
+        u2_ = tree.tree_map(lambda s: s[-1], u2)
         assert testing.allclose(u1_, u2_, atol=1e-3, rtol=1e-3)

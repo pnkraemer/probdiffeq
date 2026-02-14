@@ -20,7 +20,7 @@ manipulation of square root matrices.
 
 """
 
-from probdiffeq.backend import control_flow, linalg, np, tree_util
+from probdiffeq.backend import control_flow, linalg, np, tree
 
 
 def revert_conditional_noisefree(R_X_F, R_X):
@@ -121,9 +121,9 @@ def sum_of_sqrtm_factors(R_stack: tuple):
 # logsumexp but for squares
 def sqrt_sum_square_scalar(*args):
     """Compute sqrt(a**2 + b**2) without squaring a or b."""
-    args_are_scalar = tree_util.tree_map(lambda x: np.ndim(x) == 0, args)
-    if not tree_util.tree_all(args_are_scalar):
-        args_shapes = tree_util.tree_map(np.shape, args)
+    args_are_scalar = tree.tree_map(lambda x: np.ndim(x) == 0, args)
+    if not tree.tree_all(args_are_scalar):
+        args_shapes = tree.tree_map(np.shape, args)
         msg1 = "'sqrt_sum_square_scalar' expects scalar arguments. "
         msg2 = f"PyTree with shapes {args_shapes} received."
         raise ValueError(msg1 + msg2)

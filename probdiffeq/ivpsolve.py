@@ -13,7 +13,7 @@ from probdiffeq.backend import (
     func,
     linalg,
     np,
-    tree_util,
+    tree,
     warnings,
 )
 from probdiffeq.backend.typing import (
@@ -90,7 +90,7 @@ def solve_adaptive_terminal_values(
         solution = solve_save_at(
             u, save_at=save_at, atol=atol, rtol=rtol, dt0=dt0, eps=eps, damp=damp
         )
-        return tree_util.tree_map(lambda s: s[-1], solution)
+        return tree.tree_map(lambda s: s[-1], solution)
 
     return solve
 
@@ -155,7 +155,7 @@ def solve_adaptive_save_at(
             the rejection loop automatically interpolates.
             """
 
-            @tree_util.register_dataclass
+            @tree.register_dataclass
             @containers.dataclass
             class AdvanceState:
                 do_continue: bool
@@ -216,8 +216,8 @@ def dt0(vf_autonomous, initial_values, /, scale=0.01, nugget=1e-5):
     u0, *_ = initial_values
     f0 = vf_autonomous(*initial_values)
 
-    u0, _ = tree_util.ravel_pytree(u0)
-    f0, _ = tree_util.ravel_pytree(f0)
+    u0, _ = tree.ravel_pytree(u0)
+    f0, _ = tree.ravel_pytree(f0)
 
     norm_y0 = linalg.vector_norm(u0)
     norm_dy0 = linalg.vector_norm(f0) + nugget
@@ -241,8 +241,8 @@ def dt0_adaptive(vf, initial_values, /, t0, *, error_contraction_rate, rtol, ato
 
     f0 = vf(y0, t=t0)
 
-    y0, unravel = tree_util.ravel_pytree(y0)
-    f0, _ = tree_util.ravel_pytree(f0)
+    y0, unravel = tree.ravel_pytree(y0)
+    f0, _ = tree.ravel_pytree(f0)
 
     scale = atol + np.abs(y0) * rtol
     d0, d1 = linalg.vector_norm(y0), linalg.vector_norm(f0)
@@ -251,7 +251,7 @@ def dt0_adaptive(vf, initial_values, /, t0, *, error_contraction_rate, rtol, ato
 
     y1 = y0 + dt0 * f0
     f1 = vf(unravel(y1), t=t0 + dt0)
-    f1, _ = tree_util.ravel_pytree(f1)
+    f1, _ = tree.ravel_pytree(f1)
     d2 = linalg.vector_norm((f1 - f0) / scale) / dt0
 
     dt1 = np.where(
@@ -262,7 +262,7 @@ def dt0_adaptive(vf, initial_values, /, t0, *, error_contraction_rate, rtol, ato
     return np.minimum(100.0 * dt0, dt1)
 
 
-@tree_util.register_dataclass
+@tree.register_dataclass
 @containers.dataclass
 class TimeStepState(Generic[T]):
     """State for adaptive time-stepping."""
@@ -289,7 +289,7 @@ class TimeStepState(Generic[T]):
     """The error-estimate corresponding to 'step_from'."""
 
 
-@tree_util.register_dataclass
+@tree.register_dataclass
 @containers.dataclass
 class _RejectionLoopState:
     """State for a single rejection loop.
@@ -385,7 +385,7 @@ class RejectionLoop:
         """Initialise the rejection state."""
 
         def _ones_like(tree):
-            return tree_util.tree_map(np.ones_like, tree)
+            return tree.tree_map(np.ones_like, tree)
 
         smaller_than_1 = 0.9  # the cond() must return True
         return _RejectionLoopState(
