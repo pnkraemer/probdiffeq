@@ -80,8 +80,8 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
     _, unravel_leaf = tree.ravel_pytree(leaves[0])
 
     def unravel(z):
-        tree = func.vmap(unravel_tree, in_axes=1, out_axes=0)(z)
-        return tree.tree_map(unravel_leaf, tree)
+        pytree = func.vmap(unravel_tree, in_axes=1, out_axes=0)(z)
+        return tree.tree_map(unravel_leaf, pytree)
 
     prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
     normal = _normal.IsotropicNormal(ode_shape=ode_shape)
@@ -113,8 +113,8 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
     _, unravel_leaf = tree.ravel_pytree(leaves[0])
 
     def unravel(z):
-        tree = func.vmap(unravel_tree, in_axes=0, out_axes=0)(z)
-        return tree.tree_map(unravel_leaf, tree)
+        pytree = func.vmap(unravel_tree, in_axes=0, out_axes=0)(z)
+        return tree.tree_map(unravel_leaf, pytree)
 
     prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)
     normal = _normal.BlockDiagNormal(ode_shape=ode_shape)

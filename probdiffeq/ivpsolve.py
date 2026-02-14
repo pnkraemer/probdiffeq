@@ -16,17 +16,10 @@ from probdiffeq.backend import (
     tree,
     warnings,
 )
-from probdiffeq.backend.typing import (
-    Any,
-    Array,
-    Callable,
-    Generic,
-    NamedArg,
-    Protocol,
-    TypeVar,
-)
+from probdiffeq.backend.typing import Any, Array, Callable, Generic, Protocol, TypeVar
 
-T = TypeVar("T", contravariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+T = TypeVar("T")
 S = TypeVar("S")
 
 
@@ -48,14 +41,20 @@ class Solution(Protocol, Generic[S]):
 # can now be written.
 
 
-class Solver(Protocol, Generic[T, S]):
+class Solver(Protocol, Generic[T_contra, S]):
     """An IVP solver protocol."""
 
-    def init(self, *, t, u: T) -> S:
+    def init(self, *, t, u: T_contra) -> S:
         """Initialise the solver's state."""
 
     def step(self, state: S, *, dt: float, damp: float) -> S:
         """Perform a step."""
+
+    def interpolate(self, *, t, interp_from: S, interp_to: S):
+        """Interpolate between two solver states."""
+
+    def interpolate_at_t1(self, *, t, interp_from: S, interp_to: S):
+        """Interpolate close to a checkpoint."""
 
     @property
     def is_suitable_for_save_at(self) -> bool:
@@ -65,12 +64,84 @@ class Solver(Protocol, Generic[T, S]):
         """Postprocess the solution before returning."""
 
 
+class Control(Generic[T]):
+    """An interface for a control algorithm."""
+
+    def init(self, dt: float, /) -> T:
+        """Initialise the controller state."""
+        raise NotImplementedError
+
+    def apply(self, dt: float, state: T, /, *, error_power: float) -> tuple[float, T]:
+        """Propose a time-step-size."""
+        raise NotImplementedError
+
+
+# TODO: these parameters are floats and could be passed to "apply"?
+class control_proportional_integral(Control[float]):
+    """Construct a proportional-integral-controller with time-clipping."""
+
+    def __init__(
+        self,
+        *,
+        safety=0.95,
+        factor_min=0.2,
+        factor_max=10.0,
+        power_integral_unscaled=0.3,
+        power_proportional_unscaled=0.4,
+    ):
+        self.safety = safety
+        self.factor_min = factor_min
+        self.factor_max = factor_max
+        self.power_integral_unscaled = power_integral_unscaled
+        self.power_proportional_unscaled = power_proportional_unscaled
+
+    def init(self, dt: float, /) -> float:
+        del dt
+        return 1.0
+
+    def apply(self, dt: float, error_power_prev: float, /, *, error_power):
+        # Equivalent: error_power = error_norm ** (-1.0 / error_contraction_rate)
+        a1 = error_power**self.power_integral_unscaled
+        a2 = (error_power / error_power_prev) ** self.power_proportional_unscaled
+        scale_factor_unclipped = self.safety * a1 * a2
+
+        scale_factor_clipped_min = np.minimum(scale_factor_unclipped, self.factor_max)
+        scale_factor = np.maximum(self.factor_min, scale_factor_clipped_min)
+
+        # >= 1.0 because error_power is 1/scaled_error_norm
+        error_power_prev = np.where(error_power >= 1.0, error_power, error_power_prev)
+
+        dt_proposed = scale_factor * dt
+        return dt_proposed, error_power_prev
+
+
+class control_integral(Control[tuple]):
+    """Construct an integral-controller."""
+
+    def __init__(self, *, safety=0.95, factor_min=0.2, factor_max=10.0):
+        self.safety = safety
+        self.factor_min = factor_min
+        self.factor_max = factor_max
+
+    def init(self, dt, /) -> tuple:
+        del dt
+        return ()
+
+    def apply(self, dt, state: tuple, /, *, error_power):
+        del state
+        scale_factor_unclipped = self.safety * error_power
+
+        scale_factor_clipped_min = np.minimum(scale_factor_unclipped, self.factor_max)
+        scale_factor = np.maximum(self.factor_min, scale_factor_clipped_min)
+        return scale_factor * dt, ()
+
+
 def solve_adaptive_terminal_values(
     solver: Solver,
     errorest,
-    control=None,
-    clip_dt=False,
-    while_loop=control_flow.while_loop,
+    control: Control | None = None,
+    clip_dt: bool = False,
+    while_loop: Callable = control_flow.while_loop,
 ) -> Callable:
     """Simulate the terminal values of an initial value problem."""
     # Turn off warnings because any solver goes for terminal values
@@ -99,10 +170,10 @@ def solve_adaptive_save_at(
     *,
     solver: Solver,
     errorest,
-    control=None,
-    clip_dt=False,
+    control: Control | None = None,
+    clip_dt: bool = False,
+    while_loop: Callable = control_flow.while_loop,
     warn=True,
-    while_loop=control_flow.while_loop,
 ) -> Callable:
     r"""Solve an initial value problem and return the solution at a pre-determined grid.
 
@@ -307,27 +378,22 @@ class _RejectionLoopState:
     errorest_proposed: Any
 
 
-@containers.dataclass
 class RejectionLoop:
     """Implement a rejection loop."""
 
-    solver: Any
-    """The solver."""
-
-    clip_dt: bool
-    """Whether or not to clip the timestep before stepping."""
-
-    errorest: Any
-    """Error estimator."""
-
-    control: Any
-    """The controller."""
-
-    while_loop: Callable
-    """An implementation of a while-loop to be used for the rejection loop.
-
-    Change this to a bounded while loop to make the solvers reverse-differentiable.
-    """
+    def __init__(
+        self,
+        solver: Solver,
+        clip_dt: bool,
+        errorest: Any,
+        control: Control,
+        while_loop: Callable,
+    ):
+        self.solver = solver
+        self.clip_dt = clip_dt
+        self.errorest = errorest
+        self.control = control
+        self.while_loop = while_loop
 
     def init(self, state_solver, dt) -> TimeStepState:
         """Initialise the adaptive solver state."""
@@ -384,8 +450,8 @@ class RejectionLoop:
     def step_init_loopstate(self, s0: TimeStepState) -> _RejectionLoopState:
         """Initialise the rejection state."""
 
-        def _ones_like(tree):
-            return tree.tree_map(np.ones_like, tree)
+        def _ones_like(pytree):
+            return tree.tree_map(np.ones_like, pytree)
 
         smaller_than_1 = 0.9  # the cond() must return True
         return _RejectionLoopState(
@@ -486,63 +552,3 @@ class RejectionLoop:
             errorest_step_from=state.errorest_step_from,
         )
         return solution, new_state
-
-
-@containers.dataclass
-class _Controller(Generic[T]):
-    """Control algorithm."""
-
-    init: Callable[[float], T]
-    """Initialise the controller state."""
-
-    apply: Callable[[float, T, NamedArg(float, "error_power")], tuple[float, T]]
-    """Propose a time-step-size."""
-
-
-def control_proportional_integral(
-    *,
-    safety=0.95,
-    factor_min=0.2,
-    factor_max=10.0,
-    power_integral_unscaled=0.3,
-    power_proportional_unscaled=0.4,
-) -> _Controller[float]:
-    """Construct a proportional-integral-controller with time-clipping."""
-
-    def init(_dt: float, /) -> float:
-        return 1.0
-
-    def apply(dt: float, error_power_prev: float, /, *, error_power):
-        # Equivalent: error_power = error_norm ** (-1.0 / error_contraction_rate)
-        a1 = error_power**power_integral_unscaled
-        a2 = (error_power / error_power_prev) ** power_proportional_unscaled
-        scale_factor_unclipped = safety * a1 * a2
-
-        scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
-        scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
-
-        # >= 1.0 because error_power is 1/scaled_error_norm
-        error_power_prev = np.where(error_power >= 1.0, error_power, error_power_prev)
-
-        dt_proposed = scale_factor * dt
-        return dt_proposed, error_power_prev
-
-    return _Controller(init=init, apply=apply)
-
-
-def control_integral(
-    *, safety=0.95, factor_min=0.2, factor_max=10.0
-) -> _Controller[None]:
-    """Construct an integral-controller."""
-
-    def init(_dt, /) -> None:
-        return None
-
-    def apply(dt, _state, /, *, error_power):
-        scale_factor_unclipped = safety * error_power
-
-        scale_factor_clipped_min = np.minimum(scale_factor_unclipped, factor_max)
-        scale_factor = np.maximum(factor_min, scale_factor_clipped_min)
-        return scale_factor * dt, None
-
-    return _Controller(init=init, apply=apply)
