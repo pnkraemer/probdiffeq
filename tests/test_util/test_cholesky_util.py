@@ -3,7 +3,7 @@
 These are so crucial and annoying to debug that they need their own test set.
 """
 
-from probdiffeq.backend import func, linalg, np, random, testing
+from probdiffeq.backend import func, linalg, np, random, testing, tree
 from probdiffeq.util import cholesky_util
 
 _SHAPES = ([(4, 3), (3, 3), (4, 4)], [(2, 3), (3, 3), (2, 2)])
@@ -147,9 +147,9 @@ def test_sqrt_sum_square_scalar_derivative_value_test_at_origin():
     assert testing.allclose(expected, received)
 
 
-def _tree_is_free_of_nans(tree):
+def _tree_is_free_of_nans(pytree):
     def contains_no_nan(x):
         return np.logical_not(np.any(np.isnan(x)))
 
-    tree_contains_no_nan = tree.tree_map(contains_no_nan, tree)
+    tree_contains_no_nan = tree.tree_map(contains_no_nan, pytree)
     return tree.tree_all(tree_contains_no_nan)
