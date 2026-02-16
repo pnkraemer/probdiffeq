@@ -32,7 +32,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 
 def main(start=3.0, stop=11.0, step=1.0, repeats=2, use_diffrax: bool = False):
@@ -41,9 +41,9 @@ def main(start=3.0, stop=11.0, step=1.0, repeats=2, use_diffrax: bool = False):
     jax.config.update("jax_enable_x64", True)
 
     # Simulate once to plot the state
-    ts, ys = solve_ivp_once()
+    _ts, ys = solve_ivp_once()
 
-    fig, ax = plt.subplots(figsize=(5, 3))
+    _fig, ax = plt.subplots(figsize=(5, 3))
     ax.plot(ys[:, :7], ys[:, 7:14], linestyle="solid", marker="None")
     ax.plot(ys[0, :7], ys[0, 7:14], linestyle="None", marker=".", markersize=4)
     ax.plot(ys[-1, :7], ys[-1, 7:14], linestyle="None", marker="*", markersize=8)
@@ -61,10 +61,10 @@ def main(start=3.0, stop=11.0, step=1.0, repeats=2, use_diffrax: bool = False):
     # Assemble algorithms
     algorithms = {
         r"ProbDiffEq: TS0($5$)": solver_probdiffeq(
-            num_derivatives=5, correction_fun=ivpsolvers.correction_ts0
+            num_derivatives=5, constraint_ode_fun=probdiffeq.constraint_ode_ts0
         ),
         r"ProbDiffEq: TS0($8$)": solver_probdiffeq(
-            num_derivatives=8, correction_fun=ivpsolvers.correction_ts0
+            num_derivatives=8, constraint_ode_fun=probdiffeq.constraint_ode_ts0
         ),
         "SciPy: 'RK45'": solver_scipy(method="RK45", use_numba=False),
         "SciPy: 'DOP853'": solver_scipy(method="DOP853", use_numba=False),
@@ -92,7 +92,7 @@ def main(start=3.0, stop=11.0, step=1.0, repeats=2, use_diffrax: bool = False):
         param_to_wp = workprec(algo, precision_fun=precision_fun, timeit_fun=timeit_fun)
         results[label] = param_to_wp(tolerances)
 
-    fig, ax = plt.subplots(figsize=(7, 3))
+    _fig, ax = plt.subplots(figsize=(7, 3))
     for label, wp in results.items():
         ax.loglog(wp["precision"], wp["work_mean"], label=label)
 
@@ -159,7 +159,7 @@ def setup_timeit(*, repeats: int) -> Callable:
     return timer
 
 
-def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
+def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
     # fmt: off
     u0 = jnp.asarray(
@@ -197,27 +197,27 @@ def solver_probdiffeq(*, num_derivatives: int, correction_fun) -> Callable:
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
 
-        init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
             tcoeffs, ssm_fact="isotropic"
         )
-        ts0_or_ts1 = correction_fun(vf_probdiffeq, ssm=ssm, ode_order=2)
-        strategy = ivpsolvers.strategy_filter(ssm=ssm)
-        solver = ivpsolvers.solver_dynamic(
-            strategy, prior=ibm, correction=ts0_or_ts1, ssm=ssm
+        ts0_or_ts1 = constraint_ode_fun(ssm=ssm, ode_order=2)
+        strategy = probdiffeq.strategy_filter(ssm=ssm)
+        solver = probdiffeq.solver_dynamic(
+            vf_probdiffeq, strategy=strategy, prior=ibm, constraint=ts0_or_ts1, ssm=ssm
         )
-        control = ivpsolvers.control_proportional_integral()
-        adaptive_solver = ivpsolvers.adaptive(
-            solver, atol=1e-3 * tol, rtol=tol, control=control, ssm=ssm
+        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+
+        control = ivpsolve.control_proportional_integral()
+        solve = ivpsolve.solve_adaptive_terminal_values(
+            solver=solver, errorest=errorest, control=control
         )
 
         # Solve
         dt0 = ivpsolve.dt0(vf_auto, (u0, du0))
-        solution = ivpsolve.solve_adaptive_terminal_values(
-            init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
-        )
+        solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-3 * tol, rtol=tol)
 
         # Return the terminal value
-        return jax.block_until_ready(solution.u[0])
+        return jax.block_until_ready(solution.u.mean[0])
 
     return param_to_solution
 

@@ -26,7 +26,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend
 
-from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 # +
 if not backend.has_been_selected:
@@ -50,58 +50,52 @@ u0 = jnp.asarray([0.1])
 # Assemble the discretised prior (with and without the correct Taylor coefficients)
 
 NUM_DERIVATIVES = 2
-tcoeffs_like = [u0] * (NUM_DERIVATIVES + 1)
+tcoeffs_mean = [u0] * (NUM_DERIVATIVES + 1)
+tcoeffs_std = [jnp.ones_like(u0)] * (NUM_DERIVATIVES + 1)
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
-init_raw, transitions, ssm = ivpsolvers.prior_wiener_integrated_discrete(
-    ts, tcoeffs_like, output_scale=100.0, ssm_fact="dense"
+markov_seq_prior, ssm = probdiffeq.prior_wiener_integrated_discrete(
+    ts, tcoeffs_mean, tcoeffs_std=tcoeffs_std, output_scale=100.0, ssm_fact="dense"
 )
-
-markov_seq_prior = stats.MarkovSeq(init_raw, transitions)
-
 
 tcoeffs = taylor.odejet_padded_scan(
     lambda y: vector_field(y, t=t0), (u0,), num=NUM_DERIVATIVES
 )
-init_tcoeffs = ssm.normal.from_tcoeffs(tcoeffs)
-markov_seq_tcoeffs = stats.MarkovSeq(init_tcoeffs, transitions)
+markov_seq_tcoeffs, _ssm = probdiffeq.prior_wiener_integrated_discrete(
+    ts, tcoeffs, output_scale=100.0, ssm_fact="dense"
+)
 
 # +
 # Compute the posterior
 
-init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="dense"
 )
-ts1 = ivpsolvers.correction_ts1(vector_field, ssm=ssm)
-strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
-solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts1, ssm=ssm)
-adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-1, rtol=1e-2, ssm=ssm)
+ts1 = probdiffeq.constraint_ode_ts1(ssm=ssm)
+strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
+solver = probdiffeq.solver(
+    vector_field, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
+)
+errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 
 dt0 = ivpsolve.dt0(lambda y: vector_field(y, t=t0), (u0,))
-sol = ivpsolve.solve_adaptive_save_at(
-    init, save_at=ts, dt0=1.0, adaptive_solver=adaptive_solver, ssm=ssm
-)
-markov_seq_posterior = stats.markov_select_terminal(sol.posterior)
+solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
+sol = solve(init, save_at=ts, dt0=dt0, atol=1e-1, rtol=1e-1)
+markov_seq_posterior = sol.solution_full
 
-# +
-# Compute marginals
-
-margs_prior = stats.markov_marginals(markov_seq_prior, reverse=False, ssm=ssm)
-margs_tcoeffs = stats.markov_marginals(markov_seq_tcoeffs, reverse=False, ssm=ssm)
-margs_posterior = stats.markov_marginals(markov_seq_posterior, reverse=True, ssm=ssm)
 
 # +
 # Compute samples
 
 num_samples = 5
 key = jax.random.PRNGKey(seed=1)
-samples_prior, _ = stats.markov_sample(
-    key, markov_seq_prior, shape=(num_samples,), reverse=False, ssm=ssm
+samples_prior = strategy.markov_sample(
+    key, markov_seq_prior, shape=(num_samples,), reverse=False
 )
-samples_tcoeffs, _ = stats.markov_sample(
-    key, markov_seq_tcoeffs, shape=(num_samples,), reverse=False, ssm=ssm
+samples_tcoeffs = strategy.markov_sample(
+    key, markov_seq_tcoeffs, shape=(num_samples,), reverse=False
 )
-samples_posterior, _ = stats.markov_sample(
-    key, markov_seq_posterior, shape=(num_samples,), reverse=True, ssm=ssm
+samples_posterior = strategy.markov_sample(
+    key, markov_seq_posterior, shape=(num_samples,), reverse=True
 )
 
 # +
@@ -115,12 +109,6 @@ axes_state[1].set_title("w/ Initial condition")
 axes_state[2].set_title("Posterior")
 
 sample_style = {"marker": "None", "alpha": 0.99, "linewidth": 0.75}
-mean_style = {
-    "marker": "None",
-    "color": "black",
-    "linestyle": "dashed",
-    "linewidth": 0.99,
-}
 
 
 def residual(x, t):
@@ -128,67 +116,32 @@ def residual(x, t):
     return x[1] - jax.vmap(jax.vmap(vector_field), in_axes=(0, None))(x[0], t)
 
 
-residual_prior = residual(samples_prior, ts[:-1])
-residual_tcoeffs = residual(samples_tcoeffs, ts[:-1])
-residual_posterior = residual(samples_posterior, ts[:-1])
+residual_prior = residual(samples_prior, ts)
+residual_tcoeffs = residual(samples_tcoeffs, ts)
+residual_posterior = residual(samples_posterior, ts)
 
 
 for i in range(num_samples):
     # Plot all state-samples
-    axes_state[0].plot(ts[1:], samples_prior[0][i, ..., 0], **sample_style, color="C0")
-    axes_state[1].plot(
-        ts[1:], samples_tcoeffs[0][i, ..., 0], **sample_style, color="C1"
-    )
-    axes_state[2].plot(
-        ts[:-1], samples_posterior[0][i, ..., 0], **sample_style, color="C2"
-    )
+    axes_state[0].plot(ts, samples_prior[0][i, ..., 0], **sample_style, color="C0")
+    axes_state[1].plot(ts, samples_tcoeffs[0][i, ..., 0], **sample_style, color="C1")
+    axes_state[2].plot(ts, samples_posterior[0][i, ..., 0], **sample_style, color="C2")
 
     # Plot all residual-samples
-    axes_residual[0].plot(ts[:-1], residual_prior[i, ...], **sample_style, color="C0")
-    axes_residual[1].plot(ts[:-1], residual_tcoeffs[i, ...], **sample_style, color="C1")
-    axes_residual[2].plot(
-        ts[:-1], residual_posterior[i, ...], **sample_style, color="C2"
-    )
+    axes_residual[0].plot(ts, residual_prior[i, ...], **sample_style, color="C0")
+    axes_residual[1].plot(ts, residual_tcoeffs[i, ...], **sample_style, color="C1")
+    axes_residual[2].plot(ts, residual_posterior[i, ...], **sample_style, color="C2")
 
     # Plot all log-residual samples
     axes_log_abs[0].plot(
-        ts[:-1], jnp.log10(jnp.abs(residual_prior))[i, ...], **sample_style, color="C0"
+        ts, jnp.log10(jnp.abs(residual_prior))[i, ...], **sample_style, color="C0"
     )
     axes_log_abs[1].plot(
-        ts[:-1],
-        jnp.log10(jnp.abs(residual_tcoeffs))[i, ...],
-        **sample_style,
-        color="C1",
+        ts, jnp.log10(jnp.abs(residual_tcoeffs))[i, ...], **sample_style, color="C1"
     )
     axes_log_abs[2].plot(
-        ts[:-1],
-        jnp.log10(jnp.abs(residual_posterior))[i, ...],
-        **sample_style,
-        color="C2",
+        ts, jnp.log10(jnp.abs(residual_posterior))[i, ...], **sample_style, color="C2"
     )
-#
-
-
-def residual_mean(x, t):
-    """Evaluate the ODE residual."""
-    return x[1] - jax.vmap(vector_field)(x[0], t)
-
-
-# # Plot state means
-axes_state[0].plot(ts[1:], ssm.stats.qoi(margs_prior)[0], **mean_style)
-axes_state[1].plot(ts[1:], ssm.stats.qoi(margs_tcoeffs)[0], **mean_style)
-axes_state[2].plot(ts[:-1], ssm.stats.qoi(margs_posterior)[0], **mean_style)
-
-# # Plot residual means
-axes_residual[0].plot(
-    ts[:-1], residual_mean(ssm.stats.qoi(margs_prior), ts[:-1]), **mean_style
-)
-axes_residual[1].plot(
-    ts[:-1], residual_mean(ssm.stats.qoi(margs_tcoeffs), ts[:-1]), **mean_style
-)
-axes_residual[2].plot(
-    ts[:-1], residual_mean(ssm.stats.qoi(margs_posterior), ts[:-1]), **mean_style
-)
 
 
 # Set the x- and y-ticks/limits

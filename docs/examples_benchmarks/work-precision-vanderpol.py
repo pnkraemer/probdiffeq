@@ -31,7 +31,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 
 def main(start=2.0, stop=8.0, step=1.0, repeats=2, use_diffrax: bool = False):
@@ -42,7 +42,7 @@ def main(start=2.0, stop=8.0, step=1.0, repeats=2, use_diffrax: bool = False):
     # Simulate once to plot the state
     ts, ys = solve_ivp_once()
 
-    fig, ax = plt.subplots(figsize=(5, 3))
+    _fig, ax = plt.subplots(figsize=(5, 3))
     ax.plot(ts, ys)
     ax.set_ylim((-6, 6))
     ax.set_title("Van-der-Pol problem")
@@ -80,7 +80,7 @@ def main(start=2.0, stop=8.0, step=1.0, repeats=2, use_diffrax: bool = False):
         param_to_wp = workprec(algo, precision_fun=precision_fun, timeit_fun=timeit_fun)
         results[label] = param_to_wp(tolerances)
 
-    fig, ax = plt.subplots(figsize=(7, 3))
+    _fig, ax = plt.subplots(figsize=(7, 3))
     for label, wp in results.items():
         ax.loglog(wp["precision"], wp["work_mean"], label=label)
 
@@ -143,26 +143,23 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
 
-        init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
-        ts0_or_ts1 = ivpsolvers.correction_ts1(vf_probdiffeq, ode_order=2, ssm=ssm)
-        strategy = ivpsolvers.strategy_filter(ssm=ssm)
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
+        ts0_or_ts1 = probdiffeq.constraint_ode_ts1(ode_order=2, ssm=ssm)
+        strategy = probdiffeq.strategy_filter(ssm=ssm)
 
-        solver = ivpsolvers.solver_dynamic(
-            strategy, prior=ibm, correction=ts0_or_ts1, ssm=ssm
+        solver = probdiffeq.solver_dynamic(
+            vf_probdiffeq, strategy=strategy, prior=ibm, constraint=ts0_or_ts1, ssm=ssm
         )
-        control = ivpsolvers.control_proportional_integral()
-        adaptive_solver = ivpsolvers.adaptive(
-            solver, atol=1e-3 * tol, rtol=tol, control=control, ssm=ssm, clip_dt=True
-        )
+        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 
-        # Solve
         dt0 = ivpsolve.dt0(vf_auto, (u0, du0))
-        solution = ivpsolve.solve_adaptive_terminal_values(
-            init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
-        )
+        control = ivpsolve.control_proportional_integral()
 
-        # Return the terminal value
-        return jax.block_until_ready(solution.u[0])
+        solve = ivpsolve.solve_adaptive_terminal_values(
+            solver=solver, errorest=errorest, control=control, clip_dt=True
+        )
+        solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-3 * tol, rtol=tol)
+        return jax.block_until_ready(solution.u.mean[0])
 
     return param_to_solution
 

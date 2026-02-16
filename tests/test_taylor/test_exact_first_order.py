@@ -1,8 +1,7 @@
 """Test the exactness of differentiation-based routines on first-order problems."""
 
 from probdiffeq import taylor
-from probdiffeq.backend import functools, ode, testing
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import func, np, ode, testing
 
 
 @testing.case()
@@ -23,7 +22,7 @@ def case_odejet_unroll():
 @testing.fixture(name="pb_with_solution")
 def fixture_pb_with_solution():
     vf, (u0,), (t0, _) = ode.ivp_three_body_1st()
-    vf = functools.partial(vf, t=t0)
+    vf = func.partial(vf, t=t0)
 
     solution = np.load("./tests/test_taylor/data/three_body_first_solution.npy")
     return (vf, (u0,)), solution

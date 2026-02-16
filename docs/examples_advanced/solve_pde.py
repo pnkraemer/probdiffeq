@@ -25,7 +25,7 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 jax.config.update("jax_enable_x64", True)
 
@@ -44,22 +44,22 @@ def main():
 
     # Set up a state-space model
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
+    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
 
     # Build a solver
-    ts = ivpsolvers.correction_ts1(vf, ssm=ssm)
-    strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
-    solver = ivpsolvers.solver_dynamic(
-        ssm=ssm, strategy=strategy, prior=ibm, correction=ts
+    ts = probdiffeq.constraint_ode_ts1(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
+    solver = probdiffeq.solver_dynamic(
+        vf, ssm=ssm, strategy=strategy, prior=ibm, constraint=ts
     )
-    adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
+    errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 
     # Solve the ODE
     save_at = jnp.linspace(t0, t1, num=5, endpoint=True)
-    simulate = simulator(save_at=save_at, adaptive_solver=adaptive_solver, ssm=ssm)
+    simulate = simulator(save_at=save_at, errorest=errorest, solver=solver)
     (u, u_std) = simulate(init)
 
-    fig, axes = plt.subplots(
+    _fig, axes = plt.subplots(
         nrows=2, ncols=len(u), figsize=(2 * len(u), 3), tight_layout=True
     )
     for t_i, u_i, std_i, ax_i in zip(save_at, u, u_std, axes.T):
@@ -81,15 +81,14 @@ def main():
     plt.show()
 
 
-def simulator(save_at, adaptive_solver, ssm):
+def simulator(save_at, errorest, solver):
     """Simulate a PDE."""
 
     @jax.jit
     def solve(init):
-        solution = ivpsolve.solve_adaptive_save_at(
-            init, save_at=save_at, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
-        )
-        return (solution.u[0], solution.u_std[0])
+        solve = ivpsolve.solve_adaptive_save_at(errorest=errorest, solver=solver)
+        solution = solve(init, save_at=save_at, atol=1e-4, rtol=1e-2)
+        return (solution.u.mean[0], solution.u.std[0])
 
     return solve
 

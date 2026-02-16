@@ -3,8 +3,7 @@
 These are so crucial and annoying to debug that they need their own test set.
 """
 
-from probdiffeq.backend import functools, linalg, random, testing, tree_util
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import func, linalg, np, random, testing, tree
 from probdiffeq.util import cholesky_util
 
 _SHAPES = ([(4, 3), (3, 3), (4, 4)], [(2, 3), (3, 3), (2, 2)])
@@ -86,7 +85,7 @@ def test_reverse_conditional_jacrev_zero_matrix():
     HC = _some_array((2, 3)) * 0.0
     X = _some_array((2, 2)) + 3.0 + np.eye(2)
 
-    result = functools.jacrev(cholesky_util.revert_conditional)(HC.T, C.T, X.T)
+    result = func.jacrev(cholesky_util.revert_conditional)(HC.T, C.T, X.T)
     is_not_nan = _tree_is_free_of_nans(result)
     assert is_not_nan
 
@@ -99,7 +98,7 @@ def test_sum_of_sqrtm_factors_jacrev_zero_matrix():
     C = _some_array((3, 3)) * 0.0
     HC = _some_array((3, 2))
 
-    result = functools.jacrev(cholesky_util.sum_of_sqrtm_factors)((C.T, HC.T))
+    result = func.jacrev(cholesky_util.sum_of_sqrtm_factors)((C.T, HC.T))
     is_not_nan = _tree_is_free_of_nans(result)
     assert is_not_nan
 
@@ -111,11 +110,11 @@ def test_sqrt_sum_square_scalar_derivative_value_test():
     to resolve specific corner cases, but need to assert that these are correct.
     """
 
-    @functools.grad
+    @func.grad
     def triu_via_naive_arithmetic_and_autograd(x, y, z):
         return np.sqrt(x**2 + y**2 + z**2)
 
-    @functools.grad
+    @func.grad
     def triu_via_qr_r(x, y, z):
         return cholesky_util.sqrt_sum_square_scalar(x, y, z)
 
@@ -134,11 +133,11 @@ def test_sqrt_sum_square_scalar_derivative_value_test_at_origin():
 
     # Use square of triu to ensure that the reference is differentiable
     # (np.sqrt is not differentiable at zero)
-    @functools.grad
+    @func.grad
     def triu_via_naive_arithmetic_and_autograd(x, y, z):
         return x**2 + y**2 + z**2
 
-    @functools.grad
+    @func.grad
     def triu_via_qr_r(x, y, z):
         return cholesky_util.sqrt_sum_square_scalar(x, y, z) ** 2
 
@@ -148,9 +147,9 @@ def test_sqrt_sum_square_scalar_derivative_value_test_at_origin():
     assert testing.allclose(expected, received)
 
 
-def _tree_is_free_of_nans(tree):
+def _tree_is_free_of_nans(pytree):
     def contains_no_nan(x):
         return np.logical_not(np.any(np.isnan(x)))
 
-    tree_contains_no_nan = tree_util.tree_map(contains_no_nan, tree)
-    return tree_util.tree_all(tree_contains_no_nan)
+    tree_contains_no_nan = tree.tree_map(contains_no_nan, pytree)
+    return tree.tree_all(tree_contains_no_nan)

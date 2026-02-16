@@ -3,7 +3,7 @@
 Mostly **discrete** filtering and smoothing.
 """
 
-from probdiffeq.backend import containers, control_flow, tree_util
+from probdiffeq.backend import flow, structs, tree
 from probdiffeq.backend.typing import Any
 
 
@@ -19,7 +19,7 @@ def estimate_fwd(data, /, init, prior_transitions, observation_model, *, estimat
     idx_or_slice = slice(1, len(data), 1)
     information = _select((data, observation_model), idx_or_slice=idx_or_slice)
     xs = (prior_transitions, *information)
-    return control_flow.scan(step, init=init, xs=xs, reverse=False)
+    return flow.scan(step, init=init, xs=xs, reverse=False)
 
 
 def estimate_rev(data, /, init, prior_transitions, observation_model, *, estimator):
@@ -33,14 +33,14 @@ def estimate_rev(data, /, init, prior_transitions, observation_model, *, estimat
     # Scan over the remaining data points
     information = _select((data, observation_model), idx_or_slice=slice(0, -1, 1))
     xs = (prior_transitions, *information)
-    return control_flow.scan(step, init=init, xs=xs, reverse=True)
+    return flow.scan(step, init=init, xs=xs, reverse=True)
 
 
 def fixedpointsmoother_precon(*, ssm):
     """Construct a discrete, preconditioned fixedpoint-smoother."""
 
-    @tree_util.register_dataclass
-    @containers.dataclass
+    @tree.register_dataclass
+    @structs.dataclass
     class _FPState:
         rv: Any
         conditional: Any
@@ -70,15 +70,15 @@ def fixedpointsmoother_precon(*, ssm):
     return _initialise, _step
 
 
-def _select(tree, idx_or_slice):
-    return tree_util.tree_map(lambda s: s[idx_or_slice, ...], tree)
+def _select(pytree, idx_or_slice):
+    return tree.tree_map(lambda s: s[idx_or_slice, ...], pytree)
 
 
 def kalmanfilter_with_marginal_likelihood(*, ssm):
     """Construct a Kalman-filter-implementation of computing the marginal likelihood."""
 
-    @tree_util.register_dataclass
-    @containers.dataclass
+    @tree.register_dataclass
+    @structs.dataclass
     class _KFState:
         rv: Any
         num_data_points: float
@@ -88,7 +88,7 @@ def kalmanfilter_with_marginal_likelihood(*, ssm):
         observed, conditional = ssm.conditional.revert(rv, model)
         corrected = ssm.conditional.apply(data, conditional)
         logpdf = ssm.stats.logpdf(data, observed)
-        return _KFState(corrected, num_data_points=0.0, logpdf=logpdf)
+        return _KFState(corrected, num_data_points=1.0, logpdf=logpdf)
 
     def _step(state: _KFState, cond_and_data_and_obs) -> tuple[_KFState, _KFState]:
         conditional, data, observation = cond_and_data_and_obs

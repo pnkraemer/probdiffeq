@@ -29,7 +29,7 @@ import jax
 import jax.numpy as jnp
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
@@ -56,15 +56,16 @@ def vf(*y, t):  # noqa: ARG001
 # +
 def solve(tc):
     """Solve the ODE."""
-    init, prior, ssm = ivpsolvers.prior_wiener_integrated(tc, ssm_fact="dense")
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
-    strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
-    solver = ivpsolvers.solver_mle(strategy, prior=prior, correction=ts0, ssm=ssm)
-    ts = jnp.linspace(t0, t1, endpoint=True, num=10)
-    adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-2, rtol=1e-2, ssm=ssm)
-    return ivpsolve.solve_adaptive_save_at(
-        init, save_at=ts, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
+    init, prior, ssm = probdiffeq.prior_wiener_integrated(tc, ssm_fact="dense")
+    ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
+    solver = probdiffeq.solver_mle(
+        vf, strategy=strategy, prior=prior, constraint=ts0, ssm=ssm
     )
+    ts = jnp.linspace(t0, t1, endpoint=True, num=10)
+    errorest = probdiffeq.errorest_local_residual_cached(prior=prior, ssm=ssm)
+    solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
+    return solve(init, save_at=ts, atol=1e-2, rtol=1e-2)
 
 
 # -
@@ -93,8 +94,10 @@ print(jax.tree.map(jnp.shape, solution.u))
 
 # +
 
-Taylor = collections.namedtuple("Taylor", ["state", "velocity", "acceleration"])
-tcoeffs = Taylor(*tcoeffs)
+CustomTCoeffs = collections.namedtuple(
+    "CustomTCoeffs", ["state", "velocity", "acceleration"]
+)
+tcoeffs = CustomTCoeffs(*tcoeffs)
 solution = solve(tcoeffs)
 
 print(jax.tree.map(jnp.shape, tcoeffs))
@@ -110,14 +113,15 @@ print(jax.tree.map(jnp.shape, solution.u))
 # +
 
 key = jax.random.PRNGKey(seed=15)
-posterior = stats.markov_select_terminal(solution.posterior)
-samples, samples_init = stats.markov_sample(
-    key, posterior, reverse=True, ssm=solution.ssm
-)
+_, _, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
+strategy = probdiffeq.strategy_filter(ssm)
+posterior = solution.solution_full
+sample_one = strategy.markov_sample(key, posterior, reverse=True)
+sample_many = strategy.markov_sample(key, posterior, shape=(1, 2, 3), reverse=True)
 
-print(jax.tree.map(jnp.shape, solution.u))
-print(jax.tree.map(jnp.shape, solution.u_std))
-print(jax.tree.map(jnp.shape, samples))
-print(jax.tree.map(jnp.shape, samples_init))
+print(jax.tree.map(jnp.shape, solution.u.mean))
+print(jax.tree.map(jnp.shape, solution.u.std))
+print(jax.tree.map(jnp.shape, sample_one))
+print(jax.tree.map(jnp.shape, sample_many))
 
 # -

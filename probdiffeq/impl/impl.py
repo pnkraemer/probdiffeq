@@ -1,11 +1,11 @@
 """State-space model implementations."""
 
-from probdiffeq.backend import containers, functools, tree_util
+from probdiffeq.backend import func, structs, tree
 from probdiffeq.backend.typing import Callable
-from probdiffeq.impl import _conditional, _linearise, _normal, _prototypes, _stats
+from probdiffeq.impl import _conditional, _linearize, _normal, _prototypes, _stats
 
 
-@containers.dataclass
+@structs.dataclass
 class FactImpl:
     """Implementation of factorized state-space models."""
 
@@ -13,7 +13,7 @@ class FactImpl:
     prototypes: _prototypes.PrototypeBackend
     normal: _normal.NormalBackend
     stats: _stats.StatsBackend
-    linearise: _linearise.LinearisationBackend
+    linearize: _linearize.LinearizationBackend
     conditional: _conditional.ConditionalBackend
 
     num_derivatives: int
@@ -42,14 +42,14 @@ def choose(which: str, /, *, tcoeffs_like) -> FactImpl:
 
 
 def _select_dense(*, tcoeffs_like) -> FactImpl:
-    ode_shape = tree_util.ravel_pytree(tcoeffs_like[0])[0].shape
-    flat, unravel = tree_util.ravel_pytree(tcoeffs_like)
+    ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
+    flat, unravel = tree.ravel_pytree(tcoeffs_like)
 
     num_derivatives = len(tcoeffs_like) - 1
 
     prototypes = _prototypes.DensePrototype(ode_shape=ode_shape)
     normal = _normal.DenseNormal(ode_shape=ode_shape)
-    linearise = _linearise.DenseLinearisation(ode_shape=ode_shape, unravel=unravel)
+    linearize = _linearize.DenseLinearization(ode_shape=ode_shape, unravel=unravel)
     stats = _stats.DenseStats(ode_shape=ode_shape, unravel=unravel)
     conditional = _conditional.DenseConditional(
         ode_shape=ode_shape,
@@ -59,7 +59,7 @@ def _select_dense(*, tcoeffs_like) -> FactImpl:
     )
     return FactImpl(
         name="dense",
-        linearise=linearise,
+        linearize=linearize,
         conditional=conditional,
         normal=normal,
         prototypes=prototypes,
@@ -70,23 +70,23 @@ def _select_dense(*, tcoeffs_like) -> FactImpl:
 
 
 def _select_isotropic(*, tcoeffs_like) -> FactImpl:
-    ode_shape = tree_util.ravel_pytree(tcoeffs_like[0])[0].shape
+    ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
     num_derivatives = len(tcoeffs_like) - 1
 
-    tcoeffs_tree_only = tree_util.tree_map(lambda *_a: 0.0, tcoeffs_like)
-    _, unravel_tree = tree_util.ravel_pytree(tcoeffs_tree_only)
+    tcoeffs_tree_only = tree.tree_map(lambda *_a: 0.0, tcoeffs_like)
+    _, unravel_tree = tree.ravel_pytree(tcoeffs_tree_only)
 
-    leaves, _ = tree_util.tree_flatten(tcoeffs_like)
-    _, unravel_leaf = tree_util.ravel_pytree(leaves[0])
+    leaves, _ = tree.tree_flatten(tcoeffs_like)
+    _, unravel_leaf = tree.ravel_pytree(leaves[0])
 
     def unravel(z):
-        tree = functools.vmap(unravel_tree, in_axes=1, out_axes=0)(z)
-        return tree_util.tree_map(unravel_leaf, tree)
+        pytree = func.vmap(unravel_tree, in_axes=1, out_axes=0)(z)
+        return tree.tree_map(unravel_leaf, pytree)
 
     prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
     normal = _normal.IsotropicNormal(ode_shape=ode_shape)
     stats = _stats.IsotropicStats(ode_shape=ode_shape, unravel=unravel)
-    linearise = _linearise.IsotropicLinearisation(unravel=unravel)
+    linearize = _linearize.IsotropicLinearization(unravel=unravel)
     conditional = _conditional.IsotropicConditional(
         ode_shape=ode_shape, num_derivatives=num_derivatives, unravel_tree=unravel_tree
     )
@@ -95,7 +95,7 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
         prototypes=prototypes,
         normal=normal,
         stats=stats,
-        linearise=linearise,
+        linearize=linearize,
         conditional=conditional,
         num_derivatives=len(tcoeffs_like) - 1,
         unravel=unravel,
@@ -103,23 +103,23 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
 
 
 def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
-    ode_shape = tree_util.ravel_pytree(tcoeffs_like[0])[0].shape
+    ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
     num_derivatives = len(tcoeffs_like) - 1
 
-    tcoeffs_tree_only = tree_util.tree_map(lambda *_a: 0.0, tcoeffs_like)
-    _, unravel_tree = tree_util.ravel_pytree(tcoeffs_tree_only)
+    tcoeffs_tree_only = tree.tree_map(lambda *_a: 0.0, tcoeffs_like)
+    _, unravel_tree = tree.ravel_pytree(tcoeffs_tree_only)
 
-    leaves, _ = tree_util.tree_flatten(tcoeffs_like)
-    _, unravel_leaf = tree_util.ravel_pytree(leaves[0])
+    leaves, _ = tree.tree_flatten(tcoeffs_like)
+    _, unravel_leaf = tree.ravel_pytree(leaves[0])
 
     def unravel(z):
-        tree = functools.vmap(unravel_tree, in_axes=0, out_axes=0)(z)
-        return tree_util.tree_map(unravel_leaf, tree)
+        pytree = func.vmap(unravel_tree, in_axes=0, out_axes=0)(z)
+        return tree.tree_map(unravel_leaf, pytree)
 
     prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)
     normal = _normal.BlockDiagNormal(ode_shape=ode_shape)
     stats = _stats.BlockDiagStats(ode_shape=ode_shape, unravel=unravel)
-    linearise = _linearise.BlockDiagLinearisation(unravel=unravel)
+    linearize = _linearize.BlockDiagLinearization(unravel=unravel)
     conditional = _conditional.BlockDiagConditional(
         ode_shape=ode_shape, num_derivatives=num_derivatives, unravel_tree=unravel_tree
     )
@@ -128,7 +128,7 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
         prototypes=prototypes,
         normal=normal,
         stats=stats,
-        linearise=linearise,
+        linearize=linearize,
         conditional=conditional,
         num_derivatives=len(tcoeffs_like) - 1,
         unravel=unravel,

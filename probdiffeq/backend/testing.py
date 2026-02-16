@@ -11,7 +11,7 @@ This is not good for extendability of the test suite.
 
 import jax
 import jax.numpy as jnp
-import jax.tree_util
+import jax.tree
 import pytest
 import pytest_cases
 
@@ -48,7 +48,7 @@ def _tree_allclose(tree1, tree2, /, *, atol, rtol):
     def allclose_partial(t1, t2, /):
         return _allclose(t1, t2, atol=atol, rtol=rtol)
 
-    return jax.tree_util.tree_map(allclose_partial, tree1, tree2)
+    return jax.tree.map(allclose_partial, tree1, tree2)
 
 
 def marginals_allclose(
@@ -62,13 +62,17 @@ def marginals_allclose(
     return jnp.logical_and(means_allclose, covs_allclose)
 
 
-def _allclose(a, b, /, *, atol: float | None, rtol: float | None):
+def _allclose(
+    a, b, /, *, atol: jax.Array | float | None, rtol: jax.Array | float | None
+):
     # promote to float-type to enable finfo.eps
     a = jnp.asarray(1.0 * a)
     b = jnp.asarray(1.0 * b)
 
-    # numpy.allclose uses defaults atol=1e-8 and rtol=1e-5;
-    # we mirror this as atol=sqrt(tol) and rtol slightly larger.
+    # numpy.allclose uses defaults atol=1e-8 and rtol=1e-5,
+    # which can be too restrictive in single precision.
+    # we mirror this by selecting tolerances proportional
+    # to the square root of the machine epsilon.
     tol = jnp.sqrt(jnp.finfo(b.dtype).eps)
     if atol is None:
         atol = tol

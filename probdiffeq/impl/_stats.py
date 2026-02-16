@@ -1,5 +1,4 @@
-from probdiffeq.backend import abc, functools, linalg
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import abc, func, linalg, np
 from probdiffeq.backend.typing import Callable
 from probdiffeq.impl import _normal
 from probdiffeq.util import cholesky_util
@@ -79,7 +78,7 @@ class DenseStats(StatsBackend):
 
     def standard_deviation(self, rv):
         if rv.mean.ndim > 1:
-            return functools.vmap(self.standard_deviation)(rv)
+            return func.vmap(self.standard_deviation)(rv)
 
         diag = np.einsum("ij,ij->i", rv.cholesky, rv.cholesky)
         return np.sqrt(diag)
@@ -102,7 +101,7 @@ class DenseStats(StatsBackend):
 
     def qoi_from_sample(self, sample, /):
         if np.ndim(sample) > 1:
-            return functools.vmap(self.qoi_from_sample)(sample)
+            return func.vmap(self.qoi_from_sample)(sample)
         return self.unravel(sample)
 
     def update_mean(self, mean, x, /, num):
@@ -142,14 +141,14 @@ class IsotropicStats(StatsBackend):
 
         # Batch in the "mean" dimension and sum the results.
         rv_batch = _normal.Normal(1, None)
-        return np.sum(functools.vmap(logpdf_scalar, in_axes=(1, rv_batch))(u, rv))
+        return np.sum(func.vmap(logpdf_scalar, in_axes=(1, rv_batch))(u, rv))
 
     def mean(self, rv):
         return rv.mean
 
     def standard_deviation(self, rv):
         if rv.cholesky.ndim > 1:
-            return functools.vmap(self.standard_deviation)(rv)
+            return func.vmap(self.standard_deviation)(rv)
         std = np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
         return std[..., None] @ np.ones((1, rv.mean.shape[-1]))
 
@@ -175,7 +174,7 @@ class IsotropicStats(StatsBackend):
 
     def qoi_from_sample(self, sample, /):
         if np.ndim(sample) > 2:
-            return functools.vmap(self.qoi_from_sample)(sample)
+            return func.vmap(self.qoi_from_sample)(sample)
         return self.unravel(sample)
 
     def update_mean(self, mean, x, /, num):
@@ -209,7 +208,7 @@ class BlockDiagStats(StatsBackend):
             logdet_term = 2.0 * slogdet
             return -0.5 * (logdet_term + maha_term + x.size * np.log(np.pi() * 2))
 
-        return np.sum(functools.vmap(logpdf_scalar)(u, rv))
+        return np.sum(func.vmap(logpdf_scalar)(u, rv))
 
     def mean(self, rv):
         return rv.mean
@@ -219,7 +218,7 @@ class BlockDiagStats(StatsBackend):
 
     def standard_deviation(self, rv):
         if rv.cholesky.ndim > 1:
-            return functools.vmap(self.standard_deviation)(rv)
+            return func.vmap(self.standard_deviation)(rv)
 
         return np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
 
@@ -237,7 +236,7 @@ class BlockDiagStats(StatsBackend):
 
     def _cov_dense(self, cholesky):
         if cholesky.ndim > 2:
-            return functools.vmap(self._cov_dense)(cholesky)
+            return func.vmap(self._cov_dense)(cholesky)
         return cholesky @ cholesky.T
 
     def qoi(self, rv):
@@ -245,13 +244,13 @@ class BlockDiagStats(StatsBackend):
 
     def qoi_from_sample(self, sample, /):
         if np.ndim(sample) > 2:
-            return functools.vmap(self.qoi_from_sample)(sample)
+            return func.vmap(self.qoi_from_sample)(sample)
         return self.unravel(sample)
 
     def update_mean(self, mean, x, /, num):  # TODO rename: update_mean_estimate
         if np.ndim(mean) > 0:
             assert np.shape(mean) == np.shape(x)
-            return functools.vmap(self.update_mean, in_axes=(0, 0, None))(mean, x, num)
+            return func.vmap(self.update_mean, in_axes=(0, 0, None))(mean, x, num)
 
         sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
         return sum_updated / np.sqrt(num + 1)

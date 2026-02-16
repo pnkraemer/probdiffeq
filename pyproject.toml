@@ -22,7 +22,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dynamic = ["version"]
-dependencies = ["mypy_extensions", "typing_extensions"]
+dependencies = ["typing_extensions"]
 
 [project.optional-dependencies]
 cpu = [
@@ -155,7 +155,8 @@ split-on-trailing-comma = false
 # Examples shouldn't fail with print statements:
 "probdiffeq/util/doc_util*" = ["T20"]
 # Subclasses inherit docstrings, but D102 doesn't understand this.
-"probdiffeq/ivpsolvers.py" = ["D102"]
+"probdiffeq/probdiffeq.py" = ["D102"]
+"probdiffeq/ivpsolve.py" = ["D102"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"

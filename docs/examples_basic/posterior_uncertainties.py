@@ -17,14 +17,16 @@
 # +
 """Display the marginal uncertainties of filters and smoothers."""
 
+# Set up the ODE
+
+import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
-
-# Set up the ODE
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 
+@jax.jit
 def vf(y, *, t):  # noqa: ARG001
     """Evaluate the Lotka-Volterra vector field."""
     y0, y1 = y[0], y[1]
@@ -42,17 +44,18 @@ u0 = jnp.asarray([20.0, 20.0])
 # Set up a solver
 # To all users: Try replacing the fixedpoint-smoother with a filter!
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
-init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
-ts = ivpsolvers.correction_ts1(vf, ssm=ssm)
-strategy = ivpsolvers.strategy_fixedpoint(ssm=ssm)
-solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts, ssm=ssm)
-adaptive_solver = ivpsolvers.adaptive(solver, atol=1e-1, rtol=1e-1, ssm=ssm)
+init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
+ts = probdiffeq.constraint_ode_ts1(ssm=ssm)
+strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
+
+solver = probdiffeq.solver_mle(vf, strategy=strategy, prior=ibm, constraint=ts, ssm=ssm)
+errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
+
 
 # Solve the ODE
 ts = jnp.linspace(t0, t1, endpoint=True, num=50)
-sol = ivpsolve.solve_adaptive_save_at(
-    init, save_at=ts, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
-)
+sol = jax.jit(solve)(init, save_at=ts, dt0=0.1, atol=1e-1, rtol=1e-1)
 
 # Plot the solution
 fig, axes = plt.subplots(
@@ -60,9 +63,9 @@ fig, axes = plt.subplots(
     ncols=len(tcoeffs),
     sharex="col",
     tight_layout=True,
-    figsize=(len(sol.u) * 2, 5),
+    figsize=(len(sol.u.mean) * 2, 5),
 )
-for i, (u_i, std_i, ax_i) in enumerate(zip(sol.u, sol.u_std, axes.T)):
+for i, (u_i, std_i, ax_i) in enumerate(zip(sol.u.mean, sol.u.std, axes.T)):
     # Set up titles and axis descriptions
     if i == 0:
         ax_i[0].set_title("State")

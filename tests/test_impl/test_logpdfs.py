@@ -3,8 +3,7 @@
 Necessary because the implementation has been faulty in the past. Never again.
 """
 
-from probdiffeq.backend import functools, random, stats, testing, tree_util
-from probdiffeq.backend import numpy as np
+from probdiffeq.backend import func, np, random, stats, testing, tree
 from probdiffeq.impl import impl
 
 
@@ -27,7 +26,7 @@ def test_grad_not_none(fact):
     rv, ssm = random_variable(fact=fact)
     u = np.ones_like(ssm.stats.mean(rv))
 
-    pdf = functools.jacrev(ssm.stats.logpdf)(u, rv)
+    pdf = func.jacrev(ssm.stats.logpdf)(u, rv)
     assert not np.any(np.isinf(pdf))
     assert not np.any(np.isnan(pdf))
 
@@ -40,7 +39,7 @@ def random_variable(fact):
     rv = discretize(0.1, output_scale)
 
     key = random.prng_key(seed=1)
-    noise_flat, unravel = tree_util.ravel_pytree(rv.noise)
+    noise_flat, unravel = tree.ravel_pytree(rv.noise)
     noise_flat = random.normal(key, shape=noise_flat.shape)
     noise = unravel(noise_flat)
     return noise, ssm

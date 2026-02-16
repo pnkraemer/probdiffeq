@@ -22,7 +22,7 @@
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 # Define a differential equation
 
@@ -33,27 +33,28 @@ def vf(y, *, t):  # noqa: ARG001
     return 2 * y * (1 - y)
 
 
-u0 = jnp.asarray([0.1])
+u0 = jnp.asarray(0.1)
 t0, t1 = 0.0, 5.0
 
 
 # Set up a state-space model
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
-init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
+init, iwp, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
 
 
 # Build a solver
-ts = ivpsolvers.correction_ts1(vf, ssm=ssm, ode_order=1)
-strategy = ivpsolvers.strategy_filter(ssm=ssm)
-solver = ivpsolvers.solver_mle(ssm=ssm, strategy=strategy, prior=ibm, correction=ts)
-adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
+ts = probdiffeq.constraint_ode_ts1(ssm=ssm, ode_order=1)
+strategy = probdiffeq.strategy_filter(ssm=ssm)
+solver = probdiffeq.solver_mle(vf, ssm=ssm, strategy=strategy, prior=iwp, constraint=ts)
+errorest = probdiffeq.errorest_local_residual_cached(prior=iwp, ssm=ssm)
 
 
 # Solve the ODE
 # To all users: Try different solution routines.
-solution = ivpsolve.solve_adaptive_save_every_step(
-    init, t0=t0, t1=t1, dt0=0.1, adaptive_solver=adaptive_solver, ssm=ssm
-)
+save_at = jnp.linspace(t0, t1, num=100, endpoint=True)
+solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
+solution = jax.jit(solve)(init, save_at, atol=1e-3, rtol=1e-3)
+
 
 # Look at the solution
 print(f"\ninitial = {jax.tree.map(jnp.shape, init)}")

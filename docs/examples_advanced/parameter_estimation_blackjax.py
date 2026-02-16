@@ -132,7 +132,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, ivpsolvers, stats, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 # +
 
@@ -172,19 +172,23 @@ def plot_solution(t, u, *, ax, marker=".", **plotting_kwargs):
     return ax
 
 
+tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta_guess,), num=2)
+init, ibm, ssm = probdiffeq.prior_wiener_integrated(
+    tcoeffs, output_scale=10.0, ssm_fact="isotropic"
+)
+ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
+strategy = probdiffeq.strategy_filter(ssm=ssm)
+solver = probdiffeq.solver(vf, strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
+
+
 @jax.jit
 def solve_fixed(theta, *, ts):
     """Evaluate the parameter-to-solution map, solving on a fixed grid."""
     # Create a probabilistic solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
-    output_scale = 10.0
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
-        tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
-    )
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
-    strategy = ivpsolvers.strategy_filter(ssm=ssm)
-    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    return ivpsolve.solve_fixed_grid(init, grid=ts, solver=solver, ssm=ssm)
+    init, _ibm, _ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="isotropic")
+    solve = ivpsolve.solve_fixed_grid(solver=solver)
+    return solve(init, grid=ts)
 
 
 @jax.jit
@@ -192,17 +196,10 @@ def solve_adaptive(theta, *, save_at):
     """Evaluate the parameter-to-solution map, solving on an adaptive grid."""
     # Create a probabilistic solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
-    output_scale = 10.0
-    init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
-        tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
-    )
-    ts0 = ivpsolvers.correction_ts0(vf, ssm=ssm)
-    strategy = ivpsolvers.strategy_filter(ssm=ssm)
-    solver = ivpsolvers.solver(strategy, prior=ibm, correction=ts0, ssm=ssm)
-    adaptive_solver = ivpsolvers.adaptive(solver, ssm=ssm)
-    return ivpsolve.solve_adaptive_save_at(
-        init, save_at=save_at, adaptive_solver=adaptive_solver, dt0=0.1, ssm=ssm
-    )
+    init, _ibm, _ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="isotropic")
+    errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+    solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
+    return solve(init, save_at=save_at, dt0=0.1, atol=1e-4, rtol=1e-2)
 
 
 save_at = jnp.linspace(t0, t1, num=250, endpoint=True)
@@ -216,12 +213,12 @@ fig, ax = plt.subplots(figsize=(5, 3))
 data_kwargs = {"alpha": 0.5, "color": "gray"}
 ax.annotate("Data", (13.0, 30.0), **data_kwargs)
 sol = solve_save_at(theta_true)
-ax = plot_solution(sol.t, sol.u[0], ax=ax, **data_kwargs)
+ax = plot_solution(sol.t, sol.u.mean[0], ax=ax, **data_kwargs)
 
 guess_kwargs = {"color": "C3"}
 ax.annotate("Initial guess", (7.5, 20.0), **guess_kwargs)
 sol = solve_save_at(theta_guess)
-ax = plot_solution(sol.t, sol.u[0], ax=ax, **guess_kwargs)
+ax = plot_solution(sol.t, sol.u.mean[0], ax=ax, **guess_kwargs)
 plt.show()
 # -
 
@@ -239,9 +236,9 @@ cov = jnp.eye(2) * 30  # fairly uninformed prior
 def logposterior_fn(theta, *, data, ts, obs_stdev=0.1):
     """Evaluate the logposterior-function of the data."""
     solution = solve_fixed(theta, ts=ts)
-    y_T = jax.tree.map(lambda s: s[-1], solution.posterior)
-    logpdf_data = stats.log_marginal_likelihood_terminal_values(
-        data, standard_deviation=obs_stdev, posterior=y_T, ssm=solution.ssm
+    y_T = jax.tree.map(lambda s: s[-1], solution.solution_full)
+    logpdf_data = strategy.log_marginal_likelihood_terminal_values(
+        data, standard_deviation=obs_stdev, posterior=y_T
     )
     logpdf_prior = jax.scipy.stats.multivariate_normal.logpdf(theta, mean=mean, cov=cov)
     return logpdf_data + logpdf_prior
@@ -251,7 +248,7 @@ def logposterior_fn(theta, *, data, ts, obs_stdev=0.1):
 
 
 ts = jnp.linspace(t0, t1, endpoint=True, num=100)
-data = solve_fixed(theta_true, ts=ts).u[0][-1]
+data = solve_fixed(theta_true, ts=ts).u.mean[0][-1]
 
 log_M = functools.partial(logposterior_fn, data=data, ts=ts)
 # -
@@ -318,19 +315,19 @@ fig, ax = plt.subplots()
 
 sample_kwargs = {"color": "C0"}
 ax.annotate("Samples", (2.75, 31.0), **sample_kwargs)
-for ts, us in zip(solution_samples.t, solution_samples.u[0]):
+for ts, us in zip(solution_samples.t, solution_samples.u.mean[0]):
     ax = plot_solution(ts, us, ax=ax, linewidth=0.1, alpha=0.75, **sample_kwargs)
 
 data_kwargs = {"color": "gray"}
 ax.annotate("Data", (18.25, 40.0), **data_kwargs)
 sol = solve_save_at(theta_true)
-ax = plot_solution(sol.t, sol.u[0], ax=ax, linewidth=4, alpha=0.5, **data_kwargs)
+ax = plot_solution(sol.t, sol.u.mean[0], ax=ax, linewidth=4, alpha=0.5, **data_kwargs)
 
 guess_kwargs = {"color": "gray"}
 ax.annotate("Initial guess", (6.0, 12.0), **guess_kwargs)
 sol = solve_save_at(theta_guess)
 ax = plot_solution(
-    sol.t, sol.u[0], ax=ax, linestyle="dashed", alpha=0.75, **guess_kwargs
+    sol.t, sol.u.mean[0], ax=ax, linestyle="dashed", alpha=0.75, **guess_kwargs
 )
 plt.show()
 # -

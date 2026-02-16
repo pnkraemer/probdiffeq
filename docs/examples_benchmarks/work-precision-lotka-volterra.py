@@ -31,7 +31,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 
 def main(start=3.0, stop=12.0, step=1.0, repeats=2, use_diffrax: bool = False):
@@ -42,7 +42,7 @@ def main(start=3.0, stop=12.0, step=1.0, repeats=2, use_diffrax: bool = False):
     # Simulate once to plot the state
     ts, ys = solve_ivp_once()
 
-    fig, ax = plt.subplots(figsize=(5, 3))
+    _fig, ax = plt.subplots(figsize=(5, 3))
     ax.plot(ts, ys)
     ax.set_title("Lotka-Volterra problem")
     ax.set_xlabel("Time")
@@ -55,10 +55,10 @@ def main(start=3.0, stop=12.0, step=1.0, repeats=2, use_diffrax: bool = False):
     timeit_fun = setup_timeit(repeats=repeats)
 
     # Assemble algorithms
-    ts0, ts1 = ivpsolvers.correction_ts0, ivpsolvers.correction_ts1
-    ts0_iso = solver_probdiffeq(5, correction=ts0, implementation="isotropic")
-    ts0_bd = solver_probdiffeq(5, correction=ts0, implementation="blockdiag")
-    ts1_dense = solver_probdiffeq(8, correction=ts1, implementation="dense")
+    ts0, ts1 = probdiffeq.constraint_ode_ts0, probdiffeq.constraint_ode_ts1
+    ts0_iso = solver_probdiffeq(5, constraint=ts0, implementation="isotropic")
+    ts0_bd = solver_probdiffeq(5, constraint=ts0, implementation="blockdiag")
+    ts1_dense = solver_probdiffeq(8, constraint=ts1, implementation="dense")
     algorithms = {
         r"ProbDiffEq: TS0($5$, isotropic)": ts0_iso,
         r"ProbDiffEq: TS0($5$, blockdiag)": ts0_bd,
@@ -87,7 +87,7 @@ def main(start=3.0, stop=12.0, step=1.0, repeats=2, use_diffrax: bool = False):
         param_to_wp = workprec(algo, precision_fun=precision_fun, timeit_fun=timeit_fun)
         results[label] = param_to_wp(tolerances)
 
-    fig, ax = plt.subplots(figsize=(7, 3))
+    _fig, ax = plt.subplots(figsize=(7, 3))
     for label, wp in results.items():
         ax.loglog(wp["precision"], wp["work_mean"], label=label)
 
@@ -133,7 +133,7 @@ def setup_timeit(*, repeats: int) -> Callable:
     return timer
 
 
-def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Callable:
+def solver_probdiffeq(num_derivatives: int, implementation, constraint) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @jax.jit
@@ -148,29 +148,30 @@ def solver_probdiffeq(num_derivatives: int, implementation, correction) -> Calla
 
     @jax.jit
     def param_to_solution(tol):
-        # Build a solver
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
 
-        init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
             tcoeffs, ssm_fact=implementation
         )
-        strategy = ivpsolvers.strategy_filter(ssm=ssm)
-        corr = correction(vf_probdiffeq, ssm=ssm)
-        solver = ivpsolvers.solver_mle(strategy, prior=ibm, correction=corr, ssm=ssm)
-        control = ivpsolvers.control_proportional_integral()
-        adaptive_solver = ivpsolvers.adaptive(
-            solver, atol=1e-2 * tol, rtol=tol, control=control, ssm=ssm
+        strategy = probdiffeq.strategy_filter(ssm=ssm)
+        corr = constraint(ssm=ssm)
+        solver = probdiffeq.solver_mle(
+            vf_probdiffeq, strategy=strategy, prior=ibm, constraint=corr, ssm=ssm
         )
+        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 
-        # Solve
-        dt0 = ivpsolve.dt0(vf_auto, (u0,))
-        solution = ivpsolve.solve_adaptive_terminal_values(
-            init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
+        control = ivpsolve.control_proportional_integral()
+        solve = ivpsolve.solve_adaptive_terminal_values(
+            errorest=errorest, solver=solver, control=control
         )
+        dt0 = ivpsolve.dt0(vf_auto, (u0,))
+
+        # Build a solver
+        solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-2 * tol, rtol=tol)
 
         # Return the terminal value
-        return jax.block_until_ready(solution.u[0])
+        return jax.block_until_ready(solution.u.mean[0])
 
     return param_to_solution
 

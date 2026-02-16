@@ -31,7 +31,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import ivpsolve, ivpsolvers, taylor
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 
 def main():
@@ -62,7 +62,7 @@ def main():
 
     # Set up the benchmark (compute a reference etc.)
     reference = solver_scipy(method="LSODA")(1e-12)
-    tolerances = 0.1 ** jnp.arange(2, 8, step=0.25)
+    tolerances = 0.1 ** jnp.arange(2, 8, step=0.5)
     precision_fun = rmse_relative(reference)
     timeit_fun = timer()
 
@@ -73,7 +73,7 @@ def main():
         results[label] = param_to_wp(tolerances)
 
     layout = [["values", "trends"]]
-    fig, ax = plt.subplot_mosaic(
+    _fig, ax = plt.subplot_mosaic(
         layout,
         figsize=(8, 3),
         constrained_layout=True,
@@ -171,27 +171,30 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
 
     @jax.jit
     def param_to_solution(tol):
-        # Build a solver
+        # Do inside the function so we jit the Taylor code
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
 
-        init, ibm, ssm = ivpsolvers.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
-        strategy = ivpsolvers.strategy_filter(ssm=ssm)
-        corr = ivpsolvers.correction_ts1(vf_probdiffeq, ssm=ssm)
-        solver = ivpsolvers.solver(strategy, prior=ibm, correction=corr, ssm=ssm)
-        control = ivpsolvers.control_proportional_integral()
-        adaptive_solver = ivpsolvers.adaptive(
-            solver, atol=1e-2 * tol, rtol=tol, control=control, ssm=ssm
+        # Build a solver
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
+        strategy = probdiffeq.strategy_filter(ssm=ssm)
+        corr = probdiffeq.constraint_ode_ts1(ssm=ssm)
+        solver = probdiffeq.solver(
+            vf_probdiffeq, strategy=strategy, prior=ibm, constraint=corr, ssm=ssm
+        )
+        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+
+        control = ivpsolve.control_proportional_integral()
+        solve = ivpsolve.solve_adaptive_terminal_values(
+            solver=solver, errorest=errorest, control=control
         )
 
         # Solve
         dt0 = ivpsolve.dt0(vf_auto, (u0,))
-        solution = ivpsolve.solve_adaptive_terminal_values(
-            init, t0=t0, t1=t1, dt0=dt0, adaptive_solver=adaptive_solver, ssm=ssm
-        )
+        solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-2 * tol, rtol=tol)
 
         # Return the terminal value
-        return solution.u[0], solution.num_steps
+        return solution.u.mean[0], solution.num_steps
 
     return param_to_solution
 
@@ -206,7 +209,7 @@ def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
         works_std = []
         precisions = []
         for arg in list_of_args:
-            x, num_steps = fun(arg)
+            _x, num_steps = fun(arg)
 
             precision = precision_fun(fun(arg)[0].block_until_ready())
             times = timeit_fun(lambda: fun(arg)[0].block_until_ready())  # noqa: B023

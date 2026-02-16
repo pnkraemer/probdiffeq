@@ -1,13 +1,14 @@
-from probdiffeq.backend import abc, containers, linalg, tree_util
-from probdiffeq.backend import numpy as np
-from probdiffeq.backend.typing import Array, Sequence, TypeVar
+from probdiffeq.backend import abc, linalg, np, structs, tree
+from probdiffeq.backend.typing import Generic, Sequence, TypeVar
+
+T = TypeVar("T")
 
 
-@tree_util.register_dataclass
-@containers.dataclass
-class Normal:
-    mean: Array
-    cholesky: Array
+@tree.register_dataclass
+@structs.dataclass
+class Normal(Generic[T]):
+    mean: T
+    cholesky: T
 
 
 C = TypeVar("C", bound=Sequence)
@@ -15,7 +16,7 @@ C = TypeVar("C", bound=Sequence)
 
 class NormalBackend(abc.ABC):
     @abc.abstractmethod
-    def from_tcoeffs(self, loc: C, scale: C | None = None, damp: float = 0.0):
+    def from_tcoeffs(self, loc: C, scale: C | None = None):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -31,21 +32,19 @@ class DenseNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, loc: C, scale: C | None = None, damp: float = 0.0):
+    def from_tcoeffs(self, loc: C, scale: C | None = None):
         if scale is None:
-            scale = tree_util.tree_map(np.ones_like, loc)
+            scale = tree.tree_map(np.ones_like, loc)
 
-        loc_flat, _ = tree_util.ravel_pytree(loc)
-        scale_flat, _ = tree_util.ravel_pytree(scale)
+        loc_flat, _ = tree.ravel_pytree(loc)
+        scale_flat, _ = tree.ravel_pytree(scale)
         assert loc_flat.shape == scale_flat.shape
 
         (ode_dim,) = self.ode_shape
         num_coeffs = len(loc)
         assert loc_flat.size == num_coeffs * ode_dim
 
-        powers = 1 / np.arange(1, num_coeffs + 1)
-        powers = np.repeat(powers, ode_dim)
-        cholesky_flat = linalg.diagonal_matrix(damp**powers * scale_flat)
+        cholesky_flat = linalg.diagonal_matrix(scale_flat)
         return Normal(loc_flat, cholesky_flat)
 
     def preconditioner_apply(self, rv, p, /):
@@ -65,18 +64,18 @@ class IsotropicNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, loc: C, scale: C | None = None, damp: float = 0.0):
+    def from_tcoeffs(self, loc: C, scale: C | None = None):
         if scale is None:
-            scale = tree_util.tree_map(lambda _: np.ones(()), loc)
+            scale = tree.tree_map(lambda _: np.ones(()), loc)
 
         def ravel(s):
-            return tree_util.ravel_pytree(s)[0]
+            return tree.ravel_pytree(s)[0]
 
-        loc_leaves, _ = tree_util.tree_flatten(loc)
-        leaves_flat = tree_util.tree_map(ravel, loc_leaves)
+        loc_leaves, _ = tree.tree_flatten(loc)
+        leaves_flat = tree.tree_map(ravel, loc_leaves)
         loc_flat = np.stack(leaves_flat)
 
-        scale_leaves, _ = tree_util.tree_flatten(scale)
+        scale_leaves, _ = tree.tree_flatten(scale)
         scale_flat = np.stack(scale_leaves)
 
         num_coeffs = len(loc)
@@ -86,8 +85,7 @@ class IsotropicNormal(NormalBackend):
             msg += f"Received: {scale}"
             raise ValueError(msg)
 
-        powers = 1 / np.arange(1, num_coeffs + 1)
-        cholesky_flat = linalg.diagonal_matrix(damp**powers * scale_flat)
+        cholesky_flat = linalg.diagonal_matrix(scale_flat)
         return Normal(loc_flat, cholesky_flat)
 
     def preconditioner_apply(self, rv, p, /):
@@ -103,27 +101,27 @@ class BlockDiagNormal(NormalBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def from_tcoeffs(self, loc: C, scale: C | None = None, damp: float = 0.0):
+    def from_tcoeffs(self, loc: C, scale: C | None = None):
         if scale is None:
-            scale = tree_util.tree_map(np.ones_like, loc)
+            scale = tree.tree_map(np.ones_like, loc)
 
         def ravel(s):
-            return tree_util.ravel_pytree(s)[0]
+            return tree.ravel_pytree(s)[0]
 
         # Flatten and reshape the mean
-        loc_leaves, _ = tree_util.tree_flatten(loc)
-        loc_leaves_flat = tree_util.tree_map(ravel, loc_leaves)
+        loc_leaves, _ = tree.tree_flatten(loc)
+        loc_leaves_flat = tree.tree_map(ravel, loc_leaves)
         loc_flat = np.stack(loc_leaves_flat).T
 
         # Flatten and reshape the standard deviation
-        scale_leaves, _ = tree_util.tree_flatten(scale)
-        scale_leaves_flat = tree_util.tree_map(ravel, scale_leaves)
+        scale_leaves, _ = tree.tree_flatten(scale)
+        scale_leaves_flat = tree.tree_map(ravel, scale_leaves)
         scale_flat = np.stack(scale_leaves_flat).T
 
         # Promote std into covariance matrix and apply damping
         num_coeffs = len(loc)
-        powers = 1 / np.arange(1, num_coeffs + 1)
-        cholesky = linalg.diagonal_matrix(damp**powers)
+        d = np.ones((num_coeffs,))
+        cholesky = linalg.diagonal_matrix(d)
         cholesky_flat = scale_flat[..., None] * cholesky[None, ...]
         return Normal(loc_flat, cholesky_flat)
 

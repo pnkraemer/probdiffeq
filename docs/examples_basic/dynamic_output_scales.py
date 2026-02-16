@@ -39,7 +39,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, ivpsolvers
+from probdiffeq import ivpsolve, probdiffeq
 
 # +
 if not backend.has_been_selected:
@@ -63,13 +63,15 @@ def vf(*ys, t):  # noqa: ARG001
 num_derivatives = 1
 
 tcoeffs = (u0, vf(u0, t=t0))
-init, ibm, ssm = ivpsolvers.prior_wiener_integrated(
+init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="dense"
 )
-ts1 = ivpsolvers.correction_ts1(vf, ssm=ssm)
-strategy = ivpsolvers.strategy_filter(ssm=ssm)
-dynamic = ivpsolvers.solver_dynamic(strategy, prior=ibm, correction=ts1, ssm=ssm)
-mle = ivpsolvers.solver_mle(strategy, prior=ibm, correction=ts1, ssm=ssm)
+ts1 = probdiffeq.constraint_ode_ts1(ssm=ssm)
+strategy = probdiffeq.strategy_filter(ssm=ssm)
+dynamic = probdiffeq.solver_dynamic(
+    vf, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
+)
+mle = probdiffeq.solver_mle(vf, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm)
 
 # +
 t0, t1 = 0.0, 3.0
@@ -78,8 +80,13 @@ num_pts = 200
 ts = jnp.linspace(t0, t1, num=num_pts, endpoint=True)
 
 
-solution_dynamic = ivpsolve.solve_fixed_grid(init, grid=ts, solver=dynamic, ssm=ssm)
-solution_mle = ivpsolve.solve_fixed_grid(init, grid=ts, solver=mle, ssm=ssm)
+solve_dynamic = ivpsolve.solve_fixed_grid(solver=dynamic)
+solution_dynamic = jax.jit(solve_dynamic)(init, grid=ts)
+
+
+solve_mle = ivpsolve.solve_fixed_grid(solver=mle)
+solution_mle = jax.jit(solve_mle)(init, grid=ts)
+
 # -
 
 # Plot the solution.
@@ -88,10 +95,8 @@ solution_mle = ivpsolve.solve_fixed_grid(init, grid=ts, solver=mle, ssm=ssm)
 fig, (axes_linear, axes_log) = plt.subplots(ncols=2, nrows=2, sharex=True, sharey="row")
 
 
-u_dynamic = solution_dynamic.u[0]
-u_mle = solution_mle.u[0]
-scale_dynamic = solution_dynamic.output_scale
-scale_mle = jnp.ones_like(solution_mle.output_scale) * solution_mle.output_scale[-1]
+u_dynamic = solution_dynamic.u.mean[0]
+u_mle = solution_mle.u.mean[0]
 
 style_target = {
     "marker": "None",
@@ -108,25 +113,16 @@ style_approx = {
     "linewidth": 1.5,
     "alpha": 0.75,
 }
-style_scale = {
-    "marker": "None",
-    "color": "C3",
-    "linestyle": "solid",
-    "label": "Output scale",
-    "linewidth": 1.5,
-    "alpha": 0.75,
-}
+
 
 axes_linear[0].set_title("Time-varying model")
 axes_linear[0].plot(ts, jnp.exp(ts * 2), **style_target)
 axes_linear[0].plot(ts, u_dynamic, **style_approx)
-axes_linear[0].plot(ts[1:], scale_dynamic, **style_scale)
 axes_linear[0].legend()
 
 axes_linear[1].set_title("Constant model")
 axes_linear[1].plot(ts, jnp.exp(ts * 2), **style_target)
 axes_linear[1].plot(ts, u_mle, **style_approx)
-axes_linear[1].plot(ts[1:], scale_mle, **style_scale)
 axes_linear[1].legend()
 
 axes_linear[0].set_ylabel("Linear scale")
@@ -136,12 +132,10 @@ axes_linear[0].set_xlim((t0, t1))
 
 axes_log[0].semilogy(ts, jnp.exp(ts * 2), **style_target)
 axes_log[0].semilogy(ts, u_dynamic, **style_approx)
-axes_log[0].semilogy(ts[1:], scale_dynamic, **style_scale)
 axes_log[0].legend()
 
 axes_log[1].semilogy(ts, jnp.exp(ts * 2), **style_target)
 axes_log[1].semilogy(ts, u_mle, **style_approx)
-axes_log[1].semilogy(ts[1:], scale_mle, **style_scale)
 axes_log[1].legend()
 
 axes_log[0].set_ylabel("Logarithmic scale")
