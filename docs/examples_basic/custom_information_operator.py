@@ -21,9 +21,14 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import ivpsolve, probdiffeq
 
-t0, t1 = 0.0, 5.0
+# TODO: always add machine epsilon to initial Tcoeffs?
+# TODO: demo mass matrices?
+# TODO: think about adaptive steps
+
+
+# Define the problem
 
 
 @jax.jit
@@ -39,117 +44,95 @@ def hamiltonian_1st(y):
     return kinetic + potential
 
 
-u0 = jnp.array([1.0, 0.0, 0.0, 1.0])
-
-zeros, ones = jnp.zeros_like(u0), jnp.ones_like(u0)
-tcoeffs = [u0, zeros, zeros, zeros]
-tcoeffs_std = [zeros, ones, ones, ones]
-
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-    tcoeffs, tcoeffs_std=tcoeffs_std, output_scale=1.0, ssm_fact="dense"
-)
-ts1 = probdiffeq.constraint_ode_ts1(ssm=ssm)
-strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-solver_1st = probdiffeq.solver_mle(
-    vf_1st, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
-)
-solve = ivpsolve.solve_fixed_grid(solver=solver_1st)
-
-# -
-
-grid = jnp.linspace(t0, t1, endpoint=True, num=150)
-solution = jax.jit(solve)(init, grid=grid)
-hamiltonian_drift = jax.vmap(hamiltonian_1st)(solution.u.mean[0]) - hamiltonian_1st(u0)
-
-fig, ax = plt.subplots(ncols=2, figsize=(8, 3), constrained_layout=True)
-ax[0].plot(solution.t, solution.u.mean[0], marker=".")
-ax[1].semilogy(solution.t, jnp.abs(hamiltonian_drift))
-
-plt.show()
-
-# The default configuration assumes that the ODE to be solved is of first order.
-# Now, the same game with a second-order ODE
-
-# +
-
-
 @jax.jit
-def vf_2(y, dy, *, t):  # noqa: ARG001
+def vf_2nd(y, dy, *, t):  # noqa: ARG001
     """Evaluate the three-body problem as a second-order IVP."""
     return -y
 
 
-def hamiltonian_2(u, du):
-    """
-    Energy:
-    H = 1/2 |du|^2 + 1/2 |u|^2
-    """
+def hamiltonian_2nd(u, du):
     kinetic = 0.5 * jnp.dot(du, du)
     potential = 0.5 * jnp.dot(u, u)
     return kinetic + potential
 
 
-u0, du0 = jnp.split(u0, 2)
+t0, t1 = 0.0, 5.0
+u0_1st = jnp.array([1.0, 0.0, 0.0, 1.0])
 
-# # One derivative more than above because we don't transform to first order
-tcoeffs = taylor.odejet_padded_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-    tcoeffs, output_scale=1.0, ssm_fact="dense"
+
+# Hamiltonian at t=0 (a good solution conserves it)
+H0 = hamiltonian_1st(u0_1st)
+
+
+# +
+
+# Set up the first-order solver (for reference)
+
+zeros, ones = jnp.zeros_like(u0_1st), jnp.ones_like(u0_1st)
+tcoeffs = [u0_1st, zeros, zeros, zeros]
+tcoeffs_std = [zeros, ones, ones, ones]
+init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, tcoeffs_std=tcoeffs_std)
+ts1 = probdiffeq.constraint_ode_ts1(ssm=ssm)
+strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
+solver_1st = probdiffeq.solver(
+    vf_1st, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
 )
-# ts0 = probdiffeq.constraint_root_ts1(root, ode_order=2, ssm=ssm)
-# strategy = probdiffeq.strategy_filter(ssm=ssm)
-# solver_2nd = probdiffeq.solver_mle(
-#     vf_2, strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
-# )
-# errorest_2nd = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+solve = ivpsolve.solve_fixed_grid(solver=solver_1st)
 
-# # -
+# +
 
-# solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, errorest=errorest_2nd)
-# solution = jax.jit(solve)(init, save_at=save_at, atol=1e-5, rtol=1e-5)
+grid = jnp.linspace(t0, t1, endpoint=True, num=150)
+solution = jax.jit(solve)(init, grid=grid)
+hamiltonian = jax.vmap(hamiltonian_1st)(solution.u.mean[0])
 
 
-# fig, ax = plt.subplots(ncols=2, figsize=(8, 3), constrained_layout=True)
-# ax[0].plot(solution.u.mean[0][:, 0], solution.u.mean[0][:, 1], marker=".")
-# ax[1].semilogy(
-#     solution.t,
-#     jnp.abs(
-#         jax.vmap(hamiltonian)(solution.u.mean[0], solution.u.mean[1])
-#         - hamiltonian(u0, du0)
-#     ),
-# )
-# plt.show()
+# +
+
+fig, ax = plt.subplots(ncols=2, figsize=(8, 3), constrained_layout=True)
+ax[0].plot(solution.t, solution.u.mean[0], marker=".")
+ax[1].semilogy(solution.t, jnp.abs(hamiltonian - H0))
+ax[1].set_ylim((1e-8, 1e-3))
+
+plt.show()
 
 
-# # -
+# +
+
+
+# Set up the custom information operator.
+# We know: (i) the ODE is second order; (ii) the Hamiltonian should be conserved
 
 
 def root(vf, *u_and_du_and_ddu):
     *u_and_du, ddu = u_and_du_and_ddu
     deriv = ddu - vf(*u_and_du)
-    hamil = hamiltonian_2(*u_and_du) - hamiltonian_2(u0, du0)
-    return jnp.concatenate([deriv, 100 * hamil[None]])
+    hamil = hamiltonian_2nd(*u_and_du) - H0
+    return [deriv, hamil]
 
 
-ts0 = probdiffeq.constraint_root_ts1(root, ode_order=2, ssm=ssm)
-strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-solver_2nd = probdiffeq.solver_mle(
-    vf_2, strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
+u0, du0 = jnp.split(u0_1st, 2)
+
+zeros, ones = jnp.zeros_like(u0), jnp.ones_like(u0)
+tcoeffs = [u0, du0, zeros, zeros]
+tcoeffs_std = [zeros, 1e-10 + zeros, ones, ones]  # avoid NaNs
+init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, tcoeffs_std=tcoeffs_std)
+ts1 = probdiffeq.constraint_root_ts1(root, ssm=ssm, ode_order=2)
+strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
+solver_2nd = probdiffeq.solver(
+    vf_2nd, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
 )
-errorest_2nd = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+solve = ivpsolve.solve_fixed_grid(solver=solver_2nd)
 
-solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, errorest=errorest_2nd)
-solution = jax.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2, damp=1e-8)
-print(solution)
+
+grid = jnp.linspace(t0, t1, endpoint=True, num=150)
+solution = jax.jit(solve)(init, grid=grid)
+hamiltonian = jax.vmap(hamiltonian_2nd)(solution.u.mean[0], solution.u.mean[1])
 
 fig, ax = plt.subplots(ncols=2, figsize=(8, 3), constrained_layout=True)
-ax[0].plot(solution.u.mean[0][:, 0], solution.u.mean[0][:, 1], marker=".")
-ax[1].semilogy(
-    solution.t,
-    1e-8
-    + jnp.abs(
-        jax.vmap(hamiltonian_2)(solution.u.mean[0], solution.u.mean[1])
-        - hamiltonian_2(u0, du0)
-    ),
-)
+ax[0].plot(solution.t, solution.u.mean[0], marker=".")
+ax[0].plot(solution.t, solution.u.mean[1], marker=".")
+ax[1].semilogy(solution.t, jnp.abs(hamiltonian - H0))
+ax[1].set_ylim((1e-8, 1e-3))
+plt.show()
+
 plt.show()

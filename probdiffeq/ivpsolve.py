@@ -272,7 +272,7 @@ def solve_fixed_grid(*, solver: Solver) -> Callable[..., Solution]:
             return s_new, s_new
 
         t0 = grid[0]
-        state0 = solver.init(t=t0, u=u)
+        state0 = solver.init(t=t0, u=u, damp=damp)
         _, result = flow.scan(body_fn, init=state0, xs=np.diff(grid))
 
         return solver.userfriendly_output(solution0=state0, solution=result)

@@ -10,6 +10,7 @@ from probdiffeq.backend.typing import (
     ArrayLike,
     Callable,
     Generic,
+    Literal,
     Protocol,
     Sequence,
     TypeVar,
@@ -918,7 +919,7 @@ def prior_wiener_integrated(
     tcoeffs: C,
     *,
     tcoeffs_std: C | None = None,
-    ssm_fact: str,
+    ssm_fact: Literal["dense", "blockdiag", "isotropic"] = "dense",
     output_scale: ArrayLike | None = None,
 ):
     """Construct an repeatedly-integrated Wiener process.
@@ -937,7 +938,10 @@ def prior_wiener_integrated(
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
 
     if tcoeffs_std is None:
-        error_like = np.zeros_like(ssm.prototypes.error_estimate())
+        # TODO: initialise the tcoeffs with machine epsilon
+        #       uncertainty because all solvers do an update at initialisation
+        #       and we hate NaNs?
+        error_like = np.ones_like(ssm.prototypes.error_estimate())
         tcoeffs_std = tree.tree_map(lambda _: error_like, tcoeffs)
 
     marginal = ssm.normal.from_tcoeffs(tcoeffs, tcoeffs_std)
@@ -953,7 +957,7 @@ def prior_wiener_integrated_discrete(
     tcoeffs: C,
     *,
     tcoeffs_std: C | None = None,
-    ssm_fact: str,
+    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",
     output_scale: ArrayLike | None = None,
 ):
     """Compute a time-discretization of an integrated Wiener process."""
@@ -1473,19 +1477,27 @@ class solver_mle(ProbabilisticSolver):
 
     """
 
-    def init(self, t, u) -> ProbabilisticSolution:
-        estimate, posterior = self.strategy.init_posterior(u=u)
+    def init(self, t, u, *, damp) -> ProbabilisticSolution:
+        estimate, prediction = self.strategy.init_posterior(u=u)
         correction_state = self.constraint.init_linearization()
 
         output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale())
-        output_scale_running = 0 * output_scale_prior
 
+        # Update
         f_wrapped = func.partial(self.vector_field, t=t)
-        fun_evals, correction_state = self.constraint.linearize(
-            f_wrapped, estimate.marginals, correction_state, damp=0.0
+        fx, correction_state = self.constraint.linearize(
+            f_wrapped, estimate.marginals, correction_state, damp=damp
         )
-        fun_evals = tree.tree_map(np.zeros_like, fun_evals)
-        auxiliary = (correction_state, output_scale_running, 0)
+        observed, reverted = self.ssm.conditional.revert(u.marginals, fx)
+        updates = reverted.noise
+        u, posterior = self.strategy.apply_updates(
+            prediction=prediction, updates=updates
+        )
+
+        # Calibrate the output scale
+        output_scale_running = self.ssm.stats.mahalanobis_norm_relative(0.0, observed)
+
+        auxiliary = (correction_state, output_scale_running, 1)
         return ProbabilisticSolution(
             t=t,
             u=estimate,
@@ -1493,7 +1505,7 @@ class solver_mle(ProbabilisticSolver):
             auxiliary=auxiliary,
             output_scale=output_scale_prior,
             num_steps=0,
-            fun_evals=fun_evals,
+            fun_evals=fx,
         )
 
     def step(self, state, *, dt: float, damp: float):
@@ -1704,16 +1716,19 @@ class solver(ProbabilisticSolver):
 
     """
 
-    def init(self, t: Array, u: TaylorCoeffTarget) -> ProbabilisticSolution:
-        u, posterior = self.strategy.init_posterior(u=u)
+    def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
+        u, prediction = self.strategy.init_posterior(u=u)
+
         correction_state = self.constraint.init_linearization()
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
 
         f_wrapped = func.partial(self.vector_field, t=t)
-        fun_evals, correction_state = self.constraint.linearize(
-            f_wrapped, rv=u.marginals, state=correction_state, damp=0.0
+        fx, correction_state = self.constraint.linearize(
+            f_wrapped, rv=u.marginals, state=correction_state, damp=damp
         )
-        fun_evals = tree.tree_map(np.zeros_like, fun_evals)
+        _, reverted = self.ssm.conditional.revert(u.marginals, fx)
+        u, posterior = self.strategy.apply_updates(prediction, updates=reverted.noise)
+
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
         return ProbabilisticSolution(
             t=t,
             u=u,
@@ -1721,7 +1736,7 @@ class solver(ProbabilisticSolver):
             num_steps=0,
             auxiliary=correction_state,
             output_scale=output_scale,
-            fun_evals=fun_evals,
+            fun_evals=fx,
         )
 
     def step(self, state: ProbabilisticSolution, *, dt, damp):
