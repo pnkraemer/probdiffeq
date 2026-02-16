@@ -28,6 +28,10 @@ def linearize(func, *args):
     return jax.linearize(func, *args)
 
 
+def vjp(func, *args):
+    return jax.vjp(func, *args)
+
+
 def jvp(func, /, primals, tangents):
     return jax.jvp(func, primals, tangents)
 

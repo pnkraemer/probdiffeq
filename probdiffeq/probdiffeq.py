@@ -197,11 +197,14 @@ class JacobianHandler:
         raise NotImplementedError
 
 
-class jacobian_fwd_materialize(JacobianHandler):
+class jacobian_materialize(JacobianHandler):
     """Construct a handler that always materialized Jacobian matrices.
 
     Use this Jacobian if the dimension of the problem is relatively small.
     """
+
+    def __init__(self, *, jacfun=func.jacfwd):
+        self.jacfun = jacfun
 
     def init_jacobian_handler(self):
         return ()
@@ -227,10 +230,12 @@ class jacobian_fwd_materialize(JacobianHandler):
         return fx, dfx_diagonal, ()
 
 
-class jacobian_fwd_hutchinson(JacobianHandler):
+class jacobian_hutchinson_fwd(JacobianHandler):
     """Construct a handler that uses stochastic trace estimation for traces/diagonals.
 
-    Use this Jacobian if the dimension of the problem is large.
+    Use a Hutchinson handler if the dimension of the problem is large.
+
+    This implementation uses **forward-mode** automatic differentiation.
     """
 
     def __init__(self, *, seed=1, num_probes=10):
@@ -268,6 +273,49 @@ class jacobian_fwd_hutchinson(JacobianHandler):
         return fx, J_diagonal, key
 
 
+class jacobian_hutchinson_rev(JacobianHandler):
+    """Construct a handler that uses stochastic trace estimation for traces/diagonals.
+
+    Use a Hutchinson handler if the dimension of the problem is large.
+
+    This implementation uses **reverse-mode** automatic differentiation.
+    """
+
+    def __init__(self, *, seed=1, num_probes=10):
+        self.seed = seed
+        self.num_probes = num_probes
+
+    def init_jacobian_handler(self):
+        return random.prng_key(seed=self.seed)
+
+    def materialize_dense(self, fun, x, state):
+        # TODO: approximate Jacobian with outer products instead of forming?
+        # What is the "correct" thing to do?
+        fx = fun(x)
+        dfx = func.jacrev(fun)(x)
+        return fx, dfx, state
+
+    def calculate_trace(self, fun, x, key, /):
+        key, subkey = random.split(key, num=2)
+        sample_shape = (self.num_probes, *x.shape)
+        v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
+
+        fx, vjp = func.vjp(fun, x)
+        J_trace = func.vmap(lambda s: linalg.vector_dot(s, vjp(s)[0]))(v)
+        J_trace = J_trace.mean(axis=0)
+        return fx, J_trace, key
+
+    def calculate_diagonal(self, fun, x, key, /):
+        key, subkey = random.split(key, num=2)
+        sample_shape = (self.num_probes, *x.shape)
+        v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
+
+        fx, vjp = func.vjp(fun, x)
+        vJv = func.vmap(lambda s: s * vjp(s)[0])(v)
+        J_diagonal = vJv.mean(axis=0)
+        return fx, J_diagonal, key
+
+
 class Constraint(Protocol):
     """An interface for constraints + linearization in probabilistic solvers.
 
@@ -294,12 +342,15 @@ def constraint_ode_ts0(ssm, ode_order=1):
     return ssm.linearize.ode_taylor_0th(ode_order=ode_order)
 
 
-def constraint_ode_ts1(*, ssm, jacobian: JacobianHandler, ode_order=1):
+def constraint_ode_ts1(*, ssm, jacobian: JacobianHandler | None = None, ode_order=1):
     """Create an ODE constraint with first-order Taylor linearisation.
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
+    if jacobian is None:
+        # Use hutchinson Jacobian handling for backward compatibility.
+        jacobian = jacobian_hutchinson_fwd()
     return ssm.linearize.ode_taylor_1st(ode_order=ode_order, jacobian=jacobian)
 
 
