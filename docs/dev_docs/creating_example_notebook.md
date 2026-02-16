@@ -10,7 +10,8 @@ Probdiffeq hosts numerous tutorials and benchmarks that demonstrate the library.
    - `docs/examples_advanced/example-name.ipynb`  
    Choose a meaningful name (e.g., `work-precision-hires`, `demonstrate-calibration`). The notebook should run the full example/benchmark and produce its plots. Ensure execution time stays well below one minute to keep CI manageable.
 
-   If your example requires external dependencies (e.g., sampling or optimization libraries), place it in `examples_advanced`.
+   If your example requires external dependencies (e.g., sampling or optimization libraries), place it in `examples_advanced`. If it is a benchmark, place it in `examples_benchmarks`. Otherwise, place it in
+   `examples_basic`.
 
 2. **Sync to py:light:**  
    Install documentation dependencies and pre-commit hooks if you haven't already:

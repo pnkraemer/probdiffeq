@@ -8,23 +8,19 @@ Probdiffeq is a JAX library that focuses on state-space-model-based formulations
 
 ## Transitioning from ProbNumDiffEq.jl (Julia)
 
-[ProbNumDiffEq.jl](https://nathanaelbosch.github.io/ProbNumDiffEq.jl/stable/) is a library for probabilistic IVP solvers in Julia, similar to Probdiffeq. However, both libraries are unrelated.
-
-* Probdiffeq is Python/JAX-based; ProbNumDiffEq is Julia-based.
-* Probdiffeq provides additional solvers, dense output, and posterior sampling.
-* ProbNumDiffEq handles mass-matrix problems and callbacks, which Probdiffeq does not (yet).
-
+[ProbNumDiffEq.jl](https://nathanaelbosch.github.io/ProbNumDiffEq.jl/stable/) is a library for probabilistic IVP solvers in Julia, similar to Probdiffeq. However, while the feature offerings are similar, the libraries are unrelated.
 To translate ProbNumDiffEq.jl code to Probdiffeq code:
 
 | ProbNumDiffEq.jl           | ProbDiffEq Equivalent                                      |
 |----------------------------|------------------------------------------------------------|
-| `EK0` / `EK1`              | `ts0()` / `ts1()`                                         |
-| `DynamicDiffusion` / `FixedDiffusion` | `ivpsolvers.solver_dynamic()` or `ivpsolvers.solver_mle()` |
+| `EK0` / `EK1`              | `constraint_ode_ts0()` / `constraint_ode_ts1()`                         |
+| `DynamicDiffusion` / `FixedDiffusion` | `solver_dynamic()` or `solver_mle()` |
 | `IWP(diffusion=x^2)` |  `prior_wiener_integrated(output_scale=x)`                                       |
-| Filtering and smoothing via `smooth=true/false`      | Solver strategy constructions, including one for fixed-point smoothing    |
+| Filtering and smoothing via `smooth=true/false`      | `strategy_filter`, `strategy_smoother_fixedpoint`, `strategy_smoother_fixedinterval`    |
 
 
-Both libraries are evolving; consult the latest API documentation when in doubt.
+Both libraries are evolving, and these translation guides may not be up-to-date. 
+Consult each libraries' latest API documentation when in doubt.
 
 
 
@@ -40,26 +36,20 @@ Both libraries are evolving; consult the latest API documentation when in doubt.
 
 ## Transitioning from Diffrax
 
-[Diffrax](https://docs.kidger.site/diffrax/) is a JAX-based library for differential equations. Key differences:
-
-* Diffrax solvers are non-probabilistic; Probdiffeq solvers are probabilistic.
-* Vector fields: Diffrax uses `ODETerm()`; Probdiffeq uses plain functions `(*ys, t)`.
-* Solver construction: Diffrax requires (`diffrax.Tsit5()`); Probdiffeq constructs probabilistic state-space models.
-
-Approximate solver mapping:
+[Diffrax](https://docs.kidger.site/diffrax/) is a JAX-based library for differential equations. The key difference is that Diffrax's solvers are non-probabilistic; Probdiffeq solvers are probabilistic. Approximate solver mapping:
 
 | Diffrax                     | ProbDiffEq Equivalent                                     |
 |-----------------------------|-----------------------------------------------------------|
-| `Heun()`, `Midpoint()`      | `prior_ibm(num_derivatives=1)` or `ts0()`                |
-| `Tsit5()`, `Dopri5()`       | Increase `num_derivatives=4`                               |
-| `Dopri8()`                   | Increase `num_derivatives=5-7`; `ts1()` recommended but not required |
-| `Kvaerno3()`–`Kvaerno5()`   | Use `num_derivatives=2-4` with `ts1()` correction         |
-| Other methods                | Work in progress                                          |
+| `Heun()`, `Midpoint()`      | Track $n=2$ Taylor coefficients and use `constraint_ode_ts0()`.  |
+| `Tsit5()`, `Dopri5()`       | Track $n=4$ Taylor coefficients instead.                               |
+| `Dopri8()`                   | Track $n=5, 6, 7$ Taylor coefficients instead; `constraint_ode_ts1()` and `solver_dynamic()` recommended but not required |
+| `Kvaerno3()`, `Kvaerno5()`   | Track $n=2,3,4$ Taylor coefficients and use `constraint_ode_ts1()`         |
+| Other methods (e.g. SDE solvers)                | Work in progress                                          |
 
 
 
 
-## General differences from conventional ODE solvers (e.g., SciPy, jax.odeint)
+## General differences from other common ODE solvers (e.g., SciPy, jax.odeint)
 
-* Solutions are posterior distributions instead of point estimates, enabling uncertainty quantification and more sophisticated models (eg easy switch to second-order problems).
-* Solver modes are explicit: `simulate_terminal_values()`, `solve_adaptive_save_every_step()`, `solve_adaptive_save_at()` instead of a one-size-fits-all `solve()` method
+* Probdiffeq's solutions are posterior distributions instead of point estimates, enabling uncertainty quantification and more sophisticated models (eg easy switch to second-order problems).
+* Probdiffeq's solver modes are explicit: `simulate_terminal_values()`, and `solve_adaptive_save_at()` instead of a one-size-fits-all `solve()` method.
