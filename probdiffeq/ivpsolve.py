@@ -42,7 +42,7 @@ class Solution(Protocol, Generic[S]):
 class Solver(Protocol, Generic[T_contra, S]):
     """An protocol that defines expected solver types."""
 
-    def init(self, *, t, u: T_contra) -> S:
+    def init(self, t, u: T_contra, *, damp: float) -> S:
         """Initialise the solver's state."""
 
     def step(self, state: S, *, dt: float, damp: float) -> S:
@@ -247,7 +247,7 @@ def solve_adaptive_save_at(
             return (advanced.solution, advanced.loopstate), advanced.solution
 
         # Initialise the adaptive solver
-        solution0 = solver.init(t=save_at[0], u=u)
+        solution0 = solver.init(t=save_at[0], u=u, damp=damp)
         state = loop.init(solution0, dt=dt0)
 
         # Advance to one checkpoint after the other

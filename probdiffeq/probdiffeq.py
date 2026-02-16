@@ -744,7 +744,7 @@ class ProbabilisticSolver:
         """
         return self.strategy.is_suitable_for_save_every_step
 
-    def init(self, t, init: TaylorCoeffTarget) -> ProbabilisticSolution:
+    def init(self, t, init: TaylorCoeffTarget, *, damp: float) -> ProbabilisticSolution:
         """Initialize the probabilistic solution."""
         raise NotImplementedError
 
@@ -919,7 +919,7 @@ def prior_wiener_integrated(
     tcoeffs: C,
     *,
     tcoeffs_std: C | None = None,
-    ssm_fact: Literal["dense", "blockdiag", "isotropic"] = "dense",
+    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
 ):
     """Construct an repeatedly-integrated Wiener process.
@@ -957,7 +957,7 @@ def prior_wiener_integrated_discrete(
     tcoeffs: C,
     *,
     tcoeffs_std: C | None = None,
-    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",
+    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
 ):
     """Compute a time-discretization of an integrated Wiener process."""
@@ -1477,7 +1477,7 @@ class solver_mle(ProbabilisticSolver):
 
     """
 
-    def init(self, t, u, *, damp) -> ProbabilisticSolution:
+    def init(self, t, u: TaylorCoeffTarget, *, damp: float) -> ProbabilisticSolution:
         estimate, prediction = self.strategy.init_posterior(u=u)
         correction_state = self.constraint.init_linearization()
 
@@ -1719,7 +1719,9 @@ class solver(ProbabilisticSolver):
 
     """
 
-    def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
+    def init(
+        self, t: Array, u: TaylorCoeffTarget, *, damp: float
+    ) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
 
         correction_state = self.constraint.init_linearization()
