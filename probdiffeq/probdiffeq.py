@@ -342,6 +342,10 @@ def constraint_ode_ts0(ssm, ode_order=1):
     return ssm.linearize.ode_taylor_0th(ode_order=ode_order)
 
 
+def constraint_root_ts1(root, *, ssm, jacobian, ode_order=1):
+    return ssm.linearize.root_taylor_1st(root, ode_order=ode_order, jacobian=jacobian)
+
+
 def constraint_ode_ts1(*, ssm, jacobian: JacobianHandler | None = None, ode_order=1):
     """Create an ODE constraint with first-order Taylor linearisation.
 
