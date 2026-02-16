@@ -1603,21 +1603,24 @@ class solver_dynamic(ProbabilisticSolver):
         self.constraint = constraint
         self.re_linearize_after_calibration = re_linearize_after_calibration
 
-    def init(self, t, u) -> ProbabilisticSolution:
-        estimate, posterior = self.strategy.init_posterior(u=u)
+    def init(self, t, u, *, damp) -> ProbabilisticSolution:
+        u, prediction = self.strategy.init_posterior(u=u)
         lin_state = self.constraint.init_linearization()
 
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
 
         f_wrapped = func.partial(self.vector_field, t=t)
         fx, lin_state = self.constraint.linearize(
-            f_wrapped, estimate.marginals, lin_state, damp=0.0
+            f_wrapped, u.marginals, lin_state, damp=damp
         )
-        fx = tree.tree_map(np.zeros_like, fx)
+
+        _, reverted = self.ssm.conditional.revert(u.marginals, fx)
+        updates = reverted.noise
+        u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
         return ProbabilisticSolution(
             t=t,
-            u=estimate,
+            u=u,
             solution_full=posterior,
             auxiliary=lin_state,
             output_scale=output_scale,

@@ -74,14 +74,14 @@ tcoeffs_std = [zeros, ones, ones, ones]
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, tcoeffs_std=tcoeffs_std)
 ts1 = probdiffeq.constraint_ode_ts1(ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-solver_1st = probdiffeq.solver(
+solver_1st = probdiffeq.solver_mle(
     vf_1st, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
 )
 solve = ivpsolve.solve_fixed_grid(solver=solver_1st)
 
 # +
 
-grid = jnp.linspace(t0, t1, endpoint=True, num=150)
+grid = jnp.linspace(t0, t1, endpoint=True, num=100)
 solution = jax.jit(solve)(init, grid=grid)
 hamiltonian = jax.vmap(hamiltonian_1st)(solution.u.mean[0])
 
@@ -118,13 +118,13 @@ tcoeffs_std = [zeros, 1e-10 + zeros, ones, ones]  # avoid NaNs
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, tcoeffs_std=tcoeffs_std)
 ts1 = probdiffeq.constraint_root_ts1(root, ssm=ssm, ode_order=2)
 strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-solver_2nd = probdiffeq.solver(
+solver_2nd = probdiffeq.solver_mle(
     vf_2nd, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
 )
 solve = ivpsolve.solve_fixed_grid(solver=solver_2nd)
 
 
-grid = jnp.linspace(t0, t1, endpoint=True, num=150)
+grid = jnp.linspace(t0, t1, endpoint=True, num=100)
 solution = jax.jit(solve)(init, grid=grid)
 hamiltonian = jax.vmap(hamiltonian_2nd)(solution.u.mean[0], solution.u.mean[1])
 
