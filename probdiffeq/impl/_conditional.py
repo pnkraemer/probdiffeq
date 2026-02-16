@@ -43,11 +43,11 @@ class Linearization:
         raise NotImplementedError
 
 
-@structs.dataclass
 class DenseOdeTs0(Linearization):
-    ode_order: int
-    ode_shape: tuple
-    unravel: Callable
+    def __init__(self, ode_order: int, ode_shape: tuple, unravel: Callable):
+        self.ode_order = ode_order
+        self.ode_shape = ode_shape
+        self.unravel = unravel
 
     def init_linearization(self):
         return None
@@ -65,18 +65,50 @@ class DenseOdeTs0(Linearization):
         return cond, None
 
 
-@structs.dataclass
 class DenseOdeTs1(Linearization):
+    def __init__(
+        self, ode_order: int, ode_shape: tuple, unravel: Callable, jacobian: Any
+    ):
+        if ode_order > 1:
+            msg = "Not implemented. Try the the more general TS1 constraint instead."
+            raise ValueError(msg)
+        self.ode_shape = ode_shape
+        self.unravel = unravel
+        self.jacobian = jacobian
+
+    def init_linearization(self):
+        return self.jacobian.init_jacobian_handler()
+
+    def linearize(self, fun, rv, state: None, *, damp: float):
+
+        m0, unravel = tree.ravel_pytree(self.unravel(rv.mean)[0])
+
+        def vf_flat(s):
+            s0 = unravel(s)
+            fs0 = fun(s0)
+            return tree.ravel_pytree(fs0)[0]
+
+        E0 = func.jacfwd(lambda s: tree.ravel_pytree(self.unravel(s)[0])[0])(rv.mean)
+        E1 = func.jacfwd(lambda s: tree.ravel_pytree(self.unravel(s)[1])[0])(rv.mean)
+
+        fx, J, state = self.jacobian.materialize_dense(vf_flat, m0, state)
+        linop = E1 - J @ E0
+        fx = fx - J @ m0
+        cond = LatentCond.from_linop_and_bias(linop, -fx, damp=damp)
+        return cond, state
+
+
+class DenseTs1(Linearization):
     ode_order: int
     ode_shape: tuple
     unravel: Callable
     jacobian: Any  # TODO: type for JacobianProtocol
 
     def init_linearization(self):
+        raise RuntimeError
         return self.jacobian.init_jacobian_handler()
 
     def linearize(self, fun, rv, state, *, damp: float):
-
         # TODO: expose this function somehow. This way, we can
         #       implement custom information operators easily.
         def constraint(m: Array) -> Array:
@@ -105,11 +137,12 @@ class DenseOdeTs1(Linearization):
         return cond, state
 
 
-@structs.dataclass
 class DenseOdeSlr0(Linearization):
-    cubature_rule: Any
-    ode_shape: tuple
-    unravel: Callable
+    def __init__(self, cubature_rule, ode_shape, unravel):
+        # No higher order ODEs supported for any SLR
+        self.cubature_rule = cubature_rule
+        self.ode_shape = ode_shape
+        self.unravel = unravel
 
     def init_linearization(self) -> None:
         return None
@@ -176,11 +209,11 @@ class DenseOdeSlr0(Linearization):
         return _normal.Normal(fx_mean, cov_sqrtm.T)
 
 
-@structs.dataclass
 class DenseOdeSlr1(Linearization):
-    cubature_rule: Any
-    ode_shape: tuple
-    unravel: Callable
+    def __init__(self, cubature_rule, ode_shape, unravel):
+        self.cubature_rule = cubature_rule
+        self.ode_shape = ode_shape
+        self.unravel = unravel
 
     def init_linearization(self) -> None:
         return None
@@ -249,10 +282,10 @@ class DenseOdeSlr1(Linearization):
         return linop_cond, rv_cond
 
 
-@structs.dataclass
 class IsotropicOdeTs0(Linearization):
-    ode_order: int
-    unravel: Callable
+    def __init__(self, ode_order, unravel):
+        self.unravel = unravel
+        self.ode_order = ode_order
 
     def init_linearization(self):
         return None
@@ -276,17 +309,18 @@ class IsotropicOdeTs0(Linearization):
         return cond, None
 
 
-@structs.dataclass
 class IsotropicOdeTs1(Linearization):
-    ode_order: int
-    unravel: Callable
-    jacobian: Any  # TODO: type for JacobianProtocol
+    def __init__(self, ode_order: int, unravel: Callable, jacobian: Any):
+        if ode_order > 1:
+            msg = "This linearization is not compatible with high-order ODEs as of yet."
+            raise ValueError(msg)
+        self.unravel = unravel
+        self.jacobian = jacobian
 
     def init_linearization(self):
         return self.jacobian.init_jacobian_handler()
 
     def linearize(self, fun, rv, state, *, damp: float):
-        assert self.ode_order == 1
 
         # Evaluate the linearisation
         m0, unravel = tree.ravel_pytree(self.unravel(rv.mean)[0])
@@ -309,10 +343,10 @@ class IsotropicOdeTs1(Linearization):
         return cond, state
 
 
-@structs.dataclass
 class BlockDiagOdeTs0(Linearization):
-    ode_order: int
-    unravel: Callable
+    def __init__(self, ode_order: int, unravel: Callable):
+        self.ode_order = ode_order
+        self.unravel = unravel
 
     def init_linearization(self) -> None:
         return None
@@ -338,11 +372,13 @@ class BlockDiagOdeTs0(Linearization):
         return cond, None
 
 
-@structs.dataclass
 class BlockDiagOdeTs1(Linearization):
-    ode_order: int
-    unravel: Callable
-    jacobian: Any  # TODO: type for JacobianProtocol
+    def __init__(self, ode_order: int, unravel: Callable, jacobian: Any):
+        if ode_order > 1:
+            msg = "This linearization is not compatible with high-order ODEs as of yet."
+            raise ValueError(msg)
+        self.unravel = unravel
+        self.jacobian = jacobian
 
     def init_linearization(self):
         return self.jacobian.init_jacobian_handler()
@@ -351,7 +387,7 @@ class BlockDiagOdeTs1(Linearization):
         mean = rv.mean
 
         def a1(s):
-            return s[[self.ode_order], ...]
+            return s[[1], ...]
 
         linop = func.vmap(func.jacrev(a1))(mean)
 
@@ -364,13 +400,6 @@ class BlockDiagOdeTs1(Linearization):
         # Evaluate the linearisation
         m0, unravel = select_0(rv.mean)
         fx, J_diag, state = self.jacobian.calculate_diagonal(vf_flat, m0, state)
-
-        # fx, Jvp = func.linearize(vf_flat, m0)
-        # key, subkey = random.split(key, num=2)
-        # sample_shape = (self.jvp_probes, *m0.shape)
-        # v = random.rademacher(subkey, shape=sample_shape, dtype=m0.dtype)
-        # J_diag = func.vmap(lambda s: s * Jvp(s))(v)
-        # J_diag = J_diag.mean(axis=0)
 
         E1 = func.jacrev(lambda s: s[0])(rv.mean[0])
         linop = linop - J_diag[:, None, None] * E1[None, None, :]
@@ -419,6 +448,9 @@ class DenseLinearizationFactory(LinearizationFactoryBackend):
         )
 
     def ode_taylor_1st(self, ode_order, jacobian):
+        if ode_order > 1:
+            raise ValueError
+
         return DenseOdeTs1(
             ode_order=ode_order,
             ode_shape=self.ode_shape,
@@ -444,8 +476,6 @@ class IsotropicLinearizationFactory(LinearizationFactoryBackend):
         self.unravel = unravel
 
     def ode_taylor_1st(self, ode_order, jacobian):
-        if ode_order > 1:
-            raise ValueError
         return IsotropicOdeTs1(
             jacobian=jacobian, ode_order=ode_order, unravel=self.unravel
         )
@@ -468,9 +498,6 @@ class BlockDiagLinearizationFactory(LinearizationFactoryBackend):
         return BlockDiagOdeTs0(ode_order=ode_order, unravel=self.unravel)
 
     def ode_taylor_1st(self, ode_order, jacobian):
-        if ode_order > 1:
-            raise ValueError
-
         return BlockDiagOdeTs1(
             ode_order=ode_order, unravel=self.unravel, jacobian=jacobian
         )
