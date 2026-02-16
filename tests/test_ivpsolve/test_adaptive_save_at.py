@@ -40,8 +40,15 @@ def case_constraint_ode_ts0():
 
 
 @testing.case
-def case_constraint_ode_ts1():
-    return probdiffeq.constraint_ode_ts1
+def case_constraint_ode_ts1_materialize_fwd():
+    jacobian = probdiffeq.jacobian_fwd_materialize()
+    return func.partial(probdiffeq.constraint_ode_ts1, jacobian=jacobian)
+
+
+@testing.case
+def case_constraint_ode_ts1_hutchinson_fwd():
+    jacobian = probdiffeq.jacobian_fwd_hutchinson()
+    return func.partial(probdiffeq.constraint_ode_ts1, jacobian=jacobian)
 
 
 @testing.case
