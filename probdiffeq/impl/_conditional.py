@@ -44,7 +44,7 @@ class Linearization:
 
 
 @structs.dataclass
-class DenseTs0(Linearization):
+class DenseOdeTs0(Linearization):
     ode_order: int
     ode_shape: tuple
     unravel: Callable
@@ -66,7 +66,7 @@ class DenseTs0(Linearization):
 
 
 @structs.dataclass
-class DenseTs1(Linearization):
+class DenseOdeTs1(Linearization):
     ode_order: int
     ode_shape: tuple
     unravel: Callable
@@ -106,7 +106,7 @@ class DenseTs1(Linearization):
 
 
 @structs.dataclass
-class DenseSlr0(Linearization):
+class DenseOdeSlr0(Linearization):
     cubature_rule: Any
     ode_shape: tuple
     unravel: Callable
@@ -177,7 +177,7 @@ class DenseSlr0(Linearization):
 
 
 @structs.dataclass
-class DenseSlr1(Linearization):
+class DenseOdeSlr1(Linearization):
     cubature_rule: Any
     ode_shape: tuple
     unravel: Callable
@@ -250,7 +250,7 @@ class DenseSlr1(Linearization):
 
 
 @structs.dataclass
-class IsotropicTs0(Linearization):
+class IsotropicOdeTs0(Linearization):
     ode_order: int
     unravel: Callable
 
@@ -277,7 +277,7 @@ class IsotropicTs0(Linearization):
 
 
 @structs.dataclass
-class IsotropicTs1(Linearization):
+class IsotropicOdeTs1(Linearization):
     ode_order: int
     unravel: Callable
     jacobian: Any  # TODO: type for JacobianProtocol
@@ -310,7 +310,7 @@ class IsotropicTs1(Linearization):
 
 
 @structs.dataclass
-class BlockDiagTs0(Linearization):
+class BlockDiagOdeTs0(Linearization):
     ode_order: int
     unravel: Callable
 
@@ -339,7 +339,7 @@ class BlockDiagTs0(Linearization):
 
 
 @structs.dataclass
-class BlockDiagTs1(Linearization):
+class BlockDiagOdeTs1(Linearization):
     ode_order: int
     unravel: Callable
     jacobian: Any  # TODO: type for JacobianProtocol
@@ -414,12 +414,12 @@ class DenseLinearizationFactory(LinearizationFactoryBackend):
         self.unravel = unravel
 
     def ode_taylor_0th(self, ode_order):
-        return DenseTs0(
+        return DenseOdeTs0(
             ode_order=ode_order, ode_shape=self.ode_shape, unravel=self.unravel
         )
 
     def ode_taylor_1st(self, ode_order, jacobian):
-        return DenseTs1(
+        return DenseOdeTs1(
             ode_order=ode_order,
             ode_shape=self.ode_shape,
             unravel=self.unravel,
@@ -428,13 +428,13 @@ class DenseLinearizationFactory(LinearizationFactoryBackend):
 
     def ode_statistical_1st(self, cubature_fun):
         cubature_rule = cubature_fun(input_shape=self.ode_shape)
-        return DenseSlr1(
+        return DenseOdeSlr1(
             cubature_rule=cubature_rule, ode_shape=self.ode_shape, unravel=self.unravel
         )
 
     def ode_statistical_0th(self, cubature_fun):
         cubature_rule = cubature_fun(input_shape=self.ode_shape)
-        return DenseSlr0(
+        return DenseOdeSlr0(
             cubature_rule=cubature_rule, ode_shape=self.ode_shape, unravel=self.unravel
         )
 
@@ -446,12 +446,12 @@ class IsotropicLinearizationFactory(LinearizationFactoryBackend):
     def ode_taylor_1st(self, ode_order, jacobian):
         if ode_order > 1:
             raise ValueError
-        return IsotropicTs1(
+        return IsotropicOdeTs1(
             jacobian=jacobian, ode_order=ode_order, unravel=self.unravel
         )
 
     def ode_taylor_0th(self, ode_order):
-        return IsotropicTs0(ode_order=ode_order, unravel=self.unravel)
+        return IsotropicOdeTs0(ode_order=ode_order, unravel=self.unravel)
 
     def ode_statistical_0th(self, cubature_fun):
         raise NotImplementedError
@@ -465,13 +465,13 @@ class BlockDiagLinearizationFactory(LinearizationFactoryBackend):
         self.unravel = unravel
 
     def ode_taylor_0th(self, ode_order):
-        return BlockDiagTs0(ode_order=ode_order, unravel=self.unravel)
+        return BlockDiagOdeTs0(ode_order=ode_order, unravel=self.unravel)
 
     def ode_taylor_1st(self, ode_order, jacobian):
         if ode_order > 1:
             raise ValueError
 
-        return BlockDiagTs1(
+        return BlockDiagOdeTs1(
             ode_order=ode_order, unravel=self.unravel, jacobian=jacobian
         )
 
