@@ -342,7 +342,10 @@ def constraint_ode_ts0(ssm, ode_order=1):
     return ssm.linearize.ode_taylor_0th(ode_order=ode_order)
 
 
-def constraint_root_ts1(root, *, ssm, jacobian, ode_order=1):
+def constraint_root_ts1(root, *, ssm, jacobian=None, ode_order=1):
+    if jacobian is None:
+        # Use hutchinson Jacobian handling for backward compatibility.
+        jacobian = jacobian_hutchinson_fwd()
     return ssm.linearize.root_taylor_1st(root, ode_order=ode_order, jacobian=jacobian)
 
 
