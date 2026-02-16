@@ -22,7 +22,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dynamic = ["version"]
-dependencies = ["mypy_extensions", "typing_extensions"]
+dependencies = ["typing_extensions"]
 
 [project.optional-dependencies]
 cpu = [
