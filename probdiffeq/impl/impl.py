@@ -13,7 +13,7 @@ class FactImpl:
     prototypes: _prototypes.PrototypeBackend
     normal: _normal.NormalBackend
     stats: _stats.StatsBackend
-    linearize: _conditional.LinearizationBackend
+    linearize: _conditional.LinearizationFactoryBackend
     conditional: _conditional.ConditionalBackend
 
     num_derivatives: int
@@ -49,7 +49,9 @@ def _select_dense(*, tcoeffs_like) -> FactImpl:
 
     prototypes = _prototypes.DensePrototype(ode_shape=ode_shape)
     normal = _normal.DenseNormal(ode_shape=ode_shape)
-    linearize = _conditional.DenseLinearization(ode_shape=ode_shape, unravel=unravel)
+    linearize = _conditional.DenseLinearizationFactory(
+        ode_shape=ode_shape, unravel=unravel
+    )
     stats = _stats.DenseStats(ode_shape=ode_shape, unravel=unravel)
     conditional = _conditional.DenseConditional(
         ode_shape=ode_shape,
@@ -86,7 +88,7 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
     prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
     normal = _normal.IsotropicNormal(ode_shape=ode_shape)
     stats = _stats.IsotropicStats(ode_shape=ode_shape, unravel=unravel)
-    linearize = _conditional.IsotropicLinearization(unravel=unravel)
+    linearize = _conditional.IsotropicLinearizationFactory(unravel=unravel)
     conditional = _conditional.IsotropicConditional(
         ode_shape=ode_shape, num_derivatives=num_derivatives, unravel_tree=unravel_tree
     )
@@ -119,7 +121,7 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
     prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)
     normal = _normal.BlockDiagNormal(ode_shape=ode_shape)
     stats = _stats.BlockDiagStats(ode_shape=ode_shape, unravel=unravel)
-    linearize = _conditional.BlockDiagLinearization(unravel=unravel)
+    linearize = _conditional.BlockDiagLinearizationFactory(unravel=unravel)
     conditional = _conditional.BlockDiagConditional(
         ode_shape=ode_shape, num_derivatives=num_derivatives, unravel_tree=unravel_tree
     )

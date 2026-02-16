@@ -390,7 +390,7 @@ class BlockDiagTs1(Linearization):
         return cond, state
 
 
-class LinearizationBackend(abc.ABC):
+class LinearizationFactoryBackend(abc.ABC):
     @abc.abstractmethod
     def ode_taylor_0th(self, ode_order: int):
         raise NotImplementedError
@@ -408,7 +408,7 @@ class LinearizationBackend(abc.ABC):
         raise NotImplementedError
 
 
-class DenseLinearization(LinearizationBackend):
+class DenseLinearizationFactory(LinearizationFactoryBackend):
     def __init__(self, ode_shape, unravel):
         self.ode_shape = ode_shape
         self.unravel = unravel
@@ -439,7 +439,7 @@ class DenseLinearization(LinearizationBackend):
         )
 
 
-class IsotropicLinearization(LinearizationBackend):
+class IsotropicLinearizationFactory(LinearizationFactoryBackend):
     def __init__(self, unravel):
         self.unravel = unravel
 
@@ -460,7 +460,7 @@ class IsotropicLinearization(LinearizationBackend):
         raise NotImplementedError
 
 
-class BlockDiagLinearization(LinearizationBackend):
+class BlockDiagLinearizationFactory(LinearizationFactoryBackend):
     def __init__(self, unravel):
         self.unravel = unravel
 
