@@ -516,7 +516,7 @@ class RejectionLoop:
 
     def interp_skip(self, args):
         """If step_from.t < t1, don't interpolate."""
-        state, t1 = args
+        state, _t1 = args
         solution = state.step_from
         return solution, state
 

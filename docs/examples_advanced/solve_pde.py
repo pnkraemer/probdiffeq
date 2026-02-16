@@ -59,7 +59,7 @@ def main():
     simulate = simulator(save_at=save_at, errorest=errorest, solver=solver)
     (u, u_std) = simulate(init)
 
-    fig, axes = plt.subplots(
+    _fig, axes = plt.subplots(
         nrows=2, ncols=len(u), figsize=(2 * len(u), 3), tight_layout=True
     )
     for t_i, u_i, std_i, ax_i in zip(save_at, u, u_std, axes.T):

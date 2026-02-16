@@ -25,7 +25,7 @@ def case_solve_fixed_grid(fact):
         solve = ivpsolve.solve_fixed_grid(solver=solver)
         return solve(init, grid=grid)
 
-    return solver_to_solution, ssm
+    return solver_to_solution
 
 
 @testing.case()
@@ -47,7 +47,7 @@ def case_solve_adaptive_save_at(fact):
         solve = ivpsolve.solve_adaptive_save_at(errorest=errorest, solver=solver)
         return solve(init, save_at=save_at, dt0=dt0, atol=1e-2, rtol=1e-2)
 
-    return solver_to_solution, ssm
+    return solver_to_solution
 
 
 @testing.case()
@@ -69,7 +69,7 @@ def case_simulate_terminal_values(fact):
         )
         return solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-2, rtol=1e-2)
 
-    return solver_to_solution, ssm
+    return solver_to_solution
 
 
 @testing.fixture(name="uncalibrated_and_mle_solution")
@@ -83,9 +83,8 @@ def case_simulate_terminal_values(fact):
     ],
 )
 def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
-    solve, ssm = solver_to_solution
-    uncalib = solve(probdiffeq.solver, strategy_fun)
-    mle = solve(probdiffeq.solver_mle, strategy_fun)
+    uncalib = solver_to_solution(probdiffeq.solver, strategy_fun)
+    mle = solver_to_solution(probdiffeq.solver_mle, strategy_fun)
     return (uncalib, mle)
 
 

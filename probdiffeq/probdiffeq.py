@@ -402,7 +402,7 @@ class MarkovStrategy(Generic[T]):
             Expected to correspond to a solution of an ODE with shape (d,).
         """
         [u_leaves], u_structure = tree.tree_flatten(u)
-        [std_leaves], std_structure = tree.tree_flatten(standard_deviation)
+        [_std_leaves], std_structure = tree.tree_flatten(standard_deviation)
 
         if u_structure != std_structure:
             msg = (

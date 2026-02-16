@@ -42,7 +42,7 @@ def main(start=2.0, stop=8.0, step=1.0, repeats=2, use_diffrax: bool = False):
     # Simulate once to plot the state
     ts, ys = solve_ivp_once()
 
-    fig, ax = plt.subplots(figsize=(5, 3))
+    _fig, ax = plt.subplots(figsize=(5, 3))
     ax.plot(ts, ys)
     ax.set_ylim((-6, 6))
     ax.set_title("Van-der-Pol problem")
@@ -80,7 +80,7 @@ def main(start=2.0, stop=8.0, step=1.0, repeats=2, use_diffrax: bool = False):
         param_to_wp = workprec(algo, precision_fun=precision_fun, timeit_fun=timeit_fun)
         results[label] = param_to_wp(tolerances)
 
-    fig, ax = plt.subplots(figsize=(7, 3))
+    _fig, ax = plt.subplots(figsize=(7, 3))
     for label, wp in results.items():
         ax.loglog(wp["precision"], wp["work_mean"], label=label)
 

@@ -65,7 +65,7 @@ def test_compare_filter_smoother_rmse(filter_solution, smoother_solution):
 
 
 def _reference_solution(ts):
-    vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
+    vf, (u0,), (_t0, _t1) = ode.ivp_lotka_volterra()
     return ode.odeint_and_save_at(vf, (u0,), save_at=ts, atol=1e-10, rtol=1e-10)
 
 

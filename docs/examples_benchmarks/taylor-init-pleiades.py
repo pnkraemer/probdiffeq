@@ -54,7 +54,7 @@ def main(max_time=0.5, repeats=2):
             algo, timeit_fun=timeit_fun, max_time=max_time
         )
 
-    fig, (axis_perform, axis_compile) = plt.subplots(
+    _fig, (axis_perform, axis_compile) = plt.subplots(
         ncols=2, figsize=(8, 3), dpi=150, sharex=True, sharey=True
     )
 

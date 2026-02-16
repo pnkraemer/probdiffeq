@@ -7,10 +7,10 @@ from probdiffeq.util import test_util
 
 @testing.parametrize("fact", ["isotropic"])  # no dense/blockdiag because no impl test
 def test_warning_for_fixedpoint_in_save_every_step_mode(fact):
-    vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
+    vf, (u0,), (t0, _t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
-    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    _init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
 
     ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
@@ -25,10 +25,10 @@ def test_warning_for_fixedpoint_in_save_every_step_mode(fact):
 
 @testing.parametrize("fact", ["isotropic"])  # no dense/blockdiag because no impl test
 def test_warning_for_smoother_in_save_at_mode(fact):
-    vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
+    vf, (u0,), (t0, _t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
-    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    _init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
     solver = probdiffeq.solver(

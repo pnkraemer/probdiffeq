@@ -41,9 +41,9 @@ def main(start=3.0, stop=11.0, step=1.0, repeats=2, use_diffrax: bool = False):
     jax.config.update("jax_enable_x64", True)
 
     # Simulate once to plot the state
-    ts, ys = solve_ivp_once()
+    _ts, ys = solve_ivp_once()
 
-    fig, ax = plt.subplots(figsize=(5, 3))
+    _fig, ax = plt.subplots(figsize=(5, 3))
     ax.plot(ys[:, :7], ys[:, 7:14], linestyle="solid", marker="None")
     ax.plot(ys[0, :7], ys[0, 7:14], linestyle="None", marker=".", markersize=4)
     ax.plot(ys[-1, :7], ys[-1, 7:14], linestyle="None", marker="*", markersize=8)
@@ -92,7 +92,7 @@ def main(start=3.0, stop=11.0, step=1.0, repeats=2, use_diffrax: bool = False):
         param_to_wp = workprec(algo, precision_fun=precision_fun, timeit_fun=timeit_fun)
         results[label] = param_to_wp(tolerances)
 
-    fig, ax = plt.subplots(figsize=(7, 3))
+    _fig, ax = plt.subplots(figsize=(7, 3))
     for label, wp in results.items():
         ax.loglog(wp["precision"], wp["work_mean"], label=label)
 

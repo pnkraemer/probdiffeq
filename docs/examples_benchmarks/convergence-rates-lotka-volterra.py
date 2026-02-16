@@ -73,7 +73,7 @@ def main():
         results[label] = param_to_wp(tolerances)
 
     layout = [["values", "trends"]]
-    fig, ax = plt.subplot_mosaic(
+    _fig, ax = plt.subplot_mosaic(
         layout,
         figsize=(8, 3),
         constrained_layout=True,
@@ -209,7 +209,7 @@ def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
         works_std = []
         precisions = []
         for arg in list_of_args:
-            x, num_steps = fun(arg)
+            _x, num_steps = fun(arg)
 
             precision = precision_fun(fun(arg)[0].block_until_ready())
             times = timeit_fun(lambda: fun(arg)[0].block_until_ready())  # noqa: B023
