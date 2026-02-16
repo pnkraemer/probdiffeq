@@ -172,7 +172,7 @@ class JacobianHandler:
         """
         raise NotImplementedError
 
-    def materialize_dense(self, fun, x, state):
+    def materialize_dense(self, fun, x, state, /):
         """Materialize a dense Jacobian.
 
         This is typically used for first-order linearization in dense
@@ -180,7 +180,7 @@ class JacobianHandler:
         """
         raise NotImplementedError
 
-    def calculate_trace(self, fun, x, state):
+    def calculate_trace(self, fun, x, state, /):
         """Calculate the trace of a Jacobian.
 
         This is typically used for first-order linearization in isotropic
@@ -188,7 +188,7 @@ class JacobianHandler:
         """
         raise NotImplementedError
 
-    def calculate_diagonal(self, fun, x, state):
+    def calculate_diagonal(self, fun, x, state, /):
         """Calculate the diagonal of a Jacobian.
 
         This is typically used for first-order linearization in block-diagonal
@@ -209,20 +209,20 @@ class jacobian_materialize(JacobianHandler):
     def init_jacobian_handler(self):
         return ()
 
-    def materialize_dense(self, fun, x, state):
+    def materialize_dense(self, fun, x, state, /):
         del state
         fx = fun(x)
         dfx = func.jacfwd(fun)(x)
         return fx, dfx, ()
 
-    def calculate_trace(self, fun, x, state):
+    def calculate_trace(self, fun, x, state, /):
         del state
         fx = fun(x)
         dfx = func.jacfwd(fun)(x)
         dfx_trace = linalg.trace(dfx)
         return fx, dfx_trace, ()
 
-    def calculate_diagonal(self, fun, x, state):
+    def calculate_diagonal(self, fun, x, state, /):
         del state
         fx = fun(x)
         dfx = func.jacfwd(fun)(x)
@@ -245,7 +245,7 @@ class jacobian_hutchinson_fwd(JacobianHandler):
     def init_jacobian_handler(self):
         return random.prng_key(seed=self.seed)
 
-    def materialize_dense(self, fun, x, state):
+    def materialize_dense(self, fun, x, state, /):
         # TODO: approximate Jacobian with outer products instead of forming?
         # What is the "correct" thing to do?
         fx = fun(x)
@@ -288,7 +288,7 @@ class jacobian_hutchinson_rev(JacobianHandler):
     def init_jacobian_handler(self):
         return random.prng_key(seed=self.seed)
 
-    def materialize_dense(self, fun, x, state):
+    def materialize_dense(self, fun, x, state, /):
         # TODO: approximate Jacobian with outer products instead of forming?
         # What is the "correct" thing to do?
         fx = fun(x)
