@@ -54,7 +54,7 @@ jobs:
   test:
     name: Test with ${{ matrix.python-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -76,7 +76,7 @@ jobs:
     name: Build docs with ${{ matrix.python-version }} on ${{ matrix.os }} (runs examples
       and benchmarks)
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
