@@ -26,6 +26,8 @@ from probdiffeq import ivpsolve, probdiffeq
 # TODO: always add machine epsilon to initial Tcoeffs?
 # TODO: demo mass matrices?
 # TODO: think about adaptive steps
+# TODO: fix all linter issues and tests
+# TODO: do a root ts1 by stop_gradient'ing the vf?
 
 
 # Define the problem
