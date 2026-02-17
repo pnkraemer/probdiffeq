@@ -14,6 +14,12 @@
 
 # # Second-order systems
 
+# In this tutorial, we see how second-order ODEs can (and should!) be solved
+# without transforming them into first-order problems first.
+#
+# For a related demonstration, refer to the custom information operator tutorial.
+
+
 # +
 """Demonstrate how to solve second-order IVPs without transforming them first."""
 
@@ -24,13 +30,12 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
 
-# +
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
 # -
 
-# Quick refresher: first-order ODEs
+# Quick refresher: first-order ODEs.
 
 # +
 f, u0, (t0, t1), f_args = ivps.three_body_restricted_first_order()
@@ -55,6 +60,10 @@ errorest_1st = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 
 
 # -
+
+# +
+
+
 save_at = jnp.linspace(t0, t1, endpoint=True, num=250)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, errorest=errorest_1st)
 solution = jax.jit(solve)(init, save_at=save_at, atol=1e-5, rtol=1e-5)
@@ -62,6 +71,9 @@ norm = jnp.linalg.norm((solution.u.mean[0][-1] - u0) / jnp.abs(1.0 + u0))
 plt.title(f"error={norm:.3f}")
 plt.plot(solution.u.mean[0][:, 0], solution.u.mean[0][:, 1], marker=".")
 plt.show()
+
+# -
+
 
 # The default configuration assumes that the ODE to be solved is of first order.
 # Now, the same game with a second-order ODE
@@ -90,6 +102,10 @@ errorest_2nd = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 
 # -
 
+
+# +
+
+
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, errorest=errorest_2nd)
 solution = jax.jit(solve)(init, save_at=save_at, atol=1e-5, rtol=1e-5)
 
@@ -97,6 +113,9 @@ norm = jnp.linalg.norm((solution.u.mean[0][-1, ...] - u0) / jnp.abs(1.0 + u0))
 plt.title(f"error={norm:.3f}")
 plt.plot(solution.u.mean[0][:, 0], solution.u.mean[0][:, 1], marker=".")
 plt.show()
+
+# -
+
 
 # The results are indistinguishable from the plot.
 # While the runtimes of both solvers are similar,

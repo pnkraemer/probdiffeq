@@ -59,6 +59,28 @@ def case_constraint_ode_ts1_hutchinson_rev():
 
 
 @testing.case
+def case_constraint_root_ts1():
+    jacobian = probdiffeq.jacobian_materialize()
+
+    def root(vf, u, du):
+        return tree.tree_map(lambda a, b: a - b, du, vf(u))
+
+    constraint_fn = func.partial(
+        probdiffeq.constraint_root_ts1, root, jacobian=jacobian
+    )
+
+    def constraint(*args, **kwargs):
+        try:
+            return constraint_fn(*args, **kwargs)
+        except NotImplementedError:
+            reason = "This linearisation is not implemented"
+            reason += ", likely due to the selected state-space factorisation."
+            testing.skip(reason)
+
+    return constraint
+
+
+@testing.case
 def case_constraint_ode_slr0():
     def constraint(*args, **kwargs):
         try:

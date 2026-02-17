@@ -10,6 +10,7 @@ from probdiffeq.backend.typing import (
     ArrayLike,
     Callable,
     Generic,
+    Literal,
     Protocol,
     Sequence,
     TypeVar,
@@ -340,6 +341,20 @@ def constraint_ode_ts0(ssm, ode_order=1):
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
     return ssm.linearize.ode_taylor_0th(ode_order=ode_order)
+
+
+def constraint_root_ts1(root, *, ssm, jacobian=None, ode_order=1):
+    """Construct a constraint based on a custom root.
+
+    See the custom information operator tutorial for details.
+
+    Related:
+    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
+    """
+    if jacobian is None:
+        # Use hutchinson Jacobian handling for backward compatibility.
+        jacobian = jacobian_hutchinson_fwd()
+    return ssm.linearize.root_taylor_1st(root, ode_order=ode_order, jacobian=jacobian)
 
 
 def constraint_ode_ts1(*, ssm, jacobian: JacobianHandler | None = None, ode_order=1):
@@ -701,8 +716,8 @@ class ProbabilisticSolver:
         constraint: Constraint,
         ssm: Any,
     ):
-        self.ssm = ssm
         self.vector_field = vector_field
+        self.ssm = ssm
         self.strategy = strategy
         self.prior = prior
         self.constraint = constraint
@@ -736,7 +751,7 @@ class ProbabilisticSolver:
         """
         return self.strategy.is_suitable_for_save_every_step
 
-    def init(self, t, init: TaylorCoeffTarget) -> ProbabilisticSolution:
+    def init(self, t, init: TaylorCoeffTarget, *, damp: float) -> ProbabilisticSolution:
         """Initialize the probabilistic solution."""
         raise NotImplementedError
 
@@ -911,8 +926,9 @@ def prior_wiener_integrated(
     tcoeffs: C,
     *,
     tcoeffs_std: C | None = None,
-    ssm_fact: str,
+    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
+    increase_std_by_eps: bool = True,
 ):
     """Construct an repeatedly-integrated Wiener process.
 
@@ -921,18 +937,30 @@ def prior_wiener_integrated(
     high-order solvers in low precision arithmetic. Outside of these cases,
     leave the standard deviations at zero to improve accuracy.
     """
+    # Choose a state-space model factorisation
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
+
+    # Set up the transitions
 
     # TODO: should the output_scale be an argument to solve()?
     if output_scale is None:
         output_scale = np.ones_like(ssm.prototypes.output_scale())
 
+    output_scale = np.asarray(output_scale)
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
 
     if tcoeffs_std is None:
         error_like = np.zeros_like(ssm.prototypes.error_estimate())
         tcoeffs_std = tree.tree_map(lambda _: error_like, tcoeffs)
 
+    # Increase the Taylor coefficient STD by a machine epsilon
+    # because the solver initialisation carries out an update
+    # and if the inputs are fully certain, this update yields NaNs.
+    if increase_std_by_eps:
+        eps = np.finfo_eps(output_scale.dtype)
+        tcoeffs_std = tree.tree_map(lambda s: s + eps, tcoeffs_std)
+
+    # Return the target
     marginal = ssm.normal.from_tcoeffs(tcoeffs, tcoeffs_std)
     u_mean = ssm.stats.qoi(marginal)
     std = ssm.stats.standard_deviation(marginal)
@@ -946,12 +974,17 @@ def prior_wiener_integrated_discrete(
     tcoeffs: C,
     *,
     tcoeffs_std: C | None = None,
-    ssm_fact: str,
+    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
+    increase_std_by_eps: bool = True,
 ):
     """Compute a time-discretization of an integrated Wiener process."""
     init, discretize, ssm = prior_wiener_integrated(
-        tcoeffs, tcoeffs_std=tcoeffs_std, ssm_fact=ssm_fact, output_scale=output_scale
+        tcoeffs,
+        tcoeffs_std=tcoeffs_std,
+        ssm_fact=ssm_fact,
+        output_scale=output_scale,
+        increase_std_by_eps=increase_std_by_eps,
     )
     scales = np.ones_like(ssm.prototypes.output_scale())
     discretize_vmap = func.vmap(discretize, in_axes=(0, None))
@@ -1466,19 +1499,49 @@ class solver_mle(ProbabilisticSolver):
 
     """
 
-    def init(self, t, u) -> ProbabilisticSolution:
-        estimate, posterior = self.strategy.init_posterior(u=u)
+    def __init__(
+        self,
+        vector_field: VectorField,
+        *,
+        constraint: Constraint,
+        prior: Callable,
+        ssm: Any,
+        strategy: MarkovStrategy,
+        increase_init_damp_by_eps: bool = True,
+    ):
+        super().__init__(
+            vector_field, strategy=strategy, ssm=ssm, prior=prior, constraint=constraint
+        )
+        self.increase_init_damp_by_eps = increase_init_damp_by_eps
+
+    def init(self, t, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
+        estimate, prediction = self.strategy.init_posterior(u=u)
         correction_state = self.constraint.init_linearization()
 
         output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale())
-        output_scale_running = 0 * output_scale_prior
 
+        # Increase the damping by machine epsilon because often,
+        # the initial taylor coefficients have zero standard deviation
+        # in which case the correction below would yield NaNs.
+        if self.increase_init_damp_by_eps:
+            damp = np.asarray(damp)
+            damp = damp + np.finfo_eps(damp.dtype)
+
+        # Update
         f_wrapped = func.partial(self.vector_field, t=t)
-        fun_evals, correction_state = self.constraint.linearize(
-            f_wrapped, estimate.marginals, correction_state, damp=0.0
+        fx, correction_state = self.constraint.linearize(
+            f_wrapped, estimate.marginals, correction_state, damp=damp
         )
-        fun_evals = tree.tree_map(np.zeros_like, fun_evals)
-        auxiliary = (correction_state, output_scale_running, 0)
+        observed, reverted = self.ssm.conditional.revert(u.marginals, fx)
+        updates = reverted.noise
+        u, posterior = self.strategy.apply_updates(
+            prediction=prediction, updates=updates
+        )
+
+        # Calibrate the output scale
+        output_scale_running = self.ssm.stats.mahalanobis_norm_relative(0.0, observed)
+
+        auxiliary = (correction_state, output_scale_running, 1)
         return ProbabilisticSolution(
             t=t,
             u=estimate,
@@ -1486,7 +1549,7 @@ class solver_mle(ProbabilisticSolver):
             auxiliary=auxiliary,
             output_scale=output_scale_prior,
             num_steps=0,
-            fun_evals=fun_evals,
+            fun_evals=fx,
         )
 
     def step(self, state, *, dt: float, damp: float):
@@ -1576,29 +1639,39 @@ class solver_dynamic(ProbabilisticSolver):
         constraint: Constraint,
         ssm: Any,
         re_linearize_after_calibration=False,
+        increase_init_damp_by_eps: bool = True,
     ):
-        self.ssm = ssm
-        self.vector_field = vector_field
-        self.strategy = strategy
-        self.prior = prior
-        self.constraint = constraint
+        super().__init__(
+            vector_field, strategy=strategy, ssm=ssm, prior=prior, constraint=constraint
+        )
         self.re_linearize_after_calibration = re_linearize_after_calibration
+        self.increase_init_damp_by_eps = increase_init_damp_by_eps
 
-    def init(self, t, u) -> ProbabilisticSolution:
-        estimate, posterior = self.strategy.init_posterior(u=u)
+    def init(self, t, u, *, damp) -> ProbabilisticSolution:
+        u, prediction = self.strategy.init_posterior(u=u)
         lin_state = self.constraint.init_linearization()
 
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
 
+        # Increase the damping by machine epsilon because often,
+        # the initial taylor coefficients have zero standard deviation
+        # in which case the correction below would yield NaNs.
+        if self.increase_init_damp_by_eps:
+            damp = np.asarray(damp)
+            damp = damp + np.finfo_eps(damp.dtype)
+
         f_wrapped = func.partial(self.vector_field, t=t)
         fx, lin_state = self.constraint.linearize(
-            f_wrapped, estimate.marginals, lin_state, damp=0.0
+            f_wrapped, u.marginals, lin_state, damp=damp
         )
-        fx = tree.tree_map(np.zeros_like, fx)
+
+        _, reverted = self.ssm.conditional.revert(u.marginals, fx)
+        updates = reverted.noise
+        u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
         return ProbabilisticSolution(
             t=t,
-            u=estimate,
+            u=u,
             solution_full=posterior,
             auxiliary=lin_state,
             output_scale=output_scale,
@@ -1697,16 +1770,41 @@ class solver(ProbabilisticSolver):
 
     """
 
-    def init(self, t: Array, u: TaylorCoeffTarget) -> ProbabilisticSolution:
-        u, posterior = self.strategy.init_posterior(u=u)
+    def __init__(
+        self,
+        vector_field: VectorField,
+        *,
+        constraint: Constraint,
+        prior: Callable,
+        ssm: Any,
+        strategy: MarkovStrategy,
+        increase_init_damp_by_eps: bool = True,
+    ):
+        super().__init__(
+            vector_field, strategy=strategy, ssm=ssm, prior=prior, constraint=constraint
+        )
+        self.increase_init_damp_by_eps = increase_init_damp_by_eps
+
+    def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
+        u, prediction = self.strategy.init_posterior(u=u)
+
         correction_state = self.constraint.init_linearization()
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+
+        # Increase the damping by machine epsilon because often,
+        # the initial taylor coefficients have zero standard deviation
+        # in which case the correction below would yield NaNs.
+        if self.increase_init_damp_by_eps:
+            damp = np.asarray(damp)
+            damp = damp + np.finfo_eps(damp.dtype)
 
         f_wrapped = func.partial(self.vector_field, t=t)
-        fun_evals, correction_state = self.constraint.linearize(
-            f_wrapped, rv=u.marginals, state=correction_state, damp=0.0
+        fx, correction_state = self.constraint.linearize(
+            f_wrapped, rv=u.marginals, state=correction_state, damp=damp
         )
-        fun_evals = tree.tree_map(np.zeros_like, fun_evals)
+        _, reverted = self.ssm.conditional.revert(u.marginals, fx)
+        u, posterior = self.strategy.apply_updates(prediction, updates=reverted.noise)
+
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
         return ProbabilisticSolution(
             t=t,
             u=u,
@@ -1714,7 +1812,7 @@ class solver(ProbabilisticSolver):
             num_steps=0,
             auxiliary=correction_state,
             output_scale=output_scale,
-            fun_evals=fun_evals,
+            fun_evals=fx,
         )
 
     def step(self, state: ProbabilisticSolution, *, dt, damp):
@@ -1777,6 +1875,50 @@ class solver(ProbabilisticSolver):
         )
 
 
+def errorest_error_norm_scale_then_rms(*, norm_order=None) -> Callable:
+    """Normalize an error by scaling followed by computing the root-mean-square norm.
+
+    This is the recommended approach, and there is no reason to choose
+    [`errorest_error_norm_rms_then_scale`](#probdiffeq.probdiffeq.errorest_error_norm_rms_then_scale),
+    in situations where the present function applies.
+    However, there are situations where it doesn't apply, for example,
+    in residual-based error estimators for root constraints whose pytree
+    structure differs from that of the target Taylor coefficients.
+
+    See the custom information operator tutorial for details.
+    """
+
+    def normalize(error_abs, reference, atol, rtol):
+        scale = atol + rtol * np.abs(reference)
+        error_rel = error_abs / scale
+        return rms(error_rel)
+
+    def rms(s):
+        return linalg.vector_norm(s, order=norm_order) / np.sqrt(s.size)
+
+    return normalize
+
+
+def errorest_error_norm_rms_then_scale(norm_order=None) -> Callable:
+    """Normalize an error by computing the root-mean-square norm followed by scaling.
+
+    Use this for residual-based error estimators in combination
+    with custom root constraints.
+
+    See the custom information operator tutorial for details.
+    """
+
+    def normalize(error_abs, reference, atol, rtol):
+        norm_abs = rms(error_abs)
+        norm_ref = rms(reference)
+        return norm_abs / (atol + rtol * norm_ref)
+
+    def rms(s):
+        return linalg.vector_norm(s, order=norm_order) / np.sqrt(s.size)
+
+    return normalize
+
+
 class ErrorEstimator:
     """An interface for error estimators in probabilistic solvers.
 
@@ -1828,10 +1970,14 @@ class errorest_local_residual_cached(ErrorEstimator):
 
     """
 
-    def __init__(self, prior: Any, ssm: Any, norm_order: Any = None):
+    def __init__(self, prior: Any, ssm: Any, error_norm: Callable | None = None):
+        if error_norm is None:
+            error_norm = errorest_error_norm_scale_then_rms()
+
+        self.error_norm = error_norm
+
         self.prior = prior
         self.ssm = ssm
-        self.norm_order = norm_order
 
     def init_errorest(self) -> tuple:
         return ()
@@ -1869,15 +2015,7 @@ class errorest_local_residual_cached(ErrorEstimator):
         error = tree.ravel_pytree(error)[0]
         reference = tree.ravel_pytree(reference)[0]
         error_abs = dt * error
-        normalize = atol + rtol * np.abs(reference)
-        error_rel = error_abs / normalize
-
-        # Compute the of the error
-
-        def rms(s):
-            return linalg.vector_norm(s, order=self.norm_order) / np.sqrt(s.size)
-
-        error_norm = rms(error_rel)
+        error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
         # Scale the error norm with the error contraction rate and return
         error_contraction_rate = self.ssm.num_derivatives + 1
@@ -1955,13 +2093,16 @@ class errorest_local_residual(ErrorEstimator):
         constraint: Constraint,
         prior: Any,
         ssm: Any,
-        norm_order: Any = None,
+        error_norm: Callable | None = None,
     ):
+        if error_norm is None:
+            error_norm = errorest_error_norm_scale_then_rms()
+
+        self.error_norm = error_norm
         self.vector_field = vector_field
         self.constraint = constraint
         self.prior = prior
         self.ssm = ssm
-        self.norm_order = norm_order
 
     def init_errorest(self):
         return self.constraint.init_linearization()
@@ -1998,15 +2139,7 @@ class errorest_local_residual(ErrorEstimator):
         error = tree.ravel_pytree(error)[0]
         reference = tree.ravel_pytree(reference)[0]
         error_abs = dt * error
-        normalize = atol + rtol * np.abs(reference)
-        error_rel = error_abs / normalize
-
-        # Compute the of the error
-
-        def rms(s):
-            return linalg.vector_norm(s, order=self.norm_order) / np.sqrt(s.size)
-
-        error_norm = rms(error_rel)
+        error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
         # Scale the error norm with the error contraction rate and return
         error_contraction_rate = self.ssm.num_derivatives + 1
