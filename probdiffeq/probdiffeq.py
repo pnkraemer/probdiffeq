@@ -1804,6 +1804,30 @@ class solver(ProbabilisticSolver):
         )
 
 
+def errorest_error_norm_scale_then_rms(norm_order=None):
+    def normalize(error_abs, reference, atol, rtol):
+        scale = atol + rtol * np.abs(reference)
+        error_rel = error_abs / scale
+        return rms(error_rel)
+
+    def rms(s):
+        return linalg.vector_norm(s, order=norm_order) / np.sqrt(s.size)
+
+    return normalize
+
+
+def errorest_error_norm_rms_then_scale(norm_order=None):
+    def normalize(error_abs, reference, atol, rtol):
+        norm_abs = rms(error_abs)
+        norm_ref = rms(reference)
+        return norm_abs / (atol + rtol * norm_ref)
+
+    def rms(s):
+        return linalg.vector_norm(s, order=norm_order) / np.sqrt(s.size)
+
+    return normalize
+
+
 class ErrorEstimator:
     """An interface for error estimators in probabilistic solvers.
 
@@ -1855,10 +1879,13 @@ class errorest_local_residual_cached(ErrorEstimator):
 
     """
 
-    def __init__(self, prior: Any, ssm: Any, norm_order: Any = None):
+    def __init__(self, prior: Any, ssm: Any, error_norm: Callable | None = None):
+        if error_norm is None:
+            error_norm = errorest_error_norm_scale_then_rms()
+        self.error_norm = error_norm
+
         self.prior = prior
         self.ssm = ssm
-        self.norm_order = norm_order
 
     def init_errorest(self) -> tuple:
         return ()
@@ -1896,15 +1923,7 @@ class errorest_local_residual_cached(ErrorEstimator):
         error = tree.ravel_pytree(error)[0]
         reference = tree.ravel_pytree(reference)[0]
         error_abs = dt * error
-        normalize = atol + rtol * np.abs(reference)
-        error_rel = error_abs / normalize
-
-        # Compute the of the error
-
-        def rms(s):
-            return linalg.vector_norm(s, order=self.norm_order) / np.sqrt(s.size)
-
-        error_norm = rms(error_rel)
+        error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
         # Scale the error norm with the error contraction rate and return
         error_contraction_rate = self.ssm.num_derivatives + 1
@@ -2025,16 +2044,7 @@ class errorest_local_residual(ErrorEstimator):
         error = tree.ravel_pytree(error)[0]
         reference = tree.ravel_pytree(reference)[0]
         error_abs = dt * error
-        normalize = atol + rtol * np.abs(reference)
-        error_rel = error_abs / normalize
-
-        # Compute the of the error
-
-        def rms(s):
-            return linalg.vector_norm(s, order=self.norm_order) / np.sqrt(s.size)
-
-        error_norm = rms(error_rel)
-
+        error_norm = self.normalize(error_abs, reference, atol=atol, rtol=rtol)
         # Scale the error norm with the error contraction rate and return
         error_contraction_rate = self.ssm.num_derivatives + 1
         error_power = error_norm ** (-1.0 / error_contraction_rate)
