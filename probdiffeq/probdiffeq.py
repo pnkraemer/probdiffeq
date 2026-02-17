@@ -350,11 +350,11 @@ def constraint_ode_ts0(vf, /, *, ssm):
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
-    ode_order = _check_vector_field_and_parse_order(vf)
+    ode_order = _verify_vector_field_signature_and_parse_order(vf)
     return ssm.linearize.ode_taylor_0th(vf, ode_order=ode_order)
 
 
-def constraint_root_ts1(root, *, ssm, jacobian=None):
+def constraint_root_ts1(root, /, *, ssm, jacobian=None):
     """Construct a constraint based on a custom root.
 
     See the custom information operator tutorial for details.
@@ -362,10 +362,12 @@ def constraint_root_ts1(root, *, ssm, jacobian=None):
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
+    root_order = _verify_vector_field_signature_and_parse_order(root)
+
     if jacobian is None:
         # Use hutchinson Jacobian handling for backward compatibility.
         jacobian = jacobian_hutchinson_fwd()
-    return ssm.linearize.root_taylor_1st(root, ode_order=ode_order, jacobian=jacobian)
+    return ssm.linearize.root_taylor_1st(root, root_order=root_order, jacobian=jacobian)
 
 
 def constraint_ode_ts1(vf, /, *, ssm, jacobian: JacobianHandler | None = None):
@@ -381,16 +383,45 @@ def constraint_ode_ts1(vf, /, *, ssm, jacobian: JacobianHandler | None = None):
     for third-order ODEs f(u, du, ddu, *, t), and so on.
 
     """
-    ode_order = _check_vector_field_and_parse_order(vf)
+    ode_order = _verify_vector_field_signature_and_parse_order(vf)
     if jacobian is None:
         # Use hutchinson Jacobian handling for backward compatibility.
         jacobian = jacobian_hutchinson_fwd()
-    return ssm.linearize.ode_taylor_1st(
-        vector_field, ode_order=ode_order, jacobian=jacobian
-    )
+    return ssm.linearize.ode_taylor_1st(vf, ode_order=ode_order, jacobian=jacobian)
 
 
-def _check_vector_field_and_parse_order(vf) -> int:
+def constraint_ode_slr0(vf, /, *, ssm, cubature_fun=cubature_third_order_spherical):
+    """Create an ODE constraint with zeroth-order statistical linear regression.
+
+    Related:
+    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
+    """
+    ode_order = _verify_vector_field_signature_and_parse_order(vf)
+    if ode_order > 1:
+        msg = "SLR0 constraints cannot handle higher-order ODEs as of now."
+        msg += " However, ode_order={ode_order} has been detected."
+        msg += " Try a Taylor-series-based constraint instead."
+        raise ValueError(msg)
+    return ssm.linearize.ode_statistical_0th(vf, cubature_fun=cubature_fun)
+
+
+def constraint_ode_slr1(vf, *, ssm, cubature_fun=cubature_third_order_spherical):
+    """Create an ODE constraint with first-order statistical linear regression.
+
+    Related:
+    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
+
+    """
+    ode_order = _verify_vector_field_signature_and_parse_order(vf)
+    if ode_order > 1:
+        msg = "SLR1 constraints cannot handle higher-order ODEs as of now."
+        msg += " However, ode_order={ode_order} has been detected."
+        msg += " Try a Taylor-series-based constraint instead."
+        raise ValueError(msg)
+    return ssm.linearize.ode_statistical_1st(vf, cubature_fun=cubature_fun)
+
+
+def _verify_vector_field_signature_and_parse_order(vf) -> int:
     """Parse the vector-field structure from its signature."""
     sig = inspect.signature(vf)
     params = list(sig.parameters.values())
@@ -398,21 +429,22 @@ def _check_vector_field_and_parse_order(vf) -> int:
     # Collect positional-only state arguments
     state_args = [p for p in params if p.kind in (inspect.Parameter.POSITIONAL_ONLY,)]
 
-    msg = f"""The vector field does not have a signature compatible with the constraint. 
+    msg = f"""The vector field dynamics do not have a signature compatible with the constraint. 
     
-    More precisely, ODE are expected to look like
+    More precisely, the dynamics are expected to look like
 
-    - f(u, /, * t)
-    - f(u, du, /, *, t)
-    - f(u, du, ddu /, *, t)
-    - f(u, du, dddu, /, *, t)
+    - f(u, /, * t),
+    - f(u, du, /, *, t),
+    - f(u, du, ddu /, *, t),
+    - f(u, du, dddu, /, *, t),
 
-    where the number of positional arguments mathematically specifies the order of the
-    problem. However, arguments
+    where the number of positional arguments specifies the order of the problem. 
+    
+    However, the arguments
 
     {[(p.name, p.kind) for p in params]}
     
-    have been found. 
+    have been detected. 
     
     Try wrapping the vector field through a pure Python function 
     before passing it to the ODE constraint.
@@ -430,25 +462,6 @@ def _check_vector_field_and_parse_order(vf) -> int:
         raise TypeError(msg)
 
     return len(state_args)
-
-
-def constraint_ode_slr0(*, ssm, cubature_fun=cubature_third_order_spherical):
-    """Create an ODE constraint with zeroth-order statistical linear regression.
-
-    Related:
-    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
-    """
-    return ssm.linearize.ode_statistical_0th(cubature_fun)
-
-
-def constraint_ode_slr1(*, ssm, cubature_fun=cubature_third_order_spherical):
-    """Create an ODE constraint with first-order statistical linear regression.
-
-    Related:
-    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
-
-    """
-    return ssm.linearize.ode_statistical_1st(cubature_fun)
 
 
 @tree.register_dataclass
@@ -1824,7 +1837,6 @@ class solver(ProbabilisticSolver):
 
     def __init__(
         self,
-        vector_field: VectorField,
         *,
         constraint: Constraint,
         prior: Callable,
@@ -1832,9 +1844,7 @@ class solver(ProbabilisticSolver):
         strategy: MarkovStrategy,
         increase_init_damp_by_eps: bool = True,
     ):
-        super().__init__(
-            vector_field, strategy=strategy, ssm=ssm, prior=prior, constraint=constraint
-        )
+        super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
         self.increase_init_damp_by_eps = increase_init_damp_by_eps
 
     def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
@@ -1849,9 +1859,8 @@ class solver(ProbabilisticSolver):
             damp = np.asarray(damp)
             damp = damp + np.finfo_eps(damp.dtype)
 
-        f_wrapped = func.partial(self.vector_field, t=t)
         fx, correction_state = self.constraint.linearize(
-            f_wrapped, rv=u.marginals, state=correction_state, damp=damp
+            rv=u.marginals, state=correction_state, damp=damp, t=t
         )
         _, reverted = self.ssm.conditional.revert(u.marginals, fx)
         u, posterior = self.strategy.apply_updates(prediction, updates=reverted.noise)
@@ -1878,9 +1887,8 @@ class solver(ProbabilisticSolver):
         )
 
         # Linearize
-        f_eval = func.partial(self.vector_field, t=state.t + dt)
         fx, auxiliary = self.constraint.linearize(
-            f_eval, u.marginals, state.auxiliary, damp=damp
+            u.marginals, state.auxiliary, damp=damp, t=state.t + dt
         )
 
         # Update
@@ -2141,7 +2149,6 @@ class errorest_local_residual(ErrorEstimator):
 
     def __init__(
         self,
-        vector_field: Any,
         constraint: Constraint,
         prior: Any,
         ssm: Any,
@@ -2151,7 +2158,6 @@ class errorest_local_residual(ErrorEstimator):
             error_norm = errorest_error_norm_scale_then_rms()
 
         self.error_norm = error_norm
-        self.vector_field = vector_field
         self.constraint = constraint
         self.prior = prior
         self.ssm = ssm
@@ -2199,8 +2205,7 @@ class errorest_local_residual(ErrorEstimator):
         return error_power, state
 
     def _linearize_and_estimate(self, rv, state, /, t, *, damp):
-        f_wrapped = func.partial(self.vector_field, t=t)
-        linearized, state = self.constraint.linearize(f_wrapped, rv, state, damp=damp)
+        linearized, state = self.constraint.linearize(rv, state, damp=damp, t=t)
 
         observed = self.ssm.conditional.marginalise(rv, linearized)
         output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
