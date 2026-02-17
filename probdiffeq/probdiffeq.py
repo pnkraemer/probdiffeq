@@ -344,6 +344,13 @@ def constraint_ode_ts0(ssm, ode_order=1):
 
 
 def constraint_root_ts1(root, *, ssm, jacobian=None, ode_order=1):
+    """Construct a constraint based on a custom root.
+
+    See the custom information operator tutorial for details.
+
+    Related:
+    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
+    """
     if jacobian is None:
         # Use hutchinson Jacobian handling for backward compatibility.
         jacobian = jacobian_hutchinson_fwd()
@@ -1804,7 +1811,19 @@ class solver(ProbabilisticSolver):
         )
 
 
-def errorest_error_norm_scale_then_rms(norm_order=None):
+def errorest_error_norm_scale_then_rms(*, norm_order=None) -> Callable:
+    """Normalize an error by scaling followed by computing the norm.
+
+    This is the recommended approach, and there is no reason to choose
+    [`errorest_error_norm_rms_then_scale`](#probdiffeq.probdiffeq.errorest_error_norm_rms_then_scale),
+    in situations where the present function applies.
+    However, there are situations where it doesn't apply, for example,
+    in residual-based error estimators for root constraints whose pytree
+    structure differs from that of the target Taylor coefficients.
+
+    See the custom information operator tutorial for details.
+    """
+
     def normalize(error_abs, reference, atol, rtol):
         scale = atol + rtol * np.abs(reference)
         error_rel = error_abs / scale
@@ -1816,7 +1835,15 @@ def errorest_error_norm_scale_then_rms(norm_order=None):
     return normalize
 
 
-def errorest_error_norm_rms_then_scale(norm_order=None):
+def errorest_error_norm_rms_then_scale(norm_order=None) -> Callable:
+    """Normalize an error by computing the norm followed by scaling.
+
+    Use this for residual-based error estimators in combination
+    with custom root constraints.
+
+    See the custom information operator tutorial for details.
+    """
+
     def normalize(error_abs, reference, atol, rtol):
         norm_abs = rms(error_abs)
         norm_ref = rms(reference)
@@ -2001,13 +2028,16 @@ class errorest_local_residual(ErrorEstimator):
         constraint: Constraint,
         prior: Any,
         ssm: Any,
-        norm_order: Any = None,
+        error_norm: Callable | None = None,
     ):
+        if error_norm is None:
+            error_norm = errorest_error_norm_scale_then_rms()
+
+        self.error_norm = error_norm
         self.vector_field = vector_field
         self.constraint = constraint
         self.prior = prior
         self.ssm = ssm
-        self.norm_order = norm_order
 
     def init_errorest(self):
         return self.constraint.init_linearization()
@@ -2044,7 +2074,8 @@ class errorest_local_residual(ErrorEstimator):
         error = tree.ravel_pytree(error)[0]
         reference = tree.ravel_pytree(reference)[0]
         error_abs = dt * error
-        error_norm = self.normalize(error_abs, reference, atol=atol, rtol=rtol)
+        error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
+
         # Scale the error norm with the error contraction rate and return
         error_contraction_rate = self.ssm.num_derivatives + 1
         error_power = error_norm ** (-1.0 / error_contraction_rate)
