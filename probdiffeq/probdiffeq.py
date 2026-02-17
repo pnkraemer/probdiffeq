@@ -444,13 +444,14 @@ def _verify_vector_field_signature_and_parse_order(vf) -> int:
 
     More precisely, the dynamics are expected to look like
 
-      - f(u, *, t),
-      - f(u, du, *, t),
-      - f(u, du, ddu *, t),
+      - f(u, /, *, t),
+      - f(u, du, /, *, t),
+      - f(u, du, ddu, /, *, t),
 
     and so on, where the number of positional arguments
     specifies the order of the problem.
-    (Mind the keyword-only argument 't' in the signatures above.)
+    Replace `u`, `du`, and so on with any variable name of your choosing
+    but mind the keyword-only argument 't' in the signatures above.
 
     That said, the arguments
 
