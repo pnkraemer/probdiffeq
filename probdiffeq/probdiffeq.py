@@ -3,7 +3,17 @@
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import flow, func, linalg, np, random, special, structs, tree
+from probdiffeq.backend import (
+    flow,
+    func,
+    inspect,
+    linalg,
+    np,
+    random,
+    special,
+    structs,
+    tree,
+)
 from probdiffeq.backend.typing import (
     Any,
     Array,
@@ -334,16 +344,17 @@ class Constraint(Protocol):
     """Linearize the constraint."""
 
 
-def constraint_ode_ts0(ssm, ode_order=1):
+def constraint_ode_ts0(vf, /, *, ssm):
     """Create an ODE constraint with zeroth-order Taylor linearisation.
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
-    return ssm.linearize.ode_taylor_0th(ode_order=ode_order)
+    ode_order = _check_vector_field_and_parse_order(vf)
+    return ssm.linearize.ode_taylor_0th(vf, ode_order=ode_order)
 
 
-def constraint_root_ts1(root, *, ssm, jacobian=None, ode_order=1):
+def constraint_root_ts1(root, *, ssm, jacobian=None):
     """Construct a constraint based on a custom root.
 
     See the custom information operator tutorial for details.
@@ -357,16 +368,68 @@ def constraint_root_ts1(root, *, ssm, jacobian=None, ode_order=1):
     return ssm.linearize.root_taylor_1st(root, ode_order=ode_order, jacobian=jacobian)
 
 
-def constraint_ode_ts1(*, ssm, jacobian: JacobianHandler | None = None, ode_order=1):
+def constraint_ode_ts1(vf, /, *, ssm, jacobian: JacobianHandler | None = None):
     """Create an ODE constraint with first-order Taylor linearisation.
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
+
+    The ODE vector field is assumed to be one of f(u, *, t), f(u, du, *, t), etc.
+    The order of the ODE is read off the number of positional arguments before t.
+    That is, for first-order ODEs, pass f(u, *, t),
+    for second order ODEs, pass f(u, du, *, t),
+    for third-order ODEs f(u, du, ddu, *, t), and so on.
+
     """
+    ode_order = _check_vector_field_and_parse_order(vf)
     if jacobian is None:
         # Use hutchinson Jacobian handling for backward compatibility.
         jacobian = jacobian_hutchinson_fwd()
-    return ssm.linearize.ode_taylor_1st(ode_order=ode_order, jacobian=jacobian)
+    return ssm.linearize.ode_taylor_1st(
+        vector_field, ode_order=ode_order, jacobian=jacobian
+    )
+
+
+def _check_vector_field_and_parse_order(vf) -> int:
+    """Parse the vector-field structure from its signature."""
+    sig = inspect.signature(vf)
+    params = list(sig.parameters.values())
+
+    # Collect positional-only state arguments
+    state_args = [p for p in params if p.kind in (inspect.Parameter.POSITIONAL_ONLY,)]
+
+    msg = f"""The vector field does not have a signature compatible with the constraint. 
+    
+    More precisely, ODE are expected to look like
+
+    - f(u, /, * t)
+    - f(u, du, /, *, t)
+    - f(u, du, ddu /, *, t)
+    - f(u, du, dddu, /, *, t)
+
+    where the number of positional arguments mathematically specifies the order of the
+    problem. However, arguments
+
+    {[(p.name, p.kind) for p in params]}
+    
+    have been found. 
+    
+    Try wrapping the vector field through a pure Python function 
+    before passing it to the ODE constraint.
+    """
+
+    # Check for keyword-only 't' (and no other keyword-args)
+    contains_kw_t = any(
+        p.kind == inspect.Parameter.KEYWORD_ONLY and p.name == "t" for p in params
+    )
+    contains_other_kw = any(
+        p.kind == inspect.Parameter.KEYWORD_ONLY and p.name != "t" for p in params
+    )
+
+    if not state_args or not contains_kw_t or contains_other_kw:
+        raise TypeError(msg)
+
+    return len(state_args)
 
 
 def constraint_ode_slr0(*, ssm, cubature_fun=cubature_third_order_spherical):
@@ -709,14 +772,12 @@ class ProbabilisticSolver:
 
     def __init__(
         self,
-        vector_field: VectorField,
         *,
         strategy: MarkovStrategy,
         prior: Callable,
         constraint: Constraint,
         ssm: Any,
     ):
-        self.vector_field = vector_field
         self.ssm = ssm
         self.strategy = strategy
         self.prior = prior
@@ -1501,7 +1562,6 @@ class solver_mle(ProbabilisticSolver):
 
     def __init__(
         self,
-        vector_field: VectorField,
         *,
         constraint: Constraint,
         prior: Callable,
@@ -1509,13 +1569,11 @@ class solver_mle(ProbabilisticSolver):
         strategy: MarkovStrategy,
         increase_init_damp_by_eps: bool = True,
     ):
-        super().__init__(
-            vector_field, strategy=strategy, ssm=ssm, prior=prior, constraint=constraint
-        )
+        super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
         self.increase_init_damp_by_eps = increase_init_damp_by_eps
 
     def init(self, t, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
-        estimate, prediction = self.strategy.init_posterior(u=u)
+        u, prediction = self.strategy.init_posterior(u=u)
         correction_state = self.constraint.init_linearization()
 
         output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale())
@@ -1528,9 +1586,8 @@ class solver_mle(ProbabilisticSolver):
             damp = damp + np.finfo_eps(damp.dtype)
 
         # Update
-        f_wrapped = func.partial(self.vector_field, t=t)
         fx, correction_state = self.constraint.linearize(
-            f_wrapped, estimate.marginals, correction_state, damp=damp
+            u.marginals, correction_state, damp=damp, t=t
         )
         observed, reverted = self.ssm.conditional.revert(u.marginals, fx)
         updates = reverted.noise
@@ -1544,7 +1601,7 @@ class solver_mle(ProbabilisticSolver):
         auxiliary = (correction_state, output_scale_running, 1)
         return ProbabilisticSolution(
             t=t,
-            u=estimate,
+            u=u,
             solution_full=posterior,
             auxiliary=auxiliary,
             output_scale=output_scale_prior,
@@ -1564,9 +1621,8 @@ class solver_mle(ProbabilisticSolver):
 
         # Linearize
         (lin_state, output_scale_running, num_data) = state.auxiliary
-        f_wrapped = func.partial(self.vector_field, t=state.t + dt)
         fx, correction_state = self.constraint.linearize(
-            f_wrapped, u.marginals, state=lin_state, damp=damp
+            u.marginals, state=lin_state, damp=damp, t=state.t + dt
         )
 
         # Do the full correction step
@@ -1632,7 +1688,6 @@ class solver_dynamic(ProbabilisticSolver):
 
     def __init__(
         self,
-        vector_field: VectorField,
         *,
         strategy: MarkovStrategy,
         prior: Callable,
@@ -1641,9 +1696,7 @@ class solver_dynamic(ProbabilisticSolver):
         re_linearize_after_calibration=False,
         increase_init_damp_by_eps: bool = True,
     ):
-        super().__init__(
-            vector_field, strategy=strategy, ssm=ssm, prior=prior, constraint=constraint
-        )
+        super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
         self.re_linearize_after_calibration = re_linearize_after_calibration
         self.increase_init_damp_by_eps = increase_init_damp_by_eps
 
@@ -1660,9 +1713,8 @@ class solver_dynamic(ProbabilisticSolver):
             damp = np.asarray(damp)
             damp = damp + np.finfo_eps(damp.dtype)
 
-        f_wrapped = func.partial(self.vector_field, t=t)
         fx, lin_state = self.constraint.linearize(
-            f_wrapped, u.marginals, lin_state, damp=damp
+            u.marginals, lin_state, damp=damp, t=t
         )
 
         _, reverted = self.ssm.conditional.revert(u.marginals, fx)
@@ -1689,9 +1741,9 @@ class solver_dynamic(ProbabilisticSolver):
         u = self.ssm.conditional.apply(mean, transition)
 
         # Linearize
-        f_wrapped = func.partial(self.vector_field, t=state.t + dt)
+
         fx, lin_state = self.constraint.linearize(
-            f_wrapped, u, state=lin_state, damp=damp
+            u, state=lin_state, damp=damp, t=state.t + dt
         )
         observed = self.ssm.conditional.marginalise(u, fx)
         output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
