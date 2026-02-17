@@ -62,8 +62,7 @@ def case_constraint_ode_ts1_hutchinson_rev():
 def case_constraint_root_ts1():
     jacobian = probdiffeq.jacobian_materialize()
 
-    def root(vf, *u_and_du):
-        u, du = u_and_du
+    def root(vf, u, du):
         return tree.tree_map(lambda a, b: a - b, du, vf(u))
 
     constraint_fn = func.partial(

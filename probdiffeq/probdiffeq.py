@@ -936,26 +936,29 @@ def prior_wiener_integrated(
     high-order solvers in low precision arithmetic. Outside of these cases,
     leave the standard deviations at zero to improve accuracy.
     """
+    # Choose a state-space model factorisation
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
+
+    # Set up the transitions
 
     # TODO: should the output_scale be an argument to solve()?
     if output_scale is None:
         output_scale = np.ones_like(ssm.prototypes.output_scale())
 
     output_scale = np.asarray(output_scale)
-
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
 
     if tcoeffs_std is None:
         error_like = np.zeros_like(ssm.prototypes.error_estimate())
         tcoeffs_std = tree.tree_map(lambda _: error_like, tcoeffs)
 
-    # Shift the Taylor coefficients by a small value
+    # Increase the Taylor coefficient STD by a machine epsilon
     # because the solver initialisation carries out an update
     # and if the inputs are fully certain, this update yields NaNs.
-    eps = 10 * np.finfo_eps(output_scale.dtype)
+    eps = np.finfo_eps(output_scale.dtype)
     tcoeffs_std = tree.tree_map(lambda s: s + eps, tcoeffs_std)
 
+    # Return the target
     marginal = ssm.normal.from_tcoeffs(tcoeffs, tcoeffs_std)
     u_mean = ssm.stats.qoi(marginal)
     std = ssm.stats.standard_deviation(marginal)

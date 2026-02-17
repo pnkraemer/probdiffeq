@@ -131,8 +131,6 @@ class DenseRootTs1(Linearization):
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
         fx = fx - linop @ mean
 
-        # assert False
-
         # Turn the linearization into a conditional
         cond = LatentCond.from_linop_and_bias(linop, fx, damp=damp)
         return cond, state

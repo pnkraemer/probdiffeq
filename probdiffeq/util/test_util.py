@@ -41,7 +41,7 @@ def solve_adaptive_save_every_step(solver, errorest, control=None, clip_dt=False
     def solve(
         u: T, t0, t1, *, atol, rtol, dt0=0.1, eps=1e-8, damp=0.0
     ) -> probdiffeq.ivpsolve.Solution[T]:
-        solution0 = func.jit(solver.init)(t=t0, u=u)
+        solution0 = func.jit(solver.init)(t=t0, u=u, damp=damp)
         state = func.jit(loop.init)(solution0, dt=dt0)
 
         rejection_loop_apply = func.jit(loop.loop)
