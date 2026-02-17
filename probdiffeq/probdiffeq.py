@@ -438,7 +438,8 @@ def _verify_vector_field_signature_and_parse_order(vf) -> int:
     - f(u, du, ddu /, *, t),
     - f(u, du, dddu, /, *, t),
 
-    where the number of positional arguments specifies the order of the problem.
+    where the number of **positional-only** arguments
+    specifies the order of the problem.
 
     However, the arguments
 
@@ -447,7 +448,12 @@ def _verify_vector_field_signature_and_parse_order(vf) -> int:
     have been detected.
 
     Try wrapping the vector field through a pure Python function
-    before passing it to the ODE constraint.
+    with the correct arguments before passing it to the ODE constraint.
+
+    Careful:
+    - No *args or **kwargs
+    - No functools.partial
+
     """
 
     # Check for keyword-only 't' (and no other keyword-args)
@@ -1002,7 +1008,7 @@ def prior_wiener_integrated(
     tcoeffs_std: C | None = None,
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
-    increase_std_by_eps: bool = True,
+    increase_std_by_eps: bool = False,
 ):
     """Construct an repeatedly-integrated Wiener process.
 
@@ -1050,7 +1056,7 @@ def prior_wiener_integrated_discrete(
     tcoeffs_std: C | None = None,
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
-    increase_std_by_eps: bool = True,
+    increase_std_by_eps: bool = False,
 ):
     """Compute a time-discretization of an integrated Wiener process."""
     init, discretize, ssm = prior_wiener_integrated(
@@ -1580,10 +1586,10 @@ class solver_mle(ProbabilisticSolver):
         prior: Callable,
         ssm: Any,
         strategy: MarkovStrategy,
-        increase_init_damp_by_eps: bool = True,
+        update_at_init: bool = False,
     ):
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
-        self.increase_init_damp_by_eps = increase_init_damp_by_eps
+        self.update_at_init = update_at_init
 
     def init(self, t, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
@@ -1591,27 +1597,27 @@ class solver_mle(ProbabilisticSolver):
 
         output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale())
 
-        # Increase the damping by machine epsilon because often,
-        # the initial taylor coefficients have zero standard deviation
-        # in which case the correction below would yield NaNs.
-        if self.increase_init_damp_by_eps:
-            damp = np.asarray(damp)
-            damp = damp + np.finfo_eps(damp.dtype)
-
         # Update
         fx, correction_state = self.constraint.linearize(
             u.marginals, correction_state, damp=damp, t=t
         )
-        observed, reverted = self.ssm.conditional.revert(u.marginals, fx)
-        updates = reverted.noise
-        u, posterior = self.strategy.apply_updates(
-            prediction=prediction, updates=updates
-        )
+        if self.update_at_init:
+            observed, reverted = self.ssm.conditional.revert(u.marginals, fx)
+            updates = reverted.noise
+            u, posterior = self.strategy.apply_updates(
+                prediction=prediction, updates=updates
+            )
+            # Calibrate the output scale
+            output_scale_running = self.ssm.stats.mahalanobis_norm_relative(
+                0.0, observed
+            )
+            auxiliary = (correction_state, output_scale_running, 1)
+        else:
+            fx = tree.tree_map(np.zeros_like, fx)
+            posterior = prediction
+            output_scale_running = np.zeros_like(output_scale_prior)
+            auxiliary = (correction_state, output_scale_running, 0)
 
-        # Calibrate the output scale
-        output_scale_running = self.ssm.stats.mahalanobis_norm_relative(0.0, observed)
-
-        auxiliary = (correction_state, output_scale_running, 1)
         return ProbabilisticSolution(
             t=t,
             u=u,
@@ -1707,11 +1713,11 @@ class solver_dynamic(ProbabilisticSolver):
         constraint: Constraint,
         ssm: Any,
         re_linearize_after_calibration=False,
-        increase_init_damp_by_eps: bool = True,
+        update_at_init: bool = False,
     ):
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
         self.re_linearize_after_calibration = re_linearize_after_calibration
-        self.increase_init_damp_by_eps = increase_init_damp_by_eps
+        self.update_at_init = update_at_init
 
     def init(self, t, u, *, damp) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
@@ -1719,20 +1725,18 @@ class solver_dynamic(ProbabilisticSolver):
 
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
 
-        # Increase the damping by machine epsilon because often,
-        # the initial taylor coefficients have zero standard deviation
-        # in which case the correction below would yield NaNs.
-        if self.increase_init_damp_by_eps:
-            damp = np.asarray(damp)
-            damp = damp + np.finfo_eps(damp.dtype)
-
         fx, lin_state = self.constraint.linearize(
             u.marginals, lin_state, damp=damp, t=t
         )
-
-        _, reverted = self.ssm.conditional.revert(u.marginals, fx)
-        updates = reverted.noise
-        u, posterior = self.strategy.apply_updates(prediction, updates=updates)
+        # TODO: avoid the linearization altogether if update is false.
+        #  use jax.eval_shape instead.
+        if self.update_at_init:
+            _, reverted = self.ssm.conditional.revert(u.marginals, fx)
+            updates = reverted.noise
+            u, posterior = self.strategy.apply_updates(prediction, updates=updates)
+        else:
+            fx = tree.tree_map(np.zeros_like, fx)
+            posterior = prediction
 
         return ProbabilisticSolution(
             t=t,
@@ -1842,29 +1846,26 @@ class solver(ProbabilisticSolver):
         prior: Callable,
         ssm: Any,
         strategy: MarkovStrategy,
-        increase_init_damp_by_eps: bool = True,
+        update_at_init: bool = False,
     ):
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
-        self.increase_init_damp_by_eps = increase_init_damp_by_eps
+        self.update_at_init = update_at_init
 
     def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
 
         correction_state = self.constraint.init_linearization()
-
-        # Increase the damping by machine epsilon because often,
-        # the initial taylor coefficients have zero standard deviation
-        # in which case the correction below would yield NaNs.
-        if self.increase_init_damp_by_eps:
-            damp = np.asarray(damp)
-            damp = damp + np.finfo_eps(damp.dtype)
-
         fx, correction_state = self.constraint.linearize(
             rv=u.marginals, state=correction_state, damp=damp, t=t
         )
-        _, reverted = self.ssm.conditional.revert(u.marginals, fx)
-        u, posterior = self.strategy.apply_updates(prediction, updates=reverted.noise)
-
+        if self.update_at_init:
+            _, reverted = self.ssm.conditional.revert(u.marginals, fx)
+            u, posterior = self.strategy.apply_updates(
+                prediction, updates=reverted.noise
+            )
+        else:
+            posterior = prediction
+            fx = tree.tree_map(np.zeros_like, fx)
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
         return ProbabilisticSolution(
             t=t,

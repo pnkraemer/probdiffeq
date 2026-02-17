@@ -69,8 +69,6 @@ errorest_1st = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 save_at = jnp.linspace(t0, t1, endpoint=True, num=250)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, errorest=errorest_1st)
 solution = jax.jit(solve)(init, save_at=save_at, atol=1e-5, rtol=1e-5)
-norm = jnp.linalg.norm((solution.u.mean[0][-1] - u0) / jnp.abs(1.0 + u0))
-plt.title(f"error={norm:.3f}")
 plt.plot(solution.u.mean[0][:, 0], solution.u.mean[0][:, 1], marker=".")
 plt.show()
 
@@ -91,9 +89,9 @@ def vf_2(y, dy, /, *, t):
     return f(y, dy, *f_args)
 
 
-# One derivative more than above because we don't transform to first order
+# Different derivative count because we don't transform to first order
+# The goal is to match the number of tracked taylor coefficients.
 tcoeffs = taylor.odejet_padded_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
-print(len(tcoeffs))
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="isotropic"
 )
@@ -113,8 +111,6 @@ errorest_2nd = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, errorest=errorest_2nd)
 solution = jax.jit(solve)(init, save_at=save_at, atol=1e-5, rtol=1e-5)
 
-norm = jnp.linalg.norm((solution.u.mean[0][-1, ...] - u0) / jnp.abs(1.0 + u0))
-plt.title(f"error={norm:.3f}")
 plt.plot(solution.u.mean[0][:, 0], solution.u.mean[0][:, 1], marker=".")
 plt.show()
 
@@ -122,7 +118,3 @@ plt.show()
 
 
 # The results are indistinguishable from the plot.
-# While the runtimes of both solvers are similar,
-# the error of the second-order solver is much lower.
-#
-# See the benchmarks for more quantitative versions of this statement.

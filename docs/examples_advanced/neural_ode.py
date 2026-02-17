@@ -96,7 +96,7 @@ def vf_neural_ode(*, hidden: tuple, t0: float, t1: float):
     u0 = jnp.asarray([0.0])
 
     @jax.jit
-    def vf(y, *, t, p):
+    def vf(y, /, *, t, p):
         """Evaluate the neural ODE vector field."""
         y_and_t = jnp.concatenate([y, t[None]])
         return mlp(p, y_and_t)
@@ -167,14 +167,14 @@ def loss_log_marginal_likelihood(vf, *, t0):
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(
             tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
         )
-        ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
+
+        def vf_p(y, /, *, t):
+            return vf(y, t=t, p=p)
+
+        ts0 = probdiffeq.constraint_ode_ts0(vf_p, ssm=ssm)
         strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
         solver_ts0 = probdiffeq.solver(
-            lambda *a, **kw: vf(*a, **kw, p=p),
-            strategy=strategy,
-            prior=ibm,
-            constraint=ts0,
-            ssm=ssm,
+            strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
         )
 
         # Solve

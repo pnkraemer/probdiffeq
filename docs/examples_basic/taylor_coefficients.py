@@ -42,9 +42,10 @@ if not backend.has_been_selected:
 f, u0, (t0, t1), f_args = ivps.logistic()
 
 
-def vf(*y, t):  # noqa: ARG001
+def vf(y, /, *, t):
     """Evaluate the vector field."""
-    return f(*y, *f_args)
+    del t
+    return f(y, *f_args)
 
 
 # -
@@ -57,10 +58,10 @@ def vf(*y, t):  # noqa: ARG001
 def solve(tc):
     """Solve the ODE."""
     init, prior, ssm = probdiffeq.prior_wiener_integrated(tc, ssm_fact="dense")
-    ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
+    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_mle(
-        vf, strategy=strategy, prior=prior, constraint=ts0, ssm=ssm
+        strategy=strategy, prior=prior, constraint=ts0, ssm=ssm
     )
     ts = jnp.linspace(t0, t1, endpoint=True, num=10)
     errorest = probdiffeq.errorest_local_residual_cached(prior=prior, ssm=ssm)
