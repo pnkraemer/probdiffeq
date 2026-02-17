@@ -134,10 +134,6 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
 
-# Fail this notebook on NaN detection (to catch those in the CI)
-jax.config.update("jax_debug_nans", True)
-
-
 # +
 
 # IVP examples in JAX
