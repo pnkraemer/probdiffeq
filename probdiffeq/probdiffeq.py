@@ -1514,7 +1514,7 @@ class solver_mle(ProbabilisticSolver):
         )
         self.increase_init_damp_by_eps = increase_init_damp_by_eps
 
-    def init(self, t, u: TaylorCoeffTarget, *, damp: float) -> ProbabilisticSolution:
+    def init(self, t, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         estimate, prediction = self.strategy.init_posterior(u=u)
         correction_state = self.constraint.init_linearization()
 
@@ -1525,7 +1525,7 @@ class solver_mle(ProbabilisticSolver):
         # in which case the correction below would yield NaNs.
         if self.increase_init_damp_by_eps:
             damp = np.asarray(damp)
-            damp = damp + np.finfo_eps(damp)
+            damp = damp + np.finfo_eps(damp.dtype)
 
         # Update
         f_wrapped = func.partial(self.vector_field, t=t)
@@ -1658,7 +1658,7 @@ class solver_dynamic(ProbabilisticSolver):
         # in which case the correction below would yield NaNs.
         if self.increase_init_damp_by_eps:
             damp = np.asarray(damp)
-            damp = damp + np.finfo_eps(damp)
+            damp = damp + np.finfo_eps(damp.dtype)
 
         f_wrapped = func.partial(self.vector_field, t=t)
         fx, lin_state = self.constraint.linearize(
@@ -1785,9 +1785,7 @@ class solver(ProbabilisticSolver):
         )
         self.increase_init_damp_by_eps = increase_init_damp_by_eps
 
-    def init(
-        self, t: Array, u: TaylorCoeffTarget, *, damp: float
-    ) -> ProbabilisticSolution:
+    def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
 
         correction_state = self.constraint.init_linearization()
@@ -1797,7 +1795,7 @@ class solver(ProbabilisticSolver):
         # in which case the correction below would yield NaNs.
         if self.increase_init_damp_by_eps:
             damp = np.asarray(damp)
-            damp = damp + np.finfo_eps(damp)
+            damp = damp + np.finfo_eps(damp.dtype)
 
         f_wrapped = func.partial(self.vector_field, t=t)
         fx, correction_state = self.constraint.linearize(
