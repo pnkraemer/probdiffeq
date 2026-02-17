@@ -427,13 +427,14 @@ def _verify_vector_field_signature_and_parse_order(vf) -> int:
     params = list(sig.parameters.values())
 
     # Collect positional-only state arguments
+    # TODO: should we allow positional-or-keyword arguments?
     state_args = [p for p in params if p.kind in (inspect.Parameter.POSITIONAL_ONLY,)]
 
     msg = f"""The dynamics' signature is not compatible with the constraint.
 
     More precisely, the dynamics are expected to look like
 
-      - f(u, /, * t),
+      - f(u, /, *,  t),
       - f(u, du, /, *, t),
       - f(u, du, ddu /, *, t),
 

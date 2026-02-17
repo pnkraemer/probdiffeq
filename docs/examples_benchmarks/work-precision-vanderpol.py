@@ -136,9 +136,9 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         """Van-der-Pol dynamics as a second-order differential equation."""
         return 1e5 * ((1.0 - u**2) * du - u)
 
-    def root(vf, u, du, ddu):
+    def root(u, du, ddu, /, *, t):
         """Evaluate a root to solve the 2nd-order problem directly."""
-        return ddu - vf(u, du)
+        return ddu - vf_probdiffeq(u, du, t=t)
 
     t0, t1 = 0.0, 3.0
     u0, du0 = (jnp.atleast_1d(2.0), jnp.atleast_1d(0.0))
@@ -151,11 +151,11 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
 
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
-        ts0_or_ts1 = probdiffeq.constraint_root_ts1(root, ode_order=2, ssm=ssm)
+        ts0_or_ts1 = probdiffeq.constraint_root_ts1(root, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         solver = probdiffeq.solver_dynamic(
-            vf_probdiffeq, strategy=strategy, prior=ibm, constraint=ts0_or_ts1, ssm=ssm
+            strategy=strategy, prior=ibm, constraint=ts0_or_ts1, ssm=ssm
         )
         errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 

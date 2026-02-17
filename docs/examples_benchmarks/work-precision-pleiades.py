@@ -180,7 +180,7 @@ def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
     # fmt: on
 
     @jax.jit
-    def vf_probdiffeq(u, du, *, t):  # noqa: ARG001
+    def vf_probdiffeq(u, du, /, *, t):  # noqa: ARG001
         """Pleiades problem."""
         x = u[0:7]  # x
         y = u[7:14]  # y
@@ -203,10 +203,10 @@ def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(
             tcoeffs, ssm_fact="isotropic"
         )
-        ts0_or_ts1 = constraint_ode_fun(ssm=ssm, ode_order=2)
+        ts0_or_ts1 = constraint_ode_fun(vf_probdiffeq, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
         solver = probdiffeq.solver_dynamic(
-            vf_probdiffeq, strategy=strategy, prior=ibm, constraint=ts0_or_ts1, ssm=ssm
+            strategy=strategy, prior=ibm, constraint=ts0_or_ts1, ssm=ssm
         )
         errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 

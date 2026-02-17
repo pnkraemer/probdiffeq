@@ -140,7 +140,7 @@ def solver_probdiffeq(num_derivatives: int, implementation, constraint) -> Calla
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @jax.jit
-    def vf_probdiffeq(y, *, t):  # noqa: ARG001
+    def vf_probdiffeq(y, /, *, t):  # noqa: ARG001
         """Lotka--Volterra dynamics."""
         dy1 = 0.5 * y[0] - 0.05 * y[0] * y[1]
         dy2 = -0.5 * y[1] + 0.05 * y[0] * y[1]
@@ -158,9 +158,9 @@ def solver_probdiffeq(num_derivatives: int, implementation, constraint) -> Calla
             tcoeffs, ssm_fact=implementation
         )
         strategy = probdiffeq.strategy_filter(ssm=ssm)
-        corr = constraint(ssm=ssm)
+        corr = constraint(vf_probdiffeq, ssm=ssm)
         solver = probdiffeq.solver_mle(
-            vf_probdiffeq, strategy=strategy, prior=ibm, constraint=corr, ssm=ssm
+            strategy=strategy, prior=ibm, constraint=corr, ssm=ssm
         )
         errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 

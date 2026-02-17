@@ -142,7 +142,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @jax.jit
-    def vf_probdiffeq(u, *, t):  # noqa: ARG001
+    def vf_probdiffeq(u, /, *, t):  # noqa: ARG001
         """High irradiance response."""
         du1 = -1.71 * u[0] + 0.43 * u[1] + 8.32 * u[2] + 0.0007
         du2 = 1.71 * u[0] - 8.75 * u[1]
@@ -165,10 +165,10 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
-        ts1 = probdiffeq.constraint_ode_ts1(ssm=ssm)
+        ts1 = probdiffeq.constraint_ode_ts1(vf_probdiffeq, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
         solver = probdiffeq.solver_dynamic(
-            vf_probdiffeq, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
+            strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
         )
         errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 
