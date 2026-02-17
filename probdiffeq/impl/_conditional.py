@@ -39,7 +39,7 @@ class Linearization:
     def init_linearization(self):
         raise NotImplementedError
 
-    def linearize(self, fun, rv, state: None, *, damp: float):
+    def linearize(self, rv, state: None, *, damp: float, t):
         raise NotImplementedError
 
 
@@ -440,15 +440,15 @@ class LinearizationFactoryBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_taylor_1st(self, ode_order: int):
+    def ode_taylor_1st(self, vf, *, ode_order: int):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_statistical_1st(self, cubature_fun: Callable):
+    def ode_statistical_1st(self, vf, *, cubature_fun: Callable):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_statistical_0th(self, cubature_fun: Callable):
+    def ode_statistical_0th(self, vf, *, cubature_fun: Callable):
         raise NotImplementedError
 
 
@@ -462,17 +462,17 @@ class DenseLinearizationFactory(LinearizationFactoryBackend):
             root, unravel=self.unravel, jacobian=jacobian, root_order=root_order
         )
 
-    def ode_taylor_0th(self, vf, ode_order):
+    def ode_taylor_0th(self, vf, *, ode_order):
         return DenseOdeTs0(
             vf, ode_order=ode_order, ode_shape=self.ode_shape, unravel=self.unravel
         )
 
-    def ode_taylor_1st(self, vector_field, ode_order, jacobian):
+    def ode_taylor_1st(self, vf, *, ode_order, jacobian):
         if ode_order > 1:
             raise ValueError
 
         return DenseOdeTs1(
-            vector_field=vector_field,
+            vf,
             ode_order=ode_order,
             ode_shape=self.ode_shape,
             unravel=self.unravel,
@@ -510,7 +510,7 @@ class IsotropicLinearizationFactory(LinearizationFactoryBackend):
             vf, jacobian=jacobian, ode_order=ode_order, unravel=self.unravel
         )
 
-    def ode_taylor_0th(self, vf, ode_order):
+    def ode_taylor_0th(self, vf, *, ode_order):
         return IsotropicOdeTs0(vf, ode_order=ode_order, unravel=self.unravel)
 
     def ode_statistical_0th(self, vf, *, cubature_fun):

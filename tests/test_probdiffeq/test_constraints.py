@@ -40,16 +40,16 @@ def fixture_solution(constraint_ode_factory, fact):
     try:
         tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-        constraint = constraint_ode_factory(ssm=ssm)
+        constraint = constraint_ode_factory(vf, ssm=ssm)
 
     except NotImplementedError:
-        reason = "No implementation available. Most likely because"
+        reason = "Skipped test since NotImplementedError has been raised. Most likely because"
         reason += " this combo of linearisation + ssm factorisation isn't available."
         testing.skip(reason=reason)
 
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver_mle(
-        vf, strategy=strategy, prior=ibm, constraint=constraint, ssm=ssm
+        strategy=strategy, prior=ibm, constraint=constraint, ssm=ssm
     )
     errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, errorest=errorest)
