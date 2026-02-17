@@ -12,10 +12,19 @@
 #     name: python3
 # ---
 
-# # Second-order systems
+# # Custom information operators
 
 # +
-"""Demonstrate how to implement custom information operators."""
+"""Demonstrate how to implement custom information operators.
+
+For details on the setup, see:
+
+Bosch, Nathanael, Filip Tronarp, and Philipp Hennig.
+"Pick-and-mix information operators for probabilistic ODE solvers."
+International Conference on Artificial Intelligence and Statistics.
+PMLR, 2022.
+
+"""
 
 import jax
 import jax.numpy as jnp
@@ -34,25 +43,26 @@ from probdiffeq import ivpsolve, probdiffeq
 
 
 @jax.jit
-def vf_1st(y, t):  # noqa: ARG001
+def vf_1st(y, *, t):
+    """Evaluate the harmonic oscillator dynamics."""
     u, du = jnp.split(y, 2)
-    return jnp.concatenate([du, -u])
+    return jnp.concatenate([du, vf_2nd(u, du, t=t)])
 
 
 def hamiltonian_1st(y):
+    """Evaluate the Hamiltonian of the harmonic oscillator."""
     u, du = jnp.split(y, 2)
-    kinetic = 0.5 * jnp.dot(du, du)
-    potential = 0.5 * jnp.dot(u, u)
-    return kinetic + potential
+    return hamiltonian_2nd(u, du)
 
 
 @jax.jit
 def vf_2nd(y, dy, *, t):  # noqa: ARG001
-    """Evaluate the three-body problem as a second-order IVP."""
+    """Evaluate the harmonic oscillator as a 2nd-order problem."""
     return -y
 
 
 def hamiltonian_2nd(u, du):
+    """Evaluate the Hamiltonian of the harmonic oscillator."""
     kinetic = 0.5 * jnp.dot(du, du)
     potential = 0.5 * jnp.dot(u, u)
     return kinetic + potential
@@ -69,8 +79,7 @@ H0 = hamiltonian_1st(u0_1st)
 
 # +
 
-# Set up the first-order solver (for reference)
-
+# Set up the first-order solver (for illustration)
 zeros, ones = jnp.zeros_like(u0_1st), jnp.ones_like(u0_1st)
 tcoeffs = [u0_1st, zeros, zeros]
 tcoeffs_std = [zeros, ones, ones]
@@ -90,27 +99,40 @@ hamiltonian_1 = jax.vmap(hamiltonian_1st)(solution_1.u.mean[0])
 # +
 
 
-# Set up the custom information operator.
-# We know: (i) the ODE is second order; (ii) the Hamiltonian should be conserved
+# The harmonic oscillator calls for a custom information operator because
+# we know: (i) the ODE is second order; (ii) the Hamiltonian should be conserved.
 
 
 def root(vf, u, du, ddu):
+    """Evaluate a custom root for the harmonic oscillator."""
     deriv = ddu - vf(u, du)
     hamil = hamiltonian_2nd(u, du) - H0
     return [deriv, hamil]  # any PyTree goes
 
 
+# Set up the custom-root solver
 u0, du0 = jnp.split(u0_1st, 2)
 
+# We don't do high order because high-order initialisation
+# of custom-information-operator solvers is an open problem.
+# But for low-order solvers, custom roots work well.
 zeros, ones = jnp.zeros_like(u0), jnp.ones_like(u0)
 tcoeffs = [u0, du0, zeros]
-tcoeffs_std = [zeros, 1e-8 + zeros, ones]  # avoid NaNs
+tcoeffs_std = [1e-8 + zeros, 1e-8 + zeros, ones]  # avoid NaNs
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, tcoeffs_std=tcoeffs_std)
+
+# Use this constraint function for custom roots:
 ts1 = probdiffeq.constraint_root_ts1(root, ssm=ssm, ode_order=2)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 solver_2nd = probdiffeq.solver_mle(
     vf_2nd, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
 )
+
+# Custom roots with residual-based error estimates
+# require norming-then-scaling
+# (instead of scaling-then-norming, which is the default),
+# because scaling-then-norming assumes that the root pytree
+# has the same structure as the target pytree.
 error_norm = probdiffeq.errorest_error_norm_rms_then_scale()
 errorest = probdiffeq.errorest_local_residual_cached(
     prior=ibm, ssm=ssm, error_norm=error_norm
