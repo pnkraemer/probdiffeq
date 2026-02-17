@@ -945,11 +945,14 @@ def prior_wiener_integrated(
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
 
     if tcoeffs_std is None:
-        # TODO: initialise the tcoeffs with machine epsilon
-        #       uncertainty because all solvers do an update at initialisation
-        #       and we hate NaNs?
-        error_like = np.ones_like(ssm.prototypes.error_estimate())
+        error_like = np.zeros_like(ssm.prototypes.error_estimate())
         tcoeffs_std = tree.tree_map(lambda _: error_like, tcoeffs)
+
+    # Shift the Taylor coefficients by a small value
+    # because the solver initialisation carries out an update
+    # and if the inputs are fully certain, this update yields NaNs.
+    eps = 10 * np.finfo_eps(output_scale.dtype)
+    tcoeffs_std = tree.tree_map(lambda s: s + eps, tcoeffs_std)
 
     marginal = ssm.normal.from_tcoeffs(tcoeffs, tcoeffs_std)
     u_mean = ssm.stats.qoi(marginal)

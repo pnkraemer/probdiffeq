@@ -60,6 +60,10 @@ def atleast_1d(arr, /):
     return jnp.atleast_1d(arr)
 
 
+def finfo_eps(arr_or_dtype, /):
+    return jnp.finfo(arr_or_dtype).eps
+
+
 def concatenate(list_of_arrays, /):
     return jnp.concatenate(list_of_arrays)
 

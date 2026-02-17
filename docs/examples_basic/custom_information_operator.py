@@ -32,14 +32,7 @@ import matplotlib.pyplot as plt
 
 from probdiffeq import ivpsolve, probdiffeq
 
-# TODO: always add machine epsilon to initial Tcoeffs?
-# TODO: demo mass matrices?
-# TODO: think about adaptive steps
-# TODO: fix all linter issues and tests
-# TODO: do a root ts1 by stop_gradient'ing the vf?
-
-
-# Define the problem
+# Define the problem.
 
 
 @jax.jit
@@ -68,18 +61,18 @@ def hamiltonian_2nd(u, du):
     return kinetic + potential
 
 
-t0, t1 = 0.0, 1_000.0  # reeeeally long time-integration
+t0, t1 = 0.0, 100.0  # reeeeally long time-integration
 u0_1st = jnp.array([1.0, 0.0, 0.0, 1.0])
 save_at = jnp.linspace(t0, t1, endpoint=True, num=500)
 
 
-# Hamiltonian at t=0 (a good solution conserves it)
+# A good solution conserves the Hamiltonian.
+
 H0 = hamiltonian_1st(u0_1st)
 
 
-# +
+# Set up the first-order solver (for illustration).
 
-# Set up the first-order solver (for illustration)
 zeros, ones = jnp.zeros_like(u0_1st), jnp.ones_like(u0_1st)
 tcoeffs = [u0_1st, zeros, zeros]
 tcoeffs_std = [zeros, ones, ones]
@@ -92,11 +85,11 @@ solver_1st = probdiffeq.solver_mle(
 errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, errorest=errorest)
 
-solution_1 = jax.jit(solve)(init, save_at=save_at, atol=1e-4, rtol=1e-2)
-hamiltonian_1 = jax.vmap(hamiltonian_1st)(solution_1.u.mean[0])
 
+# Solve at poor tolerances to make the Hamiltonian drift more obvious.
 
-# +
+sol_1 = jax.jit(solve)(init, save_at=save_at, atol=1e-3, rtol=1e-1)
+ham_1 = jax.vmap(hamiltonian_1st)(sol_1.u.mean[0])
 
 
 # The harmonic oscillator calls for a custom information operator because
@@ -110,18 +103,21 @@ def root(vf, u, du, ddu):
     return [deriv, hamil]  # any PyTree goes
 
 
-# Set up the custom-root solver
+# Set up the custom-root solver.
+
 u0, du0 = jnp.split(u0_1st, 2)
 
 # We don't do high order because high-order initialisation
 # of custom-information-operator solvers is an open problem.
 # But for low-order solvers, custom roots work well.
+
 zeros, ones = jnp.zeros_like(u0), jnp.ones_like(u0)
 tcoeffs = [u0, du0, zeros]
-tcoeffs_std = [1e-8 + zeros, 1e-8 + zeros, ones]  # avoid NaNs
+tcoeffs_std = [zeros, zeros, ones]  # avoid NaNs
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, tcoeffs_std=tcoeffs_std)
 
 # Use this constraint function for custom roots:
+
 ts1 = probdiffeq.constraint_root_ts1(root, ssm=ssm, ode_order=2)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 solver_2nd = probdiffeq.solver_mle(
@@ -133,37 +129,38 @@ solver_2nd = probdiffeq.solver_mle(
 # (instead of scaling-then-norming, which is the default),
 # because scaling-then-norming assumes that the root pytree
 # has the same structure as the target pytree.
+
 error_norm = probdiffeq.errorest_error_norm_rms_then_scale()
 errorest = probdiffeq.errorest_local_residual_cached(
     prior=ibm, ssm=ssm, error_norm=error_norm
 )
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, errorest=errorest)
 
-solution_2 = jax.jit(solve)(init, save_at=save_at, atol=1e-4, rtol=1e-2)
-hamiltonian_2 = jax.vmap(hamiltonian_2nd)(solution_2.u.mean[0], solution_2.u.mean[1])
+sol_2 = jax.jit(solve)(init, save_at=save_at, atol=1e-3, rtol=1e-1)
+ham_2 = jax.vmap(hamiltonian_2nd)(sol_2.u.mean[0], sol_2.u.mean[1])
 
 
-# Plot solution
+# Plot both solutions.
+# See how much better the custom root solver preserves the Hamiltonian?
+
+
 fig, ax = plt.subplots(ncols=2, figsize=(8, 3), constrained_layout=True)
 
-ax[0].set_title("Differential equation solution")
-ax[0].plot(
-    solution_1.u.mean[0][:, 0], solution_1.u.mean[0][:, 1], ".", label="Standard solver"
-)
-ax[0].plot(
-    solution_2.u.mean[0][:, 0], solution_2.u.mean[0][:, 1], ".", label="Custom root"
-)
+ax[0].set_title("Differential equation solution", fontsize="medium")
+ax[0].plot(sol_1.u.mean[0][:, 0], sol_1.u.mean[0][:, 1], label="Standard solver")
+ax[0].plot(sol_2.u.mean[0][:, 0], sol_2.u.mean[0][:, 1], label="Custom root")
 ax[0].legend()
 ax[0].set_xlabel("$x_1$")
 ax[0].set_ylabel("$x_2$")
 
-eps = jnp.finfo(solution_2.t).eps
-ax[1].set_title("Hamiltonian error")
-ax[1].semilogy(solution_1.t, eps + jnp.abs(hamiltonian_1 - H0), label="Standard solver")
-ax[1].semilogy(solution_2.t, eps + jnp.abs(hamiltonian_2 - H0), label="Custom root")
+eps = jnp.sqrt(jnp.finfo(sol_2.t).eps)
+ax[1].set_title("Hamiltonian error", fontsize="medium")
+ax[1].semilogy(sol_1.t, eps + jnp.abs(ham_1 - H0), label="Standard solver")
+ax[1].semilogy(sol_2.t, eps + jnp.abs(ham_2 - H0), label="Custom root")
 ax[1].set_xlabel("Time $t$")
 ax[1].set_ylabel("Error")
 ax[1].legend()
+ax[1].set_ylim((eps, 10))
 plt.show()
 
 plt.show()
