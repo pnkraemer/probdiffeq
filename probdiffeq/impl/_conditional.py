@@ -70,7 +70,7 @@ class DenseOdeTs1(Linearization):
         self, ode_order: int, ode_shape: tuple, unravel: Callable, jacobian: Any
     ):
         if ode_order > 1:
-            msg = "Not implemented. Try the the more general TS1 constraint instead."
+            msg = "Not implemented. Try the a root-based TS1 constraint instead."
             raise ValueError(msg)
         self.ode_shape = ode_shape
         self.unravel = unravel
