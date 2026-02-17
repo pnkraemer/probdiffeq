@@ -928,6 +928,7 @@ def prior_wiener_integrated(
     tcoeffs_std: C | None = None,
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
+    increase_std_by_eps: bool = True,
 ):
     """Construct an repeatedly-integrated Wiener process.
 
@@ -955,8 +956,9 @@ def prior_wiener_integrated(
     # Increase the Taylor coefficient STD by a machine epsilon
     # because the solver initialisation carries out an update
     # and if the inputs are fully certain, this update yields NaNs.
-    eps = np.finfo_eps(output_scale.dtype)
-    tcoeffs_std = tree.tree_map(lambda s: s + eps, tcoeffs_std)
+    if increase_std_by_eps:
+        eps = np.finfo_eps(output_scale.dtype)
+        tcoeffs_std = tree.tree_map(lambda s: s + eps, tcoeffs_std)
 
     # Return the target
     marginal = ssm.normal.from_tcoeffs(tcoeffs, tcoeffs_std)
@@ -974,10 +976,15 @@ def prior_wiener_integrated_discrete(
     tcoeffs_std: C | None = None,
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
+    increase_std_by_eps: bool = True,
 ):
     """Compute a time-discretization of an integrated Wiener process."""
     init, discretize, ssm = prior_wiener_integrated(
-        tcoeffs, tcoeffs_std=tcoeffs_std, ssm_fact=ssm_fact, output_scale=output_scale
+        tcoeffs,
+        tcoeffs_std=tcoeffs_std,
+        ssm_fact=ssm_fact,
+        output_scale=output_scale,
+        increase_std_by_eps=increase_std_by_eps,
     )
     scales = np.ones_like(ssm.prototypes.output_scale())
     discretize_vmap = func.vmap(discretize, in_axes=(0, None))
