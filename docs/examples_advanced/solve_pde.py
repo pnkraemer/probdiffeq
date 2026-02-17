@@ -25,9 +25,10 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import ivpsolve, probdiffeq
 
-jax.config.update("jax_enable_x64", True)
+# Fail this notebook on NaN detection (to catch those in the CI)
+jax.config.update("jax_debug_nans", True)
 
 
 def main():
@@ -35,22 +36,21 @@ def main():
     key = jax.random.PRNGKey(1)
     f, (u0,), (t0, t1) = fhn_2d(key, num=40, t1=10.0)
 
-    @jax.jit
-    def vf(y, *, t):  # noqa: ARG001
+    def vf(y, /, *, t):  # noqa: ARG001
         """Evaluate the dynamics of the PDE."""
         return f(y)
 
     print("Problem dimension:", u0.size)
 
     # Set up a state-space model
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
+    tcoeffs = [u0, vf(u0, t=t0)]
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
 
     # Build a solver
-    ts = probdiffeq.constraint_ode_ts1(ssm=ssm)
+    ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_dynamic(
-        vf, ssm=ssm, strategy=strategy, prior=ibm, constraint=ts
+        ssm=ssm, strategy=strategy, prior=ibm, constraint=ts
     )
     errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 

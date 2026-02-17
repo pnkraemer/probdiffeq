@@ -34,6 +34,9 @@ import tqdm
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
 
+# Fail this notebook on NaN detection (to catch those in the CI)
+jax.config.update("jax_debug_nans", True)
+
 
 def main(start=3.0, stop=11.0, step=1.0, repeats=2, use_diffrax: bool = False):
     """Run the script."""

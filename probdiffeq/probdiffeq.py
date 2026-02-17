@@ -433,26 +433,25 @@ def _verify_vector_field_signature_and_parse_order(vf) -> int:
 
     More precisely, the dynamics are expected to look like
 
-    - f(u, /, * t),
-    - f(u, du, /, *, t),
-    - f(u, du, ddu /, *, t),
-    - f(u, du, dddu, /, *, t),
+      - f(u, /, * t),
+      - f(u, du, /, *, t),
+      - f(u, du, ddu /, *, t),
 
-    where the number of **positional-only** arguments
-    specifies the order of the problem.
+    and so on, where the number of **positional-only** arguments
+    specifies the order of the problem. (Mind the positional-only
+    and keyword-only arguments in the signatures above.)
 
-    However, the arguments
+    That said, the arguments
 
     {[(p.name, p.kind) for p in params]}
 
-    have been detected.
+    have been detected in the dynamics function.
 
     Try wrapping the vector field through a pure Python function
     with the correct arguments before passing it to the ODE constraint.
 
-    Careful:
-    - No *args or **kwargs
-    - No functools.partial
+      - No *args or **kwargs
+      - No functools.partial
 
     """
 

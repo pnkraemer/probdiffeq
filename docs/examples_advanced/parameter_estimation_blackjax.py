@@ -134,6 +134,10 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
 
+# Fail this notebook on NaN detection (to catch those in the CI)
+jax.config.update("jax_debug_nans", True)
+
+
 # +
 
 # IVP examples in JAX
@@ -153,7 +157,7 @@ f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
 
 @jax.jit
-def vf(y, *, t):  # noqa: ARG001
+def vf(y, /, *, t):  # noqa: ARG001
     """Evaluate the Lotka-Volterra vector field."""
     return f(y, *f_args)
 
@@ -180,9 +184,9 @@ tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta_guess,), num=2
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=10.0, ssm_fact="isotropic"
 )
-ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
+ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
-solver = probdiffeq.solver(vf, strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
+solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
 
 
 @jax.jit

@@ -25,6 +25,9 @@ import optax
 
 from probdiffeq import ivpsolve, probdiffeq
 
+# Fail this notebook on NaN detection (to catch those in the CI)
+jax.config.update("jax_debug_nans", True)
+
 
 def main(num_data=100, epochs=500, print_every=50, hidden=(20,), lr=0.2):
     """Train a neural ODE using diffusion tempering."""

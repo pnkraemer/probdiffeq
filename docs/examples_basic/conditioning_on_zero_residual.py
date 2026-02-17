@@ -34,6 +34,11 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
+
+# Fail this notebook on NaN detection (to catch those in the CI)
+jax.config.update("jax_debug_nans", True)
+
+
 # -
 
 # Create an ODE problem.

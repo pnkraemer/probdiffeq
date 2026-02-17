@@ -36,6 +36,10 @@ from probdiffeq import ivpsolve, probdiffeq
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
+# Fail this notebook on NaN detection (to catch those in the CI)
+jax.config.update("jax_debug_nans", True)
+
+
 # -
 
 
@@ -64,15 +68,13 @@ def solve(p):
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, output_scale=10.0, ssm_fact="isotropic"
     )
-    ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
+
+    def vf_p(y, /, *, t):
+        return vf(y, t=t, p=p)
+
+    ts0 = probdiffeq.constraint_ode_ts0(vf_p, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-    solver = probdiffeq.solver(
-        jax.jit(lambda y, t: vf(y, t, p=p)),
-        strategy=strategy,
-        prior=ibm,
-        constraint=ts0,
-        ssm=ssm,
-    )
+    solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
     return solve(init, grid=ts)
 
