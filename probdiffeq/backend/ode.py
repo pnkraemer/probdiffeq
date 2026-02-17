@@ -26,7 +26,7 @@ def ivp_lotka_volterra():
 
     # Dictionary to ensure pytree compatibility
     @jax.jit
-    def vf(x, /, *, t):  # noqa: ARG001
+    def vf(x, *, t):  # noqa: ARG001
         return {"u": f(x["u"], *f_args)}
 
     return vf, ({"u": u0},), (t0, t1)

@@ -426,21 +426,31 @@ def _verify_vector_field_signature_and_parse_order(vf) -> int:
     sig = inspect.signature(vf)
     params = list(sig.parameters.values())
 
-    # Collect positional-only state arguments
-    # TODO: should we allow positional-or-keyword arguments?
-    state_args = [p for p in params if p.kind in (inspect.Parameter.POSITIONAL_ONLY,)]
+    POSITIONAL = (
+        inspect.Parameter.POSITIONAL_ONLY,
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+    )
+    KEYWORD = (inspect.Parameter.KEYWORD_ONLY,)
+
+    def is_positional(p):
+        return p.kind in POSITIONAL
+
+    def is_keyword(p):
+        return p.kind in KEYWORD
+
+    state_args = [p for p in params if is_positional(p)]
 
     msg = f"""The dynamics' signature is not compatible with the constraint.
 
     More precisely, the dynamics are expected to look like
 
-      - f(u, /, *,  t),
-      - f(u, du, /, *, t),
-      - f(u, du, ddu /, *, t),
+      - f(u, *, t),
+      - f(u, du, *, t),
+      - f(u, du, ddu *, t),
 
-    and so on, where the number of **positional-only** arguments
-    specifies the order of the problem. (Mind the positional-only
-    and keyword-only arguments in the signatures above.)
+    and so on, where the number of positional arguments
+    specifies the order of the problem.
+    (Mind the keyword-only argument 't' in the signatures above.)
 
     That said, the arguments
 
@@ -456,15 +466,11 @@ def _verify_vector_field_signature_and_parse_order(vf) -> int:
 
     """
 
-    # Check for keyword-only 't' (and no other keyword-args)
-    contains_kw_t = any(
-        p.kind == inspect.Parameter.KEYWORD_ONLY and p.name == "t" for p in params
-    )
-    contains_other_kw = any(
-        p.kind == inspect.Parameter.KEYWORD_ONLY and p.name != "t" for p in params
-    )
+    contains_no_positional = len(state_args) == 0
+    t_is_not_keyword = not any(is_keyword(p) and p.name == "t" for p in params)
+    contains_keyword_other_than_t = any(is_keyword(p) and p.name != "t" for p in params)
 
-    if not state_args or not contains_kw_t or contains_other_kw:
+    if contains_no_positional or t_is_not_keyword or contains_keyword_other_than_t:
         raise TypeError(msg)
 
     return len(state_args)
