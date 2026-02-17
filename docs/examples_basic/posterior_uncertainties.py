@@ -29,9 +29,12 @@ import matplotlib.pyplot as plt
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
 
+# Fail this notebook on NaN detection (to catch those in the CI)
+jax.config.update("jax_debug_nans", True)
+
 
 @jax.jit
-def vf(y, *, t):  # noqa: ARG001
+def vf(y, /, *, t):  # noqa: ARG001
     """Evaluate the Lotka-Volterra vector field."""
     y0, y1 = y[0], y[1]
 
@@ -58,10 +61,10 @@ u0 = jnp.asarray([20.0, 20.0])
 
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
-ts = probdiffeq.constraint_ode_ts1(ssm=ssm)
+ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 
-solver = probdiffeq.solver_mle(vf, strategy=strategy, prior=ibm, constraint=ts, ssm=ssm)
+solver = probdiffeq.solver_mle(strategy=strategy, prior=ibm, constraint=ts, ssm=ssm)
 errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
 

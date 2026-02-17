@@ -13,9 +13,9 @@ def test_output_matches_reference(fact):
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     init, iwp, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    constraint = probdiffeq.constraint_ode_ts0(ssm=ssm)
+    constraint = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     solver = probdiffeq.solver_dynamic(
-        vf, strategy=strategy, prior=iwp, constraint=constraint, ssm=ssm
+        strategy=strategy, prior=iwp, constraint=constraint, ssm=ssm
     )
     errorest = probdiffeq.errorest_local_residual_cached(prior=iwp, ssm=ssm)
 

@@ -28,7 +28,7 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 
 
 @jax.jit
-def vf(y, *, t):  # noqa: ARG001
+def vf(y, /, *, t):  # noqa: ARG001
     """Evaluate the dynamics of the logistic ODE."""
     return 2 * y * (1 - y)
 
@@ -43,9 +43,9 @@ init, iwp, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
 
 
 # Build a solver
-ts = probdiffeq.constraint_ode_ts1(ssm=ssm, ode_order=1)
+ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
-solver = probdiffeq.solver_mle(vf, ssm=ssm, strategy=strategy, prior=iwp, constraint=ts)
+solver = probdiffeq.solver_mle(ssm=ssm, strategy=strategy, prior=iwp, constraint=ts)
 errorest = probdiffeq.errorest_local_residual_cached(prior=iwp, ssm=ssm)
 
 

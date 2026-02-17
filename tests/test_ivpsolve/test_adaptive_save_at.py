@@ -4,6 +4,11 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 from probdiffeq.backend import func, np, ode, testing, tree
 
 
+@testing.fixture(name="ivp")
+def ivp_lotka_volterra():
+    return ode.ivp_lotka_volterra()
+
+
 @testing.case
 def case_strategy_filter():
     return probdiffeq.strategy_filter
@@ -59,19 +64,20 @@ def case_constraint_ode_ts1_hutchinson_rev():
 
 
 @testing.case
-def case_constraint_root_ts1():
+def case_constraint_root_ts1(ivp):
+    vf, _u0, (_t0, _t1) = ivp
+
     jacobian = probdiffeq.jacobian_materialize()
 
-    def root(vf, u, du):
-        return tree.tree_map(lambda a, b: a - b, du, vf(u))
+    def root(u, du, /, *, t):
+        return tree.tree_map(lambda a, b: a - b, du, vf(u, t=t))
 
-    constraint_fn = func.partial(
-        probdiffeq.constraint_root_ts1, root, jacobian=jacobian
-    )
+    constraint_fn = func.partial(probdiffeq.constraint_root_ts1, jacobian=jacobian)
 
-    def constraint(*args, **kwargs):
+    def constraint(vf, **kwargs):
         try:
-            return constraint_fn(*args, **kwargs)
+            del vf  # no vector fields, we use the root instead
+            return constraint_fn(root, **kwargs)
         except NotImplementedError:
             reason = "This linearisation is not implemented"
             reason += ", likely due to the selected state-space factorisation."
@@ -108,8 +114,7 @@ def case_constraint_ode_slr1():
 
 @testing.case
 def case_errorest_local_residual_cached():
-    def residual_wrapper(vector_field, constraint, **kw):
-        del vector_field
+    def residual_wrapper(constraint, **kw):
         del constraint
         return probdiffeq.errorest_local_residual_cached(**kw)
 
@@ -127,21 +132,19 @@ def case_errorest_local_residual():
 @testing.parametrize_with_cases("constraint_factory", ".", prefix="case_constraint_")
 @testing.parametrize_with_cases("errorest_factory", ".", prefix="case_errorest_")
 def test_output_matches_reference(
-    fact, solver_factory, constraint_factory, strategy_factory, errorest_factory
+    ivp, fact, solver_factory, constraint_factory, strategy_factory, errorest_factory
 ):
-    vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
+    vf, u0, (t0, t1) = ivp
 
     # Build a solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     init, iwp, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
     strategy = strategy_factory(ssm=ssm)
-    constraint = constraint_factory(ssm=ssm)
+    constraint = constraint_factory(vf, ssm=ssm)
     solver = solver_factory(
-        vf, strategy=strategy, prior=iwp, constraint=constraint, ssm=ssm
+        strategy=strategy, prior=iwp, constraint=constraint, ssm=ssm
     )
-    errorest = errorest_factory(
-        prior=iwp, ssm=ssm, vector_field=vf, constraint=constraint
-    )
+    errorest = errorest_factory(prior=iwp, ssm=ssm, constraint=constraint)
 
     # Compute the PN solution
     save_at = np.linspace(t0, t1, endpoint=True, num=7)

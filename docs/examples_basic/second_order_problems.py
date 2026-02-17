@@ -30,6 +30,10 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
 
+# Fail this notebook on NaN detection (to catch those in the CI)
+jax.config.update("jax_debug_nans", True)
+
+
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
@@ -42,19 +46,21 @@ f, u0, (t0, t1), f_args = ivps.three_body_restricted_first_order()
 
 
 @jax.jit
-def vf_1(y, t):  # noqa: ARG001
+def vf_1(y, /, *, t):
     """Evaluate the three-body problem as a first-order IVP."""
+    del t
     return f(y, *f_args)
 
 
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
+
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="isotropic"
 )
-ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
+ts0 = probdiffeq.constraint_ode_ts0(vf_1, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
 solver_1st = probdiffeq.solver_mle(
-    vf_1, strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
+    strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
 )
 errorest_1st = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 
@@ -67,8 +73,6 @@ errorest_1st = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 save_at = jnp.linspace(t0, t1, endpoint=True, num=250)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, errorest=errorest_1st)
 solution = jax.jit(solve)(init, save_at=save_at, atol=1e-5, rtol=1e-5)
-norm = jnp.linalg.norm((solution.u.mean[0][-1] - u0) / jnp.abs(1.0 + u0))
-plt.title(f"error={norm:.3f}")
 plt.plot(solution.u.mean[0][:, 0], solution.u.mean[0][:, 1], marker=".")
 plt.show()
 
@@ -83,20 +87,22 @@ f, (u0, du0), (t0, t1), f_args = ivps.three_body_restricted()
 
 
 @jax.jit
-def vf_2(y, dy, t):  # noqa: ARG001
+def vf_2(y, dy, /, *, t):
     """Evaluate the three-body problem as a second-order IVP."""
+    del t
     return f(y, dy, *f_args)
 
 
-# One derivative more than above because we don't transform to first order
+# Different derivative count because we don't transform to first order
+# The goal is to match the number of tracked taylor coefficients.
 tcoeffs = taylor.odejet_padded_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="isotropic"
 )
-ts0 = probdiffeq.constraint_ode_ts0(ode_order=2, ssm=ssm)
+ts0 = probdiffeq.constraint_ode_ts0(vf_2, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
 solver_2nd = probdiffeq.solver_mle(
-    vf_2, strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
+    strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
 )
 errorest_2nd = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 
@@ -109,8 +115,6 @@ errorest_2nd = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, errorest=errorest_2nd)
 solution = jax.jit(solve)(init, save_at=save_at, atol=1e-5, rtol=1e-5)
 
-norm = jnp.linalg.norm((solution.u.mean[0][-1, ...] - u0) / jnp.abs(1.0 + u0))
-plt.title(f"error={norm:.3f}")
 plt.plot(solution.u.mean[0][:, 0], solution.u.mean[0][:, 1], marker=".")
 plt.show()
 
@@ -118,7 +122,3 @@ plt.show()
 
 
 # The results are indistinguishable from the plot.
-# While the runtimes of both solvers are similar,
-# the error of the second-order solver is much lower.
-#
-# See the benchmarks for more quantitative versions of this statement.

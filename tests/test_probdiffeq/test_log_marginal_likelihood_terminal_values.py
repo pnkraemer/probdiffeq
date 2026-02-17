@@ -1,7 +1,7 @@
 """Tests for marginal log likelihood functionality (terminal values)."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import np, ode, testing, tree
+from probdiffeq.backend import func, np, ode, testing, tree
 
 
 @testing.case()
@@ -27,14 +27,12 @@ def fixture_solution(strategy_func, fact):
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
-    ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
+    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = strategy_func(ssm=ssm)
-    solver = probdiffeq.solver(
-        vf, strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
-    )
+    solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
     errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, errorest=errorest)
-    sol = solve(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2)
+    sol = func.jit(solve)(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2)
     return sol, strategy
 
 
@@ -48,7 +46,7 @@ def test_output_is_scalar_and_not_inf_and_not_nan(solution):
     data = tree.tree_map(lambda s: s + 0.005, sol.u.mean[0])
     std = tree.tree_map(lambda _s: 1e-2 * np.ones(()), sol.u.std[0])
 
-    mll = strategy.log_marginal_likelihood_terminal_values(
+    mll = func.jit(strategy.log_marginal_likelihood_terminal_values)(
         data, standard_deviation=std, posterior=sol.solution_full
     )
 

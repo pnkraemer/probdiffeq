@@ -1,7 +1,7 @@
 """Tests for log-marginal-likelihood functionality."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import np, ode, testing, tree
+from probdiffeq.backend import func, np, ode, testing, tree
 
 
 @testing.fixture(name="solution")
@@ -12,17 +12,15 @@ def fixture_solution(fact):
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
 
-    ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
+    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 
-    solver = probdiffeq.solver(
-        vf, strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
-    )
+    solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
     errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 
     save_at = np.linspace(t0, t1, endpoint=True, num=4)
     solve = ivpsolve.solve_adaptive_save_at(errorest=errorest, solver=solver)
-    sol = solve(init, save_at=save_at, atol=1e-2, rtol=1e-2)
+    sol = func.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
     return sol, strategy
 
 
@@ -30,7 +28,7 @@ def test_output_is_a_scalar_and_not_nan_and_not_inf(solution):
     sol, strategy = solution
     data = tree.tree_map(lambda s: s + 0.005, sol.u.mean[0])
     std = tree.tree_map(lambda _s: np.ones_like(sol.t), sol.u.std[0])
-    lml = strategy.log_marginal_likelihood(
+    lml = func.jit(strategy.log_marginal_likelihood)(
         data, standard_deviation=std, posterior=sol.solution_full
     )
     assert lml.shape == ()
@@ -78,11 +76,9 @@ def test_raises_error_for_filter(fact):
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
 
-    ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
+    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
-    solver = probdiffeq.solver(
-        vf, strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
-    )
+    solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
 
     grid = np.linspace(t0, t1, num=3)
     solve = ivpsolve.solve_fixed_grid(solver=solver)

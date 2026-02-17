@@ -3,7 +3,17 @@
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import flow, func, linalg, np, random, special, structs, tree
+from probdiffeq.backend import (
+    flow,
+    func,
+    inspect,
+    linalg,
+    np,
+    random,
+    special,
+    structs,
+    tree,
+)
 from probdiffeq.backend.typing import (
     Any,
     Array,
@@ -334,16 +344,17 @@ class Constraint(Protocol):
     """Linearize the constraint."""
 
 
-def constraint_ode_ts0(ssm, ode_order=1):
+def constraint_ode_ts0(vf, /, *, ssm):
     """Create an ODE constraint with zeroth-order Taylor linearisation.
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
-    return ssm.linearize.ode_taylor_0th(ode_order=ode_order)
+    ode_order = _verify_vector_field_signature_and_parse_order(vf)
+    return ssm.linearize.ode_taylor_0th(vf, ode_order=ode_order)
 
 
-def constraint_root_ts1(root, *, ssm, jacobian=None, ode_order=1):
+def constraint_root_ts1(root, /, *, ssm, jacobian=None):
     """Construct a constraint based on a custom root.
 
     See the custom information operator tutorial for details.
@@ -351,41 +362,119 @@ def constraint_root_ts1(root, *, ssm, jacobian=None, ode_order=1):
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
+    root_order = _verify_vector_field_signature_and_parse_order(root)
+
     if jacobian is None:
         # Use hutchinson Jacobian handling for backward compatibility.
         jacobian = jacobian_hutchinson_fwd()
-    return ssm.linearize.root_taylor_1st(root, ode_order=ode_order, jacobian=jacobian)
+    return ssm.linearize.root_taylor_1st(root, root_order=root_order, jacobian=jacobian)
 
 
-def constraint_ode_ts1(*, ssm, jacobian: JacobianHandler | None = None, ode_order=1):
+def constraint_ode_ts1(vf, /, *, ssm, jacobian: JacobianHandler | None = None):
     """Create an ODE constraint with first-order Taylor linearisation.
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
+
+    The ODE vector field is assumed to be one of f(u, *, t), f(u, du, *, t), etc.
+    The order of the ODE is read off the number of positional arguments before t.
+    That is, for first-order ODEs, pass f(u, *, t),
+    for second order ODEs, pass f(u, du, *, t),
+    for third-order ODEs f(u, du, ddu, *, t), and so on.
+
     """
+    ode_order = _verify_vector_field_signature_and_parse_order(vf)
     if jacobian is None:
         # Use hutchinson Jacobian handling for backward compatibility.
         jacobian = jacobian_hutchinson_fwd()
-    return ssm.linearize.ode_taylor_1st(ode_order=ode_order, jacobian=jacobian)
+    return ssm.linearize.ode_taylor_1st(vf, ode_order=ode_order, jacobian=jacobian)
 
 
-def constraint_ode_slr0(*, ssm, cubature_fun=cubature_third_order_spherical):
+def constraint_ode_slr0(vf, /, *, ssm, cubature_fun=cubature_third_order_spherical):
     """Create an ODE constraint with zeroth-order statistical linear regression.
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
-    return ssm.linearize.ode_statistical_0th(cubature_fun)
+    ode_order = _verify_vector_field_signature_and_parse_order(vf)
+    if ode_order > 1:
+        msg = "SLR0 constraints cannot handle higher-order ODEs as of now."
+        msg += " However, ode_order={ode_order} has been detected."
+        msg += " Try a Taylor-series-based constraint instead."
+        raise ValueError(msg)
+    return ssm.linearize.ode_statistical_0th(vf, cubature_fun=cubature_fun)
 
 
-def constraint_ode_slr1(*, ssm, cubature_fun=cubature_third_order_spherical):
+def constraint_ode_slr1(vf, *, ssm, cubature_fun=cubature_third_order_spherical):
     """Create an ODE constraint with first-order statistical linear regression.
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
 
     """
-    return ssm.linearize.ode_statistical_1st(cubature_fun)
+    ode_order = _verify_vector_field_signature_and_parse_order(vf)
+    if ode_order > 1:
+        msg = "SLR1 constraints cannot handle higher-order ODEs as of now."
+        msg += " However, ode_order={ode_order} has been detected."
+        msg += " Try a Taylor-series-based constraint instead."
+        raise ValueError(msg)
+    return ssm.linearize.ode_statistical_1st(vf, cubature_fun=cubature_fun)
+
+
+def _verify_vector_field_signature_and_parse_order(vf) -> int:
+    """Parse the vector-field structure from its signature."""
+    sig = inspect.signature(vf)
+    params = list(sig.parameters.values())
+
+    POSITIONAL = (
+        inspect.Parameter.POSITIONAL_ONLY,
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+    )
+    KEYWORD = (inspect.Parameter.KEYWORD_ONLY,)
+
+    def is_positional(p):
+        return p.kind in POSITIONAL
+
+    def is_keyword(p):
+        return p.kind in KEYWORD
+
+    state_args = [p for p in params if is_positional(p)]
+
+    msg = f"""The dynamics' signature is not compatible with the constraint.
+
+    More precisely, the dynamics are expected to look like
+
+      - f(u, /, *, t),
+      - f(u, du, /, *, t),
+      - f(u, du, ddu, /, *, t),
+
+    and so on, where the number of positional arguments
+    specifies the order of the problem.
+    Replace `u`, `du`, and so on with any variable name of your choosing
+    but mind the keyword-only argument 't' in the signatures above.
+
+    That said, the arguments
+
+    {[(p.name, p.kind) for p in params]}
+
+    have been detected in the dynamics function.
+
+    Try wrapping the vector field through a pure Python function
+    with the correct arguments before passing it to the ODE constraint.
+
+      - No *args or **kwargs
+      - No functools.partial
+
+    """
+
+    contains_no_positional = len(state_args) == 0
+    t_is_not_keyword = not any(is_keyword(p) and p.name == "t" for p in params)
+    contains_keyword_other_than_t = any(is_keyword(p) and p.name != "t" for p in params)
+
+    if contains_no_positional or t_is_not_keyword or contains_keyword_other_than_t:
+        raise TypeError(msg)
+
+    return len(state_args)
 
 
 @tree.register_dataclass
@@ -709,14 +798,12 @@ class ProbabilisticSolver:
 
     def __init__(
         self,
-        vector_field: VectorField,
         *,
         strategy: MarkovStrategy,
         prior: Callable,
         constraint: Constraint,
         ssm: Any,
     ):
-        self.vector_field = vector_field
         self.ssm = ssm
         self.strategy = strategy
         self.prior = prior
@@ -928,7 +1015,7 @@ def prior_wiener_integrated(
     tcoeffs_std: C | None = None,
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
-    increase_std_by_eps: bool = True,
+    increase_std_by_eps: bool = False,
 ):
     """Construct an repeatedly-integrated Wiener process.
 
@@ -976,7 +1063,7 @@ def prior_wiener_integrated_discrete(
     tcoeffs_std: C | None = None,
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
-    increase_std_by_eps: bool = True,
+    increase_std_by_eps: bool = False,
 ):
     """Compute a time-discretization of an integrated Wiener process."""
     init, discretize, ssm = prior_wiener_integrated(
@@ -1501,50 +1588,46 @@ class solver_mle(ProbabilisticSolver):
 
     def __init__(
         self,
-        vector_field: VectorField,
         *,
         constraint: Constraint,
         prior: Callable,
         ssm: Any,
         strategy: MarkovStrategy,
-        increase_init_damp_by_eps: bool = True,
+        update_at_init: bool = False,
     ):
-        super().__init__(
-            vector_field, strategy=strategy, ssm=ssm, prior=prior, constraint=constraint
-        )
-        self.increase_init_damp_by_eps = increase_init_damp_by_eps
+        super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
+        self.update_at_init = update_at_init
 
     def init(self, t, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
-        estimate, prediction = self.strategy.init_posterior(u=u)
+        u, prediction = self.strategy.init_posterior(u=u)
         correction_state = self.constraint.init_linearization()
 
         output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale())
 
-        # Increase the damping by machine epsilon because often,
-        # the initial taylor coefficients have zero standard deviation
-        # in which case the correction below would yield NaNs.
-        if self.increase_init_damp_by_eps:
-            damp = np.asarray(damp)
-            damp = damp + np.finfo_eps(damp.dtype)
-
         # Update
-        f_wrapped = func.partial(self.vector_field, t=t)
         fx, correction_state = self.constraint.linearize(
-            f_wrapped, estimate.marginals, correction_state, damp=damp
+            u.marginals, correction_state, damp=damp, t=t
         )
-        observed, reverted = self.ssm.conditional.revert(u.marginals, fx)
-        updates = reverted.noise
-        u, posterior = self.strategy.apply_updates(
-            prediction=prediction, updates=updates
-        )
+        if self.update_at_init:
+            observed, reverted = self.ssm.conditional.revert(u.marginals, fx)
+            updates = reverted.noise
+            u, posterior = self.strategy.apply_updates(
+                prediction=prediction, updates=updates
+            )
+            # Calibrate the output scale
+            output_scale_running = self.ssm.stats.mahalanobis_norm_relative(
+                0.0, observed
+            )
+            auxiliary = (correction_state, output_scale_running, 1)
+        else:
+            fx = tree.tree_map(np.zeros_like, fx)
+            posterior = prediction
+            output_scale_running = np.zeros_like(output_scale_prior)
+            auxiliary = (correction_state, output_scale_running, 0)
 
-        # Calibrate the output scale
-        output_scale_running = self.ssm.stats.mahalanobis_norm_relative(0.0, observed)
-
-        auxiliary = (correction_state, output_scale_running, 1)
         return ProbabilisticSolution(
             t=t,
-            u=estimate,
+            u=u,
             solution_full=posterior,
             auxiliary=auxiliary,
             output_scale=output_scale_prior,
@@ -1564,9 +1647,8 @@ class solver_mle(ProbabilisticSolver):
 
         # Linearize
         (lin_state, output_scale_running, num_data) = state.auxiliary
-        f_wrapped = func.partial(self.vector_field, t=state.t + dt)
         fx, correction_state = self.constraint.linearize(
-            f_wrapped, u.marginals, state=lin_state, damp=damp
+            u.marginals, state=lin_state, damp=damp, t=state.t + dt
         )
 
         # Do the full correction step
@@ -1632,20 +1714,17 @@ class solver_dynamic(ProbabilisticSolver):
 
     def __init__(
         self,
-        vector_field: VectorField,
         *,
         strategy: MarkovStrategy,
         prior: Callable,
         constraint: Constraint,
         ssm: Any,
         re_linearize_after_calibration=False,
-        increase_init_damp_by_eps: bool = True,
+        update_at_init: bool = False,
     ):
-        super().__init__(
-            vector_field, strategy=strategy, ssm=ssm, prior=prior, constraint=constraint
-        )
+        super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
         self.re_linearize_after_calibration = re_linearize_after_calibration
-        self.increase_init_damp_by_eps = increase_init_damp_by_eps
+        self.update_at_init = update_at_init
 
     def init(self, t, u, *, damp) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
@@ -1653,21 +1732,18 @@ class solver_dynamic(ProbabilisticSolver):
 
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
 
-        # Increase the damping by machine epsilon because often,
-        # the initial taylor coefficients have zero standard deviation
-        # in which case the correction below would yield NaNs.
-        if self.increase_init_damp_by_eps:
-            damp = np.asarray(damp)
-            damp = damp + np.finfo_eps(damp.dtype)
-
-        f_wrapped = func.partial(self.vector_field, t=t)
         fx, lin_state = self.constraint.linearize(
-            f_wrapped, u.marginals, lin_state, damp=damp
+            u.marginals, lin_state, damp=damp, t=t
         )
-
-        _, reverted = self.ssm.conditional.revert(u.marginals, fx)
-        updates = reverted.noise
-        u, posterior = self.strategy.apply_updates(prediction, updates=updates)
+        # TODO: avoid the linearization altogether if update is false.
+        #  use jax.eval_shape instead.
+        if self.update_at_init:
+            _, reverted = self.ssm.conditional.revert(u.marginals, fx)
+            updates = reverted.noise
+            u, posterior = self.strategy.apply_updates(prediction, updates=updates)
+        else:
+            fx = tree.tree_map(np.zeros_like, fx)
+            posterior = prediction
 
         return ProbabilisticSolution(
             t=t,
@@ -1689,9 +1765,9 @@ class solver_dynamic(ProbabilisticSolver):
         u = self.ssm.conditional.apply(mean, transition)
 
         # Linearize
-        f_wrapped = func.partial(self.vector_field, t=state.t + dt)
+
         fx, lin_state = self.constraint.linearize(
-            f_wrapped, u, state=lin_state, damp=damp
+            u, state=lin_state, damp=damp, t=state.t + dt
         )
         observed = self.ssm.conditional.marginalise(u, fx)
         output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
@@ -1706,7 +1782,7 @@ class solver_dynamic(ProbabilisticSolver):
         # Relinearize
         if self.re_linearize_after_calibration:
             fx, lin_state = self.constraint.linearize(
-                f_wrapped, u.marginals, state=lin_state, damp=damp
+                u.marginals, state=lin_state, damp=damp, t=state.t + dt
             )
 
         # Complete the update
@@ -1772,38 +1848,31 @@ class solver(ProbabilisticSolver):
 
     def __init__(
         self,
-        vector_field: VectorField,
         *,
         constraint: Constraint,
         prior: Callable,
         ssm: Any,
         strategy: MarkovStrategy,
-        increase_init_damp_by_eps: bool = True,
+        update_at_init: bool = False,
     ):
-        super().__init__(
-            vector_field, strategy=strategy, ssm=ssm, prior=prior, constraint=constraint
-        )
-        self.increase_init_damp_by_eps = increase_init_damp_by_eps
+        super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
+        self.update_at_init = update_at_init
 
     def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
 
         correction_state = self.constraint.init_linearization()
-
-        # Increase the damping by machine epsilon because often,
-        # the initial taylor coefficients have zero standard deviation
-        # in which case the correction below would yield NaNs.
-        if self.increase_init_damp_by_eps:
-            damp = np.asarray(damp)
-            damp = damp + np.finfo_eps(damp.dtype)
-
-        f_wrapped = func.partial(self.vector_field, t=t)
         fx, correction_state = self.constraint.linearize(
-            f_wrapped, rv=u.marginals, state=correction_state, damp=damp
+            rv=u.marginals, state=correction_state, damp=damp, t=t
         )
-        _, reverted = self.ssm.conditional.revert(u.marginals, fx)
-        u, posterior = self.strategy.apply_updates(prediction, updates=reverted.noise)
-
+        if self.update_at_init:
+            _, reverted = self.ssm.conditional.revert(u.marginals, fx)
+            u, posterior = self.strategy.apply_updates(
+                prediction, updates=reverted.noise
+            )
+        else:
+            posterior = prediction
+            fx = tree.tree_map(np.zeros_like, fx)
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
         return ProbabilisticSolution(
             t=t,
@@ -1826,9 +1895,8 @@ class solver(ProbabilisticSolver):
         )
 
         # Linearize
-        f_eval = func.partial(self.vector_field, t=state.t + dt)
         fx, auxiliary = self.constraint.linearize(
-            f_eval, u.marginals, state.auxiliary, damp=damp
+            u.marginals, state.auxiliary, damp=damp, t=state.t + dt
         )
 
         # Update
@@ -2089,7 +2157,6 @@ class errorest_local_residual(ErrorEstimator):
 
     def __init__(
         self,
-        vector_field: Any,
         constraint: Constraint,
         prior: Any,
         ssm: Any,
@@ -2099,7 +2166,6 @@ class errorest_local_residual(ErrorEstimator):
             error_norm = errorest_error_norm_scale_then_rms()
 
         self.error_norm = error_norm
-        self.vector_field = vector_field
         self.constraint = constraint
         self.prior = prior
         self.ssm = ssm
@@ -2147,8 +2213,7 @@ class errorest_local_residual(ErrorEstimator):
         return error_power, state
 
     def _linearize_and_estimate(self, rv, state, /, t, *, damp):
-        f_wrapped = func.partial(self.vector_field, t=t)
-        linearized, state = self.constraint.linearize(f_wrapped, rv, state, damp=damp)
+        linearized, state = self.constraint.linearize(rv, state, damp=damp, t=t)
 
         observed = self.ssm.conditional.marginalise(rv, linearized)
         output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)

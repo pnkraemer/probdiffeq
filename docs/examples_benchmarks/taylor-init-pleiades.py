@@ -30,6 +30,9 @@ import matplotlib.pyplot as plt
 
 from probdiffeq import taylor
 
+# Fail this notebook on NaN detection (to catch those in the CI)
+jax.config.update("jax_debug_nans", True)
+
 
 def main(max_time=0.5, repeats=2):
     """Run the script."""
