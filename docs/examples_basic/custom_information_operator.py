@@ -14,7 +14,9 @@
 
 # # Custom information operators
 #
-# For background information, see:
+# This tutorial extends the demonstration of solving second-order problems directly.
+#
+# For background information on what's presented below, see:
 #
 #   > Bosch, Nathanael, Filip Tronarp, and Philipp Hennig.
 #     "Pick-and-mix information operators for probabilistic ODE solvers."
