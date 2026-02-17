@@ -1,6 +1,6 @@
 # probdiffeq
 
-[![CI](https://github.com/pnkraemer/probdiffeq/workflows/ci/badge.svg?branch=main)](https://github.com/pnkraemer/probdiffeq/actions)
+[![CI](https://github.com/pnkraemer/probdiffeq/workflows/ci/badge.svg)](https://github.com/pnkraemer/probdiffeq/actions)
 [![PyPI version](https://img.shields.io/pypi/v/probdiffeq.svg)](https://pypi.python.org/pypi/probdiffeq)
 [![License](https://img.shields.io/pypi/l/probdiffeq.svg)](https://pypi.python.org/pypi/probdiffeq)
 [![Python versions](https://img.shields.io/pypi/pyversions/probdiffeq.svg)](https://pypi.python.org/pypi/probdiffeq)
