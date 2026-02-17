@@ -65,7 +65,7 @@ def case_constraint_ode_ts1_hutchinson_rev():
 
 @testing.case
 def case_constraint_root_ts1(ivp):
-    vf, u0, (t0, t1) = ivp
+    vf, _u0, (_t0, _t1) = ivp
 
     jacobian = probdiffeq.jacobian_materialize()
 

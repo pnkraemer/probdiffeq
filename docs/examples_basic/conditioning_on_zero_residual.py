@@ -22,6 +22,8 @@
 
 """Demonstrate how probabilistic solvers work via conditioning on constraints."""
 
+import functools
+
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -40,8 +42,9 @@ if not backend.has_been_selected:
 
 
 @jax.jit
-def vector_field(y, t):  # noqa: ARG001
+def vector_field(y, /, *, t):
     """Evaluate the logistic ODE vector field."""
+    del t
     return 10.0 * y * (2.0 - y)
 
 
@@ -78,11 +81,9 @@ markov_seq_tcoeffs, _ssm = probdiffeq.prior_wiener_integrated_discrete(
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="dense"
 )
-ts1 = probdiffeq.constraint_ode_ts1(ssm=ssm)
+ts1 = probdiffeq.constraint_ode_ts1(vector_field, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-solver = probdiffeq.solver(
-    vector_field, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
-)
+solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm)
 errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 
 dt0 = ivpsolve.dt0(lambda y: vector_field(y, t=t0), (u0,))
@@ -126,7 +127,8 @@ sample_style = {"marker": "None", "alpha": 0.99, "linewidth": 0.75}
 
 def residual(x, t):
     """Evaluate the ODE residual."""
-    return x[1] - jax.vmap(jax.vmap(vector_field), in_axes=(0, None))(x[0], t)
+    vf_wrapped = functools.partial(vector_field, t=t)
+    return x[1] - jax.vmap(jax.vmap(vf_wrapped))(x[0])
 
 
 residual_prior = residual(samples_prior, ts)

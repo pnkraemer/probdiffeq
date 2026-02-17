@@ -43,8 +43,9 @@ def fixture_solution(constraint_ode_factory, fact):
         constraint = constraint_ode_factory(vf, ssm=ssm)
 
     except NotImplementedError:
-        reason = "Skipped test since NotImplementedError has been raised. Most likely because"
-        reason += " this combo of linearisation + ssm factorisation isn't available."
+        reason = "Skipped test since NotImplementedError has been raised."
+        reason += " Most likely because this combo of"
+        reason += " linearisation + ssm factorisation isn't available."
         testing.skip(reason=reason)
 
     strategy = probdiffeq.strategy_filter(ssm=ssm)

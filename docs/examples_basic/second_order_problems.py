@@ -42,19 +42,21 @@ f, u0, (t0, t1), f_args = ivps.three_body_restricted_first_order()
 
 
 @jax.jit
-def vf_1(y, t):  # noqa: ARG001
+def vf_1(y, /, *, t):
     """Evaluate the three-body problem as a first-order IVP."""
+    del t
     return f(y, *f_args)
 
 
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
+
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="isotropic"
 )
-ts0 = probdiffeq.constraint_ode_ts0(ssm=ssm)
+ts0 = probdiffeq.constraint_ode_ts0(vf_1, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
 solver_1st = probdiffeq.solver_mle(
-    vf_1, strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
+    strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
 )
 errorest_1st = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 
@@ -83,20 +85,22 @@ f, (u0, du0), (t0, t1), f_args = ivps.three_body_restricted()
 
 
 @jax.jit
-def vf_2(y, dy, t):  # noqa: ARG001
+def vf_2(y, dy, /, *, t):
     """Evaluate the three-body problem as a second-order IVP."""
+    del t
     return f(y, dy, *f_args)
 
 
 # One derivative more than above because we don't transform to first order
 tcoeffs = taylor.odejet_padded_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
+print(len(tcoeffs))
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="isotropic"
 )
-ts0 = probdiffeq.constraint_ode_ts0(ode_order=2, ssm=ssm)
+ts0 = probdiffeq.constraint_ode_ts0(vf_2, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
 solver_2nd = probdiffeq.solver_mle(
-    vf_2, strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
+    strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
 )
 errorest_2nd = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 

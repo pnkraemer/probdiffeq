@@ -43,7 +43,7 @@ from probdiffeq import ivpsolve, probdiffeq
 
 
 @jax.jit
-def vf_1st(y, *, t):
+def vf_1st(y, /, *, t):
     """Evaluate the harmonic oscillator dynamics."""
     u, du = jnp.split(y, 2)
     return jnp.concatenate([du, vf_2nd(u, du, t=t)])
@@ -90,10 +90,10 @@ zeros, ones = jnp.zeros_like(u0_1st), jnp.ones_like(u0_1st)
 tcoeffs = [u0_1st, zeros, zeros]
 tcoeffs_std = [zeros, ones, ones]
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, tcoeffs_std=tcoeffs_std)
-ts1 = probdiffeq.constraint_ode_ts1(ssm=ssm)
+ts1 = probdiffeq.constraint_ode_ts1(vf_1st, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 solver_1st = probdiffeq.solver_mle(
-    vf_1st, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
+    strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
 )
 errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, errorest=errorest)
@@ -115,9 +115,9 @@ ham_1 = jax.vmap(hamiltonian_1st)(sol_1.u.mean[0])
 # +
 
 
-def root(vf, u, du, ddu):
+def root(u, du, ddu, /, *, t):
     """Evaluate a custom root for the harmonic oscillator."""
-    deriv = ddu - vf(u, du)
+    deriv = ddu - vf_2nd(u, du, t=t)
     hamil = hamiltonian_2nd(u, du) - H0
     return [deriv, hamil]  # any PyTree goes
 
@@ -145,10 +145,10 @@ init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, tcoeffs_std=tcoeffs
 
 # +
 
-ts1 = probdiffeq.constraint_root_ts1(root, ssm=ssm, ode_order=2)
+ts1 = probdiffeq.constraint_root_ts1(root, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 solver_2nd = probdiffeq.solver_mle(
-    vf_2nd, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
+    strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
 )
 
 # -

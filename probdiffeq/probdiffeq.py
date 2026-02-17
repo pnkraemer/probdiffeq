@@ -429,8 +429,8 @@ def _verify_vector_field_signature_and_parse_order(vf) -> int:
     # Collect positional-only state arguments
     state_args = [p for p in params if p.kind in (inspect.Parameter.POSITIONAL_ONLY,)]
 
-    msg = f"""The vector field dynamics do not have a signature compatible with the constraint. 
-    
+    msg = f"""The dynamics' signature is not compatible with the constraint.
+
     More precisely, the dynamics are expected to look like
 
     - f(u, /, * t),
@@ -438,15 +438,15 @@ def _verify_vector_field_signature_and_parse_order(vf) -> int:
     - f(u, du, ddu /, *, t),
     - f(u, du, dddu, /, *, t),
 
-    where the number of positional arguments specifies the order of the problem. 
-    
+    where the number of positional arguments specifies the order of the problem.
+
     However, the arguments
 
     {[(p.name, p.kind) for p in params]}
-    
-    have been detected. 
-    
-    Try wrapping the vector field through a pure Python function 
+
+    have been detected.
+
+    Try wrapping the vector field through a pure Python function
     before passing it to the ODE constraint.
     """
 
@@ -1771,7 +1771,7 @@ class solver_dynamic(ProbabilisticSolver):
         # Relinearize
         if self.re_linearize_after_calibration:
             fx, lin_state = self.constraint.linearize(
-                f_wrapped, u.marginals, state=lin_state, damp=damp
+                u.marginals, state=lin_state, damp=damp, t=state.t + dt
             )
 
         # Complete the update

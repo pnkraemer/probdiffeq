@@ -53,9 +53,10 @@ f, u0, (t0, t1), f_args = ivps.affine_independent(initial_values=(1.0,), a=2.0)
 
 
 @jax.jit
-def vf(*ys, t):  # noqa: ARG001
+def vf(y, /, *, t):
     """Evaluate the affine vector field."""
-    return f(*ys, *f_args)
+    del t
+    return f(y, *f_args)
 
 
 # -
@@ -68,12 +69,12 @@ tcoeffs = (u0, vf(u0, t=t0))
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="dense"
 )
-ts1 = probdiffeq.constraint_ode_ts1(ssm=ssm)
+ts1 = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
 dynamic = probdiffeq.solver_dynamic(
-    vf, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
+    strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
 )
-mle = probdiffeq.solver_mle(vf, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm)
+mle = probdiffeq.solver_mle(strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm)
 
 # -
 
