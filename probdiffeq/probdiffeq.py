@@ -942,6 +942,8 @@ def prior_wiener_integrated(
     if output_scale is None:
         output_scale = np.ones_like(ssm.prototypes.output_scale())
 
+    output_scale = np.asarray(output_scale)
+
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
 
     if tcoeffs_std is None:
@@ -1815,7 +1817,7 @@ class solver(ProbabilisticSolver):
 
 
 def errorest_error_norm_scale_then_rms(*, norm_order=None) -> Callable:
-    """Normalize an error by scaling followed by computing the norm.
+    """Normalize an error by scaling followed by computing the root-mean-square norm.
 
     This is the recommended approach, and there is no reason to choose
     [`errorest_error_norm_rms_then_scale`](#probdiffeq.probdiffeq.errorest_error_norm_rms_then_scale),
@@ -1839,7 +1841,7 @@ def errorest_error_norm_scale_then_rms(*, norm_order=None) -> Callable:
 
 
 def errorest_error_norm_rms_then_scale(norm_order=None) -> Callable:
-    """Normalize an error by computing the norm followed by scaling.
+    """Normalize an error by computing the root-mean-square norm followed by scaling.
 
     Use this for residual-based error estimators in combination
     with custom root constraints.
@@ -1912,6 +1914,7 @@ class errorest_local_residual_cached(ErrorEstimator):
     def __init__(self, prior: Any, ssm: Any, error_norm: Callable | None = None):
         if error_norm is None:
             error_norm = errorest_error_norm_scale_then_rms()
+
         self.error_norm = error_norm
 
         self.prior = prior

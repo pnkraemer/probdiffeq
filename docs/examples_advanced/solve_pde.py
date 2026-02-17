@@ -81,6 +81,11 @@ def main():
     plt.show()
 
 
+# -
+
+# +
+
+
 def simulator(save_at, errorest, solver):
     """Simulate a PDE."""
 
@@ -91,6 +96,11 @@ def simulator(save_at, errorest, solver):
         return (solution.u.mean[0], solution.u.std[0])
 
     return solve
+
+
+# -
+
+# +
 
 
 def fhn_2d(prng_key, *, num, t1, t0=0.0, a=2.8e-4, b=5e-3, k=-0.005, tau=1.0):
@@ -128,5 +138,12 @@ def _laplace_2d(grid, dx):
     return grid[1:-1, 1:-1]
 
 
+# -
+
+# +
+
+
 if __name__ == "__main__":
     main()
+
+# -

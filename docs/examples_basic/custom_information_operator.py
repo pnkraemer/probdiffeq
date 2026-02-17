@@ -123,20 +123,15 @@ def root(vf, u, du, ddu):
 # -
 
 # Set up the custom-root solver.
-
-# +
-
-u0, du0 = jnp.split(u0_1st, 2)
-
-# -
-
-# We don't do high order because high-order initialisation
+#
+# We don't use high orders because high-order initialisation
 # of custom-information-operator solvers is an open problem.
 # But for low-order solvers, custom roots work well.
 
 
 # +
 
+u0, du0 = jnp.split(u0_1st, 2)
 zeros, ones = jnp.zeros_like(u0), jnp.ones_like(u0)
 tcoeffs = [u0, du0, zeros]
 tcoeffs_std = [zeros, zeros, ones]  # avoid NaNs

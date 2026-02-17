@@ -26,8 +26,6 @@ import jax.numpy as jnp
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
 
-# -
-
 
 def solution_routine(while_loop):
     """Construct a parameter-to-solution function and an initial value."""
@@ -64,7 +62,15 @@ def solution_routine(while_loop):
     return simulate, init
 
 
-# This is the default behaviour
+# -
+
+
+# This is the default behaviour.
+
+
+# +
+
+
 solve, x = solution_routine(jax.lax.while_loop)
 
 try:
@@ -72,7 +78,14 @@ try:
 except ValueError as err:
     print(f"Caught error:\n\t {err}")
 
+
+# -
+
+
 # This while-loop makes the solver differentiable
+
+
+# +
 
 
 def while_loop_func(*a, **kw):
@@ -87,3 +100,5 @@ solution, gradient = jax.jit(jax.value_and_grad(solve))(x)
 
 print(solution)
 print(gradient)
+
+# -

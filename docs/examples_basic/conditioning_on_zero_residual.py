@@ -19,6 +19,7 @@
 #
 
 # +
+
 """Demonstrate how probabilistic solvers work via conditioning on constraints."""
 
 import jax
@@ -28,13 +29,14 @@ from diffeqzoo import backend
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
 
-# +
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
+# -
+
+# Create an ODE problem.
 
 # +
-# Create an ODE problem
 
 
 @jax.jit
@@ -46,8 +48,11 @@ def vector_field(y, t):  # noqa: ARG001
 t0, t1 = 0.0, 0.5
 u0 = jnp.asarray([0.1])
 
+# -
+
+# Assemble the discretised prior (with and without the correct Taylor coefficients).
+
 # +
-# Assemble the discretised prior (with and without the correct Taylor coefficients)
 
 NUM_DERIVATIVES = 2
 tcoeffs_mean = [u0] * (NUM_DERIVATIVES + 1)
@@ -64,8 +69,11 @@ markov_seq_tcoeffs, _ssm = probdiffeq.prior_wiener_integrated_discrete(
     ts, tcoeffs, output_scale=100.0, ssm_fact="dense"
 )
 
+# -
+
+# Compute the posterior.
+
 # +
-# Compute the posterior
 
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(
     tcoeffs, output_scale=1.0, ssm_fact="dense"
@@ -82,9 +90,11 @@ solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
 sol = solve(init, save_at=ts, dt0=dt0, atol=1e-1, rtol=1e-1)
 markov_seq_posterior = sol.solution_full
 
+# -
+
+# Compute samples.
 
 # +
-# Compute samples
 
 num_samples = 5
 key = jax.random.PRNGKey(seed=1)
@@ -98,8 +108,11 @@ samples_posterior = strategy.markov_sample(
     key, markov_seq_posterior, shape=(num_samples,), reverse=True
 )
 
+# -
+
+# Plot the results.
+
 # +
-# Plot the results
 
 fig, (axes_state, axes_residual, axes_log_abs) = plt.subplots(
     nrows=3, ncols=3, sharex=True, sharey="row", constrained_layout=True, figsize=(8, 5)
@@ -168,3 +181,5 @@ axes_log_abs[2].set_xlabel("Time $t$")
 # Show the result
 fig.align_ylabels()
 plt.show()
+
+# -

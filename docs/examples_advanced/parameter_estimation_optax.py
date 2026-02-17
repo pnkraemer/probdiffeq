@@ -33,7 +33,6 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, probdiffeq
 
-# +
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
@@ -87,15 +86,20 @@ solution_true = solve(parameter_true)
 data = solution_true.u.mean[0]
 plt.plot(ts, data, "P-")
 plt.show()
+
 # -
 
 # We make an initial guess, but it does not lead to a good data fit:
+
+# +
 
 solution_guess = solve(parameter_guess)
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
 plt.plot(ts, solution_guess.u.mean[0])
 plt.show()
 
+
+# -
 
 # Use the probdiffeq functionality to compute a parameter-to-data fit function.
 #
@@ -123,9 +127,10 @@ sensitivities = jax.jit(jax.grad(parameter_to_data_fit))
 # We can differentiate the function forward- and reverse-mode
 # (the latter is possible because we use fixed steps)
 
+# +
 parameter_to_data_fit(parameter_guess)
 sensitivities(parameter_guess)
-
+# -
 
 # Now, enter optax: build an optimizer,
 # and optimise the parameter-to-model-fit function.
@@ -151,7 +156,11 @@ def build_update_fn(*, optimizer, loss_fn):
 optim = optax.adam(learning_rate=1e-2)
 update_fn = build_update_fn(optimizer=optim, loss_fn=parameter_to_data_fit)
 
+# -
+
 # +
+
+
 p = parameter_guess
 state = optim.init(p)
 
@@ -165,7 +174,11 @@ for i in range(chunk_size):
 
 # The solution looks much better:
 
+# +
+
 solution_better = solve(p)
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
 plt.plot(ts, solution_better.u.mean[0])
 plt.show()
+
+# -

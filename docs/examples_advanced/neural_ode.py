@@ -85,6 +85,11 @@ def main(num_data=100, epochs=500, print_every=50, hidden=(20,), lr=0.2):
     plt.show()
 
 
+# -
+
+# +
+
+
 def vf_neural_ode(*, hidden: tuple, t0: float, t1: float):
     """Build a neural ODE."""
     f_args, mlp = model_mlp(hidden=hidden, shape_in=(2,), shape_out=(1,))
@@ -97,6 +102,11 @@ def vf_neural_ode(*, hidden: tuple, t0: float, t1: float):
         return mlp(p, y_and_t)
 
     return vf, (u0,), (t0, t1), f_args
+
+
+# -
+
+# +
 
 
 def model_mlp(
@@ -131,6 +141,11 @@ def model_mlp(
     key = jax.random.PRNGKey(1)
     p_init = jax.random.normal(key, shape=p_flat.shape, dtype=p_flat.dtype)
     return unravel(p_init), fwd
+
+
+# -
+
+# +
 
 
 def loss_log_marginal_likelihood(vf, *, t0):
@@ -177,6 +192,11 @@ def loss_log_marginal_likelihood(vf, *, t0):
     return loss
 
 
+# -
+
+# +
+
+
 def train_step_optax(optimizer, loss):
     """Implement a training step using Optax."""
 
@@ -192,6 +212,11 @@ def train_step_optax(optimizer, loss):
         return (params, opt_state), info
 
     return update
+
+
+# -
+
+# +
 
 
 if __name__ == "__main__":

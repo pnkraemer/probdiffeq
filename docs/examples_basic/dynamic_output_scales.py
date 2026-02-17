@@ -41,7 +41,6 @@ from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, probdiffeq
 
-# +
 if not backend.has_been_selected:
     backend.select("jax")  # ivp examples in jax
 
@@ -59,7 +58,10 @@ def vf(*ys, t):  # noqa: ARG001
     return f(*ys, *f_args)
 
 
+# -
+
 # +
+
 num_derivatives = 1
 
 tcoeffs = (u0, vf(u0, t=t0))
@@ -73,7 +75,10 @@ dynamic = probdiffeq.solver_dynamic(
 )
 mle = probdiffeq.solver_mle(vf, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm)
 
+# -
+
 # +
+
 t0, t1 = 0.0, 3.0
 num_pts = 200
 
@@ -87,11 +92,15 @@ solution_dynamic = jax.jit(solve_dynamic)(init, grid=ts)
 solve_mle = ivpsolve.solve_fixed_grid(solver=mle)
 solution_mle = jax.jit(solve_mle)(init, grid=ts)
 
+
 # -
+
 
 # Plot the solution.
 
+
 # +
+
 fig, (axes_linear, axes_log) = plt.subplots(ncols=2, nrows=2, sharex=True, sharey="row")
 
 
@@ -146,6 +155,7 @@ axes_log[0].set_xlim((t0, t1))
 
 fig.align_ylabels()
 plt.show()
+
 # -
 
 # The dynamic solver adapts the output-scale so

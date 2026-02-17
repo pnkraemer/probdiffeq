@@ -162,7 +162,11 @@ theta_true = u0 + 0.5 * jnp.flip(u0)
 theta_guess = u0  # initial guess
 
 
+# -
+
 # +
+
+
 def plot_solution(t, u, *, ax, marker=".", **plotting_kwargs):
     """Plot the IVP solution."""
     for d in [0, 1]:
@@ -205,8 +209,14 @@ def solve_adaptive(theta, *, save_at):
 save_at = jnp.linspace(t0, t1, num=250, endpoint=True)
 solve_save_at = functools.partial(solve_adaptive, save_at=save_at)
 
-# +
+
+# -
+
 # Visualise the initial guess and the data
+
+
+# +
+
 
 fig, ax = plt.subplots(figsize=(5, 3))
 
@@ -220,6 +230,7 @@ ax.annotate("Initial guess", (7.5, 20.0), **guess_kwargs)
 sol = solve_save_at(theta_guess)
 ax = plot_solution(sol.t, sol.u.mean[0], ax=ax, **guess_kwargs)
 plt.show()
+
 # -
 
 # ## Log-posterior densities via ProbDiffEq
@@ -244,16 +255,29 @@ def logposterior_fn(theta, *, data, ts, obs_stdev=0.1):
     return logpdf_data + logpdf_prior
 
 
+# -
+
+
 # Fixed steps for reverse-mode differentiability:
+
+
+# +
 
 
 ts = jnp.linspace(t0, t1, endpoint=True, num=100)
 data = solve_fixed(theta_true, ts=ts).u.mean[0][-1]
 
 log_M = functools.partial(logposterior_fn, data=data, ts=ts)
+
+
 # -
 
+# +
+
+
 print(jnp.exp(log_M(theta_true)), ">=", jnp.exp(log_M(theta_guess)), "?")
+
+# -
 
 
 # ## Sampling with BlackJAX
@@ -261,6 +285,9 @@ print(jnp.exp(log_M(theta_true)), ">=", jnp.exp(log_M(theta_guess)), "?")
 # From here on, BlackJAX takes over:
 
 # Set up a sampler.
+
+
+# +
 
 
 @functools.partial(jax.jit, static_argnames=["kernel", "num_samples"])
@@ -277,13 +304,24 @@ def inference_loop(rng_key, kernel, initial_state, num_samples):
     return states
 
 
+# -
+
+
 # Initialise the sampler, warm it up, and run the inference loop.
+
+
+# +
+
 
 initial_position = theta_guess
 rng_key = jax.random.PRNGKey(0)
 
+# -
+
+# Warm up.
+
 # +
-# WARMUP
+
 warmup = blackjax.window_adaptation(blackjax.nuts, log_M, progress_bar=True)
 
 warmup_results, _ = warmup.run(rng_key, initial_position, num_steps=200)
@@ -296,20 +334,39 @@ nuts_kernel = blackjax.nuts(
 )
 # -
 
-# INFERENCE LOOP
+# Inference loop
+
+
+# +
+
+
 rng_key, _ = jax.random.split(rng_key, 2)
 states = inference_loop(
     rng_key, kernel=nuts_kernel, initial_state=initial_state, num_samples=150
 )
 
+# -
+
+
 # ## Visualisation
 #
 # Now that we have samples of $\theta$, let's plot the corresponding solutions:
 
-solution_samples = jax.vmap(solve_save_at)(states.position)
 
 # +
+
+
+solution_samples = jax.vmap(solve_save_at)(states.position)
+
+# -
+
+# +
+
 # Visualise the initial guess and the data
+
+
+# +
+
 
 fig, ax = plt.subplots()
 
@@ -330,6 +387,7 @@ ax = plot_solution(
     sol.t, sol.u.mean[0], ax=ax, linestyle="dashed", alpha=0.75, **guess_kwargs
 )
 plt.show()
+
 # -
 
 # The samples cover a perhaps surpringly large range of
@@ -337,12 +395,20 @@ plt.show()
 #
 # In parameter space, this is what it looks like:
 
+
+# +
+
+
 plt.title("Posterior samples (parameter space)")
 plt.plot(states.position[:, 0], states.position[:, 1], "o", alpha=0.5, markersize=4)
 plt.plot(theta_true[0], theta_true[1], "P", label="Truth", markersize=8)
 plt.plot(theta_guess[0], theta_guess[1], "P", label="Initial guess", markersize=8)
 plt.legend()
 plt.show()
+
+
+# -
+
 
 # Let's add the value of $M$ to the plot to see whether
 # the sampler covers the entire region of interest.
@@ -360,7 +426,11 @@ log_M_vmapped_x = jax.vmap(log_M, in_axes=-1, out_axes=-1)
 log_M_vmapped = jax.vmap(log_M_vmapped_x, in_axes=-1, out_axes=-1)
 Zs = log_M_vmapped(Thetas)
 
+
+# -
+
 # +
+
 fig, ax = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(8, 3))
 
 ax_samples, ax_heatmap = ax
@@ -377,6 +447,7 @@ ax_samples.legend()
 im = ax_heatmap.contourf(Xs, Ys, jnp.exp(Zs), cmap="cividis", alpha=0.8)
 plt.colorbar(im)
 plt.show()
+
 # -
 
 # Looks great!
