@@ -716,8 +716,8 @@ class ProbabilisticSolver:
         constraint: Constraint,
         ssm: Any,
     ):
-        self.ssm = ssm
         self.vector_field = vector_field
+        self.ssm = ssm
         self.strategy = strategy
         self.prior = prior
         self.constraint = constraint
@@ -1499,11 +1499,33 @@ class solver_mle(ProbabilisticSolver):
 
     """
 
+    def __init__(
+        self,
+        vector_field: VectorField,
+        *,
+        constraint: Constraint,
+        prior: Callable,
+        ssm: Any,
+        strategy: MarkovStrategy,
+        increase_init_damp_by_eps: bool = True,
+    ):
+        super().__init__(
+            vector_field, strategy=strategy, ssm=ssm, prior=prior, constraint=constraint
+        )
+        self.increase_init_damp_by_eps = increase_init_damp_by_eps
+
     def init(self, t, u: TaylorCoeffTarget, *, damp: float) -> ProbabilisticSolution:
         estimate, prediction = self.strategy.init_posterior(u=u)
         correction_state = self.constraint.init_linearization()
 
         output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale())
+
+        # Increase the damping by machine epsilon because often,
+        # the initial taylor coefficients have zero standard deviation
+        # in which case the correction below would yield NaNs.
+        if self.increase_init_damp_by_eps:
+            damp = np.asarray(damp)
+            damp = damp + np.finfo_eps(damp)
 
         # Update
         f_wrapped = func.partial(self.vector_field, t=t)
@@ -1617,19 +1639,26 @@ class solver_dynamic(ProbabilisticSolver):
         constraint: Constraint,
         ssm: Any,
         re_linearize_after_calibration=False,
+        increase_init_damp_by_eps: bool = True,
     ):
-        self.ssm = ssm
-        self.vector_field = vector_field
-        self.strategy = strategy
-        self.prior = prior
-        self.constraint = constraint
+        super().__init__(
+            vector_field, strategy=strategy, ssm=ssm, prior=prior, constraint=constraint
+        )
         self.re_linearize_after_calibration = re_linearize_after_calibration
+        self.increase_init_damp_by_eps = increase_init_damp_by_eps
 
     def init(self, t, u, *, damp) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
         lin_state = self.constraint.init_linearization()
 
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+
+        # Increase the damping by machine epsilon because often,
+        # the initial taylor coefficients have zero standard deviation
+        # in which case the correction below would yield NaNs.
+        if self.increase_init_damp_by_eps:
+            damp = np.asarray(damp)
+            damp = damp + np.finfo_eps(damp)
 
         f_wrapped = func.partial(self.vector_field, t=t)
         fx, lin_state = self.constraint.linearize(
@@ -1741,12 +1770,34 @@ class solver(ProbabilisticSolver):
 
     """
 
+    def __init__(
+        self,
+        vector_field: VectorField,
+        *,
+        constraint: Constraint,
+        prior: Callable,
+        ssm: Any,
+        strategy: MarkovStrategy,
+        increase_init_damp_by_eps: bool = True,
+    ):
+        super().__init__(
+            vector_field, strategy=strategy, ssm=ssm, prior=prior, constraint=constraint
+        )
+        self.increase_init_damp_by_eps = increase_init_damp_by_eps
+
     def init(
         self, t: Array, u: TaylorCoeffTarget, *, damp: float
     ) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
 
         correction_state = self.constraint.init_linearization()
+
+        # Increase the damping by machine epsilon because often,
+        # the initial taylor coefficients have zero standard deviation
+        # in which case the correction below would yield NaNs.
+        if self.increase_init_damp_by_eps:
+            damp = np.asarray(damp)
+            damp = damp + np.finfo_eps(damp)
 
         f_wrapped = func.partial(self.vector_field, t=t)
         fx, correction_state = self.constraint.linearize(
