@@ -13,18 +13,17 @@
 # ---
 
 # # Custom information operators
+#
+# For background information, see:
+#
+#   > Bosch, Nathanael, Filip Tronarp, and Philipp Hennig.
+#     "Pick-and-mix information operators for probabilistic ODE solvers."
+#     International Conference on Artificial Intelligence and Statistics.
+#     PMLR, 2022.
+#
 
 # +
-"""Demonstrate how to implement custom information operators.
-
-For details on the setup, see:
-
-Bosch, Nathanael, Filip Tronarp, and Philipp Hennig.
-"Pick-and-mix information operators for probabilistic ODE solvers."
-International Conference on Artificial Intelligence and Statistics.
-PMLR, 2022.
-
-"""
+"""Demonstrate how to implement custom information operators."""
 
 import jax
 import jax.numpy as jnp
@@ -32,7 +31,13 @@ import matplotlib.pyplot as plt
 
 from probdiffeq import ivpsolve, probdiffeq
 
+# -
+
+
 # Define the problem.
+
+
+# +
 
 
 @jax.jit
@@ -65,13 +70,19 @@ t0, t1 = 0.0, 100.0  # reeeeally long time-integration
 u0_1st = jnp.array([1.0, 0.0, 0.0, 1.0])
 save_at = jnp.linspace(t0, t1, endpoint=True, num=500)
 
+# -
 
 # A good solution conserves the Hamiltonian.
 
+# +
+
 H0 = hamiltonian_1st(u0_1st)
 
+# -
 
 # Set up the first-order solver (for illustration).
+
+# +
 
 zeros, ones = jnp.zeros_like(u0_1st), jnp.ones_like(u0_1st)
 tcoeffs = [u0_1st, zeros, zeros]
@@ -85,15 +96,21 @@ solver_1st = probdiffeq.solver_mle(
 errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, errorest=errorest)
 
+# -
 
-# Solve at poor tolerances to make the Hamiltonian drift more obvious.
+# Solve at relatively poor tolerances to make the Hamiltonian drift more obvious.
+
+# +
 
 sol_1 = jax.jit(solve)(init, save_at=save_at, atol=1e-3, rtol=1e-1)
 ham_1 = jax.vmap(hamiltonian_1st)(sol_1.u.mean[0])
 
+# -
 
 # The harmonic oscillator calls for a custom information operator because
 # we know: (i) the ODE is second order; (ii) the Hamiltonian should be conserved.
+
+# +
 
 
 def root(vf, u, du, ddu):
@@ -103,20 +120,33 @@ def root(vf, u, du, ddu):
     return [deriv, hamil]  # any PyTree goes
 
 
+# -
+
 # Set up the custom-root solver.
 
+# +
+
 u0, du0 = jnp.split(u0_1st, 2)
+
+# -
 
 # We don't do high order because high-order initialisation
 # of custom-information-operator solvers is an open problem.
 # But for low-order solvers, custom roots work well.
+
+
+# +
 
 zeros, ones = jnp.zeros_like(u0), jnp.ones_like(u0)
 tcoeffs = [u0, du0, zeros]
 tcoeffs_std = [zeros, zeros, ones]  # avoid NaNs
 init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, tcoeffs_std=tcoeffs_std)
 
+# -
+
 # Use this constraint function for custom roots:
+
+# +
 
 ts1 = probdiffeq.constraint_root_ts1(root, ssm=ssm, ode_order=2)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
@@ -124,11 +154,15 @@ solver_2nd = probdiffeq.solver_mle(
     vf_2nd, strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
 )
 
+# -
+
 # Custom roots with residual-based error estimates
 # require norming-then-scaling
 # (instead of scaling-then-norming, which is the default),
 # because scaling-then-norming assumes that the root pytree
 # has the same structure as the target pytree.
+
+# +
 
 error_norm = probdiffeq.errorest_error_norm_rms_then_scale()
 errorest = probdiffeq.errorest_local_residual_cached(
@@ -139,10 +173,12 @@ solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, errorest=errorest)
 sol_2 = jax.jit(solve)(init, save_at=save_at, atol=1e-3, rtol=1e-1)
 ham_2 = jax.vmap(hamiltonian_2nd)(sol_2.u.mean[0], sol_2.u.mean[1])
 
+# -
 
 # Plot both solutions.
 # See how much better the custom root solver preserves the Hamiltonian?
 
+# +
 
 fig, ax = plt.subplots(ncols=2, figsize=(8, 3), constrained_layout=True)
 
@@ -163,4 +199,4 @@ ax[1].legend()
 ax[1].set_ylim((eps, 10))
 plt.show()
 
-plt.show()
+# -

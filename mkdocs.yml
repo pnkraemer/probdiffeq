@@ -90,6 +90,7 @@ nav:
       - examples_basic/dynamic_output_scales.ipynb
       - examples_basic/second_order_problems.ipynb
       - examples_basic/taylor_coefficients.ipynb
+      - examples_basic/custom_information_operator.ipynb
   - EXAMPLES | ADVANCED:
       - examples_advanced/parameter_estimation_optax.ipynb
       - examples_advanced/parameter_estimation_blackjax.ipynb

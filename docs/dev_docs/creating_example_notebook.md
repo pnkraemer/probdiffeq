@@ -34,7 +34,7 @@ Probdiffeq hosts numerous tutorials and benchmarks that demonstrate the library.
    Ensure the corresponding script is excluded under `mkdocs.yml -> exclude:`; if needed, add it there.
 
 4. **Makefile:**  
-   Add the new example or benchmark to the appropriate Makefile target (e.g., `examples-and-benchmarks`).
+   Check whether the new example or benchmark needs to be added to the appropriate Makefile target (e.g., `examples-and-benchmarks`). Generally, new files are detected automatically, but check nevertheless.
 
 5. **Pyproject.toml:**  
    If your example requires external dependencies, list them under the `doc` optional dependencies in `pyproject.toml`.
