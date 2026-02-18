@@ -18,7 +18,6 @@
 # +
 """Evaluate the convergence rates of the probabilistic solvers."""
 
-import functools
 import statistics
 import timeit
 from collections.abc import Callable
@@ -31,7 +30,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -44,23 +43,23 @@ def main():
 
     # Assemble algorithms
     algorithms = {
-        r"TS1(1)": solver_probdiffeq(1),
-        r"TS1(2)": solver_probdiffeq(2),
-        r"TS1(3)": solver_probdiffeq(3),
-        r"TS1(4)": solver_probdiffeq(4),
+        # r"TS1(1)": solver_probdiffeq(1),
+        # r"TS1(2)": solver_probdiffeq(2),
+        # r"TS1(3)": solver_probdiffeq(3),
+        # r"TS1(4)": solver_probdiffeq(4),
         r"TS1(5)": solver_probdiffeq(5),
         r"TS1(6)": solver_probdiffeq(6),
         r"TS1(7)": solver_probdiffeq(7),
         r"TS1(8)": solver_probdiffeq(8),
         r"TS1(9)": solver_probdiffeq(9),
-        r"TS1(10)": solver_probdiffeq(10),
-        r"TS1(11)": solver_probdiffeq(11),
-        r"TS1(12)": solver_probdiffeq(12),
-        r"TS1(13)": solver_probdiffeq(13),
-        r"TS1(14)": solver_probdiffeq(14),
-        r"TS1(15)": solver_probdiffeq(15),
-        r"TS1(16)": solver_probdiffeq(16),
-        r"TS1(17)": solver_probdiffeq(17),
+        # r"TS1(10)": solver_probdiffeq(10),
+        # r"TS1(11)": solver_probdiffeq(11),
+        # r"TS1(12)": solver_probdiffeq(12),
+        # r"TS1(13)": solver_probdiffeq(13),
+        # r"TS1(14)": solver_probdiffeq(14),
+        # r"TS1(15)": solver_probdiffeq(15),
+        # r"TS1(16)": solver_probdiffeq(16),
+        # r"TS1(17)": solver_probdiffeq(17),
     }
 
     # Set up the benchmark (compute a reference etc.)
@@ -91,9 +90,7 @@ def main():
 
         # Smooth curves
         x, y = smooth(values["work_num_steps"], values["precision"])
-        (x_lin, y_lin), (scale, _) = linear_trend(
-            values["work_num_steps"], values["precision"]
-        )
+        (x_lin, y_lin), (scale, bias) = linear_trend(x, y)
 
         # All curves start at (1, 1)
         ax["values"].loglog(x / x.min(), y / y.max(), color=color, label=keys)
@@ -167,7 +164,9 @@ def timer():
 def solver_probdiffeq(num_derivatives: int) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
-    @jax.jit
+    def root(y, dy, *, t):
+        return dy - vf_probdiffeq(y, t=t)
+
     def vf_probdiffeq(y, /, *, t):  # noqa: ARG001
         """Lotka--Volterra dynamics."""
         dy1 = 0.5 * y[0] - 0.05 * y[0] * y[1]
@@ -180,24 +179,28 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
     @jax.jit
     def param_to_solution(tol):
         # Do inside the function so we jit the Taylor code
-        vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
+        zeros, ones = jnp.zeros_like(u0), jnp.ones_like(u0)
+        tcoeffs = [u0, *[zeros for _ in range(num_derivatives)]]
+        tcoeffs_std = [zeros, *[ones for _ in range(num_derivatives)]]
 
         # Build a solver
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
+            tcoeffs, tcoeffs_std=tcoeffs_std
+        )
         strategy = probdiffeq.strategy_filter(ssm=ssm)
-        ts = probdiffeq.constraint_ode_ts1(vf_probdiffeq, ssm=ssm)
-        solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts, ssm=ssm)
-        error = probdiffeq.error_residual_std(constraint=ts, prior=ibm, ssm=ssm)
-
-        control = ivpsolve.control_proportional_integral()
-        solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, error=error, control=control
+        ts = probdiffeq.constraint_root_jet_ts1(root, ssm=ssm)
+        solver = probdiffeq.solver_iterated(
+            strategy=strategy, prior=ibm, constraint=ts, ssm=ssm, update_at_init=True
+        )
+        error_norm = probdiffeq.error_norm_rms_then_scale()
+        error = probdiffeq.error_residual_std(
+            constraint=ts, prior=ibm, ssm=ssm, error_norm=error_norm
         )
 
+        solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
+
         # Solve
-        dt0 = ivpsolve.dt0(vf_auto, (u0,))
-        solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-2 * tol, rtol=tol)
+        solution = solve(init, t0=t0, t1=t1, atol=1e-2 * tol, rtol=tol)
 
         # Return the terminal value
         return solution.u.mean[0], solution.num_steps

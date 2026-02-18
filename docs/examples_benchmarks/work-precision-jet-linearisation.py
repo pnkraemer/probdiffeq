@@ -36,7 +36,7 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 jax.config.update("jax_debug_nans", True)
 
 
-def main(start=3.0, stop=10.0, step=1.0, repeats=5):
+def main(start=1.0, stop=10.0, step=0.25, repeats=2):
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
@@ -58,13 +58,14 @@ def main(start=3.0, stop=10.0, step=1.0, repeats=5):
 
     # Assemble algorithms
     algorithms = {}
-    idcs = [3, 6, 9]
+    idcs = [3, 5, 8]
     for i in idcs:
         algorithms[f"Old: TS1({i})"] = solver_probdiffeq_ts(i)
         algorithms[f"New: Jet({i})"] = solver_probdiffeq_jet(i)
+        algorithms[f"New: iJet({i})"] = solver_probdiffeq_jet_iterated(i)
 
     # Compute a reference solution
-    reference = solver_scipy(method="BDF")(1e-13)
+    reference = solver_scipy(method="LSODA")(1e-13)
     precision_fun = rmse_relative(reference)
 
     # Compute all work-precision diagrams
@@ -73,25 +74,28 @@ def main(start=3.0, stop=10.0, step=1.0, repeats=5):
         param_to_wp = workprec(algo, precision_fun=precision_fun, timeit_fun=timeit_fun)
         results[label] = param_to_wp(tolerances)
 
-    _fig, ax = plt.subplots(figsize=(8, 5), dpi=150)
+    _fig, axes = plt.subplot_mosaic("ABC", figsize=(13, 3), dpi=120)
 
     for label, wp in results.items():
-        style = {
-            "linestyle": "dashed" if "ts" in label.lower() else "solid",
-            "color": "C0" if "3" in label else "C1" if "6" in label else "C2",
-        }
+        if "3" in label:
+            ax = axes["A"]
+        elif "5" in label:
+            ax = axes["B"]
+        else:
+            ax = axes["C"]
 
         x, y = wp["precision"], wp["work_mean"]
-        ax.loglog(x, y, alpha=0.25, **style)
+        ax.loglog(x, y, alpha=0.2, color="black")
 
-        x_lin, y_lin = linear_trend(x, y)
-        ax.loglog(x_lin, y_lin, label=label, **style)
+        (x_lin, y_lin), (scale, _) = linear_trend(x, y)
+        ax.loglog(x_lin, y_lin, label=label + f", {-1 / scale:.0f}")
 
-    ax.set_title("Work-precision diagram")
-    ax.set_xlabel("Precision (relative RMSE)")
-    ax.set_ylabel("Work (avg. wall time)")
-    ax.grid(linestyle="dotted", which="both")
-    ax.legend(fontsize="small", loc="center left", bbox_to_anchor=(1, 0.5))
+    for _, ax in axes.items():
+        ax.set_title("Work-precision diagram")
+        ax.set_xlabel("Precision (relative RMSE)")
+        ax.set_ylabel("Work (avg. wall time)")
+        ax.grid(linestyle="dotted", which="both")
+        ax.legend(fontsize="small")
 
     plt.tight_layout()
     plt.show()
@@ -102,7 +106,7 @@ def linear_trend(x, y):
     x = jnp.log10(x)
     y = jnp.log10(y)
     scale, bias = jnp.polyfit(x, y, 1)
-    return 10 ** (x), 10 ** (scale * x + bias)
+    return (10 ** (x), 10 ** (scale * x + bias)), (scale, bias)
 
 
 def solve_ivp_once():
@@ -163,16 +167,14 @@ def solver_probdiffeq_ts(num_derivatives: int) -> Callable:
         solver = probdiffeq.solver(
             strategy=strategy, prior=ibm, constraint=corr, ssm=ssm
         )
-        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+        error = probdiffeq.error_residual_std(constraint=corr, prior=ibm, ssm=ssm)
 
-        control = ivpsolve.control_proportional_integral()
+        control = ivpsolve.control_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
-            errorest=errorest, solver=solver, control=control
+            error=error, solver=solver, control=control, clip_dt=True
         )
-        dt0 = ivpsolve.dt0(vf_auto, (u0,))
-
         # Build a solver
-        solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-2 * tol, rtol=tol)
+        solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
 
         # Return the terminal value
         return jax.block_until_ready(solution.u.mean[0])
@@ -208,14 +210,61 @@ def solver_probdiffeq_jet(num_derivatives: int) -> Callable:
         solver = probdiffeq.solver(
             strategy=strategy, prior=ibm, constraint=corr, ssm=ssm, update_at_init=True
         )
-        error_norm = probdiffeq.errorest_error_norm_rms_then_scale()
-        errorest = probdiffeq.errorest_local_residual(
+        error_norm = probdiffeq.error_norm_rms_then_scale()
+        error = probdiffeq.error_residual_std(
+            constraint=corr, prior=ibm, ssm=ssm, error_norm=error_norm
+        )
+
+        control = ivpsolve.control_integral()
+        solve = ivpsolve.solve_adaptive_terminal_values(
+            error=error, solver=solver, control=control, clip_dt=True
+        )
+
+        # Build a solver
+        solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
+
+        # Return the terminal value
+        return jax.block_until_ready(solution.u.mean[0])
+
+    return param_to_solution
+
+
+def solver_probdiffeq_jet_iterated(num_derivatives: int) -> Callable:
+    """Construct a solver that wraps ProbDiffEq's solution routines."""
+
+    def root(y, dy, *, t):
+        return dy - vf(y, t=t)
+
+    def vf(y, /, *, t):  # noqa: ARG001
+        """Lotka--Volterra dynamics."""
+        dy1 = 0.5 * y[0] - 0.05 * y[0] * y[1]
+        dy2 = -0.5 * y[1] + 0.05 * y[0] * y[1]
+        return jnp.asarray([dy1, dy2])
+
+    u0 = jnp.asarray((20.0, 20.0))
+    t0, t1 = (0.0, 50.0)
+
+    @jax.jit
+    def param_to_solution(tol):
+        zeros, ones = jnp.zeros_like(u0), jnp.ones_like(u0)
+        tcoeffs = [u0, *[zeros for _ in range(num_derivatives)]]
+        tcoeffs_std = [zeros, *[ones for _ in range(num_derivatives)]]
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
+            tcoeffs, tcoeffs_std=tcoeffs_std
+        )
+        strategy = probdiffeq.strategy_filter(ssm=ssm)
+        corr = probdiffeq.constraint_root_jet_ts1(root, ssm=ssm)
+        solver = probdiffeq.solver_iterated(
+            strategy=strategy, prior=ibm, constraint=corr, ssm=ssm, update_at_init=True
+        )
+        error_norm = probdiffeq.error_norm_rms_then_scale()
+        error = probdiffeq.error_residual_std(
             constraint=corr, prior=ibm, ssm=ssm, error_norm=error_norm
         )
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
-            errorest=errorest, solver=solver, control=control
+            error=error, solver=solver, control=control
         )
 
         # Build a solver
