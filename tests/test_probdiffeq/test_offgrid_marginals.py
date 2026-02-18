@@ -16,7 +16,7 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual_std(prior=ibm, ssm=ssm)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
 
     # Compute an adaptive solution and interpolate
     ts = np.linspace(t0, t1, num=15, endpoint=True)
