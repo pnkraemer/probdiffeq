@@ -343,6 +343,15 @@ class Constraint(Protocol):
     linearize: Callable
     """Linearize the constraint."""
 
+    root_order: int
+    """The order of the root-constraint.
+
+    Here, 'order' relates to the highest derivative that the
+    constraint depends on; for instance, in first-order ODEs,
+    the root_order would be two; and in second-order ODEs,
+    the root_order would be three.
+    """
+
 
 def constraint_ode_ts0(vf, /, *, ssm):
     """Create an ODE constraint with zeroth-order Taylor linearisation.
@@ -2134,16 +2143,17 @@ class error_residual_std(ErrorEstimator):
         stdev = self.ssm.stats.standard_deviation(observed)
         error_estimate_unscaled = np.squeeze(stdev)
         error = output_scale * error_estimate_unscaled
+        error, _ = tree.ravel_pytree(error)
 
         # Compute a reference
         u0 = tree.tree_leaves(previous.u.mean)[0]
         u1 = tree.tree_leaves(proposed.u.mean)[0]
         reference = np.maximum(np.abs(u0), np.abs(u1))
+        reference, _ = tree.ravel_pytree(reference)
 
         # Turn the unscaled absolute error into a relative one
-        error = tree.ravel_pytree(error)[0]
-        reference = tree.ravel_pytree(reference)[0]
-        error_abs = dt * error
+        n = self.constraint.root_order - 1
+        error_abs = error * dt**n / np.factorial(n)
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
         # Scale the error norm with the error contraction rate and return

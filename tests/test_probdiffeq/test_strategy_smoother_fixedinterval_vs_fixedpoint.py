@@ -24,7 +24,7 @@ def fixture_solution_smoother(solver_setup):
     ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual(prior=ibm, ssm=ssm)
+    error = probdiffeq.error_residual_std(prior=ibm, ssm=ssm)
     solve = test_util.solve_adaptive_save_every_step(error=error, solver=solver)
     t0, t1 = solver_setup["t0"], solver_setup["t1"]
     return solve(init, t0=t0, t1=t1, dt0=0.1, atol=1e-3, rtol=1e-3)
@@ -37,7 +37,7 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual(prior=ibm, ssm=ssm)
+    error = probdiffeq.error_residual_std(prior=ibm, ssm=ssm)
 
     save_at = solution_smoother.t
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
@@ -92,7 +92,7 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
     strategy_fp = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy_fp, prior=ibm, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual(prior=ibm, ssm=ssm)
+    error = probdiffeq.error_residual_std(prior=ibm, ssm=ssm)
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
     solution_fixedpoint = func.jit(solve)(
         init, save_at=ts, dt0=0.1, atol=1e-3, rtol=1e-3

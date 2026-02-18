@@ -16,7 +16,7 @@ def fixture_solution(fact):
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 
     solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual(prior=ibm, ssm=ssm)
+    error = probdiffeq.error_residual_std(prior=ibm, ssm=ssm)
 
     save_at = np.linspace(t0, t1, endpoint=True, num=4)
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
