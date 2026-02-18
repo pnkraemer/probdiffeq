@@ -2152,6 +2152,13 @@ class error_residual_std(ErrorEstimator):
         reference, _ = tree.ravel_pytree(reference)
 
         # Turn the unscaled absolute error into a relative one
+        # This is a generalisation of the typical residual-based
+        # error estimates for probabilistic solvers in the sense that
+        # it respects higher-order information. For first-order problems,
+        # it is identical to Schober et al, Bosch et al., and so on.
+        # For higher-order problems it is closer to Taylor-series based
+        # (non-probabilistic) ODE solvers; for example, refer to
+        # Tan et al. (2026; https://arxiv.org/pdf/2602.04086).
         n = self.constraint.root_order - 1
         error_abs = error * dt**n / np.factorial(n)
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
