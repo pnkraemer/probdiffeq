@@ -3,6 +3,7 @@
 See the tutorials for example use cases.
 """
 
+from probdiffeq import taylor
 from probdiffeq.backend import (
     flow,
     func,
@@ -363,11 +364,41 @@ def constraint_root_ts1(root, /, *, ssm, jacobian=None):
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
     root_order = _verify_vector_field_signature_and_parse_order(root)
+    if root_order == 1:
+        msg = "Did you accidentally pass a vector field instead of a root-constraint?"
+        raise ValueError(msg)
 
     if jacobian is None:
         # Use hutchinson Jacobian handling for backward compatibility.
         jacobian = jacobian_hutchinson_fwd()
     return ssm.linearize.root_taylor_1st(root, root_order=root_order, jacobian=jacobian)
+
+
+def constraint_root_jet_ts1(root, /, *, ssm, jacobian=None):
+    """Construct a constraint based on a custom root.
+
+    See the custom information operator tutorial for details.
+
+    Related:
+    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
+    """
+    root_order = _verify_vector_field_signature_and_parse_order(root)
+    if root_order == 1:
+        msg = "Did you accidentally pass a vector field instead of a root-constraint?"
+        raise ValueError(msg)
+
+    if jacobian is None:
+        # Use hutchinson Jacobian handling for backward compatibility.
+        jacobian = jacobian_hutchinson_fwd()
+
+    def root_extended(*tcoeffs_all, t):
+        ps, ss = taylor.jet_unpack_series(tcoeffs_all, root_order)
+        primals, series = func.jet(lambda *y: root(*y, t=t), ps, ss)
+        return [primals, *series]
+
+    return ssm.linearize.root_taylor_1st(
+        root_extended, root_order=ssm.num_derivatives + 1, jacobian=jacobian
+    )
 
 
 def constraint_ode_ts1(vf, /, *, ssm, jacobian: JacobianHandler | None = None):
@@ -1890,9 +1921,11 @@ class solver(ProbabilisticSolver):
         transition = self.prior(dt, output_scale)
 
         # Predict
-        u, prediction = self.strategy.predict(
+        u_pred, prediction = self.strategy.predict(
             state.solution_full, transition=transition
         )
+
+        u = u_pred
 
         # Linearize
         fx, auxiliary = self.constraint.linearize(
@@ -1900,7 +1933,7 @@ class solver(ProbabilisticSolver):
         )
 
         # Update
-        _, reverted = self.ssm.conditional.revert(u.marginals, fx)
+        _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
         u, posterior = self.strategy.apply_updates(prediction, updates=reverted.noise)
 
         # Return solution
@@ -2204,7 +2237,12 @@ class errorest_local_residual(ErrorEstimator):
         # Turn the unscaled absolute error into a relative one
         error = tree.ravel_pytree(error)[0]
         reference = tree.ravel_pytree(reference)[0]
-        error_abs = dt * error
+
+        # Normalize, taking into account the order of the information
+        # This is relatively common in Taylor-based error estimates;
+        # see Section 2.3 in https://arxiv.org/abs/2602.04086
+        n = self.constraint.root_order - 1
+        error_abs = error * dt**n / np.factorial(n)
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
         # Scale the error norm with the error contraction rate and return

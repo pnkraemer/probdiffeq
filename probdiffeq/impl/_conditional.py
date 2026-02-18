@@ -79,10 +79,16 @@ class DenseOdeTs1(Linearization):
         if ode_order > 1:
             msg = "Not implemented. Try the a root-based TS1 constraint instead."
             raise ValueError(msg)
+
+        self.ode_order = 1
         self.ode_shape = ode_shape
         self.unravel = unravel
         self.jacobian = jacobian
         self.vector_field = vector_field
+
+    @property
+    def root_order(self):
+        return self.ode_order + 1
 
     def init_linearization(self):
         return self.jacobian.init_jacobian_handler()
