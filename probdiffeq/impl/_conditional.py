@@ -299,6 +299,10 @@ class IsotropicOdeTs0(Linearization):
         self.ode_order = ode_order
         self.vector_field = vector_field
 
+    @property
+    def root_order(self):
+        return self.ode_order + 1
+
     def init_linearization(self):
         return None
 

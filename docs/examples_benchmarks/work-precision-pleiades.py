@@ -208,7 +208,9 @@ def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
         solver = probdiffeq.solver_dynamic(
             strategy=strategy, prior=ibm, constraint=ts0_or_ts1, ssm=ssm
         )
-        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+        errorest = probdiffeq.errorest_local_residual(
+            constraint=ts0_or_ts1, prior=ibm, ssm=ssm
+        )
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
