@@ -68,8 +68,8 @@ def solve(tc):
         strategy=strategy, prior=prior, constraint=ts0, ssm=ssm
     )
     ts = jnp.linspace(t0, t1, endpoint=True, num=10)
-    errorest = probdiffeq.errorest_local_residual_cached(prior=prior, ssm=ssm)
-    solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=prior, ssm=ssm)
+    solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
     return solve(init, save_at=ts, atol=1e-2, rtol=1e-2)
 
 

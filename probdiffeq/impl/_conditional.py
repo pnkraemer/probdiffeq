@@ -43,12 +43,27 @@ class Linearization:
         raise NotImplementedError
 
 
-class DenseOdeTs0(Linearization):
-    def __init__(self, vf, *, ode_order: int, ode_shape: tuple, unravel: Callable):
+class LinearizationRoot(Linearization):
+    def __init__(self, root, /, *, root_order):
+        self.root = root
+        self.root_order = root_order
+
+
+class LinearizationOde(Linearization):
+    def __init__(self, vf, /, *, ode_order):
+        self.vector_field = vf
         self.ode_order = ode_order
+
+    @property
+    def root_order(self):
+        return self.ode_order + 1
+
+
+class DenseOdeTs0(LinearizationOde):
+    def __init__(self, vf, *, ode_order: int, ode_shape: tuple, unravel: Callable):
+        super().__init__(vf, ode_order=ode_order)
         self.ode_shape = ode_shape
         self.unravel = unravel
-        self.vector_field = vf
 
     def init_linearization(self):
         return None
@@ -67,10 +82,10 @@ class DenseOdeTs0(Linearization):
         return cond, None
 
 
-class DenseOdeTs1(Linearization):
+class DenseOdeTs1(LinearizationOde):
     def __init__(
         self,
-        vector_field: Callable,
+        vf: Callable,
         ode_order: int,
         ode_shape: tuple,
         unravel: Callable,
@@ -79,10 +94,11 @@ class DenseOdeTs1(Linearization):
         if ode_order > 1:
             msg = "Not implemented. Try the a root-based TS1 constraint instead."
             raise ValueError(msg)
+        super().__init__(vf, ode_order=ode_order)
+
         self.ode_shape = ode_shape
         self.unravel = unravel
         self.jacobian = jacobian
-        self.vector_field = vector_field
 
     def init_linearization(self):
         return self.jacobian.init_jacobian_handler()
@@ -106,10 +122,9 @@ class DenseOdeTs1(Linearization):
         return cond, state
 
 
-class DenseRootTs1(Linearization):
+class DenseRootTs1(LinearizationRoot):
     def __init__(self, root, *, root_order, unravel, jacobian):
-        self.root = root
-        self.root_order = root_order
+        super().__init__(root, root_order=root_order)
         self.unravel = unravel
         self.jacobian = jacobian
 
@@ -139,13 +154,15 @@ class DenseRootTs1(Linearization):
         return cond, state
 
 
-class DenseOdeSlr0(Linearization):
+class DenseOdeSlr0(LinearizationOde):
     def __init__(self, vf, *, cubature_rule, ode_shape, unravel):
-        # No higher order ODEs supported for any SLR
+        # No higher order ODEs supported for any SLR,
+        # not even in dense models
+        super().__init__(vf, ode_order=1)
+
         self.cubature_rule = cubature_rule
         self.ode_shape = ode_shape
         self.unravel = unravel
-        self.vector_field = vf
 
     def init_linearization(self) -> None:
         return None
@@ -213,12 +230,13 @@ class DenseOdeSlr0(Linearization):
         return _normal.Normal(fx_mean, cov_sqrtm.T)
 
 
-class DenseOdeSlr1(Linearization):
+class DenseOdeSlr1(LinearizationOde):
     def __init__(self, vf, *, cubature_rule, ode_shape, unravel):
+        super().__init__(vf, ode_order=1)
+
         self.cubature_rule = cubature_rule
         self.ode_shape = ode_shape
         self.unravel = unravel
-        self.vector_field = vf
 
     def init_linearization(self) -> None:
         return None
@@ -287,11 +305,10 @@ class DenseOdeSlr1(Linearization):
         return linop_cond, rv_cond
 
 
-class IsotropicOdeTs0(Linearization):
-    def __init__(self, vector_field, *, ode_order, unravel):
+class IsotropicOdeTs0(LinearizationOde):
+    def __init__(self, vf, *, ode_order, unravel):
+        super().__init__(vf, ode_order=ode_order)
         self.unravel = unravel
-        self.ode_order = ode_order
-        self.vector_field = vector_field
 
     def init_linearization(self):
         return None
@@ -316,14 +333,15 @@ class IsotropicOdeTs0(Linearization):
         return cond, None
 
 
-class IsotropicOdeTs1(Linearization):
+class IsotropicOdeTs1(LinearizationOde):
     def __init__(self, vf, *, ode_order: int, unravel: Callable, jacobian: Any):
         if ode_order > 1:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
             raise ValueError(msg)
+        super().__init__(vf, ode_order=1)
+
         self.unravel = unravel
         self.jacobian = jacobian
-        self.vector_field = vf
 
     def init_linearization(self):
         return self.jacobian.init_jacobian_handler()
@@ -351,11 +369,10 @@ class IsotropicOdeTs1(Linearization):
         return cond, state
 
 
-class BlockDiagOdeTs0(Linearization):
+class BlockDiagOdeTs0(LinearizationOde):
     def __init__(self, vf, *, ode_order: int, unravel: Callable):
-        self.ode_order = ode_order
+        super().__init__(vf, ode_order=ode_order)
         self.unravel = unravel
-        self.vector_field = vf
 
     def init_linearization(self) -> None:
         return None
@@ -381,14 +398,14 @@ class BlockDiagOdeTs0(Linearization):
         return cond, None
 
 
-class BlockDiagOdeTs1(Linearization):
+class BlockDiagOdeTs1(LinearizationOde):
     def __init__(self, vf, *, ode_order: int, unravel: Callable, jacobian: Any):
         if ode_order > 1:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
             raise ValueError(msg)
+        super().__init__(vf, ode_order=1)
         self.unravel = unravel
         self.jacobian = jacobian
-        self.vector_field = vf
 
     def init_linearization(self):
         return self.jacobian.init_jacobian_handler()

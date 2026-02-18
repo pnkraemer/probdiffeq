@@ -343,6 +343,15 @@ class Constraint(Protocol):
     linearize: Callable
     """Linearize the constraint."""
 
+    root_order: int
+    """The order of the root-constraint.
+
+    Here, 'order' relates to the highest derivative that the
+    constraint depends on; for instance, in first-order ODEs,
+    the root_order would be two; and in second-order ODEs,
+    the root_order would be three.
+    """
+
 
 def constraint_ode_ts0(vf, /, *, ssm):
     """Create an ODE constraint with zeroth-order Taylor linearisation.
@@ -1943,11 +1952,11 @@ class solver(ProbabilisticSolver):
         )
 
 
-def errorest_error_norm_scale_then_rms(*, norm_order=None) -> Callable:
+def error_norm_scale_then_rms(*, norm_order=None) -> Callable:
     """Normalize an error by scaling followed by computing the root-mean-square norm.
 
     This is the recommended approach, and there is no reason to choose
-    [`errorest_error_norm_rms_then_scale`](#probdiffeq.probdiffeq.errorest_error_norm_rms_then_scale),
+    [`error_norm_rms_then_scale`](#probdiffeq.probdiffeq.error_norm_rms_then_scale),
     in situations where the present function applies.
     However, there are situations where it doesn't apply, for example,
     in residual-based error estimators for root constraints whose pytree
@@ -1967,7 +1976,7 @@ def errorest_error_norm_scale_then_rms(*, norm_order=None) -> Callable:
     return normalize
 
 
-def errorest_error_norm_rms_then_scale(norm_order=None) -> Callable:
+def error_norm_rms_then_scale(norm_order=None) -> Callable:
     """Normalize an error by computing the root-mean-square norm followed by scaling.
 
     Use this for residual-based error estimators in combination
@@ -1991,12 +2000,11 @@ class ErrorEstimator:
     """An interface for error estimators in probabilistic solvers.
 
     Related:
-    [`errorest_local_residual`](#probdiffeq.probdiffeq.errorest_local_residual),
-    [`errorest_local_residual_cached`](#probdiffeq.probdiffeq.errorest_local_residual_cached).
+    [`error_residual_std`](#probdiffeq.probdiffeq.error_residual_std).
 
     """
 
-    def init_errorest(self):
+    def init_error(self):
         """Initialize the error-estimation state."""
         raise NotImplementedError
 
@@ -2024,83 +2032,8 @@ class ErrorEstimator:
         raise NotImplementedError
 
 
-class errorest_local_residual_cached(ErrorEstimator):
-    """Construct an error estimator based on a **cached** local residual.
-
-    'Cached' refers to the fact that the vector field is not evaluated
-    again, but the linearisation from the step itself is reused.
-
-    See the docstring of the non-cached version for more details.
-
-    Related:
-    [`ErrorEstimator`](#probdiffeq.probdiffeq.ErrorEstimator),
-    [`errorest_local_residual`](#probdiffeq.probdiffeq.errorest_local_residual).
-
-    """
-
-    def __init__(self, prior: Any, ssm: Any, error_norm: Callable | None = None):
-        if error_norm is None:
-            error_norm = errorest_error_norm_scale_then_rms()
-
-        self.error_norm = error_norm
-
-        self.prior = prior
-        self.ssm = ssm
-
-    def init_errorest(self) -> tuple:
-        return ()
-
-    def estimate_error_norm(
-        self,
-        state: tuple,
-        previous: ProbabilisticSolution,
-        proposed: ProbabilisticSolution,
-        *,
-        dt: float,
-        atol: float,
-        rtol: float,
-        damp: float,
-    ) -> tuple[float, tuple]:
-        del damp  # unused because no additional linearisation
-        del state  # unused because state-free method
-
-        # Discretize; The output scale is set to one
-        # since the error is multiplied with a local scale estimate anyway
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
-        transition = self.prior(dt, output_scale)
-
-        # Estimate the error
-        mean = self.ssm.stats.mean(previous.u.marginals)
-        mean_extra = self.ssm.conditional.apply(mean, transition)
-        error = self._linearize_and_estimate(mean_extra, linearized=proposed.fun_evals)
-
-        # Compute a reference
-        u0 = tree.tree_leaves(previous.u.mean)[0]
-        u1 = tree.tree_leaves(proposed.u.mean)[0]
-        reference = np.maximum(np.abs(u0), np.abs(u1))
-
-        # Turn the unscaled absolute error into a relative one
-        error = tree.ravel_pytree(error)[0]
-        reference = tree.ravel_pytree(reference)[0]
-        error_abs = dt * error
-        error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
-
-        # Scale the error norm with the error contraction rate and return
-        error_contraction_rate = self.ssm.num_derivatives + 1
-        error_power = error_norm ** (-1.0 / error_contraction_rate)
-        return error_power, ()
-
-    def _linearize_and_estimate(self, rv, /, *, linearized):
-        observed = self.ssm.conditional.marginalise(rv, linearized)
-        output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
-        stdev = self.ssm.stats.standard_deviation(observed)
-
-        error_estimate_unscaled = np.squeeze(stdev)
-        return output_scale * error_estimate_unscaled
-
-
-class errorest_local_residual(ErrorEstimator):
-    r"""Construct an error estimator based on a local residual.
+class error_residual_std(ErrorEstimator):
+    r"""Construct an error estimator based on a local residual's standard deviation.
 
     This is the common error estimate, proposed by Schober et al. (2019),
     extended by Bosch et al. (2021) to different linearization and calibration modes,
@@ -2157,20 +2090,23 @@ class errorest_local_residual(ErrorEstimator):
 
     def __init__(
         self,
+        *,
         constraint: Constraint,
         prior: Any,
         ssm: Any,
         error_norm: Callable | None = None,
+        re_linearize_before_error: bool = False,  # cache by default
     ):
         if error_norm is None:
-            error_norm = errorest_error_norm_scale_then_rms()
+            error_norm = error_norm_scale_then_rms()
 
         self.error_norm = error_norm
         self.constraint = constraint
         self.prior = prior
         self.ssm = ssm
+        self.re_linearize_before_error = re_linearize_before_error
 
-    def init_errorest(self):
+    def init_error(self):
         return self.constraint.init_linearization()
 
     def estimate_error_norm(
@@ -2189,36 +2125,45 @@ class errorest_local_residual(ErrorEstimator):
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
         transition = self.prior(dt, output_scale)
 
-        # Estimate the error
+        # Extrapolate from the zero-error state
         mean = self.ssm.stats.mean(previous.u.marginals)
-        mean_extra = self.ssm.conditional.apply(mean, transition)
-        error, state = self._linearize_and_estimate(
-            mean_extra, state, t=proposed.t, damp=damp
-        )
+        rv = self.ssm.conditional.apply(mean, transition)
+
+        # Optionally: re-linearize
+        if self.re_linearize_before_error:
+            linearized, state = self.constraint.linearize(
+                rv, state, damp=damp, t=proposed.t
+            )
+        else:
+            linearized = proposed.fun_evals
+
+        # Extract the local residual stdev from the linearization
+        observed = self.ssm.conditional.marginalise(rv, linearized)
+        output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
+        stdev = self.ssm.stats.standard_deviation(observed)
+        error_estimate_unscaled = np.squeeze(stdev)
+        error = output_scale * error_estimate_unscaled
+        error, _ = tree.ravel_pytree(error)
 
         # Compute a reference
         u0 = tree.tree_leaves(previous.u.mean)[0]
         u1 = tree.tree_leaves(proposed.u.mean)[0]
         reference = np.maximum(np.abs(u0), np.abs(u1))
+        reference, _ = tree.ravel_pytree(reference)
 
         # Turn the unscaled absolute error into a relative one
-        error = tree.ravel_pytree(error)[0]
-        reference = tree.ravel_pytree(reference)[0]
-        error_abs = dt * error
+        # This is a generalisation of the typical residual-based
+        # error estimates for probabilistic solvers in the sense that
+        # it respects higher-order information. For first-order problems,
+        # it is identical to Schober et al, Bosch et al., and so on.
+        # For higher-order problems it is closer to Taylor-series based
+        # (non-probabilistic) ODE solvers; for example, refer to
+        # Tan et al. (2026; https://arxiv.org/pdf/2602.04086).
+        n = self.constraint.root_order - 1
+        error_abs = error * dt**n / np.factorial(n)
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
         # Scale the error norm with the error contraction rate and return
         error_contraction_rate = self.ssm.num_derivatives + 1
         error_power = error_norm ** (-1.0 / error_contraction_rate)
         return error_power, state
-
-    def _linearize_and_estimate(self, rv, state, /, t, *, damp):
-        linearized, state = self.constraint.linearize(rv, state, damp=damp, t=t)
-
-        observed = self.ssm.conditional.marginalise(rv, linearized)
-        output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
-        stdev = self.ssm.stats.standard_deviation(observed)
-
-        error_estimate_unscaled = np.squeeze(stdev)
-        error_estimate = output_scale * error_estimate_unscaled
-        return error_estimate, state

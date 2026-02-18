@@ -17,14 +17,14 @@ def test_output_matches_reference(fact):
     solver = probdiffeq.solver_dynamic(
         strategy=strategy, prior=iwp, constraint=constraint, ssm=ssm
     )
-    errorest = probdiffeq.errorest_local_residual_cached(prior=iwp, ssm=ssm)
+    error = probdiffeq.error_residual_std(constraint=constraint, prior=iwp, ssm=ssm)
 
     # Compute the PN solution
     dt0 = ivpsolve.dt0_adaptive(
         vf, u0, t0, error_contraction_rate=5, rtol=1e-3, atol=1e-3
     )
 
-    solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, errorest=errorest)
+    solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
     received = func.jit(solve)(init, t0=t0, t1=t1, dt0=dt0, atol=1e-3, rtol=1e-3)
 
     # Compute a reference solution

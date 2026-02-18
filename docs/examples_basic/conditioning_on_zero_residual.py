@@ -89,10 +89,10 @@ init, ibm, ssm = probdiffeq.prior_wiener_integrated(
 ts1 = probdiffeq.constraint_ode_ts1(vector_field, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm)
-errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+error = probdiffeq.error_residual_std(constraint=ts1, prior=ibm, ssm=ssm)
 
 dt0 = ivpsolve.dt0(lambda y: vector_field(y, t=t0), (u0,))
-solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
+solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
 sol = solve(init, save_at=ts, dt0=dt0, atol=1e-1, rtol=1e-1)
 markov_seq_posterior = sol.solution_full
 
