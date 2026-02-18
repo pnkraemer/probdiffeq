@@ -17,7 +17,7 @@ def test_output_matches_reference(fact):
     solver = probdiffeq.solver_dynamic(
         strategy=strategy, prior=iwp, constraint=constraint, ssm=ssm
     )
-    errorest = probdiffeq.errorest_local_residual_cached(prior=iwp, ssm=ssm)
+    errorest = probdiffeq.errorest_local_residual(prior=iwp, ssm=ssm)
 
     # Compute the PN solution
     dt0 = ivpsolve.dt0_adaptive(

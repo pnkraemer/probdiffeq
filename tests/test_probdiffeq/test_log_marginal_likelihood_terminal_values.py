@@ -30,7 +30,7 @@ def fixture_solution(strategy_func, fact):
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = strategy_func(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
-    errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+    errorest = probdiffeq.errorest_local_residual(prior=ibm, ssm=ssm)
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, errorest=errorest)
     sol = func.jit(solve)(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2)
     return sol, strategy

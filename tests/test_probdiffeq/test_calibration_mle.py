@@ -43,7 +43,7 @@ def case_simulate_terminal_values(fact):
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
         solver = solver_fun(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
-        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+        errorest = probdiffeq.errorest_local_residual(prior=ibm, ssm=ssm)
         solve = ivpsolve.solve_adaptive_terminal_values(
             errorest=errorest, solver=solver
         )

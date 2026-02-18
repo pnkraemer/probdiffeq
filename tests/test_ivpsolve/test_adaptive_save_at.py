@@ -35,8 +35,8 @@ def case_solver_dynamic_without_relinearization():
 
 
 @testing.case
-def case_solver_dynamic():
-    return probdiffeq.solver_dynamic
+def case_solver_dynamic_with_relinearization():
+    return func.partial(probdiffeq.solver_dynamic, re_linearize_after_calibration=True)
 
 
 @testing.case
@@ -114,16 +114,16 @@ def case_constraint_ode_slr1():
 
 @testing.case
 def case_errorest_local_residual_cached():
-    def residual_wrapper(constraint, **kw):
-        del constraint
-        return probdiffeq.errorest_local_residual_cached(**kw)
-
-    return residual_wrapper
+    return func.partial(
+        probdiffeq.errorest_local_residual_std, re_linearize_before_errorest=True
+    )
 
 
 @testing.case
 def case_errorest_local_residual():
-    return probdiffeq.errorest_local_residual
+    return func.partial(
+        probdiffeq.errorest_local_residual_std, re_linearize_before_errorest=False
+    )
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
