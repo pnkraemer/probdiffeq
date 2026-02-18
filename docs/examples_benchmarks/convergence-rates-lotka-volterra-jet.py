@@ -90,7 +90,7 @@ def main():
 
         # Smooth curves
         x, y = smooth(values["work_num_steps"], values["precision"])
-        (x_lin, y_lin), (scale, bias) = linear_trend(x, y)
+        (x_lin, y_lin), (scale, _bias) = linear_trend(x, y)
 
         # All curves start at (1, 1)
         ax["values"].loglog(x / x.min(), y / y.max(), color=color, label=keys)

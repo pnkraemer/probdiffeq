@@ -386,10 +386,11 @@ def constraint_root_ts1(root, /, *, ssm, jacobian=None):
 def constraint_root_jet_ts1(root, /, *, ssm, jacobian=None):
     """Construct a constraint based on a custom root.
 
-    See the custom information operator tutorial for details.
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This function is highly experimental and not safe to use.
+        There is no guarantee that it works correctly (or at all).
+        It might be deleted tomorrow and without any deprecation policy.
 
-    Related:
-    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
     root_order = _verify_vector_field_signature_and_parse_order(root)
     if root_order == 1:
@@ -1787,7 +1788,6 @@ class solver_dynamic(ProbabilisticSolver):
         else:
             fx = tree.tree_map(np.zeros_like, fx)
             posterior = prediction
-
         return ProbabilisticSolution(
             t=t,
             u=u,
@@ -2353,6 +2353,94 @@ class error_residual_std(ErrorEstimator):
         # (non-probabilistic) ODE solvers; for example, refer to
         # Tan et al. (2026; https://arxiv.org/pdf/2602.04086).
         n = self.constraint.root_order - 1
+        error_abs = error * dt**n / np.factorial(n)
+        error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
+
+        # Scale the error norm with the error contraction rate and return
+        error_contraction_rate = self.ssm.num_derivatives + 1
+        error_power = error_norm ** (-1.0 / error_contraction_rate)
+        return error_power, state
+
+
+class error_state_std(ErrorEstimator):
+    r"""Construct an error estimator based on a state's standard deviation.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This function is highly experimental and not safe to use.
+        There is no guarantee that it works correctly (or at all).
+        It might be deleted tomorrow and without any deprecation policy.
+
+    """
+
+    # TODO: make the experimental-warning into a decorator
+    def __init__(
+        self,
+        *,
+        constraint: Constraint,
+        prior: Any,
+        ssm: Any,
+        error_norm: Callable | None = None,
+        re_linearize_before_error: bool = False,  # cache by default
+    ):
+        if error_norm is None:
+            error_norm = error_norm_scale_then_rms()
+
+        self.error_norm = error_norm
+        self.constraint = constraint
+        self.prior = prior
+        self.ssm = ssm
+        self.re_linearize_before_error = re_linearize_before_error
+
+    def init_error(self):
+        return self.constraint.init_linearization()
+
+    def estimate_error_norm(
+        self,
+        state,
+        previous: ProbabilisticSolution,
+        proposed: ProbabilisticSolution,
+        *,
+        dt: float,
+        atol: float,
+        rtol: float,
+        damp: float,
+    ) -> tuple[float, tuple]:
+        # Discretize; The output scale is set to one
+        # since the error is multiplied with a local scale estimate anyway
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        transition = self.prior(dt, output_scale)
+
+        # Extrapolate from the zero-error state
+        mean = self.ssm.stats.mean(previous.u.marginals)
+        rv = self.ssm.conditional.apply(mean, transition)
+
+        # Optionally: re-linearize
+        if self.re_linearize_before_error:
+            linearized, state = self.constraint.linearize(
+                rv, state, damp=damp, t=proposed.t
+            )
+        else:
+            linearized = proposed.fun_evals
+
+        # Extract the local residual stdev from the linearization
+        observed, conditional = self.ssm.conditional.revert(rv, linearized)
+        output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
+
+        # *New:* Go back into solution space
+        stdev = self.ssm.stats.standard_deviation(conditional.noise)
+        stdev = self.ssm.stats.qoi_from_sample(stdev)
+        error_estimate_unscaled, _ = tree.ravel_pytree(stdev)
+        error = output_scale * error_estimate_unscaled
+        error, _ = tree.ravel_pytree(error)
+
+        # Compute a reference
+        u0 = tree.tree_leaves(previous.u.mean)[0]
+        u1 = tree.tree_leaves(proposed.u.mean)[0]
+        reference = np.maximum(np.abs(u0), np.abs(u1))
+        reference, _ = tree.ravel_pytree(reference)
+
+        # Turn the unscaled absolute error into a relative one.
+        n = self.constraint.root_order - 2  # no idea why this works well
         error_abs = error * dt**n / np.factorial(n)
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
