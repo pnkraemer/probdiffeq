@@ -91,12 +91,12 @@ nav:
       - examples_basic/second_order_problems.ipynb
       - examples_basic/taylor_coefficients.ipynb
       - examples_basic/custom_information_operator.ipynb
+      - examples_basic/solve_pde.ipynb
   - EXAMPLES | ADVANCED:
       - examples_advanced/parameter_estimation_optax.ipynb
       - examples_advanced/parameter_estimation_blackjax.ipynb
       - examples_advanced/neural_ode.ipynb
       - examples_advanced/equinox_while_loop.ipynb
-      - examples_advanced/solve_pde.ipynb
   - EXAMPLES | BENCHMARKS:
       - examples_benchmarks/work-precision-lotka-volterra.ipynb
       - examples_benchmarks/work-precision-pleiades.ipynb
