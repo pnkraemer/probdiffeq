@@ -1943,11 +1943,11 @@ class solver(ProbabilisticSolver):
         )
 
 
-def errorest_error_norm_scale_then_rms(*, norm_order=None) -> Callable:
+def error_norm_scale_then_rms(*, norm_order=None) -> Callable:
     """Normalize an error by scaling followed by computing the root-mean-square norm.
 
     This is the recommended approach, and there is no reason to choose
-    [`errorest_error_norm_rms_then_scale`](#probdiffeq.probdiffeq.errorest_error_norm_rms_then_scale),
+    [`error_norm_rms_then_scale`](#probdiffeq.probdiffeq.error_norm_rms_then_scale),
     in situations where the present function applies.
     However, there are situations where it doesn't apply, for example,
     in residual-based error estimators for root constraints whose pytree
@@ -1967,7 +1967,7 @@ def errorest_error_norm_scale_then_rms(*, norm_order=None) -> Callable:
     return normalize
 
 
-def errorest_error_norm_rms_then_scale(norm_order=None) -> Callable:
+def error_norm_rms_then_scale(norm_order=None) -> Callable:
     """Normalize an error by computing the root-mean-square norm followed by scaling.
 
     Use this for residual-based error estimators in combination
@@ -1991,12 +1991,11 @@ class ErrorEstimator:
     """An interface for error estimators in probabilistic solvers.
 
     Related:
-    [`errorest_local_residual`](#probdiffeq.probdiffeq.errorest_local_residual),
-    [`errorest_local_residual_cached`](#probdiffeq.probdiffeq.errorest_local_residual_cached).
+    [`error_residual_std`](#probdiffeq.probdiffeq.error_residual_std).
 
     """
 
-    def init_errorest(self):
+    def init_error(self):
         """Initialize the error-estimation state."""
         raise NotImplementedError
 
@@ -2024,7 +2023,7 @@ class ErrorEstimator:
         raise NotImplementedError
 
 
-class errorest_local_residual_std(ErrorEstimator):
+class error_residual_std(ErrorEstimator):
     r"""Construct an error estimator based on a local residual's standard deviation.
 
     This is the common error estimate, proposed by Schober et al. (2019),
@@ -2087,18 +2086,18 @@ class errorest_local_residual_std(ErrorEstimator):
         prior: Any,
         ssm: Any,
         error_norm: Callable | None = None,
-        re_linearize_before_errorest: bool = False,  # cache by default
+        re_linearize_before_error: bool = False,  # cache by default
     ):
         if error_norm is None:
-            error_norm = errorest_error_norm_scale_then_rms()
+            error_norm = error_norm_scale_then_rms()
 
         self.error_norm = error_norm
         self.constraint = constraint
         self.prior = prior
         self.ssm = ssm
-        self.re_linearize_before_errorest = re_linearize_before_errorest
+        self.re_linearize_before_error = re_linearize_before_error
 
-    def init_errorest(self):
+    def init_error(self):
         return self.constraint.init_linearization()
 
     def estimate_error_norm(
@@ -2122,7 +2121,7 @@ class errorest_local_residual_std(ErrorEstimator):
         rv = self.ssm.conditional.apply(mean, transition)
 
         # Optionally: re-linearize
-        if self.re_linearize_before_errorest:
+        if self.re_linearize_before_error:
             linearized, state = self.constraint.linearize(
                 rv, state, damp=damp, t=proposed.t
             )

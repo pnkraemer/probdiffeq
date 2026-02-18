@@ -16,17 +16,17 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
-    errorest = probdiffeq.errorest_local_residual(prior=ibm, ssm=ssm)
+    error = probdiffeq.error_residual(prior=ibm, ssm=ssm)
 
     # Compute an adaptive solution and interpolate
     ts = np.linspace(t0, t1, num=15, endpoint=True)
-    solve = test_util.solve_adaptive_save_every_step(errorest=errorest, solver=solver)
+    solve = test_util.solve_adaptive_save_every_step(error=error, solver=solver)
     save_every = solve(init, t0=t0, t1=t1, dt0=0.1, atol=1e-2, rtol=1e-2)
     offgrid = func.vmap(lambda s: solver.offgrid_marginals(s, solution=save_every))
     u_interpolated = offgrid(ts[1:-1])
 
     # Compute a save-at solution and remove the edge-points
-    solve = ivpsolve.solve_adaptive_save_at(errorest=errorest, solver=solver)
+    solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
     save_at = solve(init, atol=1e-2, rtol=1e-2, save_at=ts, dt0=0.1)
     u_save_at = tree.tree_map(lambda s: s[1:-1], save_at.u)
 

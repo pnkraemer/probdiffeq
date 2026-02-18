@@ -23,10 +23,10 @@ def test_fixed_grid_result_matches_adaptive_grid_result_when_reusing_grid(fact):
     solver = probdiffeq.solver_mle(
         strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
     )
-    errorest = probdiffeq.errorest_local_residual(prior=ibm, ssm=ssm)
+    error = probdiffeq.error_residual(prior=ibm, ssm=ssm)
 
     solve = test_util.solve_adaptive_save_every_step(
-        errorest=errorest, solver=solver, clip_dt=True
+        error=error, solver=solver, clip_dt=True
     )
     solution_adaptive = solve(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2)
     assert isinstance(solution_adaptive.u.mean, Taylor)

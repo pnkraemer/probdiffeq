@@ -181,15 +181,13 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
         # Build a solver
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
         strategy = probdiffeq.strategy_filter(ssm=ssm)
-        corr = probdiffeq.constraint_ode_ts1(vf_probdiffeq, ssm=ssm)
-        solver = probdiffeq.solver(
-            strategy=strategy, prior=ibm, constraint=corr, ssm=ssm
-        )
-        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+        ts = probdiffeq.constraint_ode_ts1(vf_probdiffeq, ssm=ssm)
+        solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts, ssm=ssm)
+        error = probdiffeq.error_residual_std(constraint=ts, prior=ibm, ssm=ssm)
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, errorest=errorest, control=control
+            solver=solver, error=error, control=control
         )
 
         # Solve

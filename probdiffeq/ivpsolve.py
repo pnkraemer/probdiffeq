@@ -136,7 +136,7 @@ class control_integral(Control[tuple]):
 
 def solve_adaptive_terminal_values(
     solver: Solver,
-    errorest,
+    error,
     control: Control | None = None,
     clip_dt: bool = False,
     while_loop: Callable = flow.while_loop,
@@ -145,7 +145,7 @@ def solve_adaptive_terminal_values(
     # Turn off warnings because any solver goes for terminal values
     solve_save_at = solve_adaptive_save_at(
         solver=solver,
-        errorest=errorest,
+        error=error,
         control=control,
         clip_dt=clip_dt,
         warn=False,
@@ -167,7 +167,7 @@ def solve_adaptive_terminal_values(
 def solve_adaptive_save_at(
     *,
     solver: Solver,
-    errorest,
+    error,
     control: Control | None = None,
     clip_dt: bool = False,
     while_loop: Callable = flow.while_loop,
@@ -210,7 +210,7 @@ def solve_adaptive_save_at(
         solver=solver,
         clip_dt=clip_dt,
         control=control,
-        errorest=errorest,
+        error=error,
         while_loop=while_loop,
     )
 
@@ -354,7 +354,7 @@ class TimeStepState(Generic[T]):
     control: Any
     """The controller state."""
 
-    errorest_step_from: Any
+    error_step_from: Any
     """The error-estimate corresponding to 'step_from'."""
 
 
@@ -372,8 +372,8 @@ class _RejectionLoopState:
     control: Any
     proposed: Any
     step_from: Any
-    errorest_step_from: Any
-    errorest_proposed: Any
+    error_step_from: Any
+    error_proposed: Any
 
 
 class RejectionLoop:
@@ -383,26 +383,26 @@ class RejectionLoop:
         self,
         solver: Solver,
         clip_dt: bool,
-        errorest: Any,
+        error: Any,
         control: Control,
         while_loop: Callable,
     ):
         self.solver = solver
         self.clip_dt = clip_dt
-        self.errorest = errorest
+        self.error = error
         self.control = control
         self.while_loop = while_loop
 
     def init(self, state_solver, dt) -> TimeStepState:
         """Initialise the adaptive solver state."""
         state_control = self.control.init(dt)
-        state_errorest = self.errorest.init_errorest()
+        state_error = self.error.init_error()
         return TimeStepState(
             dt=dt,
             step_from=state_solver,
             interp_from=state_solver,
             control=state_control,
-            errorest_step_from=state_errorest,
+            error_step_from=state_error,
         )
 
     def loop(
@@ -457,9 +457,9 @@ class RejectionLoop:
             dt=s0.dt,
             control=s0.control,
             step_from=s0.step_from,
-            errorest_step_from=s0.errorest_step_from,
+            error_step_from=s0.error_step_from,
             proposed=_ones_like(s0.step_from),  # irrelevant
-            errorest_proposed=_ones_like(s0.errorest_step_from),  # irrelevant
+            error_proposed=_ones_like(s0.error_step_from),  # irrelevant
         )
 
     def step_attempt(
@@ -480,8 +480,8 @@ class RejectionLoop:
         # Perform the actual step.
         state_proposed = self.solver.step(state=state.step_from, dt=dt, damp=damp)
 
-        error_power, errorstate = self.errorest.estimate_error_norm(
-            state.errorest_step_from,
+        error_power, errorstate = self.error.estimate_error_norm(
+            state.error_step_from,
             previous=state.step_from,
             proposed=state_proposed,
             dt=dt,
@@ -499,8 +499,8 @@ class RejectionLoop:
             error_norm_proposed=error_power,  # new
             proposed=state_proposed,  # new
             control=state_control,  # new
-            errorest_proposed=errorstate,  # new
-            errorest_step_from=state.errorest_step_from,
+            error_proposed=errorstate,  # new
+            error_step_from=state.error_step_from,
             step_from=state.step_from,
         )
 
@@ -511,7 +511,7 @@ class RejectionLoop:
             step_from=state.proposed,
             interp_from=state.step_from,
             control=state.control,
-            errorest_step_from=state.errorest_proposed,
+            error_step_from=state.error_proposed,
         )
 
     def interp_skip(self, args):
@@ -532,7 +532,7 @@ class RejectionLoop:
             step_from=interp_res.step_from,
             interp_from=interp_res.interp_from,
             control=state.control,
-            errorest_step_from=state.errorest_step_from,
+            error_step_from=state.error_step_from,
         )
         return solution, new_state
 
@@ -547,6 +547,6 @@ class RejectionLoop:
             step_from=interp_res.step_from,
             interp_from=interp_res.interp_from,
             control=state.control,
-            errorest_step_from=state.errorest_step_from,
+            error_step_from=state.error_step_from,
         )
         return solution, new_state

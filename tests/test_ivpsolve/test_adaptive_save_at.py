@@ -22,7 +22,7 @@ class Factory:
     strategy: Callable = probdiffeq.strategy_filter
     solver: Callable = probdiffeq.solver
     constraint: Callable = probdiffeq.constraint_ode_ts0
-    errorest: Callable = probdiffeq.errorest_local_residual_std
+    error: Callable = probdiffeq.error_residual_std
 
 
 @testing.case
@@ -138,19 +138,15 @@ def case_factory_constraint_ode_slr1():
 
 
 @testing.case
-def case_factory_errorest_local_residual_cached():
-    errorest = func.partial(
-        probdiffeq.errorest_local_residual_std, re_linearize_before_errorest=True
-    )
-    return Factory(errorest=errorest)
+def case_factory_error_residual_std_cached():
+    error = func.partial(probdiffeq.error_residual_std, re_linearize_before_error=True)
+    return Factory(error=error)
 
 
 @testing.case
-def case_factory_errorest_local_residual():
-    errorest = func.partial(
-        probdiffeq.errorest_local_residual_std, re_linearize_before_errorest=False
-    )
-    return Factory(errorest=errorest)
+def case_factory_error_residual_std_not_cached():
+    error = func.partial(probdiffeq.error_residual_std, re_linearize_before_error=False)
+    return Factory(error=error)
 
 
 @testing.parametrize("ssm_fact", ["dense", "isotropic", "blockdiag"])
@@ -166,11 +162,11 @@ def test_output_matches_reference(ivp, ssm_fact, factory: Factory):
     solver = factory.solver(
         strategy=strategy, prior=iwp, constraint=constraint, ssm=ssm
     )
-    errorest = factory.errorest(prior=iwp, ssm=ssm, constraint=constraint)
+    error = factory.error(prior=iwp, ssm=ssm, constraint=constraint)
 
     # Compute the PN solution
     save_at = np.linspace(t0, t1, endpoint=True, num=7)
-    solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
+    solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
     received = func.jit(solve)(init, save_at=save_at, atol=1e-3, rtol=1e-3)
 
     # Compute a reference solution

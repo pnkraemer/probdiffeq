@@ -201,8 +201,8 @@ def solve_adaptive(theta, *, save_at):
     # Create a probabilistic solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
     init, _ibm, _ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="isotropic")
-    errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
-    solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
+    solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
     return solve(init, save_at=save_at, dt0=0.1, atol=1e-4, rtol=1e-2)
 
 

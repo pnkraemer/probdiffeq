@@ -151,19 +151,19 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
 
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
-        ts0_or_ts1 = probdiffeq.constraint_root_ts1(root, ssm=ssm)
+        ts = probdiffeq.constraint_root_ts1(root, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         solver = probdiffeq.solver_dynamic(
-            strategy=strategy, prior=ibm, constraint=ts0_or_ts1, ssm=ssm
+            strategy=strategy, prior=ibm, constraint=ts, ssm=ssm
         )
-        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+        error = probdiffeq.error_residual_std(constraint=ts, prior=ibm, ssm=ssm)
 
         dt0 = ivpsolve.dt0(vf_auto, (u0, du0))
         control = ivpsolve.control_proportional_integral()
 
         solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, errorest=errorest, control=control, clip_dt=True
+            solver=solver, error=error, control=control, clip_dt=True
         )
         solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-3 * tol, rtol=tol)
         return jax.block_until_ready(solution.u.mean[0])
