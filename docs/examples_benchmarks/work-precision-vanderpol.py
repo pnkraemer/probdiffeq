@@ -23,10 +23,10 @@ import statistics
 import timeit
 from collections.abc import Callable
 
-import diffrax
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+import numba
 import numpy as np
 import scipy.integrate
 import tqdm
@@ -37,7 +37,7 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 jax.config.update("jax_debug_nans", True)
 
 
-def main(start=2.0, stop=8.0, step=1.0, repeats=2, use_diffrax: bool = False):
+def main(start=3.0, stop=8.0, step=1.0, repeats=2):
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
@@ -60,21 +60,15 @@ def main(start=2.0, stop=8.0, step=1.0, repeats=2, use_diffrax: bool = False):
 
     # Assemble algorithms
     algorithms = {
-        "SciPy: 'Radau'": solver_scipy(method="Radau"),
-        "SciPy: 'LSODA'": solver_scipy(method="LSODA"),
+        "SciPy + numba: 'Radau'": solver_scipy(method="Radau"),
+        "SciPy + numba: 'LSODA'": solver_scipy(method="LSODA"),
         r"ProbDiffEq: TS1($3$)": solver_probdiffeq(num_derivatives=3),
         r"ProbDiffEq: TS1($4$)": solver_probdiffeq(num_derivatives=4),
         r"ProbDiffEq: TS1($5$)": solver_probdiffeq(num_derivatives=5),
     }
-    if use_diffrax:
-        # TODO: this is a temporary fix because Diffrax doesn't work with JAX >= 0.7.0
-        # Revisit in the near future.
-        algorithms["Diffrax: Kvaerno5()"] = solver_diffrax(solver=diffrax.Kvaerno5())
-    else:
-        print("\nSkipped Diffrax.\n")
 
     # Compute a reference solution
-    reference = solver_probdiffeq(num_derivatives=4)(1e-10)
+    reference = solver_scipy(method="Radau")(0.1 * tolerances[-1])
     precision_fun = rmse_absolute(reference)
 
     # Compute all work-precision diagrams
@@ -100,6 +94,7 @@ def main(start=2.0, stop=8.0, step=1.0, repeats=2, use_diffrax: bool = False):
 def solve_ivp_once():
     """Compute plotting-values for the IVP."""
 
+    @numba.jit(nopython=True)
     def vf_scipy(_t, u):
         """Van-der-Pol dynamics as a first-order differential equation."""
         return np.asarray([u[1], 1e5 * ((1.0 - u[0] ** 2) * u[1] - u[0])])
@@ -171,42 +166,10 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     return param_to_solution
 
 
-def solver_diffrax(*, solver) -> Callable:
-    """Construct a solver that wraps Diffrax' solution routines."""
-
-    @diffrax.ODETerm
-    @jax.jit
-    def vf_diffrax(_t, u, _args):
-        """Van-der-Pol dynamics as a first-order differential equation."""
-        return jnp.asarray([u[1], 1e5 * ((1.0 - u[0] ** 2) * u[1] - u[0])])
-
-    t0, t1 = 0.0, 3.0
-    u0 = jnp.concatenate((jnp.atleast_1d(2.0), jnp.atleast_1d(0.0)))
-    t0, t1 = (0.0, 6.3)
-
-    @jax.jit
-    def param_to_solution(tol):
-        controller = diffrax.PIDController(atol=1e-3 * tol, rtol=tol)
-        saveat = diffrax.SaveAt(t0=False, t1=True, ts=None)
-        solution = diffrax.diffeqsolve(
-            vf_diffrax,
-            y0=u0,
-            t0=t0,
-            t1=t1,
-            saveat=saveat,
-            stepsize_controller=controller,
-            dt0=None,
-            max_steps=10_000,
-            solver=solver,
-        )
-        return jax.block_until_ready(solution.ys[0, 0])
-
-    return param_to_solution
-
-
 def solver_scipy(method: str) -> Callable:
     """Construct a solver that wraps SciPy's solution routines."""
 
+    @numba.jit(nopython=True)
     def vf_scipy(_t, u):
         """Van-der-Pol dynamics as a first-order differential equation."""
         return np.asarray([u[1], 1e5 * ((1.0 - u[0] ** 2) * u[1] - u[0])])
