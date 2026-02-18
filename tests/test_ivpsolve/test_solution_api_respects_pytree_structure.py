@@ -27,8 +27,8 @@ def fixture_pn_solution(fact):
     solver = probdiffeq.solver_mle(
         strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
     )
-    errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
-    solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
+    solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
     save_at = np.linspace(t0, t1, endpoint=True, num=5)
     return func.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
 

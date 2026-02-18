@@ -99,8 +99,8 @@ strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 solver_1st = probdiffeq.solver_mle(
     strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
 )
-errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
-solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, errorest=errorest)
+error = probdiffeq.error_residual_std(constraint=ts1, prior=ibm, ssm=ssm)
+solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, error=error)
 
 # -
 
@@ -165,11 +165,11 @@ solver_2nd = probdiffeq.solver_mle(
 
 # +
 
-error_norm = probdiffeq.errorest_error_norm_rms_then_scale()
-errorest = probdiffeq.errorest_local_residual_cached(
-    prior=ibm, ssm=ssm, error_norm=error_norm
+error_norm = probdiffeq.error_norm_rms_then_scale()
+error = probdiffeq.error_residual_std(
+    constraint=ts1, prior=ibm, ssm=ssm, error_norm=error_norm
 )
-solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, errorest=errorest)
+solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, error=error)
 
 sol_2 = jax.jit(solve)(init, save_at=save_at, atol=1e-3, rtol=1e-1)
 ham_2 = jax.vmap(hamiltonian_2nd)(sol_2.u.mean[0], sol_2.u.mean[1])

@@ -46,13 +46,13 @@ init, iwp, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
 ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
 solver = probdiffeq.solver_mle(ssm=ssm, strategy=strategy, prior=iwp, constraint=ts)
-errorest = probdiffeq.errorest_local_residual_cached(prior=iwp, ssm=ssm)
+error = probdiffeq.error_residual_std(constraint=ts, prior=iwp, ssm=ssm)
 
 
 # Solve the ODE
 # To all users: Try different solution routines.
 save_at = jnp.linspace(t0, t1, num=100, endpoint=True)
-solve = ivpsolve.solve_adaptive_save_at(solver=solver, errorest=errorest)
+solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
 solution = jax.jit(solve)(init, save_at, atol=1e-3, rtol=1e-3)
 
 

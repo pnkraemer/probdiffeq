@@ -47,9 +47,9 @@ def solution_routine(while_loop):
 
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
-    errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
     solve_adaptive = ivpsolve.solve_adaptive_terminal_values(
-        solver=solver, errorest=errorest, while_loop=while_loop
+        solver=solver, error=error, while_loop=while_loop
     )
 
     def simulate(init_val):

@@ -52,8 +52,8 @@ def fixture_solution(constraint_ode_factory, fact):
     solver = probdiffeq.solver_mle(
         strategy=strategy, prior=ibm, constraint=constraint, ssm=ssm
     )
-    errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
-    solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, errorest=errorest)
+    error = probdiffeq.error_residual_std(constraint=constraint, prior=ibm, ssm=ssm)
+    solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
     return solve(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2, damp=1e-9)
 
 

@@ -158,15 +158,15 @@ def solver_probdiffeq(num_derivatives: int, implementation, constraint) -> Calla
             tcoeffs, ssm_fact=implementation
         )
         strategy = probdiffeq.strategy_filter(ssm=ssm)
-        corr = constraint(vf_probdiffeq, ssm=ssm)
+        ts = constraint(vf_probdiffeq, ssm=ssm)
         solver = probdiffeq.solver_mle(
-            strategy=strategy, prior=ibm, constraint=corr, ssm=ssm
+            strategy=strategy, prior=ibm, constraint=ts, ssm=ssm
         )
-        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+        error = probdiffeq.error_residual_std(constraint=ts, prior=ibm, ssm=ssm)
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
-            errorest=errorest, solver=solver, control=control
+            error=error, solver=solver, control=control
         )
         dt0 = ivpsolve.dt0(vf_auto, (u0,))
 

@@ -7,7 +7,7 @@ from probdiffeq.backend.typing import TypeVar
 T = TypeVar("T")
 
 
-def solve_adaptive_save_every_step(solver, errorest, control=None, clip_dt=False):
+def solve_adaptive_save_every_step(solver, error, control=None, clip_dt=False):
     """Solve an initial value problem and save every step.
 
     This function uses a native-Python while loop.
@@ -31,7 +31,7 @@ def solve_adaptive_save_every_step(solver, errorest, control=None, clip_dt=False
         solver=solver,
         clip_dt=clip_dt,
         control=control,
-        errorest=errorest,
+        error=error,
         # We do not expose this option to the user
         # because we do not want to suggest that this function
         # uses meaningful looping to begin with.

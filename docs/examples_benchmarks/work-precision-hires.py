@@ -170,11 +170,11 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         solver = probdiffeq.solver_dynamic(
             strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
         )
-        errorest = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+        error = probdiffeq.error_residual_std(constraint=ts1, prior=ibm, ssm=ssm)
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, clip_dt=True, control=control, errorest=errorest
+            solver=solver, clip_dt=True, control=control, error=error
         )
 
         # Solve

@@ -62,7 +62,7 @@ strategy = probdiffeq.strategy_filter(ssm=ssm)
 solver_1st = probdiffeq.solver_mle(
     strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
 )
-errorest_1st = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+error_1st = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
 
 
 # -
@@ -71,7 +71,7 @@ errorest_1st = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 
 
 save_at = jnp.linspace(t0, t1, endpoint=True, num=250)
-solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, errorest=errorest_1st)
+solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, error=error_1st)
 solution = jax.jit(solve)(init, save_at=save_at, atol=1e-5, rtol=1e-5)
 plt.plot(solution.u.mean[0][:, 0], solution.u.mean[0][:, 1], marker=".")
 plt.show()
@@ -104,7 +104,7 @@ strategy = probdiffeq.strategy_filter(ssm=ssm)
 solver_2nd = probdiffeq.solver_mle(
     strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
 )
-errorest_2nd = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
+error_2nd = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
 
 # -
 
@@ -112,7 +112,7 @@ errorest_2nd = probdiffeq.errorest_local_residual_cached(prior=ibm, ssm=ssm)
 # +
 
 
-solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, errorest=errorest_2nd)
+solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, error=error_2nd)
 solution = jax.jit(solve)(init, save_at=save_at, atol=1e-5, rtol=1e-5)
 
 plt.plot(solution.u.mean[0][:, 0], solution.u.mean[0][:, 1], marker=".")
