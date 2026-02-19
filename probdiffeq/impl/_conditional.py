@@ -689,12 +689,17 @@ class DenseConditional(ConditionalBackend):
         return LatentCond(A, noise, to_latent=ones, to_observed=ones)
 
     def ibm_transitions(self, base_scale):
+
         a, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
         (d,) = self.ode_shape
+        assert d == 3  # robertson hack
 
         eye_d = np.eye(d)
         A = np.kron(a, eye_d)
-        Q = np.kron(q_sqrtm, eye_d)
+
+        diag = linalg.diagonal_matrix(np.asarray([1.0, np.sqrt(1e-5), 1.0]))
+        # diag = eye_d
+        Q = np.kron(q_sqrtm, diag)
 
         q0 = np.zeros(self.flat_shape)
 

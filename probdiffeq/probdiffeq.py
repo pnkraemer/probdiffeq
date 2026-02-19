@@ -2428,19 +2428,24 @@ class error_state_std(ErrorEstimator):
 
         # *New:* Go back into solution space
         stdev = self.ssm.stats.standard_deviation(conditional.noise)
-        stdev = self.ssm.stats.qoi_from_sample(stdev)
+        stdev = self.ssm.stats.qoi_from_sample(stdev)[0]
         error_estimate_unscaled, _ = tree.ravel_pytree(stdev)
         error = output_scale * error_estimate_unscaled
         error, _ = tree.ravel_pytree(error)
 
         # Compute a reference
-        u0 = tree.tree_leaves(previous.u.mean)[0]
-        u1 = tree.tree_leaves(proposed.u.mean)[0]
+        u0, _ = tree.ravel_pytree(previous.u.mean[0])
+        u1, _ = tree.ravel_pytree(proposed.u.mean[0])
         reference = np.maximum(np.abs(u0), np.abs(u1))
-        reference, _ = tree.ravel_pytree(reference)
 
         # Turn the unscaled absolute error into a relative one.
-        n = self.constraint.root_order - 2  # no idea why this works well
+        # For the dt**n / factorial bit, refer to the comment in
+        # the residual-based error estimator, which contains a similar line
+        # For the root_order - 2, we do one order less than for the residual
+        # because the present error lives in "solution space", not in
+        # "derivative space", so the Taylor-coefficient normalisation
+        # has an order less. For first-order ODEs, n = 0 as expected.
+        n = self.constraint.root_order - 2
         error_abs = error * dt**n / np.factorial(n)
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
