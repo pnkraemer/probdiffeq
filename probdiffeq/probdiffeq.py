@@ -1898,11 +1898,6 @@ class solver(ProbabilisticSolver):
 
     def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
-
-        import jax
-
-        jax.debug.print("Prediction, {}", u.mean[:2], ordered=True)
-
         correction_state = self.constraint.init_linearization()
         fx, correction_state = self.constraint.linearize(
             rv=u.marginals, state=correction_state, damp=damp, t=t
@@ -1912,7 +1907,6 @@ class solver(ProbabilisticSolver):
             u, posterior = self.strategy.apply_updates(
                 prediction, updates=reverted.noise
             )
-            jax.debug.print("Update, {}", u.mean[:2], ordered=True)
         else:
             posterior = prediction
             fx = tree.tree_map(np.zeros_like, fx)
@@ -1936,10 +1930,8 @@ class solver(ProbabilisticSolver):
         u_pred, prediction = self.strategy.predict(
             state.solution_full, transition=transition
         )
-        # import jax
 
         u = u_pred
-        # jax.debug.print("Prediction, {}", u.std, ordered=True)
 
         # Linearize
         fx, auxiliary = self.constraint.linearize(
@@ -1949,8 +1941,7 @@ class solver(ProbabilisticSolver):
         # Update
         _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
         u, posterior = self.strategy.apply_updates(prediction, updates=reverted.noise)
-        # jax.debug.print("Update, {}", u.std, ordered=True)
-        # jax.debug.print("\n")
+
         # Return solution
         return ProbabilisticSolution(
             t=state.t + dt,
@@ -2033,6 +2024,7 @@ class solver_iterated(ProbabilisticSolver):
         fx, correction_state = self.constraint.linearize(
             rv=u_pred.marginals, state=correction_state, damp=damp, t=t
         )
+
         if self.update_at_init:
 
             def body_fun(carry):
@@ -2445,16 +2437,13 @@ class error_state_std(ErrorEstimator):
         reference = np.maximum(np.abs(u0), np.abs(u1))
 
         # Turn the unscaled absolute error into a relative one.
-        # For the dt**n / factorial bit, refer to the comment in
-        # the residual-based error estimator, which contains a similar line
-        # For the root_order - 2, we do one order less than for the residual
-        # because the present error lives in "solution space", not in
-        # "derivative space", so the Taylor-coefficient normalisation
-        # has an order less. For first-order ODEs, n = 0 as expected.
+        # In contrast to the residual-based error estimator,
+        # we don't normalise with dt because the error estimate
+        # naturally lives in "solution space"
+        # as opposed to "constraint space"
         # n = self.constraint.root_order - 2
-        # print(n)
-        # n = 0  # no normalisation
-        error_abs = error  # * dt**n / np.factorial(n)
+        n = 0  # I think n=0 should be optimal
+        error_abs = error * dt**n / np.factorial(n)
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
         # Scale the error norm with the error contraction rate and return
