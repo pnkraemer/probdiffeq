@@ -256,6 +256,7 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
 
 
 def solver_dae(*, num_derivatives: int, time_span) -> Callable:
+    """Construct an amazing DAE solver."""
 
     def root(u, du, /, *, t):
         return [vf_differential(u, du), vf_algebraic(u)]
@@ -269,18 +270,23 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
     def vf_algebraic(u):
         return u[0] + u[1] + u[2] - 1
 
-    t0, t1 = time_span
-    y0 = jnp.array([1.0, 0.0, 0.0])
-
     @jax.jit
     def param_to_solution(tol):
         # Build a solver
+        t0, t1 = time_span
+        y0 = jnp.array([1.0, 0.0, 0.0])
 
         # This initial uncertainty encodes that the third variable
         # in the initial condition is actually redundant. If we were to
         # put zero, the solver would fail because it tries to conditoin
         # something that is already certain
-        init_unc = jnp.asarray([0.0, 0.0, 1e-9])
+        # TODO: create a prior_wiener_integrated_from_initcond or so
+        #       that fills all thos taylor coefficients with zero and so on.
+        #       This could also be the place where we set
+        #       "differential_variable" like in the TODO below
+        #       so that DAEs can be solved conveniently
+        eps = 10 * jnp.finfo(y0.dtype).eps
+        init_unc = jnp.asarray([0.0, 0.0, eps])
         zeros, ones = jnp.zeros_like(y0), jnp.ones_like(y0)
         tcoeffs = [y0, *[zeros for _ in range(num_derivatives)]]
         tcoeffs_std = [init_unc, *[ones for _ in range(num_derivatives)]]
@@ -288,22 +294,35 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
         # This base scale is also critical to Robertson, because
         # the solutions live on vastly different scales
         # (but don't vary much within these scales). Priming the output
-        # scale like this is really beneficial for the solver
+        # scale like this is really beneficial for the solver.
+        # TODO: what is the best "prime" for the solver?
+        #       this should be an expectation-maximisation thing right?
         base_scale = jnp.diag(jnp.asarray([1e0, 1e-4, 1e-1]))
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(
             tcoeffs, tcoeffs_std=tcoeffs_std, output_scale=base_scale
         )
+
+        # TODO: Give all root-constraints some argument like
+        #       differential_variable=[True, True, False] or so
+        #       like in DifferentialEquations.jl, where for the
+        #       variables that are not differential, the marginal
+        #       STD in the initialisation step is inflated
+        #       by a machine epsilon to avoid dividing by zero.
+        #       Currently, a user needs to do this manually.
+        #       (Or document this really well?)
         ts = probdiffeq.constraint_root_jet_ts1(root, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
-        # For proper DAEs, non-iterated solver's don't cut it
+        # For proper DAEs, non-iterated solver's simply don't cut it
+        # Should we iterate MLE solvers and dynamic solvers as well?
+        # (Though: "you dont solve a problem you dont have...")
         eps = 10 * jnp.finfo(y0.dtype).eps
         solver = probdiffeq.solver_iterated(
             strategy=strategy,
             prior=ibm,
             constraint=ts,
             ssm=ssm,
-            update_at_init=True,
+            update_at_init=True,  # Critical for DAEs
             tol=eps,
         )
 
