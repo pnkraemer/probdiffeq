@@ -42,7 +42,7 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 jax.config.update("jax_debug_nans", True)
 
 
-def main(start=3.0, stop=12.0, step=0.5, repeats=2, time_span=(1e-6, 1e3)):
+def main(start=7.0, stop=10.0, step=0.5, repeats=2, time_span=(1e-6, 1e3)):
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
@@ -52,7 +52,7 @@ def main(start=3.0, stop=12.0, step=0.5, repeats=2, time_span=(1e-6, 1e3)):
     save_at = jnp.exp(jnp.linspace(jnp.log(t0), jnp.log(t1), num=100))
     ts, ys = solve_ivp_once(save_at=save_at, method="LSODA")
 
-    solver = solver_probdiffeq_plot(num_derivatives=4, save_at=save_at)
+    solver = solver_plot(num_derivatives=4, save_at=save_at)
     t, mean, std = jax.jit(solver)(1e-12)
 
     _fig, ax = plt.subplots(nrows=3, figsize=(8, 8))
@@ -74,8 +74,8 @@ def main(start=3.0, stop=12.0, step=0.5, repeats=2, time_span=(1e-6, 1e3)):
 
     # Assemble algorithms
     algorithms = {
-        "Old: TS1(4)": solver_probdiffeq(num_derivatives=4, time_span=time_span),
-        "Old: TS1(7)": solver_probdiffeq(num_derivatives=7, time_span=time_span),
+        "As DAE": solver_dae(num_derivatives=4, time_span=time_span),
+        "As ODE": solver_ode(num_derivatives=4, time_span=time_span),
     }
 
     # Compute a reference solution
@@ -149,7 +149,7 @@ def setup_timeit(*, repeats: int) -> Callable:
     return timer
 
 
-def solver_probdiffeq_plot(*, num_derivatives: int, save_at) -> Callable:
+def solver_plot(*, num_derivatives: int, save_at) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     def root(u, du, /, *, t):
@@ -197,8 +197,7 @@ def solver_probdiffeq_plot(*, num_derivatives: int, save_at) -> Callable:
     return param_to_solution
 
 
-def solver_probdiffeq(*, num_derivatives: int, time_span) -> Callable:
-    """Construct a solver that wraps ProbDiffEq's solution routines."""
+def solver_ode(*, num_derivatives: int, time_span) -> Callable:
 
     def root(u, du, /, *, t):
         return du - vf(u, t=t)
@@ -237,6 +236,57 @@ def solver_probdiffeq(*, num_derivatives: int, time_span) -> Callable:
             solver=solver, error=error, control=control, clip_dt=True
         )
         solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
+        jax.debug.print("{}", solution.num_steps)
+        return jax.block_until_ready(solution.u.mean[0])
+
+    return param_to_solution
+
+
+def solver_dae(*, num_derivatives: int, time_span) -> Callable:
+
+    def root(u, du, /, *, t):
+        f1, f2, f3 = vf(u, t=t)
+        du1, du2, du3 = du
+        A = jnp.stack([du1 - f1, du2 - f2, f3])
+        return A
+
+    def vf(y, *, t):
+        k1, k2, k3 = 0.04, 3e7, 1e4
+        f0 = -k1 * y[0] + k3 * y[1] * y[2]
+        f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
+        f2 = y[0] + y[1] + y[2] - 1
+        return jnp.stack([f0, f1, f2])
+
+    t0, t1 = time_span
+    y0 = jnp.array([1.0, 0.0, 0.0])
+
+    @jax.jit
+    def param_to_solution(tol):
+        # Build a solver
+        zeros, ones = jnp.zeros_like(y0), jnp.ones_like(y0)
+        tcoeffs = [y0, *[zeros for _ in range(num_derivatives)]]
+        tcoeffs_std = [zeros, *[ones for _ in range(num_derivatives)]]
+
+        base_scale = jnp.diag(jnp.asarray([1.0, (1e-5), 1.0]))
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
+            tcoeffs, tcoeffs_std=tcoeffs_std, output_scale=base_scale
+        )
+        ts = probdiffeq.constraint_root_jet_ts1(root, ssm=ssm)
+        strategy = probdiffeq.strategy_filter(ssm=ssm)
+
+        solver = probdiffeq.solver_iterated(
+            strategy=strategy, prior=ibm, constraint=ts, ssm=ssm, update_at_init=True
+        )
+        error = probdiffeq.error_state_std(constraint=ts, prior=ibm, ssm=ssm)
+
+        control = ivpsolve.control_integral()
+
+        solve = ivpsolve.solve_adaptive_terminal_values(
+            solver=solver, error=error, control=control, clip_dt=True
+        )
+        # TODO: how do I manage to solve this thing without damping?
+        # Where are we NaN'ing out? Is it because du2 is not observed?
+        solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol, damp=1e-30)
         jax.debug.print("{}", solution.num_steps)
         return jax.block_until_ready(solution.u.mean[0])
 

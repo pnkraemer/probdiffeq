@@ -1899,6 +1899,10 @@ class solver(ProbabilisticSolver):
     def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
 
+        import jax
+
+        jax.debug.print("Prediction, {}", u.mean[:2], ordered=True)
+
         correction_state = self.constraint.init_linearization()
         fx, correction_state = self.constraint.linearize(
             rv=u.marginals, state=correction_state, damp=damp, t=t
@@ -1908,6 +1912,7 @@ class solver(ProbabilisticSolver):
             u, posterior = self.strategy.apply_updates(
                 prediction, updates=reverted.noise
             )
+            jax.debug.print("Update, {}", u.mean[:2], ordered=True)
         else:
             posterior = prediction
             fx = tree.tree_map(np.zeros_like, fx)
@@ -1931,8 +1936,10 @@ class solver(ProbabilisticSolver):
         u_pred, prediction = self.strategy.predict(
             state.solution_full, transition=transition
         )
+        # import jax
 
         u = u_pred
+        # jax.debug.print("Prediction, {}", u.std, ordered=True)
 
         # Linearize
         fx, auxiliary = self.constraint.linearize(
@@ -1942,7 +1949,8 @@ class solver(ProbabilisticSolver):
         # Update
         _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
         u, posterior = self.strategy.apply_updates(prediction, updates=reverted.noise)
-
+        # jax.debug.print("Update, {}", u.std, ordered=True)
+        # jax.debug.print("\n")
         # Return solution
         return ProbabilisticSolution(
             t=state.t + dt,
@@ -2443,8 +2451,10 @@ class error_state_std(ErrorEstimator):
         # because the present error lives in "solution space", not in
         # "derivative space", so the Taylor-coefficient normalisation
         # has an order less. For first-order ODEs, n = 0 as expected.
-        n = self.constraint.root_order - 2
-        error_abs = error * dt**n / np.factorial(n)
+        # n = self.constraint.root_order - 2
+        # print(n)
+        # n = 0  # no normalisation
+        error_abs = error  # * dt**n / np.factorial(n)
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
         # Scale the error norm with the error contraction rate and return
