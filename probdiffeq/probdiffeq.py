@@ -1071,13 +1071,8 @@ def prior_wiener_integrated(
     # Choose a state-space model factorisation
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
 
-    # Set up the transitions
-
-    # TODO: should the output_scale be an argument to solve()?
-    if output_scale is None:
-        output_scale = np.ones_like(ssm.prototypes.output_scale())
-
-    output_scale = np.asarray(output_scale)
+    # Set up the transitions; output_scale = None is handled
+    # by the state-space model implementation
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
 
     if tcoeffs_std is None:

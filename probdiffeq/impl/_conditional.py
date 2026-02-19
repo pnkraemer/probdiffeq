@@ -692,26 +692,26 @@ class DenseConditional(ConditionalBackend):
 
         a, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
         (d,) = self.ode_shape
-        assert d == 3  # robertson hack
 
         eye_d = np.eye(d)
         A = np.kron(a, eye_d)
 
-        diag = linalg.diagonal_matrix(np.asarray([1.0, np.sqrt(1e-5), 1.0]))
-        # diag = eye_d
-        Q = np.kron(q_sqrtm, diag)
+        if base_scale is None:
+            base_scale = eye_d
+        else:
+            assert base_scale.ndim == 2  # Base scale covariance matrix
+        Q = np.kron(q_sqrtm, base_scale)
 
         q0 = np.zeros(self.flat_shape)
 
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
 
         def discretise(dt, output_scale):
-            scale = base_scale * output_scale
             p, p_inv = precon_fun(dt)
             p = np.repeat(p, d)
             p_inv = np.repeat(p_inv, d)
 
-            noise = _normal.Normal(q0, scale * Q)
+            noise = _normal.Normal(q0, output_scale * Q)
             return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
         return discretise
@@ -844,6 +844,10 @@ class IsotropicConditional(ConditionalBackend):
         A, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1, *self.ode_shape))
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
+        if base_scale is None:
+            base_scale = np.ones(())  # TODO: allow matrix-valued base scales somehow?
+        else:
+            assert base_scale.shape == ()
 
         def discretise(dt, output_scale):
             scale = base_scale * output_scale
@@ -995,6 +999,12 @@ class BlockDiagConditional(ConditionalBackend):
         a, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1,))
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
+
+        (d,) = self.ode_shape
+        if base_scale is None:
+            base_scale = np.ones((d,))
+        else:
+            assert base_scale.shape == (d,)
 
         def discretise(dt, output_scale):
             p, p_inv = precon_fun(dt)

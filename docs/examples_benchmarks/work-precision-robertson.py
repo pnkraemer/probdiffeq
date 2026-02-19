@@ -219,7 +219,10 @@ def solver_probdiffeq(*, num_derivatives: int, time_span) -> Callable:
         # TODO: for eg robertson, I would really like to be able to calibrate
         #   a diagonal output scale in dense models. In general, we should be able to
         #   generate dense output scales here, right?
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
+        base_scale = jnp.diag(jnp.asarray([1.0, jnp.sqrt(1e-5), 1.0]))
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
+            tcoeffs, ssm_fact="dense", output_scale=base_scale
+        )
         ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
