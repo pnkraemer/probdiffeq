@@ -74,7 +74,8 @@ def main(start=3.0, stop=12.0, step=0.5, repeats=2, time_span=(1e-6, 1e3)):
 
     # Assemble algorithms
     algorithms = {
-        "Old: TS1(4)": solver_probdiffeq(num_derivatives=4, time_span=time_span)
+        "Old: TS1(4)": solver_probdiffeq(num_derivatives=4, time_span=time_span),
+        "Old: TS1(7)": solver_probdiffeq(num_derivatives=7, time_span=time_span),
     }
 
     # Compute a reference solution
@@ -170,14 +171,16 @@ def solver_probdiffeq_plot(*, num_derivatives: int, save_at) -> Callable:
         vf_auto = functools.partial(vf, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (y0,), num=num_derivatives - 1)
 
-        # TODO: for eg robertson, I would really like to be able to calibrate
-        #   a diagonal output scale in dense models. In general, we should be able to
-        #   generate dense output scales here, right?
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
+        # Very important for Robertson: anisotropic output scales
+        base_scale = jnp.diag(jnp.asarray([1.0, jnp.sqrt(1e-5), 1.0]))
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
+            tcoeffs, output_scale=base_scale
+        )
         ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
-        strategy = probdiffeq.strategy_filter(ssm=ssm)
+        strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 
-        solver = probdiffeq.solver_dynamic(
+        # No need for dynamic solvers because the output scales don't vary much
+        solver = probdiffeq.solver_iterated(
             strategy=strategy, prior=ibm, constraint=ts, ssm=ssm
         )
         error = probdiffeq.error_state_std(constraint=ts, prior=ibm, ssm=ssm)
@@ -216,17 +219,14 @@ def solver_probdiffeq(*, num_derivatives: int, time_span) -> Callable:
         vf_auto = functools.partial(vf, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (y0,), num=num_derivatives - 1)
 
-        # TODO: for eg robertson, I would really like to be able to calibrate
-        #   a diagonal output scale in dense models. In general, we should be able to
-        #   generate dense output scales here, right?
         base_scale = jnp.diag(jnp.asarray([1.0, jnp.sqrt(1e-5), 1.0]))
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            tcoeffs, ssm_fact="dense", output_scale=base_scale
+            tcoeffs, output_scale=base_scale
         )
         ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
-        solver = probdiffeq.solver_dynamic(
+        solver = probdiffeq.solver_iterated(
             strategy=strategy, prior=ibm, constraint=ts, ssm=ssm
         )
         error = probdiffeq.error_state_std(constraint=ts, prior=ibm, ssm=ssm)

@@ -2058,6 +2058,9 @@ class solver_iterated(ProbabilisticSolver):
             u, posterior = u_pred, prediction
             fx = tree.tree_map(np.zeros_like, fx)
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        # TODO: the number of function evaluations should also be reflected
+        # in the solution object, so that we can communicate if an iterative
+        # solver took excessive attempts or so
         return ProbabilisticSolution(
             t=t,
             u=u,
