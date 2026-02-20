@@ -77,7 +77,7 @@ def main(start=2.0, stop=12.0, step=1.0, repeats=2, time_span=(1e-6, 1e5)):
     algorithms = {
         "DAE | Jet": solver_dae(num_derivatives=4, time_span=time_span),
         "ODE | TS1": solver_ode(num_derivatives=4, time_span=time_span),
-        "ODE | BDF (Scipy)": solver_scipy(method="BDF", time_span=time_span),
+        # "ODE | BDF (Scipy)": solver_scipy(method="BDF", time_span=time_span),
         "ODE | LSODA (Scipy)": solver_scipy(method="LSODA", time_span=time_span),
         "ODE | Radau (Scipy)": solver_scipy(method="Radau", time_span=time_span),
     }
@@ -227,56 +227,33 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
 
     @jax.jit
     def param_to_solution(tol):
-        # Build a solver
-        t0, t1 = time_span
-        y0 = jnp.array([1.0, 0.0, 0.0])
 
-        # This initial uncertainty encodes that the third variable
-        # in the initial condition is actually redundant. If we were to
-        # put zero, the solver would fail because it tries to conditoin
-        # something that is already certain
-        # TODO: create a prior_wiener_integrated_from_initcond or so
-        #       that fills all thos taylor coefficients with zero and so on.
-        #       This could also be the place where we set
-        #       "differential_variable" like in the TODO below
-        #       so that DAEs can be solved conveniently
-        eps = 10 * jnp.finfo(y0.dtype).eps
-        init_unc = jnp.asarray([0.0, 0.0, eps])
-        zeros, ones = jnp.zeros_like(y0), jnp.ones_like(y0)
-        tcoeffs = [y0, *[zeros for _ in range(num_derivatives)]]
-        tcoeffs_std = [init_unc, *[ones for _ in range(num_derivatives)]]
-
-        # This base scale is also critical to Robertson, because
+        # This base scale is critical to Robertson, because
         # the solutions live on vastly different scales
-        # (but don't vary much within these scales). Priming the output
-        # scale like this is really beneficial for the solver.
-        # TODO: what is the best "prime" for the solver?
+        # (but don't vary much within these scales).
+        # TODO: what is the best "base output scale" for the solver?
         #       this should be an expectation-maximisation thing right?
         base_scale = jnp.diag(jnp.asarray([1e0, 1e-4, 1e-1]))
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated_diffuse(
-            tcoeffs, tcoeffs_std, output_scale=base_scale
+
+        # For DAEs, not all variables are differential, and we need to have
+        #   and idea which ones arent to stabilise the solver initialisation
+        y0 = [jnp.array([1.0, 0.0, 0.0])]
+        differential = [jnp.array([True, True, False])]
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
+            y0,
+            output_scale=base_scale,
+            add_derivatives=num_derivatives,
+            differential_variable=differential,
         )
 
-        # TODO: Give all root-constraints some argument like
-        #       differential_variable=[True, True, False] or so
-        #       like in DifferentialEquations.jl, where for the
-        #       variables that are not differential, the marginal
-        #       STD in the initialisation step is inflated
-        #       by a machine epsilon to avoid dividing by zero.
-        #       Currently, a user needs to do this manually.
-        #       (Or document this really well?)
-        ts = probdiffeq.constraint_root_jet(root, ssm=ssm)
+        # We build a JEt constraint
+        jet = probdiffeq.constraint_root_jet(root, ssm=ssm)
+        ts = probdiffeq.constraint_root_ts1(root, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         # For proper DAEs, non-iterated solver's simply don't cut it
-        eps = 10 * jnp.finfo(y0.dtype).eps
         solver = probdiffeq.solver_iterated(
-            strategy=strategy,
-            prior=ibm,
-            constraint=ts,
-            ssm=ssm,
-            constraint_init=ts,  # Critical for DAEs
-            tol=eps,
+            strategy=strategy, prior=ibm, constraint=jet, ssm=ssm, constraint_init=jet
         )
 
         # The state-error-estimate doesn't care about the dimension
@@ -289,8 +266,7 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
         solve = ivpsolve.solve_adaptive_terminal_values(
             solver=solver, error=error, control=control, clip_dt=True
         )
-        # TODO: how do I manage to solve this thing without damping?
-        # Where are we NaN'ing out? Is it because du2 is not observed?
+        t0, t1 = time_span
         solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
 
         return jax.block_until_ready(solution.u.mean[0])

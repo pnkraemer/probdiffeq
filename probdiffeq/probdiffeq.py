@@ -1059,6 +1059,8 @@ def prior_wiener_integrated(
     *,
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
+    add_derivatives: bool = 0,
+    differential_variable=None,
 ):
     """Construct an repeatedly-integrated Wiener process.
 
@@ -1067,24 +1069,43 @@ def prior_wiener_integrated(
     high-order solvers in low precision arithmetic. Outside of these cases,
     leave the standard deviations at zero to improve accuracy.
     """
+    # If differential_variable is not None, it must be a pytree whose
+    # shape matches that of tcoeffs exactly.
+    # Prime application: len(tcoeffs) = 1 and add_derivatives > 0.
+
     # Choose a state-space model factorisation
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
 
-    if tcoeffs_std is None:
-        error_like = np.zeros_like(ssm.prototypes.error_estimate())
-        tcoeffs_std = tree.tree_map(lambda _: error_like, tcoeffs)
+    # Construct zero-standard deviations
+    def init_std_diffvar(tc, is_diff_var):
+        std = np.zeros_like(ssm.prototypes.error_estimate())
+        eps = 10 * np.finfo_eps(std.dtype)
+        return np.where(is_diff_var, std, std + eps)
+
+    def init_std(tc):
+        return np.zeros_like(ssm.prototypes.error_estimate())
+
+    if differential_variable is not None:
+        tcoeffs_std = tree.tree_map(init_std_diffvar, tcoeffs, differential_variable)
+    else:
+        tcoeffs_std = tree.tree_map(init_std, tcoeffs)
 
     return prior_wiener_integrated_diffuse(
-        tcoeffs, tcoeffs_std, ssm_fact=ssm_fact, output_scale=output_scale
+        tcoeffs,
+        tcoeffs_std,
+        ssm_fact=ssm_fact,
+        output_scale=output_scale,
+        add_derivatives=add_derivatives,
     )
 
 
 def prior_wiener_integrated_diffuse(
     tcoeffs_mean: C,
-    *,
     tcoeffs_std: C,
+    *,
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
+    add_derivatives: int = 0,
 ):
     """Construct an diffuse repeatedly-integrated Wiener process.
 
@@ -1097,19 +1118,23 @@ def prior_wiener_integrated_diffuse(
 
     Outside of these cases, use the usual integrated Wiener process.
     """
+    # Add derivatives to the Taylor coefficients.
+    # Warning: This destroys pytree structure in the tcoeffs and the
+    # resulting pytree will always be a list (for now at least)
+    u0_like = tcoeffs_mean[0]
+    zeros, ones = np.zeros_like(u0_like), np.ones_like(u0_like)
+    tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(add_derivatives)]]
+    tcoeffs_std = [*tcoeffs_std, *[ones for _ in range(add_derivatives)]]
+
     # Choose a state-space model factorisation
-    ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
+    ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs_mean)
 
     # Set up the transitions; output_scale = None is handled
     # by the state-space model implementation
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
 
-    if tcoeffs_std is None:
-        error_like = np.zeros_like(ssm.prototypes.error_estimate())
-        tcoeffs_std = tree.tree_map(lambda _: error_like, tcoeffs)
-
     # Return the target
-    marginal = ssm.normal.from_tcoeffs(tcoeffs, tcoeffs_std)
+    marginal = ssm.normal.from_tcoeffs(tcoeffs_mean, tcoeffs_std)
     u_mean = ssm.stats.qoi(marginal)
     std = ssm.stats.standard_deviation(marginal)
     u_std = ssm.stats.qoi_from_sample(std)
