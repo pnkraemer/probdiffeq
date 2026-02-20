@@ -265,8 +265,7 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
         #       by a machine epsilon to avoid dividing by zero.
         #       Currently, a user needs to do this manually.
         #       (Or document this really well?)
-        # TODO: replace jet_ts1 with jet(backend=ts1)
-        ts = probdiffeq.constraint_root_jet_ts1(root, ssm=ssm)
+        ts = probdiffeq.constraint_root_jet(root, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         # For proper DAEs, non-iterated solver's simply don't cut it

@@ -383,7 +383,7 @@ def constraint_root_ts1(root, /, *, ssm, jacobian=None):
     return ssm.linearize.root_taylor_1st(root, root_order=root_order, jacobian=jacobian)
 
 
-def constraint_root_jet_ts1(root, /, *, ssm, jacobian=None):
+def constraint_root_jet(root, /, *, ssm, jacobian=None):
     """Construct a constraint based on a custom root.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -398,10 +398,9 @@ def constraint_root_jet_ts1(root, /, *, ssm, jacobian=None):
         raise ValueError(msg)
 
     if jacobian is None:
-        # Use hutchinson Jacobian handling for backward compatibility.
         jacobian = jacobian_hutchinson_fwd()
 
-    def root_extended(*tcoeffs_all, t):
+    def root_jet(*tcoeffs_all, t):
         # TODO: if we apply the preconditioner before passing
         #   things in here, we can set is_tcoeff to True and possibly
         #   gain a bunch of numerical robustness
@@ -409,8 +408,10 @@ def constraint_root_jet_ts1(root, /, *, ssm, jacobian=None):
         primals, series = func.jet(lambda *y: root(*y, t=t), ps, ss, is_tcoeff=False)
         return [primals, *series]
 
+    # TODO: once we have a second root constraint (eg slr1),
+    #       offer the below as a function argument.
     return ssm.linearize.root_taylor_1st(
-        root_extended, root_order=ssm.num_derivatives + 1, jacobian=jacobian
+        root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian
     )
 
 
