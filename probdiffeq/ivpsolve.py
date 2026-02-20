@@ -204,7 +204,9 @@ def solve_adaptive_save_at(
         warnings.warn(msg, stacklevel=1)
 
     if control is None:
-        control = control_proportional_integral()
+        # In probabilistic solvers, integral controllers seem to work better
+        # than proportional-integral controllers.
+        control = control_integral()
 
     loop = RejectionLoop(
         solver=solver,
