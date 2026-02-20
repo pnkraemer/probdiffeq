@@ -270,14 +270,13 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         # For proper DAEs, non-iterated solver's simply don't cut it
-        # TODO: replace `update_at_init` with `constraint_init=None`
         eps = 10 * jnp.finfo(y0.dtype).eps
         solver = probdiffeq.solver_iterated(
             strategy=strategy,
             prior=ibm,
             constraint=ts,
             ssm=ssm,
-            update_at_init=True,  # Critical for DAEs
+            constraint_init=ts,  # Critical for DAEs
             tol=eps,
         )
 

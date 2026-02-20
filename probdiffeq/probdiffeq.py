@@ -1639,14 +1639,12 @@ class solver_mle(ProbabilisticSolver):
 
     def init(self, t, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
-        correction_state = self.constraint.init_linearization()
+        cstate = self.constraint.init_linearization()
 
         output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale())
 
         # Update
-        fx, correction_state = self.constraint.linearize(
-            u.marginals, correction_state, damp=damp, t=t
-        )
+        fx, cstate = self.constraint.linearize(u.marginals, cstate, damp=damp, t=t)
         if self.update_at_init:
             observed, reverted = self.ssm.conditional.revert(u.marginals, fx)
             updates = reverted.noise
@@ -1657,12 +1655,12 @@ class solver_mle(ProbabilisticSolver):
             output_scale_running = self.ssm.stats.mahalanobis_norm_relative(
                 0.0, observed
             )
-            auxiliary = (correction_state, output_scale_running, 1)
+            auxiliary = (cstate, output_scale_running, 1)
         else:
             fx = tree.tree_map(np.zeros_like, fx)
             posterior = prediction
             output_scale_running = np.zeros_like(output_scale_prior)
-            auxiliary = (correction_state, output_scale_running, 0)
+            auxiliary = (cstate, output_scale_running, 0)
 
         return ProbabilisticSolution(
             t=t,
@@ -1686,7 +1684,7 @@ class solver_mle(ProbabilisticSolver):
 
         # Linearize
         (lin_state, output_scale_running, num_data) = state.auxiliary
-        fx, correction_state = self.constraint.linearize(
+        fx, cstate = self.constraint.linearize(
             u.marginals, state=lin_state, damp=damp, t=state.t + dt
         )
 
@@ -1704,7 +1702,7 @@ class solver_mle(ProbabilisticSolver):
         )
 
         # Return the state
-        auxiliary = (correction_state, output_scale_running, num_data + 1)
+        auxiliary = (cstate, output_scale_running, num_data + 1)
         return ProbabilisticSolution(
             t=state.t + dt,
             u=u,
@@ -1891,32 +1889,40 @@ class solver(ProbabilisticSolver):
         prior: Callable,
         ssm: Any,
         strategy: MarkovStrategy,
-        update_at_init: bool = False,
+        constraint_init: Constraint | None = None,
     ):
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
-        self.update_at_init = update_at_init
+        self.constraint_init = constraint_init
 
     def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
-        u, prediction = self.strategy.init_posterior(u=u)
-        correction_state = self.constraint.init_linearization()
-        fx, correction_state = self.constraint.linearize(
-            rv=u.marginals, state=correction_state, damp=damp, t=t
-        )
-        if self.update_at_init:
-            _, reverted = self.ssm.conditional.revert(u.marginals, fx)
+        u_pred, prediction = self.strategy.init_posterior(u=u)
+
+        if self.constraint_init is not None:
+            co = self.constraint.init_linearization()
+            fx, _co = self.constraint_init.linearize(
+                rv=u_pred.marginals, state=co, damp=damp, t=t
+            )
+            _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
             u, posterior = self.strategy.apply_updates(
                 prediction, updates=reverted.noise
             )
         else:
-            posterior = prediction
-            fx = tree.tree_map(np.zeros_like, fx)
+            u, posterior = u_pred, prediction
+
+        cstate = self.constraint.init_linearization()
+        # TODO: replace the below with jax.eval_shape
+        # because we don't really want to evaluate anything here
+        fx, cstate = self.constraint.linearize(
+            rv=u_pred.marginals, state=cstate, damp=damp, t=t
+        )
+        fx = tree.tree_map(np.zeros_like, fx)
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
         return ProbabilisticSolution(
             t=t,
             u=u,
             solution_full=posterior,
             num_steps=0,
-            auxiliary=correction_state,
+            auxiliary=cstate,
             output_scale=output_scale,
             fun_evals=fx,
         )
@@ -2006,58 +2012,95 @@ class solver_iterated(ProbabilisticSolver):
         prior: Callable,
         ssm: Any,
         strategy: MarkovStrategy,
-        update_at_init: bool = False,
+        constraint_init: Constraint | None = None,
         tol: float | None = None,
         maxiter: int = 10,
+        while_loop=flow.while_loop,
     ):
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
-        self.update_at_init = update_at_init
+        self.constraint_init = constraint_init
 
         float_eps = np.finfo_eps(np.asarray(1.0).dtype)
         self.tol = tol if tol is not None else float_eps**0.5
         self.maxiter = maxiter
+        self.while_loop = while_loop
+
+    # TODO: move this outside the init and reuse in the step
+    @tree.register_dataclass
+    @structs.dataclass
+    class IState:
+        """A data structure for carrying state in iterated solvers."""
+
+        do_continue: float
+        i: int
+        linearize_at: Any
+        cstate: Any  # constraint-state
+        updated_u: Any
+        updated_posterior: Any
+        fx: Any = None
+
+    def make_body_fun(self, u_pred, prediction, *, constraint, damp, t):
+        """Create the body-function for the while-loop in an iterated solver."""
+
+        def body_fun(carry: solver_iterated.IState) -> solver_iterated.IState:
+            # _do_continue, i, lin_at, corrstate, _updated = carry
+            # Linearize
+            fx, cstate = constraint.linearize(
+                carry.linearize_at, carry.cstate, damp=damp, t=t
+            )
+
+            # Update
+            _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
+            u_upd, posterior = self.strategy.apply_updates(
+                prediction, updates=reverted.noise
+            )
+
+            diff = u_upd.marginals.mean - carry.linearize_at.mean
+            u = u_upd
+
+            diff_norm = linalg.vector_norm(diff) / np.sqrt(diff.size)
+            i = carry.i + 1
+            do_continue = np.logical_and(diff_norm > self.tol, i < self.maxiter)
+            return self.IState(
+                do_continue=do_continue,
+                i=i,
+                linearize_at=u.marginals,
+                cstate=cstate,
+                updated_u=u_upd,
+                updated_posterior=posterior,
+                fx=fx if carry.fx is not None else None,
+            )
+
+        return body_fun
 
     def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         u_pred, prediction = self.strategy.init_posterior(u=u)
 
-        correction_state = self.constraint.init_linearization()
-        fx, correction_state = self.constraint.linearize(
-            rv=u_pred.marginals, state=correction_state, damp=damp, t=t
-        )
-
-        if self.update_at_init:
-
-            def body_fun(carry):
-                _do_continue, i, lin_at, corrstate, _fx, _updated = carry
-                # Linearize
-                fx, corrstate = self.constraint.linearize(
-                    lin_at.marginals, corrstate, damp=damp, t=t
-                )
-
-                # Update
-                _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
-                u_upd, posterior = self.strategy.apply_updates(
-                    prediction, updates=reverted.noise
-                )
-
-                diff = u_upd.marginals.mean - lin_at.marginals.mean
-                u = u_upd
-
-                diff_norm = linalg.vector_norm(diff) / np.sqrt(diff.size)
-                i = i + 1
-                do_continue = np.logical_and(diff_norm > self.tol, i < self.maxiter)
-                return do_continue, i, u, corrstate, fx, (u_upd, posterior)
-
-            init = (True, 0, u_pred, correction_state, fx, (u_pred, prediction))
-            final = flow.while_loop(lambda s: s[0], body_fun, init)
-            _do_continue, _i, _linearize_at, correction_state, fx, (u, posterior) = (
-                final
+        if self.constraint_init is not None:
+            cstate = self.constraint_init.init_linearization()
+            init = self.IState(
+                do_continue=True,
+                i=0,
+                linearize_at=u_pred.marginals,
+                cstate=cstate,
+                updated_u=u_pred,
+                updated_posterior=prediction,
             )
-
+            body_fun = self.make_body_fun(
+                u_pred, prediction, constraint=self.constraint_init, damp=damp, t=t
+            )
+            final = self.while_loop(lambda s: s.do_continue, body_fun, init)
+            (u, posterior) = final.updated_u, final.updated_posterior
         else:
             u, posterior = u_pred, prediction
-            fx = tree.tree_map(np.zeros_like, fx)
+
+        cstate = self.constraint.init_linearization()
+        fx, cstate = self.constraint.linearize(
+            rv=u_pred.marginals, state=cstate, damp=damp, t=t
+        )
+
         output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+
         # TODO: the number of function evaluations should also be reflected
         # in the solution object, so that we can communicate if an iterative
         # solver took excessive attempts or so
@@ -2066,7 +2109,7 @@ class solver_iterated(ProbabilisticSolver):
             u=u,
             solution_full=posterior,
             num_steps=0,
-            auxiliary=correction_state,
+            auxiliary=cstate,
             output_scale=output_scale,
             fun_evals=fx,
         )
@@ -2081,37 +2124,28 @@ class solver_iterated(ProbabilisticSolver):
             state.solution_full, transition=transition
         )
 
-        def body_fun(carry):
-            _do_continue, i, lin_at, correction_state, _fx, _updated = carry
-            # Linearize
-            fx, correction_state = self.constraint.linearize(
-                lin_at.marginals, correction_state, damp=damp, t=state.t + dt
-            )
-
-            # Update
-            _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
-            u_upd, posterior = self.strategy.apply_updates(
-                prediction, updates=reverted.noise
-            )
-
-            diff = u_upd.marginals.mean - lin_at.marginals.mean
-            u = u_upd
-            i = i + 1
-            diff_norm = linalg.vector_norm(diff) / np.sqrt(diff.size)
-            do_continue = np.logical_and(diff_norm > self.tol, i < self.maxiter)
-            return do_continue, i, u, correction_state, fx, (u_upd, posterior)
-
-        init = (True, 0, u_pred, state.auxiliary, state.fun_evals, (u_pred, prediction))
-        final = flow.while_loop(lambda s: s[0], body_fun, init)
-        _do_continue, _i, _linearize_at, correction_state, fx, (u, posterior) = final
+        # Iterated update
+        body_fun = self.make_body_fun(
+            u_pred, prediction, constraint=self.constraint, damp=damp, t=state.t + dt
+        )
+        init = self.IState(
+            do_continue=True,
+            i=0,
+            linearize_at=u_pred.marginals,
+            cstate=state.auxiliary,
+            updated_u=u_pred,
+            updated_posterior=prediction,
+            fx=state.fun_evals,
+        )
+        final = self.while_loop(lambda s: s.do_continue, body_fun, init)
         return ProbabilisticSolution(
             t=state.t + dt,
-            u=u,
-            solution_full=posterior,
+            u=final.updated_u,
+            solution_full=final.updated_posterior,
             output_scale=output_scale,
-            auxiliary=correction_state,
+            auxiliary=final.cstate,
             num_steps=state.num_steps + 1,
-            fun_evals=fx,
+            fun_evals=final.fx,
         )
 
     def userfriendly_output(
