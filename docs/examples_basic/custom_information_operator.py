@@ -90,16 +90,14 @@ H0 = hamiltonian_1st(u0_1st)
 
 # +
 
-zeros, ones = jnp.zeros_like(u0_1st), jnp.ones_like(u0_1st)
-tcoeffs = [u0_1st, zeros, zeros]
-tcoeffs_std = [zeros, ones, ones]
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, tcoeffs_std=tcoeffs_std)
+tcoeffs = [u0_1st]
+init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, add_derivatives=2)
 ts1 = probdiffeq.constraint_ode_ts1(vf_1st, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 solver_1st = probdiffeq.solver_mle(
     strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
 )
-error = probdiffeq.error_residual_std(constraint=ts1, prior=ibm, ssm=ssm)
+error = probdiffeq.error_state_std(constraint=ts1, prior=ibm, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, error=error)
 
 # -
@@ -108,7 +106,7 @@ solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, error=error)
 
 # +
 
-sol_1 = jax.jit(solve)(init, save_at=save_at, atol=1e-3, rtol=1e-1)
+sol_1 = jax.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
 ham_1 = jax.vmap(hamiltonian_1st)(sol_1.u.mean[0])
 
 # -
@@ -138,10 +136,8 @@ def root(u, du, ddu, /, *, t):
 # +
 
 u0, du0 = jnp.split(u0_1st, 2)
-zeros, ones = jnp.zeros_like(u0), jnp.ones_like(u0)
-tcoeffs = [u0, du0, zeros]
-tcoeffs_std = [zeros, zeros, ones]  # avoid NaNs
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, tcoeffs_std=tcoeffs_std)
+tcoeffs = [u0, du0]
+init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, add_derivatives=1)
 
 # -
 
@@ -165,13 +161,10 @@ solver_2nd = probdiffeq.solver_mle(
 
 # +
 
-error_norm = probdiffeq.error_norm_rms_then_scale()
-error = probdiffeq.error_residual_std(
-    constraint=ts1, prior=ibm, ssm=ssm, error_norm=error_norm
-)
+error = probdiffeq.error_state_std(constraint=ts1, prior=ibm, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, error=error)
 
-sol_2 = jax.jit(solve)(init, save_at=save_at, atol=1e-3, rtol=1e-1)
+sol_2 = jax.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
 ham_2 = jax.vmap(hamiltonian_2nd)(sol_2.u.mean[0], sol_2.u.mean[1])
 
 # -
@@ -184,8 +177,8 @@ ham_2 = jax.vmap(hamiltonian_2nd)(sol_2.u.mean[0], sol_2.u.mean[1])
 fig, ax = plt.subplots(ncols=2, figsize=(8, 3), constrained_layout=True)
 
 ax[0].set_title("Differential equation solution", fontsize="medium")
-ax[0].plot(sol_1.u.mean[0][:, 0], sol_1.u.mean[0][:, 1], label="Standard solver")
-ax[0].plot(sol_2.u.mean[0][:, 0], sol_2.u.mean[0][:, 1], label="Custom root")
+ax[0].plot(sol_1.u.mean[0][:, 0], sol_1.u.mean[0][:, 1], "-", label="Standard solver")
+ax[0].plot(sol_2.u.mean[0][:, 0], sol_2.u.mean[0][:, 1], "-", label="Custom root")
 ax[0].legend()
 ax[0].set_xlabel("$x_1$")
 ax[0].set_ylabel("$x_2$")
@@ -197,7 +190,7 @@ ax[1].semilogy(sol_2.t, eps + jnp.abs(ham_2 - H0), label="Custom root")
 ax[1].set_xlabel("Time $t$")
 ax[1].set_ylabel("Error")
 ax[1].legend()
-ax[1].set_ylim((eps, 10))
+# ax[1].set_ylim((eps, 10))
 plt.show()
 
 # -

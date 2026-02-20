@@ -1059,8 +1059,10 @@ def prior_wiener_integrated(
     *,
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
+    # How many more derivatives to model in the state-space
     add_derivatives: bool = 0,
-    differential_variable=None,  # same tree structure as we would expect from tcoeffs
+    # same tree structure as we would expect from tcoeffs_std
+    is_differential_variable=None,
 ):
     """Construct an repeatedly-integrated Wiener process.
 
@@ -1073,21 +1075,44 @@ def prior_wiener_integrated(
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
 
     # Construct zero-standard deviations
-    def init_std_diffvar(tc, is_diff_var):
+    def init_if_some_nondiff(taylorcoeff, is_diff_var):
+        """Initialize standard-deviation if only some variables are differential.
+
+        If the Taylor coefficient is a differential variable
+        (only relevant in the context of DAEs), initialize
+        the standard-deviation as zero. Otherwise, use a small
+        but positive standard-deviation to ensure that
+        the consistent initialisation does not yield NaNs.
+        """
+        # The value is not needed, only passed to enable tree-map
+        del taylorcoeff
+
+        # The default standard deviation
         std = np.zeros_like(ssm.prototypes.error_estimate())
+
+        # Ensure the shape of the is_differential_variable is sound
+        assert is_diff_var.shape == std.shape, (is_diff_var.shape, std.shape)
+
+        # Add a small value for each state that is not differential
         eps = 10 * np.finfo_eps(std.dtype)
         return np.where(is_diff_var, std, std + eps)
 
-    def init_std(tc):
+    def init_if_all_diff(taylorcoef):
+        """Initialize the standard-deviation if all variables are differential."""
+        # The value is not needed, only passed to enable tree-map
+        del taylorcoef
+
         return np.zeros_like(ssm.prototypes.error_estimate())
 
     # TODO: check that for all factorisations, these
     # initialisations yield the correct shapes and tree structures
     # (Create a test suite for IWPs?)
-    if differential_variable is not None:
-        tcoeffs_std = tree.tree_map(init_std_diffvar, tcoeffs, differential_variable)
+    if is_differential_variable is not None:
+        tcoeffs_std = tree.tree_map(
+            init_if_some_nondiff, tcoeffs, is_differential_variable
+        )
     else:
-        tcoeffs_std = tree.tree_map(init_std, tcoeffs)
+        tcoeffs_std = tree.tree_map(init_if_all_diff, tcoeffs)
 
     return prior_wiener_integrated_diffuse(
         tcoeffs,
@@ -2459,6 +2484,7 @@ class error_state_std(ErrorEstimator):
         ssm: Any,
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default
+        derivative_idx: int = 0,
     ):
         if error_norm is None:
             error_norm = error_norm_scale_then_rms()
@@ -2468,6 +2494,7 @@ class error_state_std(ErrorEstimator):
         self.prior = prior
         self.ssm = ssm
         self.re_linearize_before_error = re_linearize_before_error
+        self.derivative_idx = derivative_idx
 
     def init_error(self):
         return self.constraint.init_linearization()
@@ -2504,25 +2531,22 @@ class error_state_std(ErrorEstimator):
         observed, conditional = self.ssm.conditional.revert(rv, linearized)
         output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
 
+        # Measure error on the n-th state (usually, n=0 because why not)
+        n = self.derivative_idx
+
         # *New:* Go back into solution space
         stdev = self.ssm.stats.standard_deviation(conditional.noise)
-        stdev = self.ssm.stats.qoi_from_sample(stdev)[0]
-        error_estimate_unscaled, _ = tree.ravel_pytree(stdev)
-        error = output_scale * error_estimate_unscaled
+        stdev = self.ssm.stats.qoi_from_sample(stdev)[n]
+        error, _ = tree.ravel_pytree(stdev)
+        error = output_scale * error
         error, _ = tree.ravel_pytree(error)
 
         # Compute a reference
-        u0, _ = tree.ravel_pytree(previous.u.mean[0])
-        u1, _ = tree.ravel_pytree(proposed.u.mean[0])
+        u0, _ = tree.ravel_pytree(previous.u.mean[n])
+        u1, _ = tree.ravel_pytree(proposed.u.mean[n])
         reference = np.maximum(np.abs(u0), np.abs(u1))
 
         # Turn the unscaled absolute error into a relative one.
-        # In contrast to the residual-based error estimator,
-        # we don't normalise with dt because the error estimate
-        # naturally lives in "solution space"
-        # as opposed to "constraint space"
-        # n = self.constraint.root_order - 2
-        n = 0  # I think n=0 should be optimal
         error_abs = error * dt**n / np.factorial(n)
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
