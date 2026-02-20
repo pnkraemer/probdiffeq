@@ -1060,7 +1060,7 @@ def prior_wiener_integrated(
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
     add_derivatives: bool = 0,
-    differential_variable=None,
+    differential_variable=None,  # same tree structure as we would expect from tcoeffs
 ):
     """Construct an repeatedly-integrated Wiener process.
 
@@ -1069,10 +1069,6 @@ def prior_wiener_integrated(
     high-order solvers in low precision arithmetic. Outside of these cases,
     leave the standard deviations at zero to improve accuracy.
     """
-    # If differential_variable is not None, it must be a pytree whose
-    # shape matches that of tcoeffs exactly.
-    # Prime application: len(tcoeffs) = 1 and add_derivatives > 0.
-
     # Choose a state-space model factorisation
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
 
@@ -1085,6 +1081,9 @@ def prior_wiener_integrated(
     def init_std(tc):
         return np.zeros_like(ssm.prototypes.error_estimate())
 
+    # TODO: check that for all factorisations, these
+    # initialisations yield the correct shapes and tree structures
+    # (Create a test suite for IWPs?)
     if differential_variable is not None:
         tcoeffs_std = tree.tree_map(init_std_diffvar, tcoeffs, differential_variable)
     else:

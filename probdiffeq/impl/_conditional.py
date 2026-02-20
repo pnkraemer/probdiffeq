@@ -699,6 +699,7 @@ class DenseConditional(ConditionalBackend):
         if base_scale is None:
             base_scale = eye_d
         else:
+            base_scale = np.asarray(base_scale)
             assert base_scale.ndim == 2  # Base scale covariance matrix
         Q = np.kron(q_sqrtm, base_scale)
 
@@ -847,6 +848,7 @@ class IsotropicConditional(ConditionalBackend):
         if base_scale is None:
             base_scale = np.ones(())  # TODO: allow matrix-valued base scales somehow?
         else:
+            base_scale = np.asarray(base_scale)
             assert base_scale.shape == ()
 
         def discretise(dt, output_scale):
