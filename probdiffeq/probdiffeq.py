@@ -1057,10 +1057,8 @@ class ProbabilisticSolver:
 def prior_wiener_integrated(
     tcoeffs: C,
     *,
-    tcoeffs_std: C | None = None,
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
-    increase_std_by_eps: bool = False,
 ):
     """Construct an repeatedly-integrated Wiener process.
 
@@ -1072,6 +1070,36 @@ def prior_wiener_integrated(
     # Choose a state-space model factorisation
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
 
+    if tcoeffs_std is None:
+        error_like = np.zeros_like(ssm.prototypes.error_estimate())
+        tcoeffs_std = tree.tree_map(lambda _: error_like, tcoeffs)
+
+    return prior_wiener_integrated_diffuse(
+        tcoeffs, tcoeffs_std, ssm_fact=ssm_fact, output_scale=output_scale
+    )
+
+
+def prior_wiener_integrated_diffuse(
+    tcoeffs_mean: C,
+    *,
+    tcoeffs_std: C,
+    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
+    output_scale: ArrayLike | None = None,
+):
+    """Construct an diffuse repeatedly-integrated Wiener process.
+
+    The diffuse process has a nonzero initial standard deviation.
+    This is typically used to:
+    - Either get more visually-pleasing uncertainties and gain
+      numerical robustness for high-order solvers in low precision arithmetic.
+    - Communicate to the solvers that the prior has not seen any data
+      (and solvers can handle data at initialisation themselves.)
+
+    Outside of these cases, use the usual integrated Wiener process.
+    """
+    # Choose a state-space model factorisation
+    ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
+
     # Set up the transitions; output_scale = None is handled
     # by the state-space model implementation
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
@@ -1079,13 +1107,6 @@ def prior_wiener_integrated(
     if tcoeffs_std is None:
         error_like = np.zeros_like(ssm.prototypes.error_estimate())
         tcoeffs_std = tree.tree_map(lambda _: error_like, tcoeffs)
-
-    # Increase the Taylor coefficient STD by a machine epsilon
-    # because the solver initialisation carries out an update
-    # and if the inputs are fully certain, this update yields NaNs.
-    if increase_std_by_eps:
-        eps = np.finfo_eps(error_like.dtype)
-        tcoeffs_std = tree.tree_map(lambda s: s + eps, tcoeffs_std)
 
     # Return the target
     marginal = ssm.normal.from_tcoeffs(tcoeffs, tcoeffs_std)

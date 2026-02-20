@@ -253,8 +253,8 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
         # TODO: what is the best "prime" for the solver?
         #       this should be an expectation-maximisation thing right?
         base_scale = jnp.diag(jnp.asarray([1e0, 1e-4, 1e-1]))
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            tcoeffs, tcoeffs_std=tcoeffs_std, output_scale=base_scale
+        init, ibm, ssm = probdiffeq.prior_wiener_integrated_diffuse(
+            tcoeffs, tcoeffs_std, output_scale=base_scale
         )
 
         # TODO: Give all root-constraints some argument like
