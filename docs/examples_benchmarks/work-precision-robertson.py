@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # WP diagram: Stiff van-der-Pol
+# # WP diagram: Robertson (ODE vs DAE)
 
 # +
 """Work-precision diagram on the Robertson problem.
@@ -45,7 +45,7 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 jax.config.update("jax_debug_nans", True)
 
 
-def main(start=2.0, stop=12.0, step=0.25, repeats=2, time_span=(1e-6, 1e5)):
+def main(start=2.0, stop=12.0, step=1.0, repeats=2, time_span=(1e-6, 1e5)):
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
@@ -55,16 +55,17 @@ def main(start=2.0, stop=12.0, step=0.25, repeats=2, time_span=(1e-6, 1e5)):
     save_at = jnp.exp(jnp.linspace(jnp.log(t0), jnp.log(t1), num=100))
     ts, ys = solve_ivp_once(save_at=save_at, tol=1e-10, method="LSODA")
 
-    _fig, ax = plt.subplots(nrows=3, figsize=(8, 8))
+    _fig, ax = plt.subplots(nrows=3, figsize=(5, 5), sharex=True)
     ax[0].set_title("Robertson solution")
     ax[0].semilogx(ts, 1e-10 + ys[:, 0])
     ax[1].semilogx(ts, 1e-10 + ys[:, 1])
     ax[2].semilogx(ts, 1e-10 + ys[:, 2])
 
-    ax[0].set_ylabel("y1")
-    ax[1].set_ylabel("y2")
-    ax[2].set_ylabel("y3")
-    ax[2].set_xlabel("t")
+    ax[0].set_ylabel("State $y_1$")
+    ax[1].set_ylabel("State $y_2$")
+    ax[2].set_ylabel("State $y_3$")
+    ax[2].set_xlabel("Time $t$")
+    ax[0].set_xlim((t0, t1))
     plt.tight_layout()
     plt.show()
 
@@ -83,19 +84,19 @@ def main(start=2.0, stop=12.0, step=0.25, repeats=2, time_span=(1e-6, 1e5)):
 
     # Compute a reference solution
     reference = solver_scipy(method="Radau", time_span=time_span)(0.1 * tolerances[-1])
-    precision_fun = rmse_relative(reference)
+    rmse_fun = rmse_relative(reference)
 
     # Compute all work-precision diagrams
     results = {}
     pbar = tqdm.tqdm(algorithms.items())
     for label, algo in pbar:
         pbar.set_description(label)
-        param_to_wp = workprec(algo, precision_fun=precision_fun, timeit_fun=timeit_fun)
+        param_to_wp = workprec(algo, precision_fun=rmse_fun, work_fun=timeit_fun)
         results[label] = param_to_wp(tolerances)
     _fig, ax = plt.subplots(ncols=2, figsize=(13, 5))
 
     for label, wp in results.items():
-        wdw = 3  # window
+        wdw = 2  # window
 
         precision, y = wp["precision"], wp["work_mean"]
         x, _ = precision.T
@@ -344,7 +345,7 @@ def rmse_relative(expected: jax.Array) -> Callable:
     return rmse
 
 
-def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
+def workprec(fun, *, precision_fun: Callable, work_fun: Callable) -> Callable:
     """Turn a parameter-to-solution function into parameter-to-workprecision."""
 
     def parameter_list_to_workprecision(list_of_args, /):
@@ -353,11 +354,11 @@ def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
         precisions = []
         for arg in list_of_args:
             precision = precision_fun(fun(arg).block_until_ready())
-            times = timeit_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
+            work = work_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
 
             precisions.append(precision)
-            works_mean.append(statistics.mean(times))
-            works_std.append(statistics.stdev(times))
+            works_mean.append(statistics.mean(work))
+            works_std.append(statistics.stdev(work))
         return {
             "work_mean": jnp.asarray(works_mean),
             "work_std": jnp.asarray(works_std),
