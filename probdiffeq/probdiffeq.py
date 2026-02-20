@@ -1083,7 +1083,7 @@ def prior_wiener_integrated(
     # because the solver initialisation carries out an update
     # and if the inputs are fully certain, this update yields NaNs.
     if increase_std_by_eps:
-        eps = np.finfo_eps(output_scale.dtype)
+        eps = np.finfo_eps(error_like.dtype)
         tcoeffs_std = tree.tree_map(lambda s: s + eps, tcoeffs_std)
 
     # Return the target

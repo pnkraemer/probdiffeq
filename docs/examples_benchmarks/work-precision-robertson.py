@@ -18,10 +18,13 @@
 # +
 """Work-precision diagram on the Robertson problem.
 
-The robertson problem is interesting for many reasons:
-- It comes in DAE, MM-ODE, and ODE form so we can compare different information operators
-- It has an exponential timescale so (good) adaptive steps are needed, fixed steps are hopeless
-- Its y-states have wildly different scales, so a good prior model is important
+The Robertson problem is interesting for many reasons:
+- It comes in DAE, MM-ODE, and ODE form
+  so we can compare different information operators
+- It has an exponential timescale so (good) adaptive
+  steps are needed; fixed steps are hopeless.
+- Its y-states have wildly different scales,
+  so a good prior model is important.
 """
 
 import functools
@@ -52,18 +55,11 @@ def main(start=2.0, stop=12.0, step=0.25, repeats=2, time_span=(1e-6, 1e5)):
     save_at = jnp.exp(jnp.linspace(jnp.log(t0), jnp.log(t1), num=100))
     ts, ys = solve_ivp_once(save_at=save_at, tol=1e-10, method="LSODA")
 
-    solver = solver_plot(num_derivatives=4, save_at=save_at)
-    t, mean, std = jax.jit(solver)(1e-10)
-
     _fig, ax = plt.subplots(nrows=3, figsize=(8, 8))
     ax[0].set_title("Robertson solution")
     ax[0].semilogx(ts, 1e-10 + ys[:, 0])
     ax[1].semilogx(ts, 1e-10 + ys[:, 1])
     ax[2].semilogx(ts, 1e-10 + ys[:, 2])
-
-    ax[0].semilogx(t, 1e-10 + mean[:, 0])
-    ax[1].semilogx(t, 1e-10 + mean[:, 1])
-    ax[2].semilogx(t, 1e-10 + mean[:, 2])
 
     ax[0].set_ylabel("y1")
     ax[1].set_ylabel("y2")
@@ -131,6 +127,7 @@ def solve_ivp_once(*, save_at, method, tol):
     """Compute plotting-values for the IVP."""
 
     def vf(t, y):
+        del t
         k1, k2, k3 = 0.04, 3e7, 1e4
         f0 = -k1 * y[0] + k3 * y[1] * y[2]
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
@@ -166,58 +163,14 @@ def setup_timeit(*, repeats: int) -> Callable:
     return timer
 
 
-def solver_plot(*, num_derivatives: int, save_at) -> Callable:
-    """Construct a solver that wraps ProbDiffEq's solution routines."""
-
-    def root(u, du, /, *, t):
-        return du - vf(u, t=t)
-
-    def vf(y, *, t):
-        k1, k2, k3 = 0.04, 3e7, 1e4
-        f0 = -k1 * y[0] + k3 * y[1] * y[2]
-        f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
-        f2 = k2 * y[1] ** 2
-        return jnp.stack([f0, f1, f2])
-
-    t0, t1 = save_at[0], save_at[-1]
-    y0 = jnp.array([1.0, 0.0, 0.0])
-
-    @jax.jit
-    def param_to_solution(tol):
-        # Build a solver
-        vf_auto = functools.partial(vf, t=t0)
-        tcoeffs = taylor.odejet_padded_scan(vf_auto, (y0,), num=num_derivatives - 1)
-
-        # Very important for Robertson: anisotropic output scales
-        base_scale = jnp.diag(jnp.asarray([1e0, 1e-4, 1e-1]))
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            tcoeffs, output_scale=base_scale
-        )
-        ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
-        strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-
-        # No need for dynamic solvers because the output scales don't vary much
-        solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts, ssm=ssm)
-        error = probdiffeq.error_state_std(constraint=ts, prior=ibm, ssm=ssm)
-
-        control = ivpsolve.control_integral()
-
-        solve = ivpsolve.solve_adaptive_save_at(
-            solver=solver, error=error, control=control, clip_dt=True
-        )
-        solution = solve(init, save_at=save_at, atol=1e-3 * tol, rtol=tol)
-
-        return solution.t, solution.u.mean[0], solution.u.std[0]
-
-    return param_to_solution
-
-
 def solver_ode(*, num_derivatives: int, time_span) -> Callable:
+    """Construct a method that solves Robertson as an ODE."""
 
     def root(u, du, /, *, t):
         return du - vf(u, t=t)
 
     def vf(y, *, t):
+        del t
         k1, k2, k3 = 0.04, 3e7, 1e4
         f0 = -k1 * y[0] + k3 * y[1] * y[2]
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
@@ -256,9 +209,10 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
 
 
 def solver_dae(*, num_derivatives: int, time_span) -> Callable:
-    """Construct an amazing DAE solver."""
+    """Construct a method that solves Robertson as a DAE."""
 
     def root(u, du, /, *, t):
+        del t
         return [vf_differential(u, du), vf_algebraic(u)]
 
     def vf_differential(y, du):
@@ -310,12 +264,12 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
         #       by a machine epsilon to avoid dividing by zero.
         #       Currently, a user needs to do this manually.
         #       (Or document this really well?)
+        # TODO: replace jet_ts1 with jet(backend=ts1)
         ts = probdiffeq.constraint_root_jet_ts1(root, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         # For proper DAEs, non-iterated solver's simply don't cut it
-        # Should we iterate MLE solvers and dynamic solvers as well?
-        # (Though: "you dont solve a problem you dont have...")
+        # TODO: replace `update_at_init` with `constraint_init=None`
         eps = 10 * jnp.finfo(y0.dtype).eps
         solver = probdiffeq.solver_iterated(
             strategy=strategy,
@@ -349,6 +303,7 @@ def solver_scipy(*, method: str, time_span) -> Callable:
     """Construct a solver that wraps SciPy's solution routines."""
 
     def vf(t, y):
+        del t
         k1, k2, k3 = 0.04, 3e7, 1e4
         f0 = -k1 * y[0] + k3 * y[1] * y[2]
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
