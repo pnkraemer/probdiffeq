@@ -240,14 +240,18 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
         # For DAEs, not all variables are differential, and we need to have
         #   and idea which ones arent to stabilise the solver initialisation
         y0 = [jnp.array([1.0, 0.0, 0.0])]
-        is_differential_variable = [jnp.array([True, True, False])]
+        is_differential = [jnp.array([True, True, False])]
+        is_differential = [jnp.array(True)]
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(
             y0,
             output_scale=lambda s: base_scale * s,
-            add_derivatives=num_derivatives,
-            is_differential_variable=is_differential_variable,
+            diffuse_derivatives=num_derivatives,
+            is_differential=is_differential,
+            ssm_fact="isotropic",
         )
-
+        print(init.mean)
+        print(init.std)
+        assert False
         # We build a Jet constraint
         jet = probdiffeq.constraint_root_jet(root, ssm=ssm)
         ts = probdiffeq.constraint_root_ts1(root, ssm=ssm)

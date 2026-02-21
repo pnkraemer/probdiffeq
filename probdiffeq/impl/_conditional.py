@@ -859,6 +859,8 @@ class IsotropicConditional(ConditionalBackend):
         return LatentCond(matrix, noise, to_latent=ones, to_observed=ones)
 
     def ibm_transitions(self, base_scale):
+        if base_scale is not None:
+            raise NotImplementedError("Todo...")
         A, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1, *self.ode_shape))
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
@@ -1015,6 +1017,9 @@ class BlockDiagConditional(ConditionalBackend):
         return LatentCond(matrix, noise, to_latent=ones, to_observed=ones)
 
     def ibm_transitions(self, base_scale):
+        if base_scale is not None:
+            raise NotImplementedError("Todo...")
+
         a, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1,))
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)

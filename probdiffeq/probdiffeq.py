@@ -1059,10 +1059,12 @@ def prior_wiener_integrated(
     *,
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: Callable | None = None,
-    # How many more derivatives to model in the state-space
-    add_derivatives: bool = 0,
-    # same tree structure as we would expect from tcoeffs_std
-    is_differential_variable=None,
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps=1e4,  # a large value
+    # Which of the Taylor coefficients are differential variables
+    is_differential=None,
+    nondifferential_eps=1e-8,  # a small value
 ):
     """Construct an repeatedly-integrated Wiener process.
 
@@ -1071,55 +1073,60 @@ def prior_wiener_integrated(
     high-order solvers in low precision arithmetic. Outside of these cases,
     leave the standard deviations at zero to improve accuracy.
     """
-    # Choose a state-space model factorisation
-    ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
-
-    # Construct zero-standard deviations
-    def init_if_some_nondiff(taylorcoeff, is_diff_var):
-        """Initialize standard-deviation if only some variables are differential.
-
-        If the Taylor coefficient is a differential variable
-        (only relevant in the context of DAEs), initialize
-        the standard-deviation as zero. Otherwise, use a small
-        but positive standard-deviation to ensure that
-        the consistent initialisation does not yield NaNs.
-        """
-        # The value is not needed, only passed to enable tree-map
-        del taylorcoeff
-
-        # The default standard deviation
-        std = np.zeros_like(ssm.prototypes.error_estimate())
-
-        # Ensure the shape of the is_differential_variable is sound
-        assert is_diff_var.shape == std.shape, (is_diff_var.shape, std.shape)
-
-        # Add a small value for each state that is not differential
-        eps = 10 * np.finfo_eps(std.dtype)
-        return np.where(is_diff_var, std, std + eps)
-
-    def init_if_all_diff(taylorcoef):
-        """Initialize the standard-deviation if all variables are differential."""
-        # The value is not needed, only passed to enable tree-map
-        del taylorcoef
-
-        return np.zeros_like(ssm.prototypes.error_estimate())
-
-    # TODO: check that for all factorisations, these
-    # initialisations yield the correct shapes and tree structures
-    # (Create a test suite for IWPs?)
-    if is_differential_variable is not None:
-        tcoeffs_std = tree.tree_map(
-            init_if_some_nondiff, tcoeffs, is_differential_variable
-        )
-    else:
-        tcoeffs_std = tree.tree_map(init_if_all_diff, tcoeffs)
-
+    tcoeffs_std = _tcoeffs_std_from_differential_vars(
+        tcoeffs,
+        is_differential=is_differential,
+        nondifferential_eps=nondifferential_eps,
+        ssm_fact=ssm_fact,
+    )
     return prior_wiener_integrated_diffuse(
         tcoeffs,
         tcoeffs_std,
         ssm_fact=ssm_fact,
         output_scale=output_scale,
-        add_derivatives=add_derivatives,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+    )
+
+
+def _tcoeffs_std_from_differential_vars(
+    tcoeffs, *, ssm_fact, is_differential, nondifferential_eps
+):
+    ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
+
+    # The expected shape for 'is_differential' is a Pytree with the
+    # same tree-structure as the Taylor coefficients and the leaf structure
+    # according to the SSM factorisation. That is, for blockdiag and dense,
+    # the leaves match those of the leaves of the Taylor coefficients;
+    # for isotropic, the leaves are scalars.
+    leaves, structure = tree.tree_flatten(tcoeffs)
+    std0_template = np.zeros_like(ssm.prototypes.error_estimate())
+    trues = np.where(std0_template == 0, True, False)
+    std_template = tree.tree_unflatten(structure, [trues for _ in leaves])
+
+    # If is_differential hasn't been passed, use the template.
+    if is_differential is None:
+        is_differential = tree.tree_map(np.zeros_like, std_template)
+    else:
+        # If is_differential is passed, assert it has the correct shape
+        try:
+
+            def tree_shape_equal(A, B):
+                return tree.tree_map(shape_equal, A, B)
+
+            def shape_equal(a, b):
+                return a.shape == b.shape
+
+            shape_equal = tree_shape_equal(is_differential, std_template)
+            assert tree.tree_all(shape_equal)
+        except (ValueError, AssertionError) as err:
+            msg = "Input 'is_differential' has the wrong PyTree structure."
+            msg += f" Expected: {tree.tree_map(np.shape, std_template)}."
+            msg += f" Received: {tree.tree_map(np.shape, is_differential)}."
+            raise ValueError(msg) from err
+
+    return tree.tree_map(
+        lambda s: np.where(s, 0.0, nondifferential_eps), is_differential
     )
 
 
@@ -1129,7 +1136,8 @@ def prior_wiener_integrated_diffuse(
     *,
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: Callable | None = None,
-    add_derivatives: int = 0,
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1e8,
 ):
     """Construct an diffuse repeatedly-integrated Wiener process.
 
@@ -1145,16 +1153,22 @@ def prior_wiener_integrated_diffuse(
     # Add derivatives to the Taylor coefficients.
     # Warning: This destroys pytree structure in the tcoeffs and the
     # resulting pytree will always be a list (for now at least)
-    u0_like = tcoeffs_mean[0]
-    zeros, ones = np.zeros_like(u0_like), np.ones_like(u0_like)
-    tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(add_derivatives)]]
-    tcoeffs_std = [*tcoeffs_std, *[ones for _ in range(add_derivatives)]]
+    tcoeffs_mean, tcoeffs_std = _add_diffuse_derivatives(
+        tcoeffs_mean,
+        tcoeffs_std,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+    )
 
     # Choose a state-space model factorisation
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs_mean)
 
     # Set up the transitions; output_scale = None is handled
     # by the state-space model implementation
+    if output_scale is not None and not callable(output_scale):
+        msg = "Custom output scales for the prior must be callable (or None)"
+        msg += f"Received: type(output_scale) = {type(output_scale)}"
+        raise TypeError(msg)
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
 
     # Return the target
@@ -1164,6 +1178,17 @@ def prior_wiener_integrated_diffuse(
     u_std = ssm.stats.qoi_from_sample(std)
     target = TaylorCoeffTarget(u_mean, u_std, marginal)
     return target, discretize, ssm
+
+
+def _add_diffuse_derivatives(
+    tcoeffs_mean, tcoeffs_std, *, diffuse_eps, diffuse_derivatives
+):
+    zeros = np.zeros_like(tcoeffs_mean[0])
+    tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(diffuse_derivatives)]]
+
+    unknowns = diffuse_eps * np.ones_like(tcoeffs_std[0])
+    tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
+    return tcoeffs_mean, tcoeffs_std
 
 
 def prior_wiener_integrated_discrete(
