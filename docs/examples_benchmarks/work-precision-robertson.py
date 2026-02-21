@@ -73,10 +73,6 @@ def main(start=2.0, stop=10.0, step=1.0, repeats=2, time_span=(1e-6, 1e5)):
     tolerances = setup_tolerances(start=start, stop=stop, step=step)
     timeit_fun = setup_timeit(repeats=repeats)
 
-    # TODO: for high-order DAE solvers, nothing works and I suspect it is
-    # because consistent initialisation fails. Fix this?
-    # Is it because Gauss--Newton fails?
-
     # Assemble algorithms
     algorithms = {
         "DAE | Jet(3)": solver_dae(num_derivatives=3, time_span=time_span),
@@ -193,9 +189,9 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
         vf_auto = functools.partial(vf, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (y0,), num=num_derivatives - 1)
 
-        base_scale = jnp.diag(jnp.asarray([1e0, 1e-5, 1e-1]))
+        base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            tcoeffs, output_scale=base_scale
+            tcoeffs, output_scale=lambda s: base_scale * s
         )
         ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
@@ -239,7 +235,7 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
         # (but don't vary much within these scales).
         # TODO: what is the best "base output scale" for the solver?
         #       this should be an expectation-maximisation thing right?
-        base_scale = jnp.diag(jnp.asarray([1e0, 1e-5, 1e-1]))
+        base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
 
         # For DAEs, not all variables are differential, and we need to have
         #   and idea which ones arent to stabilise the solver initialisation
@@ -247,7 +243,7 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
         is_differential_variable = [jnp.array([True, True, False])]
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(
             y0,
-            output_scale=base_scale,
+            output_scale=lambda s: base_scale * s,
             add_derivatives=num_derivatives,
             is_differential_variable=is_differential_variable,
         )

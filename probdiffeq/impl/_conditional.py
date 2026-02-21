@@ -688,7 +688,7 @@ class DenseConditional(ConditionalBackend):
         ones = np.ones((n,))
         return LatentCond(A, noise, to_latent=ones, to_observed=ones)
 
-    def ibm_transitions(self, base_scale):
+    def ibm_transitions(self, base_scale: Callable):
 
         a, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
         (d,) = self.ode_shape
@@ -696,18 +696,35 @@ class DenseConditional(ConditionalBackend):
         eye_d = np.eye(d)
         A = np.kron(a, eye_d)
 
+        # Infer the expected shape of the output scale
         if base_scale is None:
-            base_scale = eye_d
-        else:
-            base_scale = np.asarray(base_scale)
-            assert base_scale.ndim == 2  # Base scale covariance matrix
-        Q = np.kron(q_sqrtm, base_scale)
+
+            def base_scale(s):
+                return s
+
+        if not callable(base_scale):
+            raise TypeError("Callable expected.")
+
+        # Flatten the "scale" matvec
+        z = np.zeros(d * (self.num_derivatives + 1))
+        z0 = self.unravel(z)[0]
+
+        z0_flat, unravel = tree.ravel_pytree(z0)
+
+        def apply_scale(s):
+            s = unravel(s)
+            s = base_scale(s)
+            return tree.ravel_pytree(s)[0]
+
+        Lambda = func.jacfwd(apply_scale)(z0_flat)
+        Q = np.kron(q_sqrtm, Lambda)
 
         q0 = np.zeros(self.flat_shape)
-
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
 
         def discretise(dt, output_scale):
+            output_scale = np.asarray(output_scale)
+            assert output_scale.shape == ()
             p, p_inv = precon_fun(dt)
             p = np.repeat(p, d)
             p_inv = np.repeat(p_inv, d)

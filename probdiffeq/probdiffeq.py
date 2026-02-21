@@ -1058,7 +1058,7 @@ def prior_wiener_integrated(
     tcoeffs: C,
     *,
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    output_scale: ArrayLike | None = None,
+    output_scale: Callable | None = None,
     # How many more derivatives to model in the state-space
     add_derivatives: bool = 0,
     # same tree structure as we would expect from tcoeffs_std
@@ -1128,7 +1128,7 @@ def prior_wiener_integrated_diffuse(
     tcoeffs_std: C,
     *,
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    output_scale: ArrayLike | None = None,
+    output_scale: Callable | None = None,
     add_derivatives: int = 0,
 ):
     """Construct an diffuse repeatedly-integrated Wiener process.
@@ -1172,7 +1172,7 @@ def prior_wiener_integrated_discrete(
     *,
     tcoeffs_std: C | None = None,
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    output_scale: ArrayLike | None = None,
+    output_scale: Callable | None = None,
     increase_std_by_eps: bool = False,
 ):
     """Compute a time-discretization of an integrated Wiener process."""
