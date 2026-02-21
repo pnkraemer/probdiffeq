@@ -44,7 +44,7 @@ def test_differential_variables_dense():
     tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray([True, False, True])]
     init, iwp, ssm = probdiffeq.prior_wiener_integrated(
-        tcoeffs, is_differential=isdiff, nondifferential_eps=0.123
+        tcoeffs, is_differential=isdiff, nondifferential_eps=0.123, ssm_fact="dense"
     )
 
     [m], [s] = init.mean, init.std
@@ -57,22 +57,47 @@ def test_differential_variables_dense():
         _ = probdiffeq.prior_wiener_integrated(tcoeffs, is_differential=isdiff)
 
 
-def test_output_scale_dense():
+def test_differential_variables_blockdiag():
+    tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
+    isdiff = [np.asarray([True, False, True])]
+    init, iwp, ssm = probdiffeq.prior_wiener_integrated(
+        tcoeffs, is_differential=isdiff, nondifferential_eps=0.123, ssm_fact="blockdiag"
+    )
 
-    # Non-(d,) shape. Values don't matter.
+    [m], [s] = init.mean, init.std
+    assert testing.allclose(m, np.asarray([1.0, 2.0, 3.0]))
+    assert testing.allclose(s, np.asarray([0.0, 0.123, 0.0]))
+
+    with testing.raises(ValueError, match="wrong PyTree structure"):
+        tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
+        isdiff = [np.asarray(False)]  # wrong shape
+        _ = probdiffeq.prior_wiener_integrated(tcoeffs, is_differential=isdiff)
+
+
+@testing.parametrize("ssm_fact", ["dense", "blockdiag"])
+def test_output_scale_dense_blockdiag(ssm_fact):
+
+    # 1d problem, but "unusual" shapes. Values don't matter.
     tcoeffs = [np.ones((1, 1, 1)), np.ones((1, 1, 1))]
+    scale = 123.45 * np.ones((1, 1, 1))
 
-    def scale(s):
-        return 123.45 * s
-
-    init, iwp, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, output_scale=scale)
+    # Test that the transition covariances are scaled correctly
+    init, iwp, ssm = probdiffeq.prior_wiener_integrated(
+        tcoeffs, output_scale=scale, ssm_fact=ssm_fact
+    )
 
     cond = iwp(1.0, 1.0)
     Q_expected = 123.45**2.0 * 1.0 / np.asarray([[3.0, 2.0], [2.0, 1.0]])
-    assert testing.allclose(cond.noise.cholesky @ cond.noise.cholesky.T, Q_expected)
+    _, cov = ssm.stats.to_multivariate_normal(cond.noise)
+    assert testing.allclose(cov, Q_expected)
 
+    # Test that the "diffuse_derivatives" are scaled correctly
     init, iwp, ssm = probdiffeq.prior_wiener_integrated(
-        tcoeffs, output_scale=scale, diffuse_derivatives=3, diffuse_eps=1
+        tcoeffs,
+        output_scale=scale,
+        diffuse_derivatives=3,
+        diffuse_eps=1,
+        ssm_fact=ssm_fact,
     )
 
     zero = np.zeros((1, 1, 1))
@@ -80,3 +105,55 @@ def test_output_scale_dense():
     assert testing.allclose(
         init.std, [zero, zero, nonzero, nonzero, nonzero], strict_shapes=True
     )
+
+    # Test that for the wrong shape or type, an error is raised
+    tcoeffs = [np.ones((1, 1, 1)), np.ones((1, 1, 1))]
+    for shapes in [(), (1,), (1, 1)]:
+        scale = 123.45 * np.ones(shapes)
+        with testing.raises(ValueError, match="wrong shape"):
+            _ = probdiffeq.prior_wiener_integrated(
+                tcoeffs, output_scale=scale, ssm_fact=ssm_fact
+            )
+
+
+def test_output_scale_isotropic():
+
+    # 1d problem, but "unusual" shapes. Values don't matter.
+    tcoeffs = [np.ones((1, 1, 1)), np.ones((1, 1, 1))]
+    scale = 123.45 * np.ones(())
+
+    # Test that the transition covariances are scaled correctly
+    init, iwp, ssm = probdiffeq.prior_wiener_integrated(
+        tcoeffs, output_scale=scale, ssm_fact="isotropic"
+    )
+
+    cond = iwp(1.0, 1.0)
+    Q_expected = 123.45**2.0 * 1.0 / np.asarray([[3.0, 2.0], [2.0, 1.0]])
+    _, cov = ssm.stats.to_multivariate_normal(cond.noise)
+    assert testing.allclose(cov, Q_expected)
+
+    # Test that the "diffuse_derivatives" are scaled correctly
+    init, iwp, ssm = probdiffeq.prior_wiener_integrated(
+        tcoeffs,
+        output_scale=scale,
+        diffuse_derivatives=3,
+        diffuse_eps=1,
+        ssm_fact="isotropic",
+    )
+
+    zero = np.zeros(())
+    nonzero = 123.45 * np.ones(())
+    # TODO: fix the standard deviations types in all SSMs.
+    # Isotropic should only have the same leaves, but scalar SSMs.
+    # The fact that this is not consistent is quite annoying
+    print(init.std)
+    assert testing.allclose(init.std, [zero, zero, nonzero, nonzero, nonzero])
+
+    # Test that for the wrong shape or type, an error is raised
+    tcoeffs = [np.ones((1, 1, 1)), np.ones((1, 1, 1))]
+    for shapes in [(), (1,), (1, 1)]:
+        scale = 123.45 * np.ones(shapes)
+        with testing.raises(ValueError, match="wrong shape"):
+            _ = probdiffeq.prior_wiener_integrated(
+                tcoeffs, output_scale=scale, ssm_fact="isotropic"
+            )

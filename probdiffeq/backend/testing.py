@@ -39,7 +39,7 @@ def allclose(
     *,
     atol: float | None = None,
     rtol: float | None = None,
-    strict_shapes: bool = False,
+    strict_shapes: bool = True,  # difference to jnp.allclose
 ):
     """Check whether two pytrees are 'close' to each other.
 

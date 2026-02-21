@@ -81,7 +81,8 @@ class DenseStats(StatsBackend):
             return func.vmap(self.standard_deviation)(rv)
 
         diag = np.einsum("ij,ij->i", rv.cholesky, rv.cholesky)
-        return np.sqrt(diag)
+        std = np.sqrt(diag)
+        return self.qoi_from_sample(std)
 
     def hidden_shape(self, rv):
         return rv.mean.shape
@@ -150,7 +151,14 @@ class IsotropicStats(StatsBackend):
         if rv.cholesky.ndim > 1:
             return func.vmap(self.standard_deviation)(rv)
         std = np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
-        return std[..., None] @ np.ones((1, rv.mean.shape[-1]))
+
+        # TODO: fix all std output shapes (which should be pytrees)
+        # in all codes
+        raise RuntimeError("What's going on here??")
+        return tree.tree_unflatten(self.structure)
+        std = std[..., None] @ np.ones((1, rv.mean.shape[-1]))
+
+        return self.qoi_from_sample(std)
 
     def hidden_shape(self, rv):
         return rv.mean.shape
@@ -217,10 +225,17 @@ class BlockDiagStats(StatsBackend):
         return rv.mean.shape
 
     def standard_deviation(self, rv):
+
         if rv.cholesky.ndim > 1:
             return func.vmap(self.standard_deviation)(rv)
 
-        return np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
+        # TODO: fix all std output shapes (which should be pytrees)
+        # in all codes
+        raise RuntimeError("What's going on here??")
+
+        std = np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
+
+        return self.qoi_from_sample(std)
 
     def transform_unit_sample(self, unit_sample, /, rv):
         return rv.mean + (rv.cholesky @ unit_sample[..., None])[..., 0]

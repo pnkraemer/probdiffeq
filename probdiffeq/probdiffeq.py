@@ -1067,7 +1067,7 @@ def prior_wiener_integrated(
     # The state-space model factorisation
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     # Do we use a special output scale?
-    output_scale: Callable = _identity,
+    output_scale: C = None,
     # How many extra derivatives to model in the state-space
     diffuse_derivatives: int = 0,
     diffuse_eps: float = 1e6,  # a large value
@@ -1144,7 +1144,7 @@ def prior_wiener_integrated_diffuse(
     # The state-space model factorisation
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     # Do we use a special output scale?
-    output_scale: Callable = _identity,
+    output_scale: C = None,
     # How many extra derivatives to model in the state-space
     diffuse_derivatives: int = 0,
     diffuse_eps: float = 1e6,  # a large value
@@ -1173,23 +1173,22 @@ def prior_wiener_integrated_diffuse(
     # Choose a state-space model factorisation
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs_mean)
 
-    # Set up the transitions; output_scale = None is handled
-    # by the state-space model implementation
-    if output_scale is not None and not callable(output_scale):
-        msg = "Custom output scales for the prior must be callable (or None)"
-        msg += f"Received: type(output_scale) = {type(output_scale)}"
-        raise TypeError(msg)
+    if output_scale is None:
+        output_scale = tree.tree_map(np.ones_like, tcoeffs_std[0])
+    if output_scale.shape != tcoeffs_std[0].shape:
+        msg = "Output scale has the wrong shape."
+        msg += f" Expected: output_scale.shape={tcoeffs_std[0].shape}."
+        msg += f" Received: output_scale.shape={output_scale.shape}."
+        raise ValueError(msg)
 
-    if output_scale is not None:
-        tcoeffs_std = tree.tree_map(output_scale, tcoeffs_std)
+    tcoeffs_std = tree.tree_map(lambda b: output_scale * b, tcoeffs_std)
 
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
 
     # Return the target
     marginal = ssm.normal.from_tcoeffs(tcoeffs_mean, tcoeffs_std)
     u_mean = ssm.stats.qoi(marginal)
-    std = ssm.stats.standard_deviation(marginal)
-    u_std = ssm.stats.qoi_from_sample(std)
+    u_std = ssm.stats.standard_deviation(marginal)
     target = TaylorCoeffTarget(u_mean, u_std, marginal)
     return target, discretize, ssm
 
