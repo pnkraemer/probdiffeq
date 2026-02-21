@@ -1054,17 +1054,23 @@ class ProbabilisticSolver:
         return sol, _InterpRes(step_from=acc, interp_from=prev)
 
 
+def _identity(s):
+    return s
+
+
 def prior_wiener_integrated(
     tcoeffs: C,
     *,
+    # Which of the Taylor coefficients are differential variables
+    is_differential: C | None = None,
+    nondifferential_eps: float = 1e-6,  # a small value
+    # The state-space model factorisation
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    output_scale: Callable | None = None,
+    # Do we use a special output scale?
+    output_scale: Callable = _identity,
     # How many extra derivatives to model in the state-space
     diffuse_derivatives: int = 0,
-    diffuse_eps=1e4,  # a large value
-    # Which of the Taylor coefficients are differential variables
-    is_differential=None,
-    nondifferential_eps=1e-8,  # a small value
+    diffuse_eps: float = 1e6,  # a large value
 ):
     """Construct an repeatedly-integrated Wiener process.
 
@@ -1092,52 +1098,56 @@ def prior_wiener_integrated(
 def _tcoeffs_std_from_differential_vars(
     tcoeffs, *, ssm_fact, is_differential, nondifferential_eps
 ):
-    ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
-
-    # The expected shape for 'is_differential' is a Pytree with the
-    # same tree-structure as the Taylor coefficients and the leaf structure
-    # according to the SSM factorisation. That is, for blockdiag and dense,
-    # the leaves match those of the leaves of the Taylor coefficients;
-    # for isotropic, the leaves are scalars.
-    leaves, structure = tree.tree_flatten(tcoeffs)
-    std0_template = np.zeros_like(ssm.prototypes.error_estimate())
-    trues = np.where(std0_template == 0, True, False)
-    std_template = tree.tree_unflatten(structure, [trues for _ in leaves])
-
-    # If is_differential hasn't been passed, use the template.
-    if is_differential is None:
-        is_differential = tree.tree_map(np.zeros_like, std_template)
+    # Decide the standard deviation template based on the factorisations
+    if ssm_fact in ["dense", "blockdiag"]:
+        std_per_leaf = np.zeros_like(tcoeffs[0])
+    elif ssm_fact in ["isotropic"]:
+        std_per_leaf = np.zeros(())
     else:
-        # If is_differential is passed, assert it has the correct shape
-        try:
+        msg = f"ssm_fact={ssm_fact} is unknown."
+        raise ValueError(msg)
 
-            def tree_shape_equal(A, B):
-                return tree.tree_map(shape_equal, A, B)
+    # Infer the expected standard-deviation tree structure
+    leaves, structure = tree.tree_flatten(tcoeffs)
+    std_template = tree.tree_unflatten(structure, [std_per_leaf for _ in leaves])
 
-            def shape_equal(a, b):
-                return a.shape == b.shape
+    # If 'is_differential' hasn't been provided, simply return zeros everywhere
+    if is_differential is None:
+        return std_template
 
-            shape_equal = tree_shape_equal(is_differential, std_template)
-            assert tree.tree_all(shape_equal)
-        except (ValueError, AssertionError) as err:
-            msg = "Input 'is_differential' has the wrong PyTree structure."
-            msg += f" Expected: {tree.tree_map(np.shape, std_template)}."
-            msg += f" Received: {tree.tree_map(np.shape, is_differential)}."
-            raise ValueError(msg) from err
+    # Before using is_differential, verify it has the correct structure and shape
+    try:
 
-    return tree.tree_map(
-        lambda s: np.where(s, 0.0, nondifferential_eps), is_differential
-    )
+        def shape_equal(A, B):
+            return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
+
+        assert tree.tree_all(shape_equal(is_differential, std_template))
+    except (ValueError, AssertionError) as err:
+        msg = "Input 'is_differential' has the wrong PyTree structure."
+        msg += f" Expected: {tree.tree_map(np.shape, std_template)}."
+        msg += f" Received: {tree.tree_map(np.shape, is_differential)}."
+        raise ValueError(msg) from err
+
+    # Wherever is_differential is True, initialize with zeros.
+    # Elsewhere, initialize with a small positivec value.
+
+    def std_init(s):
+        return np.where(s, 0.0, nondifferential_eps)
+
+    return tree.tree_map(std_init, is_differential)
 
 
 def prior_wiener_integrated_diffuse(
     tcoeffs_mean: C,
     tcoeffs_std: C,
     *,
+    # The state-space model factorisation
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    output_scale: Callable | None = None,
+    # Do we use a special output scale?
+    output_scale: Callable = _identity,
+    # How many extra derivatives to model in the state-space
     diffuse_derivatives: int = 0,
-    diffuse_eps: float = 1e8,
+    diffuse_eps: float = 1e6,  # a large value
 ):
     """Construct an diffuse repeatedly-integrated Wiener process.
 
@@ -1169,6 +1179,10 @@ def prior_wiener_integrated_diffuse(
         msg = "Custom output scales for the prior must be callable (or None)"
         msg += f"Received: type(output_scale) = {type(output_scale)}"
         raise TypeError(msg)
+
+    if output_scale is not None:
+        tcoeffs_std = tree.tree_map(output_scale, tcoeffs_std)
+
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
 
     # Return the target
