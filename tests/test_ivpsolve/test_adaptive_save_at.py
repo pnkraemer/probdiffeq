@@ -154,6 +154,14 @@ def case_factory_error_residual_std_not_cached():
 def test_output_matches_reference(ivp, ssm_fact, factory: Factory):
     vf, u0, (t0, t1) = ivp
 
+    msg = "\n\nContinue by creating a NormalBlockDiag data-type"
+    msg += ", slowly moving all methods from stats into there"
+    msg += ", fixing code as needed. Also, move strategy.markov_* methods"
+    msg += " to the MarkovSequence. Then, fix *all* tests,"
+    msg += " make TaylorCoeffTarget.std into a property, and rerun benchmarks"
+    msg += "Time for some docs and a new PR as well...\n\n"
+    raise RuntimeError(msg)
+
     # Build a solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     init, iwp, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=ssm_fact)
