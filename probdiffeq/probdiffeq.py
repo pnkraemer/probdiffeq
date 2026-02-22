@@ -563,6 +563,46 @@ class MarkovSequence(Generic[T]):
     conditional: Any
     """The conditional distribution."""
 
+    reverse: bool = structs.dataclass_field(metadata={"static": True})
+    """The direction of factorisations."""
+
+    def rescale_cholesky(self, factor, /):
+        marg = self.marginal.rescale_cholesky(factor)
+        cond = self.conditional.rescale_noise(factor)
+        return MarkovSequence(marg, cond, reverse=self.reverse)
+
+    def eval_marginals(self, *, ssm):
+        """Extract the (time-)marginals from a Markov sequence.
+
+        This is only needed in combination with smoothing-based strategies.
+        """
+        if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
+            markov_seq = self._select_terminal()
+            return markov_seq.eval_marginals(ssm=ssm)
+
+        def step(x, cond):
+            extrapolated = ssm.conditional.marginalise(x, cond)
+            return extrapolated, extrapolated
+
+        _, marginals = flow.scan(
+            step, init=self.marginal, xs=self.conditional, reverse=self.reverse
+        )
+
+        if self.reverse:
+            # Append the terminal marginal to the computed ones
+            return tree.tree_array_append(marginals, self.marginal)
+
+        return tree.tree_array_prepend(self.marginal, marginals)
+
+    def _select_terminal(self):
+        """Discard all intermediate filtering solutions from a Markov sequence.
+
+        This function is useful to convert a smoothing-solution into a Markov sequence
+        that is compatible with sampling or marginalisation.
+        """
+        init = tree.tree_map(lambda x: x[-1, ...], self.marginal)
+        return MarkovSequence(init, self.conditional, reverse=self.reverse)
+
 
 class MarkovStrategy(Generic[T]):
     """An interface for estimation strategies in Markovian state-space models.
@@ -1555,7 +1595,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
 
     def init_posterior(self, *, u):
         cond = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
-        posterior = MarkovSequence(u.marginals, cond)
+        posterior = MarkovSequence(u.marginals, cond, reverse=True)
         return u, posterior
 
     def predict(
@@ -1565,66 +1605,51 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         bw0 = posterior.conditional
         marginals, cond = self.ssm.conditional.revert(rv, transition)
         cond = self.ssm.conditional.merge(bw0, cond)
-        predicted = MarkovSequence(marginals, cond)
+        predicted = MarkovSequence(marginals, cond, reverse=posterior.reverse)
 
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget.from_marginals(marginals)
         return estimate, predicted
 
     def apply_updates(self, prediction: MarkovSequence, *, updates):
-        posterior = MarkovSequence(updates, prediction.conditional)
-        rv = updates
-        u = self.ssm.stats.qoi(rv)
-        std = self.ssm.stats.standard_deviation(rv)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        marginals = rv
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        posterior = MarkovSequence(
+            updates, prediction.conditional, reverse=prediction.reverse
+        )
+        marginals = updates
+        estimate = TaylorCoeffTarget.from_marginals(marginals)
         return estimate, posterior
 
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
     ):
         assert output_scale.shape == self.ssm.prototypes.output_scale().shape
-        init = self.ssm.stats.rescale_cholesky(posterior0.marginal, output_scale)
-        conditional = self.ssm.conditional.rescale_noise(
-            posterior0.conditional, output_scale
-        )
-        posterior0 = MarkovSequence(init, conditional)
-
-        # Calibrate the time series
-        init = self.ssm.stats.rescale_cholesky(posterior.marginal, output_scale)
-        conditional = self.ssm.conditional.rescale_noise(
-            posterior.conditional, output_scale
-        )
-        posterior = MarkovSequence(init, conditional)
+        posterior0 = posterior0.rescale_cholesky(output_scale)
+        posterior = posterior.rescale_cholesky(output_scale)
 
         # Marginalise
-        marginals = self.markov_marginals(posterior, reverse=True)
+        marginals = posterior.eval_marginals(ssm=self.ssm)
 
         # Prepend the initial condition to the filtering distributions
         init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
-        posterior = MarkovSequence(marginal=init, conditional=posterior.conditional)
+        posterior = MarkovSequence(
+            marginal=init, conditional=posterior.conditional, reverse=posterior.reverse
+        )
 
         # Extract targets
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget.from_marginals(marginals)
         return estimate, posterior
 
     def interpolate_at_t1(self, *, posterior_t1: MarkovSequence):
         cond_identity = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
-        resume_from = MarkovSequence(posterior_t1.marginal, conditional=cond_identity)
+        resume_from = MarkovSequence(
+            posterior_t1.marginal,
+            conditional=cond_identity,
+            reverse=posterior_t1.reverse,
+        )
         interp_res = _InterpRes(step_from=resume_from, interp_from=resume_from)
 
         interpolated = posterior_t1
         marginals = interpolated.marginal
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget.from_marginals(marginals)
         return (estimate, interpolated), interp_res
 
     def interpolate(
@@ -1701,7 +1726,9 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
             posterior=posterior_t0, transition=transition_t0_t
         )
         conditional_id = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
-        previous_new = MarkovSequence(extrapolated_t.marginal, conditional_id)
+        previous_new = MarkovSequence(
+            extrapolated_t.marginal, conditional_id, reverse=extrapolated_t.reverse
+        )
         _, extrapolated_t1 = self.predict(
             posterior=previous_new, transition=transition_t_t1
         )
@@ -1712,17 +1739,18 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
 
         # Return the right combination of marginals and conditionals.
-        interpolated = MarkovSequence(rv_at_t, extrapolated_t.conditional)
+        interpolated = MarkovSequence(
+            rv_at_t, extrapolated_t.conditional, reverse=extrapolated_t.reverse
+        )
         step_from = MarkovSequence(
-            posterior_t1.marginal, conditional=conditional_t1_to_t
+            posterior_t1.marginal,
+            conditional=conditional_t1_to_t,
+            reverse=posterior_t1.reverse,
         )
         interp_res = _InterpRes(step_from=step_from, interp_from=previous_new)
 
         marginals = interpolated.marginal
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget.from_marginals(marginals)
         return (estimate, interpolated), interp_res
 
 
@@ -1805,8 +1833,8 @@ class solver_mle(ProbabilisticSolver):
         )
 
         # Calibrate the output scale
-        new_term = self.ssm.stats.mahalanobis_norm_relative(0.0, observed)
-        output_scale_running = self.ssm.stats.update_mean(
+        new_term = observed.mahalanobis_norm_relative(0.0)
+        output_scale_running = self.ssm.normal.update_moving_avg(
             output_scale_running, new_term, num=num_data
         )
 
@@ -1906,7 +1934,7 @@ class solver_dynamic(ProbabilisticSolver):
         # Calibrate the output scale
         ones = np.ones_like(self.ssm.prototypes.output_scale())
         transition = self.prior(dt, ones)
-        mean = self.ssm.stats.mean(state.u.marginals)
+        mean = state.u.marginals.mean
         u = self.ssm.conditional.apply(mean, transition)
 
         # Linearize
@@ -1915,7 +1943,7 @@ class solver_dynamic(ProbabilisticSolver):
             u, state=lin_state, damp=damp, t=state.t + dt
         )
         observed = self.ssm.conditional.marginalise(u, fx)
-        output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
+        output_scale = observed.mahalanobis_norm_relative(0.0)
 
         # Do the full extrapolation with the calibrated output scale
         # (Includes re-discretisation)

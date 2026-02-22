@@ -1,5 +1,6 @@
 from probdiffeq.backend import abc, func, linalg, np, tree
 from probdiffeq.backend.typing import Callable, Sequence, TypeVar
+from probdiffeq.util import cholesky_util
 
 T = TypeVar("T")
 C = TypeVar("C", bound=Sequence)
@@ -213,6 +214,11 @@ class DenseNormal(NormalBackend):
         mean = np.zeros((*self.ode_shape, ndim)).reshape((-1,), order="F")
         return NormalDense(mean, cholesky)
 
+    def update_moving_avg(self, mean, x, /, num):
+        nominator = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
+        denominator = np.sqrt(num + 1)
+        return nominator / denominator
+
 
 class IsotropicNormal(NormalBackend):
     def __init__(self, ode_shape, tree_structure):
@@ -250,6 +256,10 @@ class IsotropicNormal(NormalBackend):
         mean = np.zeros((num, *self.ode_shape))
         cholesky = output_scale * np.eye(num)
         return Normal(mean, cholesky)
+
+    def update_moving_avg(self, mean, x, /, num):
+        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
+        return sum_updated / np.sqrt(num + 1)
 
 
 class BlockDiagNormal(NormalBackend):

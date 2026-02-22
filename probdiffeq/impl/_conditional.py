@@ -29,6 +29,15 @@ class LatentCond:
         to_latent, to_observed = np.ones((d_in,)), np.ones((d_out,))
         return cls(A, noise=noise, to_latent=to_latent, to_observed=to_observed)
 
+    def rescale_noise(self, factor, /):
+        noise = self.noise.rescale_cholesky(factor)
+        return LatentCond(
+            A=self.A,
+            noise=noise,
+            to_latent=self.to_latent,
+            to_observed=self.to_observed,
+        )
+
 
 class Linearization:
     """Linearization API."""
@@ -73,9 +82,10 @@ class DenseOdeTs0(LinearizationOde):
             """Select the 'n'-th derivative."""
             return tree.ravel_pytree(self.unravel(m)[self.ode_order])[0]
 
-        fx = tree.ravel_pytree(fun(*self.unravel(rv.mean)[: self.ode_order]))[0]
+        fx, unravel = tree.ravel_pytree(fun(*self.unravel(rv.mean)[: self.ode_order]))
         linop = func.jacrev(a1)(rv.mean)
-        cond = LatentCond.from_linop_and_bias(linop, -fx, damp=damp)
+        noise = _normal.NormalDense.from_dirac(unravel(-fx), damp=damp)
+        cond = LatentCond.from_linop_and_noise(linop, noise)
         return cond, None
 
 
@@ -118,7 +128,9 @@ class DenseOdeTs1(LinearizationOde):
         fx, J, state = self.jacobian.materialize_dense(vf_flat, m0, state)
         linop = E1 - J @ E0
         fx = fx - J @ m0
-        cond = LatentCond.from_linop_and_bias(linop, -fx, damp=damp)
+
+        noise = _normal.NormalDense.from_dirac(unravel(-fx), damp=damp)
+        cond = LatentCond.from_linop_and_noise(linop, noise)
         return cond, state
 
 
@@ -189,7 +201,7 @@ class DenseOdeSlr0(LinearizationOde):
 
         # # Extract the linearisation point
         r_0_square = cholesky_util.triu_via_qr(r_0_nonsquare.T)
-        linearisation_pt = _normal.Normal(m0, r_0_square.T)
+        linearisation_pt = _normal.NormalDense(m0, r_0_square.T, unravel=unravel)
 
         def vf_flat(u):
             return tree.ravel_pytree(fun(unravel(u)))[0]
@@ -207,7 +219,7 @@ class DenseOdeSlr0(LinearizationOde):
             return tree.ravel_pytree(self.unravel(s)[1])
 
         linop = func.jacrev(lambda s: select_1(s)[0])(rv.mean)
-        bias = _normal.Normal(-mean, cov_lower)
+        bias = _normal.NormalDense(-mean, cov_lower, unravel=unravel)
         to_latent = np.ones(linop.shape[1])
         to_observed = np.ones(linop.shape[0])
         cond = LatentCond(linop, bias, to_latent=to_latent, to_observed=to_observed)
@@ -235,7 +247,7 @@ class DenseOdeSlr0(LinearizationOde):
 
         cov_sqrtm = cholesky_util.triu_via_qr(fx_centered_normed)
 
-        return _normal.Normal(fx_mean, cov_sqrtm.T)
+        return _normal.NormalDense(fx_mean, cov_sqrtm.T, unravel=x.unravel)
 
 
 class DenseOdeSlr1(LinearizationOde):
@@ -267,7 +279,7 @@ class DenseOdeSlr1(LinearizationOde):
 
         # # Extract the linearisation point
         r_0_square = cholesky_util.triu_via_qr(r_0_nonsquare.T)
-        linearisation_pt = _normal.Normal(m0, r_0_square.T)
+        linearisation_pt = _normal.NormalDense(m0, r_0_square.T, unravel=unravel)
 
         def vf_flat(u):
             return tree.ravel_pytree(fun(unravel(u)))[0]
@@ -285,7 +297,7 @@ class DenseOdeSlr1(LinearizationOde):
         damping = damp * np.eye(len(cov_lower))
         stack = np.concatenate((cov_lower.T, damping.T))
         cov_lower = cholesky_util.triu_via_qr(stack).T
-        bias = _normal.Normal(-mean, cov_lower)
+        bias = _normal.NormalDense(-mean, cov_lower, unravel=unravel)
         to_latent = np.ones(linop.shape[1])
         to_observed = np.ones(linop.shape[0])
         cond = LatentCond(linop, bias, to_latent=to_latent, to_observed=to_observed)
@@ -309,7 +321,7 @@ class DenseOdeSlr1(LinearizationOde):
             R_X_F=pts_centered_normed, R_X=fx_centered_normed
         )
         mean_cond = fx_mean - linop_cond @ x.mean
-        rv_cond = _normal.Normal(mean_cond, cov_sqrtm_cond.T)
+        rv_cond = _normal.NormalDense(mean_cond, cov_sqrtm_cond.T, unravel=x.unravel)
         return linop_cond, rv_cond
 
 
@@ -333,10 +345,9 @@ class IsotropicOdeTs0(LinearizationOde):
         mean_tree = self.unravel(mean)
         m1 = mean_tree[: self.ode_order]
         fx_tree = fun(*m1)
-        fx = tree.ravel_pytree(fx_tree)[0]
+        fx, unravel_obs = tree.ravel_pytree(fx_tree)
 
-        cov_lower = damp * np.eye(1)
-        bias = _normal.Normal(-fx, cov_lower)
+        bias = _normal.NormalIso.from_dirac(unravel_obs(-fx), damp=damp)
 
         linop = func.jacrev(lambda s: s[[self.ode_order], ...])(mean[..., 0])
         to_latent = np.ones((linop.shape[1],))
@@ -653,7 +664,7 @@ class DenseConditional(ConditionalBackend):
         Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
 
         # Gather and return
-        noise = _normal.NormalDense(xi, Xi.T)
+        noise = _normal.NormalDense(xi, Xi.T, unravel=cond1.noise.unravel)
         return LatentCond(
             g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
         )
@@ -695,7 +706,7 @@ class DenseConditional(ConditionalBackend):
         A = np.eye(n)
         m = np.zeros((n,))
         C = np.zeros((n, n))
-        noise = _normal.NormalDense(m, C)
+        noise = _normal.NormalDense(m, C, unravel=self.unravel)
         ones = np.ones((n,))
         return LatentCond(A, noise, to_latent=ones, to_observed=ones)
 
@@ -813,7 +824,7 @@ class IsotropicConditional(ConditionalBackend):
         Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
 
         # Gather and return
-        noise = _normal.Normal(xi, Xi.T)
+        noise = _normal.NormalIso(xi, Xi.T, treedef=cond1.noise.treedef)
         return LatentCond(
             g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
         )
@@ -851,7 +862,7 @@ class IsotropicConditional(ConditionalBackend):
     def identity(self, num, /) -> LatentCond:
         m0 = np.zeros((num, *self.ode_shape))
         c0 = np.zeros((num, num))
-        noise = _normal.Normal(m0, c0)
+        noise = _normal.NormalIso(m0, c0, treedef=self.tree_structure)
         matrix = np.eye(num)
         ones = np.ones((num,))
         return LatentCond(matrix, noise, to_latent=ones, to_observed=ones)
