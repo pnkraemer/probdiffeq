@@ -1,4 +1,4 @@
-from probdiffeq.backend import abc, func, linalg, np
+from probdiffeq.backend import abc, func, linalg, np, tree
 from probdiffeq.backend.typing import Callable
 from probdiffeq.impl import _normal
 from probdiffeq.util import cholesky_util
@@ -112,9 +112,10 @@ class DenseStats(StatsBackend):
 
 
 class IsotropicStats(StatsBackend):
-    def __init__(self, ode_shape, unravel):
+    def __init__(self, ode_shape, unravel, tree_structure):
         self.ode_shape = ode_shape
         self.unravel = unravel
+        self.tree_structure = tree_structure
 
     def mahalanobis_norm_relative(self, u, /, rv):
         residual_white = (rv.mean - u) / rv.cholesky
@@ -148,15 +149,20 @@ class IsotropicStats(StatsBackend):
         return rv.mean
 
     def standard_deviation(self, rv):
-        if rv.cholesky.ndim > 1:
-            return func.vmap(self.standard_deviation)(rv)
-        std = np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
+        diag = np.einsum("ij,ji->i", rv.cholesky, rv.cholesky)
+        std = np.sqrt(diag)
+        return tree.tree_unflatten(self.tree_structure, std)
+        # print(tree.tree_map(np.shape, rv))
 
-        # TODO: fix all std output shapes (which should be pytrees)
-        # in all codes
-        raise RuntimeError("What's going on here??")
-        return tree.tree_unflatten(self.structure)
-        std = std[..., None] @ np.ones((1, rv.mean.shape[-1]))
+        # assert False
+        # if rv.cholesky.ndim > 1:
+        #     return func.vmap(self.standard_deviation)(rv)
+        # std = np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
+        # # TODO: fix all std output shapes (which should be pytrees)
+        # # in all codes
+        # raise RuntimeError("What's going on here??")
+        # return tree.tree_unflatten(self.structure)
+        # std = std[..., None] @ np.ones((1, rv.mean.shape[-1]))
 
         return self.qoi_from_sample(std)
 
@@ -225,17 +231,9 @@ class BlockDiagStats(StatsBackend):
         return rv.mean.shape
 
     def standard_deviation(self, rv):
-
-        if rv.cholesky.ndim > 1:
-            return func.vmap(self.standard_deviation)(rv)
-
-        # TODO: fix all std output shapes (which should be pytrees)
-        # in all codes
-        raise RuntimeError("What's going on here??")
-
-        std = np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
-
-        return self.qoi_from_sample(std)
+        diag = np.einsum("ijk,ikj->ij", rv.cholesky, rv.cholesky)
+        std = np.sqrt(diag)
+        return self.unravel(std)
 
     def transform_unit_sample(self, unit_sample, /, rv):
         return rv.mean + (rv.cholesky @ unit_sample[..., None])[..., 0]

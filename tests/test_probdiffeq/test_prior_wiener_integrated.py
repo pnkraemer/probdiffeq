@@ -58,20 +58,45 @@ def test_differential_variables_dense():
 
 
 def test_differential_variables_blockdiag():
-    tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
-    isdiff = [np.asarray([True, False, True])]
+    tcoeffs = [np.asarray([1.0, 2.0, 3.0]), np.asarray([1.0, 2.0, 3.0])]
+    isdiff = [np.asarray([True, False, True]), np.asarray([False, False, True])]
     init, iwp, ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, is_differential=isdiff, nondifferential_eps=0.123, ssm_fact="blockdiag"
     )
 
-    [m], [s] = init.mean, init.std
-    assert testing.allclose(m, np.asarray([1.0, 2.0, 3.0]))
-    assert testing.allclose(s, np.asarray([0.0, 0.123, 0.0]))
+    [m1, m2], [s1, s2] = init.mean, init.std
+    assert testing.allclose(m1, np.asarray([1.0, 2.0, 3.0]))
+    assert testing.allclose(m2, np.asarray([1.0, 2.0, 3.0]))
+    assert testing.allclose(s1, np.asarray([0.0, 0.123, 0.0]))
+    assert testing.allclose(s2, np.asarray([0.123, 0.123, 0.0]))
 
     with testing.raises(ValueError, match="wrong PyTree structure"):
         tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
         isdiff = [np.asarray(False)]  # wrong shape
-        _ = probdiffeq.prior_wiener_integrated(tcoeffs, is_differential=isdiff)
+        _ = probdiffeq.prior_wiener_integrated(
+            tcoeffs, is_differential=isdiff, ssm_fact="blockdiag"
+        )
+
+
+def test_differential_variables_isotropic():
+    tcoeffs = [np.asarray([1.0, 2.0, 3.0]), np.asarray([1.0, 2.0, 3.0])]
+    isdiff = [np.asarray(True), np.asarray(False)]
+    init, iwp, ssm = probdiffeq.prior_wiener_integrated(
+        tcoeffs, is_differential=isdiff, nondifferential_eps=0.123, ssm_fact="isotropic"
+    )
+
+    [m1, m2], [s1, s2] = init.mean, init.std
+    assert testing.allclose(m1, np.asarray([1.0, 2.0, 3.0]))
+    assert testing.allclose(m2, np.asarray([1.0, 2.0, 3.0]))
+    assert testing.allclose(s1, np.asarray(0.0))
+    assert testing.allclose(s2, np.asarray(0.123))
+
+    with testing.raises(ValueError, match="wrong PyTree structure"):
+        tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
+        isdiff = [np.asarray([True, False, True])]  # wrong shape
+        _ = probdiffeq.prior_wiener_integrated(
+            tcoeffs, is_differential=isdiff, ssm_fact="isotropic"
+        )
 
 
 @testing.parametrize("ssm_fact", ["dense", "blockdiag"])
@@ -151,7 +176,7 @@ def test_output_scale_isotropic():
 
     # Test that for the wrong shape or type, an error is raised
     tcoeffs = [np.ones((1, 1, 1)), np.ones((1, 1, 1))]
-    for shapes in [(), (1,), (1, 1)]:
+    for shapes in [(1,), (1, 1), (1, 1, 1)]:
         scale = 123.45 * np.ones(shapes)
         with testing.raises(ValueError, match="wrong shape"):
             _ = probdiffeq.prior_wiener_integrated(

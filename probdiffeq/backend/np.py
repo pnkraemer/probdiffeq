@@ -214,3 +214,7 @@ def linspace(start, stop, *, num=50, endpoint=True):
 
 def tril(arr, /):
     return jnp.tril(arr)
+
+
+def dtype(arr_or_dtype, /):
+    return jnp.dtype(arr_or_dtype)

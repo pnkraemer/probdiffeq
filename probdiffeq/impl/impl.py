@@ -78,7 +78,7 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
     tcoeffs_tree_only = tree.tree_map(lambda *_a: 0.0, tcoeffs_like)
     _, unravel_tree = tree.ravel_pytree(tcoeffs_tree_only)
 
-    leaves, _ = tree.tree_flatten(tcoeffs_like)
+    leaves, tree_structure = tree.tree_flatten(tcoeffs_like)
     _, unravel_leaf = tree.ravel_pytree(leaves[0])
 
     def unravel(z):
@@ -87,7 +87,9 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
 
     prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
     normal = _normal.IsotropicNormal(ode_shape=ode_shape)
-    stats = _stats.IsotropicStats(ode_shape=ode_shape, unravel=unravel)
+    stats = _stats.IsotropicStats(
+        ode_shape=ode_shape, unravel=unravel, tree_structure=tree_structure
+    )
     linearize = _conditional.IsotropicLinearizationFactory(unravel=unravel)
     conditional = _conditional.IsotropicConditional(
         ode_shape=ode_shape, num_derivatives=num_derivatives, unravel_tree=unravel_tree

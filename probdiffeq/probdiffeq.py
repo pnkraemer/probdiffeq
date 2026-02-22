@@ -1079,7 +1079,7 @@ def prior_wiener_integrated(
     high-order solvers in low precision arithmetic. Outside of these cases,
     leave the standard deviations at zero to improve accuracy.
     """
-    tcoeffs_std = _tcoeffs_std_from_differential_vars(
+    tcoeffs_std = _tcoeffs_std_from_differential_variables(
         tcoeffs,
         is_differential=is_differential,
         nondifferential_eps=nondifferential_eps,
@@ -1095,7 +1095,7 @@ def prior_wiener_integrated(
     )
 
 
-def _tcoeffs_std_from_differential_vars(
+def _tcoeffs_std_from_differential_variables(
     tcoeffs, *, ssm_fact, is_differential, nondifferential_eps
 ):
     # Decide the standard deviation template based on the factorisations
@@ -1132,6 +1132,10 @@ def _tcoeffs_std_from_differential_vars(
     # Elsewhere, initialize with a small positivec value.
 
     def std_init(s):
+        if np.dtype(s) != np.dtype(bool):
+            msg = "Boolean entries expected in `is_differential`."
+            msg += f" Received: dtype={np.dtype(s)}"
+            raise TypeError(msg)
         return np.where(s, 0.0, nondifferential_eps)
 
     return tree.tree_map(std_init, is_differential)
