@@ -1085,6 +1085,7 @@ def prior_wiener_integrated(
         nondifferential_eps=nondifferential_eps,
         ssm_fact=ssm_fact,
     )
+
     return prior_wiener_integrated_diffuse(
         tcoeffs,
         tcoeffs_std,
@@ -1100,7 +1101,8 @@ def _tcoeffs_std_from_differential_variables(
 ):
     # Decide the standard deviation template based on the factorisations
     if ssm_fact in ["dense", "blockdiag"]:
-        std_per_leaf = np.zeros_like(tcoeffs[0])
+        leaves = tree.tree_leaves(tcoeffs)
+        std_per_leaf = np.zeros_like(leaves[0])
     elif ssm_fact in ["isotropic"]:
         std_per_leaf = np.zeros(())
     else:
@@ -1179,13 +1181,20 @@ def prior_wiener_integrated_diffuse(
 
     if output_scale is None:
         output_scale = tree.tree_map(np.ones_like, tcoeffs_std[0])
-    if output_scale.shape != tcoeffs_std[0].shape:
+
+    def shape_equal(A, B):
+        return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
+
+    if not tree.tree_all(shape_equal(output_scale, tcoeffs_std[0])):
         msg = "Output scale has the wrong shape."
         msg += f" Expected: output_scale.shape={tcoeffs_std[0].shape}."
         msg += f" Received: output_scale.shape={output_scale.shape}."
         raise ValueError(msg)
 
-    tcoeffs_std = tree.tree_map(lambda b: output_scale * b, tcoeffs_std)
+    [output_scale_leaf] = tree.tree_leaves(output_scale)
+    std_leaves, structure = tree.tree_flatten(tcoeffs_std)
+    std_leaves_scaled = [output_scale_leaf * s for s in std_leaves]
+    tcoeffs_std = tree.tree_unflatten(structure, std_leaves_scaled)
 
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
 
@@ -1200,10 +1209,10 @@ def prior_wiener_integrated_diffuse(
 def _add_diffuse_derivatives(
     tcoeffs_mean, tcoeffs_std, *, diffuse_eps, diffuse_derivatives
 ):
-    zeros = np.zeros_like(tcoeffs_mean[0])
+    zeros = tree.tree_map(np.zeros_like, tcoeffs_mean[0])
     tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(diffuse_derivatives)]]
 
-    unknowns = diffuse_eps * np.ones_like(tcoeffs_std[0])
+    unknowns = tree.tree_map(lambda s: diffuse_eps * np.ones_like(s), tcoeffs_std[0])
     tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
     return tcoeffs_mean, tcoeffs_std
 
@@ -1442,8 +1451,7 @@ class strategy_filter(MarkovStrategy):
     def predict(self, posterior: T, *, transition) -> tuple[TaylorCoeffTarget, T]:
         marginals = self.ssm.conditional.marginalise(posterior, transition)
         u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
+        u_std = self.ssm.stats.standard_deviation(marginals)
         estimate = TaylorCoeffTarget(u, u_std, marginals)
         return estimate, marginals
 
@@ -1451,8 +1459,7 @@ class strategy_filter(MarkovStrategy):
         del prediction
         marginals = updates
         u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
+        u_std = self.ssm.stats.standard_deviation(marginals)
         estimate = TaylorCoeffTarget(u, u_std, marginals)
         return estimate, marginals
 
@@ -2478,6 +2485,10 @@ class error_residual_std(ErrorEstimator):
         # Extract the local residual stdev from the linearization
         observed = self.ssm.conditional.marginalise(rv, linearized)
         output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
+
+        # todo: we can't have self.unravel for an SSM, because there are different
+        # variables in said SSM!
+        assert False
         stdev = self.ssm.stats.standard_deviation(observed)
         error_estimate_unscaled = np.squeeze(stdev)
         error = output_scale * error_estimate_unscaled

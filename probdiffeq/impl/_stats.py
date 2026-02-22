@@ -82,7 +82,7 @@ class DenseStats(StatsBackend):
 
         diag = np.einsum("ij,ij->i", rv.cholesky, rv.cholesky)
         std = np.sqrt(diag)
-        return self.qoi_from_sample(std)
+        return self.unravel(std)
 
     def hidden_shape(self, rv):
         return rv.mean.shape
@@ -98,9 +98,13 @@ class DenseStats(StatsBackend):
         return rv.mean, rv.cholesky @ rv.cholesky.T
 
     def qoi(self, rv):
-        return self.qoi_from_sample(rv.mean)
+        if rv.mean.ndim > 1:
+            return jax.vmap(self.qoi)(rv)
+
+        return self.unravel(rv.mean)
 
     def qoi_from_sample(self, sample, /):
+        raise RuntimeError
         if np.ndim(sample) > 1:
             return func.vmap(self.qoi_from_sample)(sample)
         return self.unravel(sample)
@@ -187,6 +191,7 @@ class IsotropicStats(StatsBackend):
         return self.qoi_from_sample(rv.mean)
 
     def qoi_from_sample(self, sample, /):
+        raise RuntimeError
         if np.ndim(sample) > 2:
             return func.vmap(self.qoi_from_sample)(sample)
         return self.unravel(sample)
@@ -256,6 +261,7 @@ class BlockDiagStats(StatsBackend):
         return self.qoi_from_sample(rv.mean)
 
     def qoi_from_sample(self, sample, /):
+        raise RuntimeError
         if np.ndim(sample) > 2:
             return func.vmap(self.qoi_from_sample)(sample)
         return self.unravel(sample)

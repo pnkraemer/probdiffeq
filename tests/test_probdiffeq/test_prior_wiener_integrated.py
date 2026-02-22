@@ -168,10 +168,6 @@ def test_output_scale_isotropic():
 
     zero = np.zeros(())
     nonzero = 123.45 * np.ones(())
-    # TODO: fix the standard deviations types in all SSMs.
-    # Isotropic should only have the same leaves, but scalar SSMs.
-    # The fact that this is not consistent is quite annoying
-    print(init.std)
     assert testing.allclose(init.std, [zero, zero, nonzero, nonzero, nonzero])
 
     # Test that for the wrong shape or type, an error is raised
