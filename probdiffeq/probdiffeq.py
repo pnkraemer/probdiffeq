@@ -541,6 +541,12 @@ class TaylorCoeffTarget(Generic[C, T]):
     marginals: T
     """The full marginal distribution of the Taylor coefficient."""
 
+    @classmethod
+    def from_marginals(cls, marginals):
+        mean = marginals.eval_mean()
+        std = marginals.eval_standard_deviation()
+        return cls(mean, std, marginals)
+
 
 @tree.register_dataclass
 @structs.dataclass
@@ -1200,9 +1206,7 @@ def prior_wiener_integrated_diffuse(
 
     # Return the target
     marginal = ssm.normal.from_tcoeffs(tcoeffs_mean, tcoeffs_std)
-    u_mean = ssm.stats.qoi(marginal)
-    u_std = ssm.stats.standard_deviation(marginal)
-    target = TaylorCoeffTarget(u_mean, u_std, marginal)
+    target = TaylorCoeffTarget.from_marginals(marginal)
     return target, discretize, ssm
 
 
@@ -1450,36 +1454,29 @@ class strategy_filter(MarkovStrategy):
 
     def predict(self, posterior: T, *, transition) -> tuple[TaylorCoeffTarget, T]:
         marginals = self.ssm.conditional.marginalise(posterior, transition)
-        u = self.ssm.stats.qoi(marginals)
-        u_std = self.ssm.stats.standard_deviation(marginals)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget.from_marginals(marginals)
         return estimate, marginals
 
     def apply_updates(self, prediction, *, updates):
         del prediction
         marginals = updates
-        u = self.ssm.stats.qoi(marginals)
-        u_std = self.ssm.stats.standard_deviation(marginals)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget.from_marginals(marginals)
         return estimate, marginals
 
     def finalize(self, *, posterior0, posterior, output_scale):
         assert output_scale.shape == self.ssm.prototypes.output_scale().shape
 
         # No rescaling because no calibration at the initial step
-        posterior0 = self.ssm.stats.rescale_cholesky(posterior0, output_scale)
+        posterior0 = posterior0.rescale_cholesky(output_scale)
 
         # Calibrate
-        posterior = self.ssm.stats.rescale_cholesky(posterior, output_scale)
+        posterior = posterior.rescale_cholesky(output_scale)
 
         # Stack
         posterior = tree.tree_array_prepend(posterior0, posterior)
 
         marginals = posterior
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget.from_marginals(marginals)
         return estimate, posterior
 
     def interpolate(
@@ -1489,22 +1486,14 @@ class strategy_filter(MarkovStrategy):
         _, interpolated = self.predict(
             posterior=posterior_t0, transition=transition_t0_t
         )
-
-        u = self.ssm.stats.qoi(interpolated)
-        std = self.ssm.stats.standard_deviation(interpolated)
-        u_std = self.ssm.stats.qoi_from_sample(std)
         marginals = interpolated
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
-
+        estimate = TaylorCoeffTarget.from_marginals(marginals)
         interp_res = _InterpRes(step_from=posterior_t1, interp_from=interpolated)
         return (estimate, interpolated), interp_res
 
     def interpolate_at_t1(self, *, posterior_t1):
-        u = self.ssm.stats.qoi(posterior_t1)
-        std = self.ssm.stats.standard_deviation(posterior_t1)
-        u_std = self.ssm.stats.qoi_from_sample(std)
         marginals = posterior_t1
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget.from_marginals(marginals)
 
         interp_res = _InterpRes(step_from=posterior_t1, interp_from=posterior_t1)
         return (estimate, posterior_t1), interp_res
@@ -2471,7 +2460,8 @@ class error_residual_std(ErrorEstimator):
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
-        mean = self.ssm.stats.mean(previous.u.marginals)
+        # TODO: should conditional.apply take the Pytree mean?
+        mean = previous.u.marginals.mean
         rv = self.ssm.conditional.apply(mean, transition)
 
         # Optionally: re-linearize
@@ -2484,14 +2474,9 @@ class error_residual_std(ErrorEstimator):
 
         # Extract the local residual stdev from the linearization
         observed = self.ssm.conditional.marginalise(rv, linearized)
-        output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
-
-        # todo: we can't have self.unravel for an SSM, because there are different
-        # variables in said SSM!
-        assert False
-        stdev = self.ssm.stats.standard_deviation(observed)
-        error_estimate_unscaled = np.squeeze(stdev)
-        error = output_scale * error_estimate_unscaled
+        output_scale = observed.mahalanobis_norm_relative(0.0)
+        observed = observed.rescale_cholesky(output_scale)
+        error = observed.eval_standard_deviation()
         error, _ = tree.ravel_pytree(error)
 
         # Compute a reference

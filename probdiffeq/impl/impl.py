@@ -86,13 +86,16 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
         return tree.tree_map(unravel_leaf, pytree)
 
     prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
-    normal = _normal.IsotropicNormal(ode_shape=ode_shape)
+    normal = _normal.IsotropicNormal(ode_shape=ode_shape, tree_structure=tree_structure)
     stats = _stats.IsotropicStats(
         ode_shape=ode_shape, unravel=unravel, tree_structure=tree_structure
     )
     linearize = _conditional.IsotropicLinearizationFactory(unravel=unravel)
     conditional = _conditional.IsotropicConditional(
-        ode_shape=ode_shape, num_derivatives=num_derivatives, unravel_tree=unravel_tree
+        ode_shape=ode_shape,
+        num_derivatives=num_derivatives,
+        unravel_tree=unravel_tree,
+        tree_structure=tree_structure,
     )
     return FactImpl(
         name="isotropic",

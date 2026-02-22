@@ -24,11 +24,8 @@ class LatentCond:
     """Push a latent vector into the observed space."""
 
     @classmethod
-    def from_linop_and_bias(cls, A, bias, /, *, damp):
+    def from_linop_and_noise(cls, A, noise):
         d_out, d_in = A.shape
-        cov_lower = damp * np.eye(d_out)
-
-        noise = _normal.Normal(bias, cov_lower)
         to_latent, to_observed = np.ones((d_in,)), np.ones((d_out,))
         return cls(A, noise=noise, to_latent=to_latent, to_observed=to_observed)
 
@@ -152,8 +149,16 @@ class DenseRootTs1(LinearizationRoot):
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
         fx = fx - linop @ mean
 
+        # Understand how to unravel
+        m_tree = func.eval_shape(self.unravel, rv.mean)
+        relevant_tcoeffs = m_tree[: self.root_order]
+        root_eval = func.eval_shape(lambda s: self.root(*s, t=t), relevant_tcoeffs)
+        root_eval = tree.tree_map(np.zeros_like, root_eval)
+        _, unravel = tree.ravel_pytree(root_eval)
+
         # Turn the linearization into a conditional
-        cond = LatentCond.from_linop_and_bias(linop, fx, damp=damp)
+        noise = _normal.NormalDense.from_dirac(unravel(fx), damp=damp)
+        cond = LatentCond.from_linop_and_noise(linop, noise)
         return cond, state
 
 
@@ -372,7 +377,11 @@ class IsotropicOdeTs1(LinearizationOde):
         fx = fx - linop @ rv.mean
 
         # Turn fx and J_trace into an observation model
-        cond = LatentCond.from_linop_and_bias(linop, fx, damp=damp)
+        vf_dummy = func.eval_shape(lambda s: fun(unravel(s)), m0)
+        _, structure = tree.tree_flatten(vf_dummy)
+        fx = tree.tree_unflatten(structure, [*fx])
+        noise = _normal.NormalIso.from_dirac(fx, damp=damp)
+        cond = LatentCond.from_linop_and_noise(linop, noise)
         return cond, state
 
 
@@ -615,7 +624,7 @@ class DenseConditional(ConditionalBackend):
         x = cond.to_latent * x
         mean = cond.to_observed * (cond.A @ x + cond.noise.mean)
         cholesky = cond.to_observed[:, None] * cond.noise.cholesky
-        return _normal.Normal(mean, cholesky)
+        return _normal.NormalDense(mean, cholesky, unravel=cond.noise.unravel)
 
     def marginalise(self, rv, cond, /):
         mean = cond.to_latent * rv.mean
@@ -626,7 +635,7 @@ class DenseConditional(ConditionalBackend):
 
         mean_new = cond.to_observed * (cond.A @ mean + cond.noise.mean)
         cholesky_new = cond.to_observed[:, None] * cholesky_new
-        return _normal.Normal(mean_new, cholesky_new)
+        return _normal.NormalDense(mean_new, cholesky_new, unravel=cond.noise.unravel)
 
     def merge(self, cond1: LatentCond, cond2: LatentCond, /) -> LatentCond:
         # Transform: latent (2) to latent (1)
@@ -644,7 +653,7 @@ class DenseConditional(ConditionalBackend):
         Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
 
         # Gather and return
-        noise = _normal.Normal(xi, Xi.T)
+        noise = _normal.NormalDense(xi, Xi.T)
         return LatentCond(
             g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
         )
@@ -663,7 +672,9 @@ class DenseConditional(ConditionalBackend):
         mean_observed = cond.A @ mean + cond.noise.mean
         mean_corrected = mean - gain @ mean_observed
         cholesky_corrected = r_cor.T
-        corrected = _normal.Normal(mean_corrected, cholesky_corrected)
+        corrected = _normal.NormalDense(
+            mean_corrected, cholesky_corrected, unravel=rv.unravel
+        )
         cond_new = LatentCond(
             gain,
             corrected,
@@ -674,7 +685,7 @@ class DenseConditional(ConditionalBackend):
         # Gather the observed variable
         mean = cond.to_observed * mean_observed
         cholesky = cond.to_observed[:, None] * r_obs.T
-        observed = _normal.Normal(mean, cholesky)
+        observed = _normal.NormalDense(mean, cholesky, unravel=cond.noise.unravel)
         return observed, cond_new
 
     def identity(self, ndim, /) -> LatentCond:
@@ -684,7 +695,7 @@ class DenseConditional(ConditionalBackend):
         A = np.eye(n)
         m = np.zeros((n,))
         C = np.zeros((n, n))
-        noise = _normal.Normal(m, C)
+        noise = _normal.NormalDense(m, C)
         ones = np.ones((n,))
         return LatentCond(A, noise, to_latent=ones, to_observed=ones)
 
@@ -712,7 +723,8 @@ class DenseConditional(ConditionalBackend):
             p = np.repeat(p, d)
             p_inv = np.repeat(p_inv, d)
 
-            noise = _normal.Normal(q0, output_scale * Q)
+            # unravel = tree.Partial(self.unravel)
+            noise = _normal.NormalDense(q0, output_scale * Q, unravel=self.unravel)
             return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
         return discretise
@@ -721,7 +733,7 @@ class DenseConditional(ConditionalBackend):
         A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
         mean = cond.to_observed * cond.noise.mean
         cholesky = cond.to_observed[:, None] * cond.noise.cholesky
-        noise = _normal.Normal(mean, cholesky)
+        noise = _normal.NormalDense(mean, cholesky)
 
         to_observed = np.ones_like(cond.to_observed)
         to_latent = np.ones_like(cond.to_latent)
@@ -757,10 +769,11 @@ class DenseConditional(ConditionalBackend):
 
 
 class IsotropicConditional(ConditionalBackend):
-    def __init__(self, *, ode_shape, num_derivatives, unravel_tree):
+    def __init__(self, *, ode_shape, num_derivatives, unravel_tree, tree_structure):
         self.ode_shape = ode_shape
         self.num_derivatives = num_derivatives
         self.unravel_tree = unravel_tree
+        self.tree_structure = tree_structure
 
     def apply(self, x, cond, /):
         # TODO: is this still relevant?
@@ -772,7 +785,7 @@ class IsotropicConditional(ConditionalBackend):
         x = cond.to_latent[:, None] * x
         mean_new = cond.to_observed[:, None] * cond.A @ x + cond.noise.mean
         cholesky_new = cond.to_observed[:, None] * cond.noise.cholesky
-        return _normal.Normal(mean_new, cholesky_new)
+        return _normal.NormalIso(mean_new, cholesky_new, treedef=cond.noise.treedef)
 
     def marginalise(self, rv, cond, /):
         mean = cond.to_latent[:, None] * rv.mean
@@ -782,7 +795,7 @@ class IsotropicConditional(ConditionalBackend):
 
         mean_new = cond.to_observed[:, None] * (cond.A @ mean + cond.noise.mean)
         cholesky_new = cond.to_observed[:, None] * cholesky_new
-        return _normal.Normal(mean_new, cholesky_new)
+        return _normal.NormalIso(mean_new, cholesky_new, treedef=cond.noise.treedef)
 
     def merge(self, cond1, cond2, /):
         # Transform: latent (2) to latent (1)
@@ -819,7 +832,9 @@ class IsotropicConditional(ConditionalBackend):
         mean_observed = cond.A @ mean + cond.noise.mean
         mean_corrected = mean - gain @ mean_observed
         cholesky_corrected = r_cor.T
-        corrected = _normal.Normal(mean_corrected, cholesky_corrected)
+        corrected = _normal.NormalIso(
+            mean_corrected, cholesky_corrected, treedef=rv.treedef
+        )
         cond_new = LatentCond(
             gain,
             corrected,
@@ -830,7 +845,7 @@ class IsotropicConditional(ConditionalBackend):
         # Gather the observed variable
         mean = cond.to_observed[:, None] * mean_observed
         cholesky = cond.to_observed[:, None] * r_obs.T
-        observed = _normal.Normal(mean, cholesky)
+        observed = _normal.NormalIso(mean, cholesky, treedef=cond.noise.treedef)
         return observed, cond_new
 
     def identity(self, num, /) -> LatentCond:
@@ -847,12 +862,13 @@ class IsotropicConditional(ConditionalBackend):
         q0 = np.zeros((self.num_derivatives + 1, *self.ode_shape))
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
 
+        [base_scale] = tree.tree_leaves(base_scale)
         assert base_scale.shape == ()
 
         def discretise(dt, output_scale):
             scale = base_scale * output_scale
             p, p_inv = precon_fun(dt)
-            noise = _normal.Normal(q0, scale * q_sqrtm)
+            noise = _normal.NormalIso(q0, scale * q_sqrtm, treedef=self.tree_structure)
             return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
         return discretise

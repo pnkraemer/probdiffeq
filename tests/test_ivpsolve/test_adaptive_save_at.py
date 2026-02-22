@@ -175,8 +175,10 @@ def test_output_matches_reference(ivp, ssm_fact, factory: Factory):
     # The results should be very similar
     assert testing.allclose(received.u.mean[0], expected)
 
-    # Assert u and u_std have matching shapes (that was wrong before)
-    u_shape = tree.tree_map(np.shape, received.u.mean)
-    u_std_shape = tree.tree_map(np.shape, received.u.std)
-    match = tree.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
+    # Assert u and u_std have matching treedefs (that was wrong before)
+    # but the shapes of the leaves may be different, e.g. STDs in isotropic
+    # models are always scalar
+    _, mean_treedef = tree.tree_flatten(received.u.mean)
+    _, std_treedef = tree.tree_flatten(received.u.std)
+    match = tree.tree_map(lambda a, b: a == b, mean_treedef, std_treedef)
     assert tree.tree_all(match)

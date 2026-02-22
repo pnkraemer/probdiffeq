@@ -56,12 +56,10 @@ class DenseStats(StatsBackend):
         self.unravel = unravel
 
     def mahalanobis_norm_relative(self, u, /, rv):
-        dx = u - rv.mean
-        residual_white = linalg.solve_triangular(rv.cholesky.T, dx, trans="T")
-        mahalanobis = linalg.qr_r(residual_white[:, None])
-        return np.reshape(np.abs(mahalanobis) / np.sqrt(rv.mean.size), ())
+        raise RuntimeError
 
     def logpdf(self, u, /, rv):
+        raise RuntimeError
         cholesky = linalg.qr_r(rv.cholesky.T).T
         diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
         slogdet = np.sum(np.log(np.abs(diagonal)))
@@ -74,9 +72,11 @@ class DenseStats(StatsBackend):
         return -1 / 2 * sqrnorm - u.size / 2 * const - slogdet
 
     def mean(self, rv):
+        raise RuntimeError
         return rv.mean
 
     def standard_deviation(self, rv):
+        raise RuntimeError
         if rv.mean.ndim > 1:
             return func.vmap(self.standard_deviation)(rv)
 
@@ -85,19 +85,24 @@ class DenseStats(StatsBackend):
         return self.unravel(std)
 
     def hidden_shape(self, rv):
+        raise RuntimeError
         return rv.mean.shape
 
     def transform_unit_sample(self, unit_sample, /, rv):
+        raise RuntimeError
         return rv.mean + rv.cholesky @ unit_sample
 
     def rescale_cholesky(self, rv, factor, /):
+        raise RuntimeError
         cholesky = factor[..., None, None] * rv.cholesky
         return _normal.Normal(rv.mean, cholesky)
 
     def to_multivariate_normal(self, rv):
+        raise RuntimeError
         return rv.mean, rv.cholesky @ rv.cholesky.T
 
     def qoi(self, rv):
+        raise RuntimeError
         if rv.mean.ndim > 1:
             return jax.vmap(self.qoi)(rv)
 
@@ -105,11 +110,13 @@ class DenseStats(StatsBackend):
 
     def qoi_from_sample(self, sample, /):
         raise RuntimeError
+        raise RuntimeError
         if np.ndim(sample) > 1:
             return func.vmap(self.qoi_from_sample)(sample)
         return self.unravel(sample)
 
     def update_mean(self, mean, x, /, num):
+        raise RuntimeError
         nominator = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
         denominator = np.sqrt(num + 1)
         return nominator / denominator
@@ -122,11 +129,13 @@ class IsotropicStats(StatsBackend):
         self.tree_structure = tree_structure
 
     def mahalanobis_norm_relative(self, u, /, rv):
+        raise RuntimeError
         residual_white = (rv.mean - u) / rv.cholesky
         residual_white_matrix = linalg.qr_r(residual_white.T)
         return np.reshape(np.abs(residual_white_matrix) / np.sqrt(rv.mean.size), ())
 
     def logpdf(self, u, /, rv):
+        raise RuntimeError
         # if the gain is qoi-to-hidden, the data is a (d,) array.
         # this is problematic for the isotropic model unless we explicitly broadcast.
         if np.ndim(u) == 1:
@@ -150,9 +159,11 @@ class IsotropicStats(StatsBackend):
         return np.sum(func.vmap(logpdf_scalar, in_axes=(1, rv_batch))(u, rv))
 
     def mean(self, rv):
+        raise RuntimeError
         return rv.mean
 
     def standard_deviation(self, rv):
+        raise RuntimeError
         diag = np.einsum("ij,ji->i", rv.cholesky, rv.cholesky)
         std = np.sqrt(diag)
         return tree.tree_unflatten(self.tree_structure, std)
@@ -171,16 +182,20 @@ class IsotropicStats(StatsBackend):
         return self.qoi_from_sample(std)
 
     def hidden_shape(self, rv):
+        raise RuntimeError
         return rv.mean.shape
 
     def transform_unit_sample(self, unit_sample, /, rv):
+        raise RuntimeError
         return rv.mean + rv.cholesky @ unit_sample
 
     def rescale_cholesky(self, rv, factor, /):
+        raise RuntimeError
         cholesky = factor[..., None, None] * rv.cholesky
         return _normal.Normal(rv.mean, cholesky)
 
     def to_multivariate_normal(self, rv):
+        raise RuntimeError
         eye_d = np.eye(*self.ode_shape)
         cov = rv.cholesky @ rv.cholesky.T
         cov = np.kron(eye_d, cov)
@@ -188,15 +203,18 @@ class IsotropicStats(StatsBackend):
         return (mean, cov)
 
     def qoi(self, rv):
+        raise RuntimeError
         return self.qoi_from_sample(rv.mean)
 
     def qoi_from_sample(self, sample, /):
+        raise RuntimeError
         raise RuntimeError
         if np.ndim(sample) > 2:
             return func.vmap(self.qoi_from_sample)(sample)
         return self.unravel(sample)
 
     def update_mean(self, mean, x, /, num):
+        raise RuntimeError
         sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
         return sum_updated / np.sqrt(num + 1)
 
