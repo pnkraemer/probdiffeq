@@ -10,19 +10,6 @@ class Normal:
     def __init__(self, mean):
         self.mean = mean
 
-    @classmethod
-    def from_dirac(cls, mean, *, damp):
-        raise NotImplementedError
-
-    def eval_mean(self):
-        raise NotImplementedError
-
-    def eval_standard_deviation(self):
-        raise NotImplementedError
-
-    def mahalanobis_norm_relative(self, u):
-        raise NotImplementedError
-
 
 class NormalDense(Normal):
     def __init__(self, mean: T, cholesky: T, unravel: Callable[[T], C]):
@@ -38,10 +25,6 @@ class NormalDense(Normal):
         return cls(mean=mean_flat, cholesky=cholesky, unravel=unravel)
 
     @classmethod
-    def from_tcoeffs(cls, loc: C, scale: C | None = None):
-        raise RuntimeError
-
-    @classmethod
     def from_mean_and_std(cls, mean, std):
         mean_flat, unravel = tree.ravel_pytree(mean)
         std_flat, _unravel = tree.ravel_pytree(std)
@@ -50,17 +33,11 @@ class NormalDense(Normal):
         cholesky = linalg.diagonal_matrix(std_flat)
         return cls(mean=mean_flat, cholesky=cholesky, unravel=unravel)
 
-    @classmethod
-    def from_standard(cls, ndim, /, output_scale):
-        raise RuntimeError
-        eye_n = np.eye(ndim)
-        eye_d = output_scale * np.eye(*self.ode_shape)
-        cholesky = np.kron(eye_d, eye_n)
-        mean = np.zeros((*self.ode_shape, ndim)).reshape((-1,), order="F")
-        return cls(mean, cholesky)
-
     def __repr__(self):
-        return f"NormalDense(mean={self.mean}, cholesky={self.cholesky}, unravel={self.unravel})"
+        msg = f"NormalDense(mean={self.mean}"
+        msg += f", cholesky={self.cholesky}"
+        msg += f", unravel={self.unravel})"
+        return msg
 
     def eval_mean(self):
         if self.mean.ndim > 1:
@@ -134,7 +111,10 @@ class NormalIso(Normal):
         self.treedef = treedef
 
     def __repr__(self):
-        return f"NormalIso(mean={self.mean}, cholesky={self.cholesky}, treedef={self.treedef})"
+        msg = f"NormalIso(mean={self.mean}"
+        msg += f", cholesky={self.cholesky}"
+        msg += f", treedef={self.treedef})"
+        return msg
 
     @classmethod
     def from_dirac(cls, mean, *, damp):
@@ -143,10 +123,6 @@ class NormalIso(Normal):
         n, _ = mean_array.shape
         cholesky = np.eye(n) * damp
         return cls(mean=mean_array, cholesky=cholesky, treedef=structure)
-
-    @classmethod
-    def from_tcoeffs(cls, loc: C, scale: C | None = None):
-        raise RuntimeError
 
     @classmethod
     def from_mean_and_std(cls, mean, std):
@@ -165,18 +141,11 @@ class NormalIso(Normal):
         if scale_flat.shape != (num_coeffs,):
             msg = "'scale' must have the same pytree structure as loc, "
             msg += "but each leaf must be a scalar instead of an array"
-            msg += f"Received: {scale}"
+            msg += f"Received: {std}"
             raise ValueError(msg)
 
         cholesky_flat = linalg.diagonal_matrix(scale_flat)
         return cls(loc_flat, cholesky_flat, treedef=treedef)
-
-    @classmethod
-    def from_standard(cls, num, /, output_scale):
-        raise RuntimeError
-        mean = np.zeros((num, *self.ode_shape))
-        cholesky = output_scale * np.eye(num)
-        return Normal(mean, cholesky)
 
     def eval_mean(self):
         if self.mean.ndim > 2:
@@ -278,7 +247,11 @@ class NormalBlockDiag(Normal):
         self.unravel_leaf = unravel_leaf
 
     def __repr__(self):
-        return f"NormalBlockDiag(mean={self.mean}, cholesky={self.cholesky}, treedef={self.treedef}, unravel_leaf=<function>)"
+        msg = f"NormalBlockDiag(mean={self.mean}"
+        msg += f", cholesky={self.cholesky}"
+        msg += f", treedef={self.treedef}"
+        msg += f", unravel_leaf={self.unravel_leaf}>)"
+        return msg
 
     @classmethod
     def from_dirac(cls, mean, *, damp):
@@ -291,10 +264,6 @@ class NormalBlockDiag(Normal):
         d, n = np.shape(mean_array)
         cholesky = np.ones((d, 1, 1)) * (np.eye(n) * damp)[None, :, :]
         return cls(mean_array, cholesky, treedef=treedef, unravel_leaf=unravel_leaf)
-
-    @classmethod
-    def from_tcoeffs(cls, loc: C, scale: C | None = None):
-        raise RuntimeError
 
     @classmethod
     def from_mean_and_std(cls, mean, std):
@@ -322,13 +291,6 @@ class NormalBlockDiag(Normal):
         cholesky = linalg.diagonal_matrix(d)
         cholesky_flat = scale_flat[..., None] * cholesky[None, ...]
         return cls(loc_flat, cholesky_flat, treedef=treedef, unravel_leaf=unravel_leaf)
-
-    @classmethod
-    def from_standard(self, ndim, output_scale):
-        raise RuntimeError
-        mean = np.zeros((*self.ode_shape, ndim))
-        cholesky = output_scale[:, None, None] * np.eye(ndim)[None, ...]
-        return Normal(mean, cholesky)
 
     def eval_mean(self):
         if self.mean.ndim > 2:
@@ -422,11 +384,6 @@ class NormalBlockDiag(Normal):
             return NormalBlockDiag(mean, cholesky, treedef, unravel_leaf)
 
         tree.register_pytree_node(NormalBlockDiag, flatten, unflatten)
-
-
-class BlockDiagNormal:
-    def __init__(self, ode_shape):
-        self.ode_shape = ode_shape
 
 
 NormalDense.register_pytree_node()

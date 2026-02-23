@@ -37,7 +37,6 @@ def marginals_allclose(
     m2,
     /,
     *,
-    ssm,
     atol: float | None = None,
     rtol: float | None = None,
     strict_shapes: bool = True,  # difference to jnp.allclose

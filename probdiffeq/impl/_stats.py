@@ -1,305 +1,305 @@
-from probdiffeq.backend import abc, func, linalg, np, tree
-from probdiffeq.backend.typing import Callable
-from probdiffeq.impl import _normal
-from probdiffeq.util import cholesky_util
+# from probdiffeq.backend import abc, func, linalg, np, tree
+# from probdiffeq.backend.typing import Callable
+# from probdiffeq.impl import _normal
+# from probdiffeq.util import cholesky_util
 
-
-class StatsBackend(abc.ABC):
-    @abc.abstractmethod
-    def mahalanobis_norm_relative(self, u, /, rv):
-        raise NotImplementedError
+
+# class StatsBackend(abc.ABC):
+#     @abc.abstractmethod
+#     def mahalanobis_norm_relative(self, u, /, rv):
+#         raise NotImplementedError
 
-    @abc.abstractmethod
-    def logpdf(self, u, /, rv):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def standard_deviation(self, rv):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def mean(self, rv):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def hidden_shape(self, rv):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def transform_unit_sample(self, unit_sample, /, rv):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def to_multivariate_normal(self, u, rv):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def rescale_cholesky(self, rv, factor, /):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def qoi(self, rv):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def qoi_from_sample(self, sample, /):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def update_mean(self, mean, x, /, num):
-        raise NotImplementedError
-
-
-class DenseStats(StatsBackend):
-    def __init__(self, ode_shape: tuple, unravel: Callable):
-        self.ode_shape = ode_shape
-        self.unravel = unravel
-
-    def mahalanobis_norm_relative(self, u, /, rv):
-        raise RuntimeError
-
-    def logpdf(self, u, /, rv):
-        raise RuntimeError
-        cholesky = linalg.qr_r(rv.cholesky.T).T
-        diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
-        slogdet = np.sum(np.log(np.abs(diagonal)))
-
-        dx = u - rv.mean
-        residual_white = linalg.solve_triangular(cholesky, dx, lower=True, trans=0)
-        sqrnorm = linalg.vector_dot(residual_white, residual_white)
-
-        const = np.log(np.pi() * 2)
-        return -1 / 2 * sqrnorm - u.size / 2 * const - slogdet
-
-    def mean(self, rv):
-        raise RuntimeError
-        return rv.mean
-
-    def standard_deviation(self, rv):
-        raise RuntimeError
-        if rv.mean.ndim > 1:
-            return func.vmap(self.standard_deviation)(rv)
-
-        diag = np.einsum("ij,ij->i", rv.cholesky, rv.cholesky)
-        std = np.sqrt(diag)
-        return self.unravel(std)
-
-    def hidden_shape(self, rv):
-        raise RuntimeError
-        return rv.mean.shape
-
-    def transform_unit_sample(self, unit_sample, /, rv):
-        raise RuntimeError
-        return rv.mean + rv.cholesky @ unit_sample
-
-    def rescale_cholesky(self, rv, factor, /):
-        raise RuntimeError
-        cholesky = factor[..., None, None] * rv.cholesky
-        return _normal.Normal(rv.mean, cholesky)
-
-    def to_multivariate_normal(self, rv):
-        raise RuntimeError
-        return rv.mean, rv.cholesky @ rv.cholesky.T
-
-    def qoi(self, rv):
-        raise RuntimeError
-        if rv.mean.ndim > 1:
-            return jax.vmap(self.qoi)(rv)
-
-        return self.unravel(rv.mean)
-
-    def qoi_from_sample(self, sample, /):
-        raise RuntimeError
-        raise RuntimeError
-        if np.ndim(sample) > 1:
-            return func.vmap(self.qoi_from_sample)(sample)
-        return self.unravel(sample)
-
-    def update_mean(self, mean, x, /, num):
-        raise RuntimeError
-        nominator = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
-        denominator = np.sqrt(num + 1)
-        return nominator / denominator
-
-
-class IsotropicStats(StatsBackend):
-    def __init__(self, ode_shape, unravel, tree_structure):
-        self.ode_shape = ode_shape
-        self.unravel = unravel
-        self.tree_structure = tree_structure
-
-    def mahalanobis_norm_relative(self, u, /, rv):
-        raise RuntimeError
-        residual_white = (rv.mean - u) / rv.cholesky
-        residual_white_matrix = linalg.qr_r(residual_white.T)
-        return np.reshape(np.abs(residual_white_matrix) / np.sqrt(rv.mean.size), ())
-
-    def logpdf(self, u, /, rv):
-        raise RuntimeError
-        # if the gain is qoi-to-hidden, the data is a (d,) array.
-        # this is problematic for the isotropic model unless we explicitly broadcast.
-        if np.ndim(u) == 1:
-            u = u[None, :]
-
-        def logpdf_scalar(x, r):
-            cholesky = linalg.qr_r(r.cholesky.T).T
-
-            dx = x - r.mean
-            w = linalg.solve_triangular(cholesky.T, dx, trans="T")
-
-            maha_term = linalg.vector_dot(w, w)
-
-            diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
-            slogdet = np.sum(np.log(np.abs(diagonal)))
-            logdet_term = 2.0 * slogdet
-            return -0.5 * (logdet_term + maha_term + x.size * np.log(np.pi() * 2))
-
-        # Batch in the "mean" dimension and sum the results.
-        rv_batch = _normal.Normal(1, None)
-        return np.sum(func.vmap(logpdf_scalar, in_axes=(1, rv_batch))(u, rv))
-
-    def mean(self, rv):
-        raise RuntimeError
-        return rv.mean
-
-    def standard_deviation(self, rv):
-        raise RuntimeError
-        diag = np.einsum("ij,ji->i", rv.cholesky, rv.cholesky)
-        std = np.sqrt(diag)
-        return tree.tree_unflatten(self.tree_structure, std)
-        # print(tree.tree_map(np.shape, rv))
-
-        # assert False
-        # if rv.cholesky.ndim > 1:
-        #     return func.vmap(self.standard_deviation)(rv)
-        # std = np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
-        # # TODO: fix all std output shapes (which should be pytrees)
-        # # in all codes
-        # raise RuntimeError("What's going on here??")
-        # return tree.tree_unflatten(self.structure)
-        # std = std[..., None] @ np.ones((1, rv.mean.shape[-1]))
-
-        return self.qoi_from_sample(std)
-
-    def hidden_shape(self, rv):
-        raise RuntimeError
-        return rv.mean.shape
-
-    def transform_unit_sample(self, unit_sample, /, rv):
-        raise RuntimeError
-        return rv.mean + rv.cholesky @ unit_sample
-
-    def rescale_cholesky(self, rv, factor, /):
-        raise RuntimeError
-        cholesky = factor[..., None, None] * rv.cholesky
-        return _normal.Normal(rv.mean, cholesky)
-
-    def to_multivariate_normal(self, rv):
-        raise RuntimeError
-        eye_d = np.eye(*self.ode_shape)
-        cov = rv.cholesky @ rv.cholesky.T
-        cov = np.kron(eye_d, cov)
-        mean = rv.mean.reshape((-1,), order="F")
-        return (mean, cov)
-
-    def qoi(self, rv):
-        raise RuntimeError
-        return self.qoi_from_sample(rv.mean)
-
-    def qoi_from_sample(self, sample, /):
-        raise RuntimeError
-        raise RuntimeError
-        if np.ndim(sample) > 2:
-            return func.vmap(self.qoi_from_sample)(sample)
-        return self.unravel(sample)
-
-    def update_mean(self, mean, x, /, num):
-        raise RuntimeError
-        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
-        return sum_updated / np.sqrt(num + 1)
-
-
-class BlockDiagStats(StatsBackend):
-    def __init__(self, ode_shape, unravel):
-        self.ode_shape = ode_shape
-        self.unravel = unravel
-
-    def mahalanobis_norm_relative(self, u, /, rv):
-        raise RuntimeError
-        # assumes rv.chol = (d,1,1)
-        # return array of norms! See calibration
-        mean = np.reshape(rv.mean, self.ode_shape)
-        cholesky = np.reshape(rv.cholesky, self.ode_shape)
-        return (mean - u) / cholesky / np.sqrt(mean.size)
-
-    def logpdf(self, u, /, rv):
-        raise RuntimeError
-
-        def logpdf_scalar(x, r):
-            cholesky = linalg.qr_r(r.cholesky.T).T
-
-            dx = x - r.mean
-            w = linalg.solve_triangular(cholesky.T, dx, trans="T")
-
-            maha_term = linalg.vector_dot(w, w)
-
-            diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
-            slogdet = np.sum(np.log(np.abs(diagonal)))
-            logdet_term = 2.0 * slogdet
-            return -0.5 * (logdet_term + maha_term + x.size * np.log(np.pi() * 2))
-
-        return np.sum(func.vmap(logpdf_scalar)(u, rv))
-
-    def mean(self, rv):
-        raise RuntimeError
-        return rv.mean
-
-    def hidden_shape(self, rv):
-        raise RuntimeError
-        return rv.mean.shape
-
-    def standard_deviation(self, rv):
-        raise RuntimeError
-        diag = np.einsum("ijk,ikj->ij", rv.cholesky, rv.cholesky)
-        std = np.sqrt(diag)
-        return self.unravel(std)
-
-    def transform_unit_sample(self, unit_sample, /, rv):
-        raise RuntimeError
-        return rv.mean + (rv.cholesky @ unit_sample[..., None])[..., 0]
-
-    def rescale_cholesky(self, rv, factor, /):
-        raise RuntimeError
-        cholesky = factor[..., None, None] * rv.cholesky
-        return _normal.Normal(rv.mean, cholesky)
-
-    def to_multivariate_normal(self, rv):
-        raise RuntimeError
-        mean = np.reshape(rv.mean.T, (-1,), order="F")
-        cov = np.block_diag(self._cov_dense(rv.cholesky))
-        return mean, cov
-
-    def _cov_dense(self, cholesky):
-        raise RuntimeError
-        if cholesky.ndim > 2:
-            return func.vmap(self._cov_dense)(cholesky)
-        return cholesky @ cholesky.T
-
-    def qoi(self, rv):
-        raise RuntimeError
-        return self.qoi_from_sample(rv.mean)
-
-    def qoi_from_sample(self, sample, /):
-        raise RuntimeError
-        if np.ndim(sample) > 2:
-            return func.vmap(self.qoi_from_sample)(sample)
-        return self.unravel(sample)
-
-    def update_mean(self, mean, x, /, num):  # TODO rename: update_mean_estimate
-        raise RuntimeError
-        if np.ndim(mean) > 0:
-            assert np.shape(mean) == np.shape(x)
-            return func.vmap(self.update_mean, in_axes=(0, 0, None))(mean, x, num)
-
-        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
-        return sum_updated / np.sqrt(num + 1)
+#     @abc.abstractmethod
+#     def logpdf(self, u, /, rv):
+#         raise NotImplementedError
+
+#     @abc.abstractmethod
+#     def standard_deviation(self, rv):
+#         raise NotImplementedError
+
+#     @abc.abstractmethod
+#     def mean(self, rv):
+#         raise NotImplementedError
+
+#     @abc.abstractmethod
+#     def hidden_shape(self, rv):
+#         raise NotImplementedError
+
+#     @abc.abstractmethod
+#     def transform_unit_sample(self, unit_sample, /, rv):
+#         raise NotImplementedError
+
+#     @abc.abstractmethod
+#     def to_multivariate_normal(self, u, rv):
+#         raise NotImplementedError
+
+#     @abc.abstractmethod
+#     def rescale_cholesky(self, rv, factor, /):
+#         raise NotImplementedError
+
+#     @abc.abstractmethod
+#     def qoi(self, rv):
+#         raise NotImplementedError
+
+#     @abc.abstractmethod
+#     def qoi_from_sample(self, sample, /):
+#         raise NotImplementedError
+
+#     @abc.abstractmethod
+#     def update_mean(self, mean, x, /, num):
+#         raise NotImplementedError
+
+
+# class DenseStats(StatsBackend):
+#     def __init__(self, ode_shape: tuple, unravel: Callable):
+#         self.ode_shape = ode_shape
+#         self.unravel = unravel
+
+#     def mahalanobis_norm_relative(self, u, /, rv):
+#         raise RuntimeError
+
+#     def logpdf(self, u, /, rv):
+#         raise RuntimeError
+#         cholesky = linalg.qr_r(rv.cholesky.T).T
+#         diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
+#         slogdet = np.sum(np.log(np.abs(diagonal)))
+
+#         dx = u - rv.mean
+#         residual_white = linalg.solve_triangular(cholesky, dx, lower=True, trans=0)
+#         sqrnorm = linalg.vector_dot(residual_white, residual_white)
+
+#         const = np.log(np.pi() * 2)
+#         return -1 / 2 * sqrnorm - u.size / 2 * const - slogdet
+
+#     def mean(self, rv):
+#         raise RuntimeError
+#         return rv.mean
+
+#     def standard_deviation(self, rv):
+#         raise RuntimeError
+#         if rv.mean.ndim > 1:
+#             return func.vmap(self.standard_deviation)(rv)
+
+#         diag = np.einsum("ij,ij->i", rv.cholesky, rv.cholesky)
+#         std = np.sqrt(diag)
+#         return self.unravel(std)
+
+#     def hidden_shape(self, rv):
+#         raise RuntimeError
+#         return rv.mean.shape
+
+#     def transform_unit_sample(self, unit_sample, /, rv):
+#         raise RuntimeError
+#         return rv.mean + rv.cholesky @ unit_sample
+
+#     def rescale_cholesky(self, rv, factor, /):
+#         raise RuntimeError
+#         cholesky = factor[..., None, None] * rv.cholesky
+#         return _normal.Normal(rv.mean, cholesky)
+
+#     def to_multivariate_normal(self, rv):
+#         raise RuntimeError
+#         return rv.mean, rv.cholesky @ rv.cholesky.T
+
+#     def qoi(self, rv):
+#         raise RuntimeError
+#         if rv.mean.ndim > 1:
+#             return jax.vmap(self.qoi)(rv)
+
+#         return self.unravel(rv.mean)
+
+#     def qoi_from_sample(self, sample, /):
+#         raise RuntimeError
+#         raise RuntimeError
+#         if np.ndim(sample) > 1:
+#             return func.vmap(self.qoi_from_sample)(sample)
+#         return self.unravel(sample)
+
+#     def update_mean(self, mean, x, /, num):
+#         raise RuntimeError
+#         nominator = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
+#         denominator = np.sqrt(num + 1)
+#         return nominator / denominator
+
+
+# class IsotropicStats(StatsBackend):
+#     def __init__(self, ode_shape, unravel, tree_structure):
+#         self.ode_shape = ode_shape
+#         self.unravel = unravel
+#         self.tree_structure = tree_structure
+
+#     def mahalanobis_norm_relative(self, u, /, rv):
+#         raise RuntimeError
+#         residual_white = (rv.mean - u) / rv.cholesky
+#         residual_white_matrix = linalg.qr_r(residual_white.T)
+#         return np.reshape(np.abs(residual_white_matrix) / np.sqrt(rv.mean.size), ())
+
+#     def logpdf(self, u, /, rv):
+#         raise RuntimeError
+#         # if the gain is qoi-to-hidden, the data is a (d,) array.
+#         # this is problematic for the isotropic model unless we explicitly broadcast.
+#         if np.ndim(u) == 1:
+#             u = u[None, :]
+
+#         def logpdf_scalar(x, r):
+#             cholesky = linalg.qr_r(r.cholesky.T).T
+
+#             dx = x - r.mean
+#             w = linalg.solve_triangular(cholesky.T, dx, trans="T")
+
+#             maha_term = linalg.vector_dot(w, w)
+
+#             diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
+#             slogdet = np.sum(np.log(np.abs(diagonal)))
+#             logdet_term = 2.0 * slogdet
+#             return -0.5 * (logdet_term + maha_term + x.size * np.log(np.pi() * 2))
+
+#         # Batch in the "mean" dimension and sum the results.
+#         rv_batch = _normal.Normal(1, None)
+#         return np.sum(func.vmap(logpdf_scalar, in_axes=(1, rv_batch))(u, rv))
+
+#     def mean(self, rv):
+#         raise RuntimeError
+#         return rv.mean
+
+#     def standard_deviation(self, rv):
+#         raise RuntimeError
+#         diag = np.einsum("ij,ji->i", rv.cholesky, rv.cholesky)
+#         std = np.sqrt(diag)
+#         return tree.tree_unflatten(self.tree_structure, std)
+#         # print(tree.tree_map(np.shape, rv))
+
+#         # assert False
+#         # if rv.cholesky.ndim > 1:
+#         #     return func.vmap(self.standard_deviation)(rv)
+#         # std = np.sqrt(linalg.vector_dot(rv.cholesky, rv.cholesky))
+#         # # TODO: fix all std output shapes (which should be pytrees)
+#         # # in all codes
+#         # raise RuntimeError("What's going on here??")
+#         # return tree.tree_unflatten(self.structure)
+#         # std = std[..., None] @ np.ones((1, rv.mean.shape[-1]))
+
+#         return self.qoi_from_sample(std)
+
+#     def hidden_shape(self, rv):
+#         raise RuntimeError
+#         return rv.mean.shape
+
+#     def transform_unit_sample(self, unit_sample, /, rv):
+#         raise RuntimeError
+#         return rv.mean + rv.cholesky @ unit_sample
+
+#     def rescale_cholesky(self, rv, factor, /):
+#         raise RuntimeError
+#         cholesky = factor[..., None, None] * rv.cholesky
+#         return _normal.Normal(rv.mean, cholesky)
+
+#     def to_multivariate_normal(self, rv):
+#         raise RuntimeError
+#         eye_d = np.eye(*self.ode_shape)
+#         cov = rv.cholesky @ rv.cholesky.T
+#         cov = np.kron(eye_d, cov)
+#         mean = rv.mean.reshape((-1,), order="F")
+#         return (mean, cov)
+
+#     def qoi(self, rv):
+#         raise RuntimeError
+#         return self.qoi_from_sample(rv.mean)
+
+#     def qoi_from_sample(self, sample, /):
+#         raise RuntimeError
+#         raise RuntimeError
+#         if np.ndim(sample) > 2:
+#             return func.vmap(self.qoi_from_sample)(sample)
+#         return self.unravel(sample)
+
+#     def update_mean(self, mean, x, /, num):
+#         raise RuntimeError
+#         sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
+#         return sum_updated / np.sqrt(num + 1)
+
+
+# class BlockDiagStats(StatsBackend):
+#     def __init__(self, ode_shape, unravel):
+#         self.ode_shape = ode_shape
+#         self.unravel = unravel
+
+#     def mahalanobis_norm_relative(self, u, /, rv):
+#         raise RuntimeError
+#         # assumes rv.chol = (d,1,1)
+#         # return array of norms! See calibration
+#         mean = np.reshape(rv.mean, self.ode_shape)
+#         cholesky = np.reshape(rv.cholesky, self.ode_shape)
+#         return (mean - u) / cholesky / np.sqrt(mean.size)
+
+#     def logpdf(self, u, /, rv):
+#         raise RuntimeError
+
+#         def logpdf_scalar(x, r):
+#             cholesky = linalg.qr_r(r.cholesky.T).T
+
+#             dx = x - r.mean
+#             w = linalg.solve_triangular(cholesky.T, dx, trans="T")
+
+#             maha_term = linalg.vector_dot(w, w)
+
+#             diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
+#             slogdet = np.sum(np.log(np.abs(diagonal)))
+#             logdet_term = 2.0 * slogdet
+#             return -0.5 * (logdet_term + maha_term + x.size * np.log(np.pi() * 2))
+
+#         return np.sum(func.vmap(logpdf_scalar)(u, rv))
+
+#     def mean(self, rv):
+#         raise RuntimeError
+#         return rv.mean
+
+#     def hidden_shape(self, rv):
+#         raise RuntimeError
+#         return rv.mean.shape
+
+#     def standard_deviation(self, rv):
+#         raise RuntimeError
+#         diag = np.einsum("ijk,ikj->ij", rv.cholesky, rv.cholesky)
+#         std = np.sqrt(diag)
+#         return self.unravel(std)
+
+#     def transform_unit_sample(self, unit_sample, /, rv):
+#         raise RuntimeError
+#         return rv.mean + (rv.cholesky @ unit_sample[..., None])[..., 0]
+
+#     def rescale_cholesky(self, rv, factor, /):
+#         raise RuntimeError
+#         cholesky = factor[..., None, None] * rv.cholesky
+#         return _normal.Normal(rv.mean, cholesky)
+
+#     def to_multivariate_normal(self, rv):
+#         raise RuntimeError
+#         mean = np.reshape(rv.mean.T, (-1,), order="F")
+#         cov = np.block_diag(self._cov_dense(rv.cholesky))
+#         return mean, cov
+
+#     def _cov_dense(self, cholesky):
+#         raise RuntimeError
+#         if cholesky.ndim > 2:
+#             return func.vmap(self._cov_dense)(cholesky)
+#         return cholesky @ cholesky.T
+
+#     def qoi(self, rv):
+#         raise RuntimeError
+#         return self.qoi_from_sample(rv.mean)
+
+#     def qoi_from_sample(self, sample, /):
+#         raise RuntimeError
+#         if np.ndim(sample) > 2:
+#             return func.vmap(self.qoi_from_sample)(sample)
+#         return self.unravel(sample)
+
+#     def update_mean(self, mean, x, /, num):  # TODO rename: update_mean_estimate
+#         raise RuntimeError
+#         if np.ndim(mean) > 0:
+#             assert np.shape(mean) == np.shape(x)
+#             return func.vmap(self.update_mean, in_axes=(0, 0, None))(mean, x, num)
+
+#         sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
+#         return sum_updated / np.sqrt(num + 1)

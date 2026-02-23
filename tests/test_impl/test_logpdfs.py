@@ -9,7 +9,7 @@ from probdiffeq.impl import impl
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
 def test_logpdf(fact):
-    rv, ssm = create_random_variable(fact=fact)
+    rv, _ssm = create_random_variable(fact=fact)
 
     u = tree.tree_map(np.ones_like, rv.eval_mean())
 
@@ -23,7 +23,7 @@ def test_logpdf(fact):
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
 def test_grad_not_none(fact):
-    rv, ssm = create_random_variable(fact=fact)
+    rv, _ssm = create_random_variable(fact=fact)
     u = tree.tree_map(np.ones_like, rv.eval_mean())
 
     pdf = func.jacrev(lambda x, y: y.logpdf(x))(u, rv)

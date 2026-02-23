@@ -107,7 +107,7 @@ def test_output_scale_dense_blockdiag(ssm_fact):
     scale = 123.45 * np.ones((1, 1, 1))
 
     # Test that the transition covariances are scaled correctly
-    init, iwp, ssm = probdiffeq.prior_wiener_integrated(
+    init, iwp, _ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, output_scale=scale, ssm_fact=ssm_fact
     )
 
@@ -117,7 +117,7 @@ def test_output_scale_dense_blockdiag(ssm_fact):
     assert testing.allclose(cov, Q_expected)
 
     # Test that the "diffuse_derivatives" are scaled correctly
-    init, iwp, ssm = probdiffeq.prior_wiener_integrated(
+    init, iwp, _ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs,
         output_scale=scale,
         diffuse_derivatives=3,
@@ -148,7 +148,7 @@ def test_output_scale_isotropic():
     scale = 123.45 * np.ones(())
 
     # Test that the transition covariances are scaled correctly
-    init, iwp, ssm = probdiffeq.prior_wiener_integrated(
+    init, iwp, _ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, output_scale=scale, ssm_fact="isotropic"
     )
 
@@ -158,7 +158,7 @@ def test_output_scale_isotropic():
     assert testing.allclose(cov, Q_expected)
 
     # Test that the "diffuse_derivatives" are scaled correctly
-    init, iwp, ssm = probdiffeq.prior_wiener_integrated(
+    init, iwp, _ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs,
         output_scale=scale,
         diffuse_derivatives=3,

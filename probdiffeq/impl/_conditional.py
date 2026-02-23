@@ -16,7 +16,9 @@ class LatentCond:
         self.to_observed = to_observed
 
     def __repr__(self):
-        return f"LatentCond(A={self.A}, noise={self.noise}, to_latent={self.to_latent}, to_observed={self.to_observed})"
+        msg = f"LatentCond(A={self.A}, noise={self.noise}"
+        msg += f", to_latent={self.to_latent}, to_observed={self.to_observed})"
+        return msg
 
     @staticmethod
     def register_pytree_node():
@@ -897,18 +899,6 @@ class IsotropicConditional(ConditionalBackend):
         u_like = self.unravel_tree(m)[0]
         noise = _normal.NormalIso.from_mean_and_std(u_like, std)
         return LatentCond.from_linop_and_noise(linop, noise)
-
-        # u_flat, _ = tree.ravel_pytree(u)
-
-        # stdev, _ = tree.ravel_pytree(standard_deviation)
-
-        # assert stdev.shape == (1,)
-        # cholesky = linalg.diagonal_matrix(stdev)
-        # noise = _normal.Normal(-u_flat, cholesky)
-
-        # to_latent = np.ones(linop.shape[1])
-        # to_observed = np.ones(linop.shape[0])
-        # return LatentCond(linop, noise, to_latent=to_latent, to_observed=to_observed)
 
     def rescale_noise(self, cond, scale):
         stats = _stats.IsotropicStats(

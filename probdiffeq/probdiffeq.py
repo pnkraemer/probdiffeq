@@ -328,11 +328,12 @@ class jacobian_hutchinson_rev(JacobianHandler):
 
 
 def loss_lml_terminal_values(*, ssm, tcoeff_index=0):
+    """Construct a log-marginal-likelihood loss for the terminal value."""
 
     def loss(u, /, *, marginals, std):
         u = tree.tree_map(np.asarray, u)
 
-        std_expected = tree.tree_map(lambda s: ssm.prototypes.error_estimate(), u)
+        std_expected = tree.tree_map(lambda _s: ssm.prototypes.error_estimate(), u)
         std = tree.tree_map(np.asarray, std)
         shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
         shapes_equal = tree.tree_all(shapes)
@@ -352,6 +353,8 @@ def loss_lml_terminal_values(*, ssm, tcoeff_index=0):
 
 
 def loss_lml_timeseries(*, ssm, tcoeff_index=0):
+    """Construct a log-marginal-likelihood loss for a time-series."""
+
     def loss(u, /, *, posterior, std):
         if not isinstance(posterior, MarkovSequence):
             msg = "The datatype of the posterior is not as expected."
@@ -359,12 +362,12 @@ def loss_lml_timeseries(*, ssm, tcoeff_index=0):
             msg += f" Received: {type(posterior)}."
             msg += " Did you perhaps use a filter instead of a smoother"
             msg += ", or did you perhaps intend to use a different loss?"
-            raise ValueError(msg)
+            raise TypeError(msg)
 
         u = tree.tree_map(np.asarray, u)
 
         std_expected = tree.tree_map(
-            func.vmap(lambda s: ssm.prototypes.error_estimate()), u
+            func.vmap(lambda _s: ssm.prototypes.error_estimate()), u
         )
         std = tree.tree_map(np.asarray, std)
         shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
@@ -667,7 +670,7 @@ class MarkovSequence(Generic[T]):
 
         # Process the remaining values
         def body(rv_and_logpdf, prior_and_observation_and_data):
-            rv, logpdf = rv_and_logpdf
+            rv, _logpdf = rv_and_logpdf
             prior, observation, data = prior_and_observation_and_data
 
             predicted = ssm.conditional.marginalise(rv, prior)
@@ -812,194 +815,6 @@ class MarkovStrategy(Generic[T]):
     def finalize(self, *, posterior0: T, posterior: T, output_scale) -> T:
         """Finalize the posterior before returning a solution."""
         raise NotImplementedError
-
-    # def markov_marginals(self, markov_seq: MarkovSequence, *, reverse: bool):
-    #     """Extract the (time-)marginals from a Markov sequence.
-
-    #     This is only needed in combination with smoothing-based strategies.
-    #     """
-    #     if markov_seq.marginal.mean.ndim == markov_seq.conditional.noise.mean.ndim:
-    #         markov_seq = self._markov_select_terminal(markov_seq)
-
-    #     def step(x, cond):
-    #         extrapolated = self.ssm.conditional.marginalise(x, cond)
-    #         return extrapolated, extrapolated
-
-    #     init, xs = markov_seq.marginal, markov_seq.conditional
-    #     _, marginals = flow.scan(step, init=init, xs=xs, reverse=reverse)
-
-    #     if reverse:
-    #         # Append the terminal marginal to the computed ones
-    #         return tree.tree_array_append(marginals, init)
-
-    #     return tree.tree_array_prepend(init, marginals)
-
-    # def markov_sample(
-    #     self, key, markov_seq: MarkovSequence, *, reverse: bool, shape: tuple = ()
-    # ):
-    #     """Sample from a Markov sequence."""
-    #     if markov_seq.marginal.mean.ndim == markov_seq.conditional.noise.mean.ndim:
-    #         markov_seq = self._markov_select_terminal(markov_seq)
-    #     # A smoother samples on the grid by sampling i.i.d values
-    #     # from the terminal RV x_N and the backward noises z_(1:N)
-    #     # and then combining them backwards as
-    #     # x_(n-1) = l_n @ x_n + z_n, for n=1,...,N.
-    #     markov_seq_shape = self._sample_shape(markov_seq)
-    #     base_samples = random.normal(key, shape=shape + markov_seq_shape)
-    #     return self._transform_unit_sample(markov_seq, base_samples, reverse=reverse)
-
-    # @staticmethod
-    # def _markov_select_terminal(markov_seq):
-    #     """Discard all intermediate filtering solutions from a Markov sequence.
-
-    #     This function is useful to convert a smoothing-solution into a Markov sequence
-    #     that is compatible with sampling or marginalisation.
-    #     """
-    #     init = tree.tree_map(lambda x: x[-1, ...], markov_seq.marginal)
-    #     return MarkovSequence(init, markov_seq.conditional)
-
-    # def _sample_shape(self, markov_seq):
-    #     # The number of samples is one larger than the number of conditionals
-    #     noise = markov_seq.conditional.noise
-    #     n, *shape_single_sample = self.ssm.stats.hidden_shape(noise)
-    #     return n + 1, *tuple(shape_single_sample)
-
-    # def _transform_unit_sample(self, markov_seq, base_sample, *, reverse):
-    #     if base_sample.ndim > len(self._sample_shape(markov_seq)):
-    #         transform = func.partial(self._transform_unit_sample, reverse=reverse)
-    #         transform_vmap = func.vmap(transform, in_axes=(None, 0))
-    #         return transform_vmap(markov_seq, base_sample)
-
-    #     # Compute a single unit sample.
-
-    #     def body_fun(samp_prev, conditionals_and_base_samples):
-    #         conditional, base = conditionals_and_base_samples
-
-    #         rv = self.ssm.conditional.apply(samp_prev, conditional)
-    #         smp = self.ssm.stats.transform_unit_sample(base, rv)
-    #         return smp, smp
-
-    #     base_sample_init, base_sample_body = base_sample[0], base_sample[1:]
-
-    #     # Compute a sample at the terminal value
-    #     init_sample = self.ssm.stats.transform_unit_sample(
-    #         base_sample_init, markov_seq.marginal
-    #     )
-
-    #     # Loop over backward models and the remaining base samples
-    #     xs = (markov_seq.conditional, base_sample_body)
-    #     _, samples = flow.scan(body_fun, init=init_sample, xs=xs, reverse=reverse)
-
-    #     if reverse:
-    #         samples = np.concatenate([samples, init_sample[None, ...]])
-    #     else:
-    #         samples = np.concatenate([init_sample[None, ...], samples])
-
-    #     return func.vmap(self.ssm.stats.qoi_from_sample)(samples)
-
-    # def log_marginal_likelihood_terminal_values(
-    #     self, u, /, *, standard_deviation, posterior: T
-    # ):
-    #     """Compute the log-marginal-likelihood at the terminal value.
-
-    #     Parameters
-    #     ----------
-    #     u
-    #         Observation. Expected to have shape (d,) for an ODE with shape (d,).
-    #     standard_deviation
-    #         Standard deviation of the observation. Expected to be a scalar.
-    #     posterior
-    #         Posterior distribution.
-    #         Expected to correspond to a solution of an ODE with shape (d,).
-    #     """
-    #     [u_leaves], u_structure = tree.tree_flatten(u)
-    #     [_std_leaves], std_structure = tree.tree_flatten(standard_deviation)
-
-    #     if u_structure != std_structure:
-    #         msg = (
-    #             f"Observation-noise tree structure {std_structure} "
-    #             f"does not match the observation structure {u_structure}. "
-    #         )
-    #         raise ValueError(msg)
-
-    #     # Generate an observation-model for the QOI
-    #     model = self.ssm.conditional.to_derivative(0, u, standard_deviation)
-    #     rv = posterior.marginal if isinstance(posterior, MarkovSequence) else posterior
-
-    #     data = np.zeros_like(u_leaves)  # 'u' is baked into the observation model
-    #     observed, _conditional = self.ssm.conditional.revert(rv, model)
-    #     return observed.logpdf(data)
-
-    # def log_marginal_likelihood(self, u, /, *, standard_deviation, posterior: T):
-    #     """Compute the log-marginal-likelihood of observations of the IVP solution.
-
-    #     Only works with smoothing-based estimators.
-
-    #     !!! note
-    #         Use `log_marginal_likelihood_terminal_values`
-    #         to compute the log-likelihood at the terminal values.
-
-    #     Parameters
-    #     ----------
-    #     u
-    #         Observation. Expected to match the ODE's type/shape.
-    #     standard_deviation
-    #         Standard deviation of the observation. Expected to match 'u's
-    #         Pytree structure, but every leaf must be a scalar.
-    #     posterior
-    #         Posterior distribution.
-    #         Expected to correspond to a solution of an ODE with shape (d,).
-    #     """
-    #     [u_leaves], u_structure = tree.tree_flatten(u)
-    #     [std_leaves], std_structure = tree.tree_flatten(standard_deviation)
-
-    #     if u_structure != std_structure:
-    #         msg = (
-    #             f"Observation-noise tree structure {std_structure} "
-    #             f"does not match the observation structure {u_structure}. "
-    #         )
-    #         raise ValueError(msg)
-
-    #     qoi_flat, _ = tree.ravel_pytree(self.ssm.prototypes.qoi())
-    #     if np.ndim(std_leaves) < 1 or np.ndim(u_leaves) != np.ndim(qoi_flat) + 1:
-    #         msg = (
-    #             f"Time-series solution expected. "
-    #             f"ndim={np.ndim(u_leaves)}, shape={np.shape(u_leaves)} received."
-    #         )
-    #         raise ValueError(msg)
-
-    #     if len(u_leaves) != len(np.asarray(std_leaves)):
-    #         msg = (
-    #             f"Observation-noise shape {np.shape(std_leaves)} "
-    #             f"does not match the observation shape {np.shape(u_leaves)}. "
-    #         )
-    #         raise ValueError(msg)
-
-    #     if not isinstance(posterior, MarkovSequence):
-    #         msg1 = "Time-series marginal likelihoods "
-    #         msg2 = "cannot be computed with a filtering solution."
-    #         raise TypeError(msg1 + msg2)
-
-    #     # Generate an observation-model for the QOI
-
-    #     model_fun = func.vmap(self.ssm.conditional.to_derivative, in_axes=(None, 0, 0))
-    #     models = model_fun(0, u, standard_deviation)
-
-    #     # Select the terminal variable
-    #     rv = tree.tree_map(lambda s: s[-1, ...], posterior.marginal)
-
-    #     # Run the reverse Kalman filter
-    #     estimator = filter_util.kalmanfilter_with_marginal_likelihood(ssm=self.ssm)
-    #     result, _ = filter_util.estimate_rev(
-    #         np.zeros_like(u_leaves),
-    #         init=rv,
-    #         prior_transitions=posterior.conditional,
-    #         observation_model=models,
-    #         estimator=estimator,
-    #     )
-
-    #     # Return only the logpdf
-    #     return result.logpdf
 
 
 @tree.register_dataclass

@@ -29,7 +29,6 @@ def test_fixed_grid_result_matches_adaptive_grid_result_when_reusing_grid(fact):
         error=error, solver=solver, clip_dt=True
     )
     solution_adaptive = solve(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2)
-    print(solution_adaptive.u.mean)
     assert isinstance(solution_adaptive.u.mean, Taylor)
 
     grid_adaptive = solution_adaptive.t

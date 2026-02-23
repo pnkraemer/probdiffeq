@@ -38,8 +38,7 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     for ui, us in zip(u_interpolated.std, u_save_at.std):
         assert testing.allclose(ui, us)
 
-    marginals_allclose_func = func.partial(testing.marginals_allclose, ssm=ssm)
-    marginals_allclose_func = func.vmap(marginals_allclose_func)
+    marginals_allclose_func = func.vmap(testing.marginals_allclose)
     are_close = marginals_allclose_func(u_interpolated.marginals, u_save_at.marginals)
 
     assert np.all(are_close)
