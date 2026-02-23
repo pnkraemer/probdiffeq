@@ -970,8 +970,10 @@ class BlockDiagConditional(ConditionalBackend):
         self.unravel_leaf = unravel_leaf
 
     def apply(self, x, cond, /):
+        print(x)
         leaves = tree.tree_leaves(x)
         x = np.stack(leaves).T
+        print(x.shape)
 
         def apply_unbatch(s, c):
             s = c.to_latent * s

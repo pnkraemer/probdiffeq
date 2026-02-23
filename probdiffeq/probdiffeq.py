@@ -672,8 +672,6 @@ class MarkovSequence(Generic[T]):
             prior, observation, data = prior_and_observation_and_data
 
             predicted = ssm.conditional.marginalise(rv, prior)
-            print(predicted)
-            print(observation)
             observed, noise = ssm.conditional.revert(predicted, observation)
 
             logpdf1 = observed.logpdf(data)
@@ -2026,7 +2024,7 @@ class solver_dynamic(ProbabilisticSolver):
         # Calibrate the output scale
         ones = np.ones_like(self.ssm.prototypes.output_scale())
         transition = self.prior(dt, ones)
-        mean = state.u.marginals.mean
+        mean = state.u.marginals.eval_mean()
         u = self.ssm.conditional.apply(mean, transition)
 
         # Linearize
@@ -2674,7 +2672,7 @@ class error_state_std(ErrorEstimator):
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
-        mean = self.ssm.stats.mean(previous.u.marginals)
+        mean = previous.u.marginals.eval_mean()
         rv = self.ssm.conditional.apply(mean, transition)
 
         # Optionally: re-linearize
