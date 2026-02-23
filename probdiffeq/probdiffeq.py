@@ -32,23 +32,6 @@ C = TypeVar("C", bound=Sequence)
 T = TypeVar("T")
 
 
-class VectorField(Protocol[T]):
-    """A protocol for the vector-field type expected by the solvers.
-
-    Examples of valid call signatures:
-
-    - `f(u: T, /, *, t: ArrayLike) -> T`
-    - `f(u: T, du: T, /, *, t: ArrayLike) -> T`
-    - `f(u: T, du: T, ddu: T, /, *, t: ArrayLike) -> T`
-    - `f(u: T, du: T, ddu: T, dddy: T, /, *, t: ArrayLike) -> T`
-
-    If a type-checker complains, try jitting the vector field.
-    If the error persists, open an issue.
-    """
-
-    def __call__(self, *ys: T, t: ArrayLike) -> T: ...
-
-
 @tree.register_dataclass
 @structs.dataclass
 class CubaturePositiveWeights:
@@ -366,9 +349,10 @@ def loss_lml_timeseries(*, ssm, tcoeff_index=0):
 
         u = tree.tree_map(np.asarray, u)
 
-        std_expected = tree.tree_map(
-            func.vmap(lambda _s: ssm.prototypes.standard_deviation()), u
-        )
+        def batch_std(s):
+            return func.vmap(lambda _s: ssm.prototypes.standard_deviation())(s)
+
+        std_expected = tree.tree_map(batch_std, u)
         std = tree.tree_map(np.asarray, std)
         shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
         shapes_equal = tree.tree_all(shapes)
@@ -665,26 +649,27 @@ class MarkovSequence(Generic[T]):
         # Process the terminal value
         u0 = tree.tree_map(lambda s: s[-1], u)
         model0 = tree.tree_map(lambda s: s[-1], model)
-        marg = ssm.conditional.marginalise(self.marginal, model0)
+        marg, cond = ssm.conditional.revert(self.marginal, model0)
+        updated = ssm.conditional.apply(u0, cond)
         pdf0 = marg.logpdf(u0)
 
         # Process the remaining values
         def body(rv_and_logpdf, prior_and_observation_and_data):
-            rv, _logpdf = rv_and_logpdf
+            rv, logpdf, num_data = rv_and_logpdf
             prior, observation, data = prior_and_observation_and_data
 
             predicted = ssm.conditional.marginalise(rv, prior)
             observed, noise = ssm.conditional.revert(predicted, observation)
 
-            logpdf1 = observed.logpdf(data)
+            logpdf1 = (logpdf * num_data + observed.logpdf(data)) / (num_data + 1)
             corrected = ssm.conditional.apply(data, noise)
-            return (corrected, logpdf1), ()
+            return (corrected, logpdf1, num_data + 1), ()
 
         u1 = tree.tree_map(lambda s: s[:-1], u)
         model1 = tree.tree_map(lambda s: s[:-1], model)
-        init = (self.marginal, pdf0)
+        init = (updated, pdf0, 1)
         xs = (self.conditional, model1, u1)
-        (_, pdf), _ = flow.scan(body, init=init, xs=xs, reverse=self.reverse)
+        (_, pdf, _), _ = flow.scan(body, init=init, xs=xs, reverse=self.reverse)
         return pdf
 
     def _select_terminal(self):
@@ -1077,10 +1062,6 @@ class ProbabilisticSolver:
         return sol, _InterpRes(step_from=acc, interp_from=prev)
 
 
-def _identity(s):
-    return s
-
-
 def prior_wiener_integrated(
     tcoeffs: C,
     *,
@@ -1220,7 +1201,7 @@ def prior_wiener_integrated_diffuse(
     std_leaves_scaled = [output_scale_leaf * s for s in std_leaves]
     tcoeffs_std = tree.tree_unflatten(structure, std_leaves_scaled)
 
-    discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
+    discretize = ssm.conditional.transition_wiener_integrated(base_scale=output_scale)
 
     # Return the target
     marginal = ssm.normal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
@@ -1256,7 +1237,7 @@ def prior_wiener_integrated_discrete(
         output_scale=output_scale,
         increase_std_by_eps=increase_std_by_eps,
     )
-    scales = np.ones_like(ssm.prototypes.output_scale())
+    scales = np.ones_like(ssm.prototypes.output_scale_calibrated())
     discretize_vmap = func.vmap(discretize, in_axes=(0, None))
     conditionals = discretize_vmap(np.diff(ts), scales)
     markov_seq = MarkovSequence(init.marginals, conditionals)
@@ -1347,7 +1328,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
     ):
-        assert output_scale.shape == self.ssm.prototypes.output_scale().shape
+        assert output_scale.shape == self.ssm.prototypes.output_scale_calibrated().shape
         posterior0 = posterior0.rescale_cholesky(output_scale)
         posterior = posterior.rescale_cholesky(output_scale)
 
@@ -1468,7 +1449,7 @@ class strategy_filter(MarkovStrategy):
         return estimate, marginals
 
     def finalize(self, *, posterior0, posterior, output_scale):
-        assert output_scale.shape == self.ssm.prototypes.output_scale().shape
+        assert output_scale.shape == self.ssm.prototypes.output_scale_calibrated().shape
 
         # No rescaling because no calibration at the initial step
         posterior0 = posterior0.rescale_cholesky(output_scale)
@@ -1585,7 +1566,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
     ):
-        assert output_scale.shape == self.ssm.prototypes.output_scale().shape
+        assert output_scale.shape == self.ssm.prototypes.output_scale_calibrated().shape
         posterior0 = posterior0.rescale_cholesky(output_scale)
         posterior = posterior.rescale_cholesky(output_scale)
 

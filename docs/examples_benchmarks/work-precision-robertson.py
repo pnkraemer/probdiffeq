@@ -249,9 +249,7 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
             is_differential=is_differential,
             ssm_fact="isotropic",
         )
-        print(init.mean)
-        print(init.std)
-        raise AssertionError()
+
         # We build a Jet constraint
         jet = probdiffeq.constraint_root_jet(root, ssm=ssm)
         ts = probdiffeq.constraint_root_ts1(root, ssm=ssm)

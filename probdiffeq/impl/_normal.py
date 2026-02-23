@@ -139,7 +139,7 @@ class NormalIso(Normal):
 
         num_coeffs = len(mean)
         if scale_flat.shape != (num_coeffs,):
-            msg = "'scale' must have the same pytree structure as loc, "
+            msg = "'std' must have the same pytree structure as mean, "
             msg += "but each leaf must be a scalar instead of an array"
             msg += f"Received: {std}"
             raise ValueError(msg)

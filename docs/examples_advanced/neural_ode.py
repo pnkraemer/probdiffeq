@@ -34,8 +34,8 @@ def main(num_data=100, epochs=500, print_every=50, hidden=(20,), lr=0.2):
     # Create some data and construct a neural ODE
     grid = jnp.linspace(0, 1, num=num_data)
     data = jnp.sin(2.5 * jnp.pi * grid) * jnp.pi * grid
-    stdev = 1e-1
-    output_scale = 1e4
+    stdev = 1e-4
+    output_scale = stdev * 1e5
     vf, u0, (t0, _t1), f_args = vf_neural_ode(hidden=hidden, t0=0.0, t1=1)
 
     # Create a loss (this is where probabilistic numerics enters!)
@@ -71,7 +71,7 @@ def main(num_data=100, epochs=500, print_every=50, hidden=(20,), lr=0.2):
 
         # Print progressbar
         if i % print_every == print_every - 1:
-            print(f"...{(i + 1)} epochs: loss={info['loss']:.3e}")
+            print(f"...{(i + 1)} epochs: loss={info['loss']:.7e}")
 
         # Diffusion tempering: https://arxiv.org/abs/2402.12231
         # To all users: Adjust this tempering and
@@ -96,12 +96,12 @@ def main(num_data=100, epochs=500, print_every=50, hidden=(20,), lr=0.2):
 def vf_neural_ode(*, hidden: tuple, t0: float, t1: float):
     """Build a neural ODE."""
     f_args, mlp = model_mlp(hidden=hidden, shape_in=(2,), shape_out=(1,))
-    u0 = jnp.asarray([0.0])
+    u0 = jnp.asarray(0.0)
 
     @jax.jit
     def vf(y, /, *, t, p):
         """Evaluate the neural ODE vector field."""
-        y_and_t = jnp.concatenate([y, t[None]])
+        y_and_t = jnp.concatenate([y[None], t[None]])
         return mlp(p, y_and_t)
 
     return vf, (u0,), (t0, t1), f_args
@@ -185,12 +185,11 @@ def loss_log_marginal_likelihood(vf, *, t0):
         sol = solve(init, grid=grid)
 
         # Evaluate loss
-        marginal_likelihood = strategy.log_marginal_likelihood(
-            data[:, None],
-            standard_deviation=jnp.ones_like(grid) * stdev,
-            posterior=sol.solution_full,
-        )
-        return -1 * marginal_likelihood, {"sol": sol}
+        loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
+        std = jnp.ones_like(grid) * stdev
+
+        lml = loss_lml(data, std=std, posterior=sol.solution_full)
+        return -lml, {"sol": sol}
 
     return loss
 
@@ -211,8 +210,7 @@ def train_step_optax(optimizer, loss):
         updates, opt_state = optimizer.update(grads, opt_state)
         params = optax.apply_updates(params, updates)
 
-        info["loss"] = value
-        return (params, opt_state), info
+        return (params, opt_state), {"sol": info["sol"], "loss": value}
 
     return update
 

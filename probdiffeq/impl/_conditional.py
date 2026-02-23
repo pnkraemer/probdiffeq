@@ -616,7 +616,7 @@ class ConditionalBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ibm_transitions(self, num_derivatives, output_scale=None):
+    def transition_wiener_integrated(self, num_derivatives, output_scale=None):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -625,10 +625,6 @@ class ConditionalBackend(abc.ABC):
 
     @abc.abstractmethod
     def to_derivative(self, i, standard_deviation):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def rescale_noise(self, cond, scale):
         raise NotImplementedError
 
 
@@ -721,7 +717,7 @@ class DenseConditional(ConditionalBackend):
         ones = np.ones((n,))
         return LatentCond(A, noise, to_latent=ones, to_observed=ones)
 
-    def ibm_transitions(self, base_scale):
+    def transition_wiener_integrated(self, base_scale):
 
         a, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
         (d,) = self.ode_shape
@@ -855,7 +851,7 @@ class IsotropicConditional(ConditionalBackend):
         ones = np.ones((num,))
         return LatentCond(matrix, noise, to_latent=ones, to_observed=ones)
 
-    def ibm_transitions(self, base_scale):
+    def transition_wiener_integrated(self, base_scale):
 
         A, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1, *self.ode_shape))
@@ -886,9 +882,8 @@ class IsotropicConditional(ConditionalBackend):
 
         m = np.zeros((self.num_derivatives + 1,))
         linop = func.jacfwd(select)(m)
-
         u_like = self.unravel_tree(m)[0]
-        noise = _normal.NormalIso.from_mean_and_std(u_like, std)
+        noise = _normal.NormalIso.from_mean_and_std([u_like], [std])
         return LatentCond.from_linop_and_noise(linop, noise)
 
 
@@ -1018,7 +1013,7 @@ class BlockDiagConditional(ConditionalBackend):
         matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
         return LatentCond.from_linop_and_noise(matrix, noise)
 
-    def ibm_transitions(self, base_scale):
+    def transition_wiener_integrated(self, base_scale):
 
         a, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1,))
