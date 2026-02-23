@@ -1,4 +1,4 @@
-from probdiffeq.backend import func, linalg, np, tree
+from probdiffeq.backend import func, linalg, np, random, tree
 from probdiffeq.backend.typing import Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
 
@@ -100,6 +100,11 @@ class NormalDense(Normal):
 
     def to_multivariate_normal(self):
         return self.mean, self.cholesky @ self.cholesky.T
+
+    def sample(self, key):
+        base = random.normal(key, shape=self.mean.shape)
+        sample_latent = self.mean + self.cholesky @ base
+        return self.unravel(sample_latent)
 
     @staticmethod
     def update_moving_avg(mean, x, /, num):
@@ -227,8 +232,8 @@ class NormalIso(Normal):
         return -0.5 * (logdet_term + maha_term + u.size * np.log(np.pi() * 2))
 
     def to_multivariate_normal(self):
-        ode_shape = tree.tree_unflatten(self.treedef, self.mean)[0].shape
-
+        ode_state = tree.tree_unflatten(self.treedef, self.mean)[0]
+        ode_shape = tree.ravel_pytree(ode_state)[0].shape
         eye_d = np.eye(*ode_shape)
 
         cov = self.cholesky @ self.cholesky.T
@@ -236,6 +241,14 @@ class NormalIso(Normal):
         cov = np.kron(eye_d, cov)
         mean = self.mean.reshape((-1,), order="F")
         return (mean, cov)
+
+    def sample(self, key):
+        n, _n = self.cholesky.shape
+
+        base = random.normal(key, shape=(n,))
+        sample_latent = self.mean + (self.cholesky @ base)[:, None]
+
+        return tree.tree_unflatten(self.treedef, [*sample_latent])
 
     @staticmethod
     def update_moving_avg(mean, x, /, num):
@@ -372,6 +385,19 @@ class NormalBlockDiag(Normal):
         if self.cholesky.ndim > 2:
             return func.vmap(NormalBlockDiag._cov_dense)(self)
         return self.cholesky @ self.cholesky.T
+
+    def sample(self, key):
+        if self.cholesky.ndim > 3:
+            d, *_ = self.cholesky.shape
+            keys = random.split(key, num=d)
+            return func.vmap(NormalBlockDiag.sample)(self, keys)
+
+        d, _n, n = self.cholesky.shape
+        base = random.normal(key, shape=(d, n))
+        sample_latent = self.mean + np.einsum("ijk,ij->ik", self.cholesky, base)
+
+        tree_sample = tree.tree_unflatten(self.treedef, [*(sample_latent.T)])
+        return tree.tree_map(self.unravel_leaf, tree_sample)
 
     @staticmethod
     def update_moving_avg(mean, x, /, num):

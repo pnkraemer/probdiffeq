@@ -27,7 +27,6 @@ from probdiffeq.backend.typing import (
     TypeVar,
 )
 from probdiffeq.impl import impl
-from probdiffeq.util import filter_util
 
 C = TypeVar("C", bound=Sequence)
 T = TypeVar("T")
@@ -684,18 +683,6 @@ class MarkovSequence(Generic[T]):
         xs = (self.conditional, model1, u1)
         (_, pdf), _ = flow.scan(body, init=init, xs=xs, reverse=self.reverse)
         return pdf
-        assert False
-        # Run the reverse Kalman filter
-        result, _ = filter_util.estimate_rev(
-            u,
-            init=self.marginal,
-            prior_transitions=self.conditional,
-            observation_model=model,
-            estimator=estimator,
-        )
-
-        # Return only the logpdf
-        return result.logpdf
 
     def _select_terminal(self):
         """Discard all intermediate filtering solutions from a Markov sequence.
@@ -705,6 +692,78 @@ class MarkovSequence(Generic[T]):
         """
         init = tree.tree_map(lambda x: x[-1, ...], self.marginal)
         return MarkovSequence(init, self.conditional, reverse=self.reverse)
+
+    def sample(self, key, *, ssm, shape: tuple = ()):
+        """Sample from a Markov sequence."""
+        # If the MarkovSequence carries unnecessary filtering marginals, remove them
+        if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
+            markov_seq = self._select_terminal()
+            return markov_seq.sample(key, ssm=ssm, shape=shape)
+
+        # If many samples are required, vmap over recursive calls to sample()
+        if len(shape) > 0:
+            n, *shape_remaining = shape
+            keys = random.split(key, num=n)
+            sample_ = func.partial(self.sample, ssm=ssm, shape=shape_remaining)
+            return func.vmap(sample_)(keys)
+
+        # Currently, sampling is only implemented for reverse
+        assert self.reverse
+
+        # Compute a single sample from the Markov sequence
+
+        def body(smp0_and_key, cond):
+            smp0, key = smp0_and_key
+            predicted = ssm.conditional.apply(smp0, cond)
+            key, subkey = random.split(key, num=2)
+            smp1 = predicted.sample(subkey)
+            return (smp1, key), smp1
+
+        key, subkey = random.split(key, num=2)
+        smp = self.marginal.sample(subkey)
+        _, smps = flow.scan(
+            body, init=(smp, key), xs=self.conditional, reverse=self.reverse
+        )
+        return tree.tree_array_append(smps, smp)
+
+    def _sample_shape(self):
+        # The number of samples is one larger than the number of conditionals
+        noise = self.conditional.noise
+        n, *shape_single_sample = self.ssm.stats.hidden_shape(noise)
+        return n + 1, *tuple(shape_single_sample)
+
+    def _transform_unit_sample(self, markov_seq, base_sample, *, reverse):
+        if base_sample.ndim > len(self._sample_shape(markov_seq)):
+            transform = func.partial(self._transform_unit_sample, reverse=reverse)
+            transform_vmap = func.vmap(transform, in_axes=(None, 0))
+            return transform_vmap(markov_seq, base_sample)
+
+        # Compute a single unit sample.
+
+        def body_fun(samp_prev, conditionals_and_base_samples):
+            conditional, base = conditionals_and_base_samples
+
+            rv = self.ssm.conditional.apply(samp_prev, conditional)
+            smp = self.ssm.stats.transform_unit_sample(base, rv)
+            return smp, smp
+
+        base_sample_init, base_sample_body = base_sample[0], base_sample[1:]
+
+        # Compute a sample at the terminal value
+        init_sample = self.ssm.stats.transform_unit_sample(
+            base_sample_init, markov_seq.marginal
+        )
+
+        # Loop over backward models and the remaining base samples
+        xs = (markov_seq.conditional, base_sample_body)
+        _, samples = flow.scan(body_fun, init=init_sample, xs=xs, reverse=reverse)
+
+        if reverse:
+            samples = np.concatenate([samples, init_sample[None, ...]])
+        else:
+            samples = np.concatenate([init_sample[None, ...], samples])
+
+        return func.vmap(self.ssm.stats.qoi_from_sample)(samples)
 
 
 class MarkovStrategy(Generic[T]):
@@ -775,68 +834,68 @@ class MarkovStrategy(Generic[T]):
 
     #     return tree.tree_array_prepend(init, marginals)
 
-    def markov_sample(
-        self, key, markov_seq: MarkovSequence, *, reverse: bool, shape: tuple = ()
-    ):
-        """Sample from a Markov sequence."""
-        if markov_seq.marginal.mean.ndim == markov_seq.conditional.noise.mean.ndim:
-            markov_seq = self._markov_select_terminal(markov_seq)
-        # A smoother samples on the grid by sampling i.i.d values
-        # from the terminal RV x_N and the backward noises z_(1:N)
-        # and then combining them backwards as
-        # x_(n-1) = l_n @ x_n + z_n, for n=1,...,N.
-        markov_seq_shape = self._sample_shape(markov_seq)
-        base_samples = random.normal(key, shape=shape + markov_seq_shape)
-        return self._transform_unit_sample(markov_seq, base_samples, reverse=reverse)
+    # def markov_sample(
+    #     self, key, markov_seq: MarkovSequence, *, reverse: bool, shape: tuple = ()
+    # ):
+    #     """Sample from a Markov sequence."""
+    #     if markov_seq.marginal.mean.ndim == markov_seq.conditional.noise.mean.ndim:
+    #         markov_seq = self._markov_select_terminal(markov_seq)
+    #     # A smoother samples on the grid by sampling i.i.d values
+    #     # from the terminal RV x_N and the backward noises z_(1:N)
+    #     # and then combining them backwards as
+    #     # x_(n-1) = l_n @ x_n + z_n, for n=1,...,N.
+    #     markov_seq_shape = self._sample_shape(markov_seq)
+    #     base_samples = random.normal(key, shape=shape + markov_seq_shape)
+    #     return self._transform_unit_sample(markov_seq, base_samples, reverse=reverse)
 
-    @staticmethod
-    def _markov_select_terminal(markov_seq):
-        """Discard all intermediate filtering solutions from a Markov sequence.
+    # @staticmethod
+    # def _markov_select_terminal(markov_seq):
+    #     """Discard all intermediate filtering solutions from a Markov sequence.
 
-        This function is useful to convert a smoothing-solution into a Markov sequence
-        that is compatible with sampling or marginalisation.
-        """
-        init = tree.tree_map(lambda x: x[-1, ...], markov_seq.marginal)
-        return MarkovSequence(init, markov_seq.conditional)
+    #     This function is useful to convert a smoothing-solution into a Markov sequence
+    #     that is compatible with sampling or marginalisation.
+    #     """
+    #     init = tree.tree_map(lambda x: x[-1, ...], markov_seq.marginal)
+    #     return MarkovSequence(init, markov_seq.conditional)
 
-    def _sample_shape(self, markov_seq):
-        # The number of samples is one larger than the number of conditionals
-        noise = markov_seq.conditional.noise
-        n, *shape_single_sample = self.ssm.stats.hidden_shape(noise)
-        return n + 1, *tuple(shape_single_sample)
+    # def _sample_shape(self, markov_seq):
+    #     # The number of samples is one larger than the number of conditionals
+    #     noise = markov_seq.conditional.noise
+    #     n, *shape_single_sample = self.ssm.stats.hidden_shape(noise)
+    #     return n + 1, *tuple(shape_single_sample)
 
-    def _transform_unit_sample(self, markov_seq, base_sample, *, reverse):
-        if base_sample.ndim > len(self._sample_shape(markov_seq)):
-            transform = func.partial(self._transform_unit_sample, reverse=reverse)
-            transform_vmap = func.vmap(transform, in_axes=(None, 0))
-            return transform_vmap(markov_seq, base_sample)
+    # def _transform_unit_sample(self, markov_seq, base_sample, *, reverse):
+    #     if base_sample.ndim > len(self._sample_shape(markov_seq)):
+    #         transform = func.partial(self._transform_unit_sample, reverse=reverse)
+    #         transform_vmap = func.vmap(transform, in_axes=(None, 0))
+    #         return transform_vmap(markov_seq, base_sample)
 
-        # Compute a single unit sample.
+    #     # Compute a single unit sample.
 
-        def body_fun(samp_prev, conditionals_and_base_samples):
-            conditional, base = conditionals_and_base_samples
+    #     def body_fun(samp_prev, conditionals_and_base_samples):
+    #         conditional, base = conditionals_and_base_samples
 
-            rv = self.ssm.conditional.apply(samp_prev, conditional)
-            smp = self.ssm.stats.transform_unit_sample(base, rv)
-            return smp, smp
+    #         rv = self.ssm.conditional.apply(samp_prev, conditional)
+    #         smp = self.ssm.stats.transform_unit_sample(base, rv)
+    #         return smp, smp
 
-        base_sample_init, base_sample_body = base_sample[0], base_sample[1:]
+    #     base_sample_init, base_sample_body = base_sample[0], base_sample[1:]
 
-        # Compute a sample at the terminal value
-        init_sample = self.ssm.stats.transform_unit_sample(
-            base_sample_init, markov_seq.marginal
-        )
+    #     # Compute a sample at the terminal value
+    #     init_sample = self.ssm.stats.transform_unit_sample(
+    #         base_sample_init, markov_seq.marginal
+    #     )
 
-        # Loop over backward models and the remaining base samples
-        xs = (markov_seq.conditional, base_sample_body)
-        _, samples = flow.scan(body_fun, init=init_sample, xs=xs, reverse=reverse)
+    #     # Loop over backward models and the remaining base samples
+    #     xs = (markov_seq.conditional, base_sample_body)
+    #     _, samples = flow.scan(body_fun, init=init_sample, xs=xs, reverse=reverse)
 
-        if reverse:
-            samples = np.concatenate([samples, init_sample[None, ...]])
-        else:
-            samples = np.concatenate([init_sample[None, ...], samples])
+    #     if reverse:
+    #         samples = np.concatenate([samples, init_sample[None, ...]])
+    #     else:
+    #         samples = np.concatenate([init_sample[None, ...], samples])
 
-        return func.vmap(self.ssm.stats.qoi_from_sample)(samples)
+    #     return func.vmap(self.ssm.stats.qoi_from_sample)(samples)
 
     # def log_marginal_likelihood_terminal_values(
     #     self, u, /, *, standard_deviation, posterior: T

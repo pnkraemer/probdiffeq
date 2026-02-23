@@ -1,7 +1,7 @@
 """Test utilities."""
 
 import probdiffeq.ivpsolve
-from probdiffeq.backend import flow, func, tree, warnings
+from probdiffeq.backend import flow, func, np, tree, warnings
 from probdiffeq.backend.typing import TypeVar
 
 T = TypeVar("T")
@@ -25,7 +25,7 @@ def solve_adaptive_save_every_step(solver, error, control=None, clip_dt=False):
         warnings.warn(msg, stacklevel=1)
 
     if control is None:
-        control = probdiffeq.ivpsolve.control_proportional_integral()
+        control = probdiffeq.ivpsolve.control_integral()
 
     loop = probdiffeq.ivpsolve.RejectionLoop(
         solver=solver,
@@ -41,6 +41,9 @@ def solve_adaptive_save_every_step(solver, error, control=None, clip_dt=False):
     def solve(
         u: T, t0, t1, *, atol, rtol, dt0=0.1, eps=1e-8, damp=0.0
     ) -> probdiffeq.ivpsolve.Solution[T]:
+        t0 = np.asarray(t0)
+        t1 = np.asarray(t1)
+
         solution0 = func.jit(solver.init)(t=t0, u=u, damp=damp)
         state = func.jit(loop.init)(solution0, dt=dt0)
 

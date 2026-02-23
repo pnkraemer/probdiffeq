@@ -753,11 +753,8 @@ class DenseConditional(ConditionalBackend):
         A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
         mean = cond.to_observed * cond.noise.mean
         cholesky = cond.to_observed[:, None] * cond.noise.cholesky
-        noise = _normal.NormalDense(mean, cholesky)
-
-        to_observed = np.ones_like(cond.to_observed)
-        to_latent = np.ones_like(cond.to_latent)
-        return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
+        noise = _normal.NormalDense(mean, cholesky, unravel=self.unravel)
+        return LatentCond.from_linop_and_noise(A, noise)
 
     def to_derivative(self, i, std):
         def select(a):
@@ -886,10 +883,8 @@ class IsotropicConditional(ConditionalBackend):
         A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
         mean = cond.to_observed[:, None] * cond.noise.mean
         cholesky = cond.to_observed[:, None] * cond.noise.cholesky
-        noise = _normal.Normal(mean, cholesky)
-        to_observed = np.ones_like(cond.to_observed)
-        to_latent = np.ones_like(cond.to_latent)
-        return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
+        noise = _normal.NormalIso(mean, cholesky, treedef=self.tree_structure)
+        return LatentCond.from_linop_and_noise(A, noise)
 
     def to_derivative(self, i, std):
 
@@ -1078,10 +1073,12 @@ class BlockDiagConditional(ConditionalBackend):
         return discretise
 
     def preconditioner_apply(self, cond, /):
-        A = cond.to_observed[None, :, None] * cond.A * cond.to_latent[None, None, :]
-        mean = cond.to_observed[None, :] * cond.noise.mean
-        cholesky = cond.to_observed[None, :, None] * cond.noise.cholesky
-        noise = _normal.Normal(mean, cholesky)
+        A = cond.to_observed[:, :, None] * cond.A * cond.to_latent[:, None, :]
+        mean = cond.to_observed * cond.noise.mean
+        cholesky = cond.to_observed[:, :, None] * cond.noise.cholesky
+        noise = _normal.NormalBlockDiag(
+            mean, cholesky, treedef=self.treedef, unravel_leaf=self.unravel_leaf
+        )
         to_observed = np.ones_like(cond.to_observed)
         to_latent = np.ones_like(cond.to_latent)
         return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)

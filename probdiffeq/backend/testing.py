@@ -32,6 +32,26 @@ def fixture(name=None, scope="function"):
     return pytest_cases.fixture(name=name, scope=scope)
 
 
+def marginals_allclose(
+    m1,
+    m2,
+    /,
+    *,
+    ssm,
+    atol: float | None = None,
+    rtol: float | None = None,
+    strict_shapes: bool = True,  # difference to jnp.allclose
+):
+    m1, c1 = m1.to_multivariate_normal()
+    m2, c2 = m2.to_multivariate_normal()
+
+    means_allclose = _allclose(
+        m1, m2, atol=atol, rtol=rtol, strict_shapes=strict_shapes
+    )
+    covs_allclose = _allclose(c1, c2, atol=atol, rtol=rtol, strict_shapes=strict_shapes)
+    return jnp.logical_and(means_allclose, covs_allclose)
+
+
 def allclose(
     tree1,
     tree2,
@@ -59,17 +79,6 @@ def _tree_allclose(tree1, tree2, /, *, atol, rtol, strict_shapes):
         return _allclose(t1, t2, atol=atol, rtol=rtol, strict_shapes=strict_shapes)
 
     return jax.tree.map(allclose_partial, tree1, tree2)
-
-
-def marginals_allclose(
-    m1, m2, /, *, ssm, atol: float | None = None, rtol: float | None = None
-):
-    m1, c1 = ssm.stats.to_multivariate_normal(m1)
-    m2, c2 = ssm.stats.to_multivariate_normal(m2)
-
-    means_allclose = _allclose(m1, m2, atol=atol, rtol=rtol)
-    covs_allclose = _allclose(c1, c2, atol=atol, rtol=rtol)
-    return jnp.logical_and(means_allclose, covs_allclose)
 
 
 def _allclose(

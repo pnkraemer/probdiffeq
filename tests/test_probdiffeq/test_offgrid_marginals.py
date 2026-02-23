@@ -33,8 +33,6 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     # Assert similarity
 
     for ui, us in zip(u_interpolated.mean, u_save_at.mean):
-        print(ui)
-        print(us)
         assert testing.allclose(ui, us)
 
     for ui, us in zip(u_interpolated.std, u_save_at.std):
@@ -42,13 +40,13 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
 
     marginals_allclose_func = func.partial(testing.marginals_allclose, ssm=ssm)
     marginals_allclose_func = func.vmap(marginals_allclose_func)
-    assert np.all(
-        marginals_allclose_func(u_interpolated.marginals, u_save_at.marginals)
-    )
+    are_close = marginals_allclose_func(u_interpolated.marginals, u_save_at.marginals)
+
+    assert np.all(are_close)
 
     # Assert u and u_std have matching shapes (that was wrong before)
-    u_shape = tree.tree_map(np.shape, u_save_at.mean)
-    u_std_shape = tree.tree_map(np.shape, u_save_at.std)
+    _, u_shape = tree.tree_flatten(u_save_at.mean)
+    _, u_std_shape = tree.tree_flatten(u_save_at.std)
     match = tree.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
     assert tree.tree_all(match)
 

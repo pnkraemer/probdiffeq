@@ -113,7 +113,7 @@ def test_output_scale_dense_blockdiag(ssm_fact):
 
     cond = iwp(1.0, 1.0)
     Q_expected = 123.45**2.0 * 1.0 / np.asarray([[3.0, 2.0], [2.0, 1.0]])
-    _, cov = ssm.stats.to_multivariate_normal(cond.noise)
+    _, cov = cond.noise.to_multivariate_normal()
     assert testing.allclose(cov, Q_expected)
 
     # Test that the "diffuse_derivatives" are scaled correctly
@@ -154,7 +154,7 @@ def test_output_scale_isotropic():
 
     cond = iwp(1.0, 1.0)
     Q_expected = 123.45**2.0 * 1.0 / np.asarray([[3.0, 2.0], [2.0, 1.0]])
-    _, cov = ssm.stats.to_multivariate_normal(cond.noise)
+    _, cov = cond.noise.to_multivariate_normal()
     assert testing.allclose(cov, Q_expected)
 
     # Test that the "diffuse_derivatives" are scaled correctly
