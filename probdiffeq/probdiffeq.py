@@ -1172,10 +1172,10 @@ class ProbabilisticSolver:
             # New
             solution_full=step_and_interpolate_from.interp_from,
             # Old
-            u=interp_from.u,  # incorrect?
-            output_scale=interp_from.output_scale,  # incorrect?
-            auxiliary=interp_from.auxiliary,  # incorrect?
-            num_steps=interp_from.num_steps,  # incorrect?
+            u=interp_from.u,
+            output_scale=interp_from.output_scale,
+            auxiliary=interp_from.auxiliary,
+            num_steps=interp_from.num_steps,
             fun_evals=interp_from.fun_evals,
         )
         sol = ProbabilisticSolution(

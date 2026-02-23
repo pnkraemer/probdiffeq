@@ -759,20 +759,6 @@ class DenseConditional(ConditionalBackend):
         to_latent = np.ones_like(cond.to_latent)
         return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
 
-    def observation_model(self, linop, std, jacobian):
-
-        def linop_flat(x):
-            return tree.ravel_pytree(linop(self.unravel(x)))[0]
-
-        x_like = np.ones(self.flat_shape)
-        state = jacobian.init_jacobian_handler()
-        fx, A, _state = jacobian.materialize_dense(linop_flat, x_like, state)
-
-        fx_like = linop(self.unravel(x_like))
-        u_like = tree.tree_map(np.zeros_like, fx_like)
-        noise = _normal.NormalDense.from_mean_and_std(u_like, std)
-        return LatentCond.from_linop_and_noise(A, noise)
-
     def to_derivative(self, i, std):
         def select(a):
             return tree.ravel_pytree(self.unravel(a)[i])[0]
@@ -938,26 +924,6 @@ class IsotropicConditional(ConditionalBackend):
             cond.A, noise_new, to_latent=cond.to_latent, to_observed=cond.to_observed
         )
 
-    def observation_model(self, linop, std, jacobian):
-        def linop_flat(x):
-            x_tree = tree.tree_unflatten(self.tree_structure, x)
-            return tree.ravel_pytree(linop(self.unravel(x)))[0]
-
-        n, d = self.num_derivatives + 1, *self.ode_shape
-        x_like = np.ones((n, d))
-        print(x_like)
-
-        state = jacobian.init_jacobian_handler()
-        fx, A, _state = jacobian.calculate_trace(linop_flat, x_like, state)
-
-        A = func.jacfwd(linop_flat)(np.ones(self.flat_shape))
-
-        u_like = tree.tree_map(
-            np.zeros_like, linop(self.unravel(np.ones(self.flat_shape)))
-        )
-        noise = _normal.NormalIso.from_mean_and_std(u_like, std)
-        return LatentCond.from_linop_and_noise(A, noise)
-
 
 class BlockDiagConditional(ConditionalBackend):
     def __init__(
@@ -970,10 +936,8 @@ class BlockDiagConditional(ConditionalBackend):
         self.unravel_leaf = unravel_leaf
 
     def apply(self, x, cond, /):
-        print(x)
         leaves = tree.tree_leaves(x)
         x = np.stack(leaves).T
-        print(x.shape)
 
         def apply_unbatch(s, c):
             s = c.to_latent * s

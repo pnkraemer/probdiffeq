@@ -23,16 +23,18 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     solve = test_util.solve_adaptive_save_every_step(error=error, solver=solver)
     save_every = solve(init, t0=t0, t1=t1, dt0=0.1, atol=1e-2, rtol=1e-2)
     offgrid = func.vmap(lambda s: solver.offgrid_marginals(s, solution=save_every))
-    u_interpolated = offgrid(ts[1:-1])
+    u_interpolated = func.jit(offgrid)(ts[1:-1])
 
     # Compute a save-at solution and remove the edge-points
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
-    save_at = solve(init, atol=1e-2, rtol=1e-2, save_at=ts, dt0=0.1)
+    save_at = func.jit(solve)(init, atol=1e-2, rtol=1e-2, save_at=ts, dt0=0.1)
     u_save_at = tree.tree_map(lambda s: s[1:-1], save_at.u)
 
     # Assert similarity
 
     for ui, us in zip(u_interpolated.mean, u_save_at.mean):
+        print(ui)
+        print(us)
         assert testing.allclose(ui, us)
 
     for ui, us in zip(u_interpolated.std, u_save_at.std):
