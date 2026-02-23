@@ -7,72 +7,8 @@ in probdiffeq.probdiffeq easier to access.
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import flow, func, np, ode, tree
+from probdiffeq.backend import flow, func, np, tree
 from probdiffeq.backend.typing import Array, ArrayLike, Callable, Sequence
-from probdiffeq.util import filter_util
-
-
-def runge_kutta_starter(dt, *, num: int, prior, ssm, atol=1e-12, rtol=1e-10):
-    """Create an estimator that uses a Runge-Kutta starter."""
-
-    def starter(vf, initial_values: tuple, /, t):
-        # TODO: higher-order ODEs
-        # TODO: allow flexible "solve" method?
-
-        # Assertions and early exits
-
-        if len(initial_values) > 1:
-            msg = "Higher-order ODEs are not supported at the moment."
-            raise ValueError(msg)
-
-        if num == 0:
-            return [*initial_values]
-
-        if num == 1:
-            return [*initial_values, vf(*initial_values, t=t)]
-
-        # Generate data
-
-        k = num + 1  # important: k > num
-        ts = np.linspace(t, t + dt * (k - 1), num=k, endpoint=True)
-        ys = ode.odeint_and_save_at(
-            vf, initial_values, save_at=ts, atol=atol, rtol=rtol
-        )
-
-        # Initial condition
-        scale = ssm.prototypes.output_scale()
-        rv_t0 = ssm.normal.standard(num + 1, scale)
-        estimator = filter_util.fixedpointsmoother_precon(ssm=ssm)
-        conditional_t0 = ssm.conditional.identity(num + 1)
-        init = (rv_t0, conditional_t0)
-
-        # Discretised prior
-        scale = ssm.prototypes.output_scale()
-        prior_vmap = func.vmap(prior, in_axes=(0, None))
-        ibm_transitions = prior_vmap(np.diff(ts), scale)
-
-        # Generate an observation-model for the QOI
-        # (1e-7 observation noise for nuggets and for reusing existing code)
-        model_fun = func.vmap(ssm.conditional.to_derivative, in_axes=(None, 0, 0))
-        std = tree.tree_map(lambda s: 1e-7 * np.ones((len(s),)), ys)
-        models = model_fun(0, ys, std)
-
-        zeros = np.zeros_like(models.noise.mean)
-
-        # Run the preconditioned fixedpoint smoother
-        result, _ = filter_util.estimate_fwd(
-            zeros,
-            init=init,
-            prior_transitions=ibm_transitions,
-            observation_model=models,
-            estimator=estimator,
-        )
-        corrected, conditional = result.rv, result.conditional
-        initial = ssm.conditional.marginalise(corrected, conditional)
-        mean = ssm.stats.mean(initial)
-        return ssm.unravel(mean)
-
-    return starter
 
 
 def odejet_padded_scan(vf: Callable, inits: Sequence[ArrayLike], /, num: int):
