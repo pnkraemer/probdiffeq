@@ -729,7 +729,7 @@ class DenseConditional(ConditionalBackend):
         A = np.kron(a, eye_d)
 
         base_scale, _ = tree.ravel_pytree(base_scale)
-        assert base_scale.shape == (d,)
+        assert base_scale.shape == (d,), base_scale.shape
 
         Lambda = linalg.diagonal_matrix(base_scale)
         Q = np.kron(q_sqrtm, Lambda)

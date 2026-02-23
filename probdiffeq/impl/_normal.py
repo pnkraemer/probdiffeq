@@ -82,6 +82,22 @@ class NormalDense(Normal):
         cholesky = factor[..., None, None] * self.cholesky
         return NormalDense(self.mean, cholesky, unravel=self.unravel)
 
+    def logpdf(self, u, /):
+        u, _ = tree.ravel_pytree(u)
+        cholesky = linalg.qr_r(self.cholesky.T).T
+        diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
+        slogdet = np.sum(np.log(np.abs(diagonal)))
+
+        dx = u - self.mean
+        residual_white = linalg.solve_triangular(cholesky, dx, lower=True, trans=0)
+        sqrnorm = linalg.vector_dot(residual_white, residual_white)
+
+        const = np.log(np.pi() * 2)
+        return -1 / 2 * sqrnorm - u.size / 2 * const - slogdet
+
+    def to_multivariate_normal(self):
+        return self.mean, self.cholesky @ self.cholesky.T
+
     @staticmethod
     def update_moving_avg(mean, x, /, num):
         nominator = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
@@ -176,6 +192,46 @@ class NormalIso(Normal):
         cholesky = factor[..., None, None] * self.cholesky
         return NormalIso(self.mean, cholesky, treedef=self.treedef)
 
+    def logpdf(self, u, /):
+        u_leaves = tree.tree_leaves(u)
+        u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
+        u_latent = np.stack(u_flat)
+
+        # # if the gain is qoi-to-hidden, the data is a (d,) array.
+        # # this is problematic for the isotropic model unless we explicitly broadcast.
+        # if np.ndim(u) == 1:
+        #     u = u[None, :]
+
+        # Batch in the "mean" dimension and sum the results.
+        rv_batch = NormalIso(1, None, treedef=self.treedef)
+        logpdf_vmap = func.vmap(NormalIso.logpdf_scalar, in_axes=(rv_batch, 1))
+        logpdfs = logpdf_vmap(self, u_latent)
+        return np.sum(logpdfs)
+
+    def logpdf_scalar(self, u, /):
+        cholesky = linalg.qr_r(self.cholesky.T).T
+
+        dx = u - self.mean
+        w = linalg.solve_triangular(cholesky.T, dx, trans="T")
+
+        maha_term = linalg.vector_dot(w, w)
+
+        diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
+        slogdet = np.sum(np.log(np.abs(diagonal)))
+        logdet_term = 2.0 * slogdet
+        return -0.5 * (logdet_term + maha_term + u.size * np.log(np.pi() * 2))
+
+    def to_multivariate_normal(self):
+        ode_shape = tree.tree_unflatten(self.treedef, self.mean)[0].shape
+
+        eye_d = np.eye(*ode_shape)
+
+        cov = self.cholesky @ self.cholesky.T
+
+        cov = np.kron(eye_d, cov)
+        mean = self.mean.reshape((-1,), order="F")
+        return (mean, cov)
+
     @staticmethod
     def update_moving_avg(mean, x, /, num):
         sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
@@ -248,7 +304,9 @@ class NormalBlockDiag(Normal):
         cholesky_flat = scale_flat[..., None] * cholesky[None, ...]
         return cls(loc_flat, cholesky_flat, treedef=treedef, unravel_leaf=unravel_leaf)
 
+    @classmethod
     def from_standard(self, ndim, output_scale):
+        raise RuntimeError
         mean = np.zeros((*self.ode_shape, ndim))
         cholesky = output_scale[:, None, None] * np.eye(ndim)[None, ...]
         return Normal(mean, cholesky)
@@ -279,6 +337,35 @@ class NormalBlockDiag(Normal):
         return NormalBlockDiag(
             self.mean, cholesky, treedef=self.treedef, unravel_leaf=self.unravel_leaf
         )
+
+    def logpdf(self, u, /):
+        u_leaves = tree.tree_leaves(u)
+        u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
+        u_ = np.stack(u_flat).T
+        return np.sum(func.vmap(NormalBlockDiag.logpdf_scalar)(self, u_))
+
+    def logpdf_scalar(self, u):
+        cholesky = linalg.qr_r(self.cholesky.T).T
+
+        dx = u - self.mean
+        w = linalg.solve_triangular(cholesky.T, dx, trans="T")
+
+        maha_term = linalg.vector_dot(w, w)
+
+        diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
+        slogdet = np.sum(np.log(np.abs(diagonal)))
+        logdet_term = 2.0 * slogdet
+        return -0.5 * (logdet_term + maha_term + u.size * np.log(np.pi() * 2))
+
+    def to_multivariate_normal(self):
+        mean = np.reshape(self.mean.T, (-1,), order="F")
+        cov = np.block_diag(self._cov_dense())
+        return mean, cov
+
+    def _cov_dense(self):
+        if self.cholesky.ndim > 2:
+            return func.vmap(NormalBlockDiag._cov_dense)(self)
+        return self.cholesky @ self.cholesky.T
 
     @staticmethod
     def update_moving_avg(mean, x, /, num):
