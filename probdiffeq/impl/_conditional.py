@@ -638,6 +638,9 @@ class DenseConditional(ConditionalBackend):
         self.flat_shape = flat_shape
 
     def apply(self, x, cond, /):
+        # 'x' is expected to live in target-space,
+        # so we ravel it before applying the conditional
+        x, _ = tree.ravel_pytree(x)
         x = cond.to_latent * x
         mean = cond.to_observed * (cond.A @ x + cond.noise.mean)
         cholesky = cond.to_observed[:, None] * cond.noise.cholesky
@@ -799,11 +802,8 @@ class IsotropicConditional(ConditionalBackend):
         self.tree_structure = tree_structure
 
     def apply(self, x, cond, /):
-        # TODO: is this still relevant?
-        # if the gain is qoi-to-hidden, the data is a (d,) array.
-        # this is problematic for the isotropic model unless we explicitly broadcast.
-        if np.ndim(x) == 1:
-            x = x[None, :]
+        leaves = tree.tree_leaves(x)
+        x = np.stack(leaves)
 
         x = cond.to_latent[:, None] * x
         mean_new = cond.to_observed[:, None] * cond.A @ x + cond.noise.mean
@@ -970,8 +970,8 @@ class BlockDiagConditional(ConditionalBackend):
         self.unravel_leaf = unravel_leaf
 
     def apply(self, x, cond, /):
-        if np.ndim(x) == 1:
-            x = x[..., None]
+        leaves = tree.tree_leaves(x)
+        x = np.stack(leaves).T
 
         def apply_unbatch(s, c):
             s = c.to_latent * s

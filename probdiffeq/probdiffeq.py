@@ -330,23 +330,20 @@ class jacobian_hutchinson_rev(JacobianHandler):
 
 def loss_lml_terminal_values(*, ssm, tcoeff_index=0):
 
-    def loss(u, /, *, marginals, std=None):
+    def loss(u, /, *, marginals, std):
         u = tree.tree_map(np.asarray, u)
 
         std_expected = tree.tree_map(lambda s: ssm.prototypes.error_estimate(), u)
-        if std is None:
-            std = tree.tree_map(np.zeros_like, std_expected)
-        else:
-            std = tree.tree_map(np.asarray, std)
-            shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
-            shapes_equal = tree.tree_all(shapes)
+        std = tree.tree_map(np.asarray, std)
+        shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
+        shapes_equal = tree.tree_all(shapes)
 
-            if not shapes_equal:
-                msg = "The standard deviation container differs from what was expected."
-                msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
-                msg += f" Received: shape={tree.tree_map(np.shape, std)}."
-                msg += f" For reference, data: shape={tree.tree_map(np.shape, u)}."
-                raise ValueError(msg)
+        if not shapes_equal:
+            msg = "The standard deviation container differs from what was expected."
+            msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
+            msg += f" Received: shape={tree.tree_map(np.shape, std)}."
+            msg += f" For reference, data: shape={tree.tree_map(np.shape, u)}."
+            raise ValueError(msg)
 
         model = ssm.conditional.to_derivative(tcoeff_index, std)
         marg = ssm.conditional.marginalise(marginals, model)
@@ -355,25 +352,37 @@ def loss_lml_terminal_values(*, ssm, tcoeff_index=0):
     return loss
 
 
-def loss_log_marginal_likelihood_terminal_values_linop(linop, ssm):
-
-    jacobian = jacobian_materialize()
-
-    def loss(u, /, std, *, marginals):
-        u = tree.tree_map(np.asarray, u)
-        std = tree.tree_map(np.asarray, std)
-
-        shapes = tree.tree_map(lambda a, b: a.shape == b.shape, u, std)
-        shapes_equal = tree.tree_all(shapes)
-        if not shapes_equal:
-            msg = "The standard deviation container differs from that of the data."
-            msg += f" Data: shape={tree.tree_map(np.shape, u)}."
-            msg += f" Standard-deviations: shape={tree.tree_map(np.shape, std)}."
+def loss_lml_timeseries(*, ssm, tcoeff_index=0):
+    def loss(u, /, *, posterior, std):
+        if not isinstance(posterior, MarkovSequence):
+            msg = "The datatype of the posterior is not as expected."
+            msg += f" Expected: {MarkovSequence}."
+            msg += f" Received: {type(posterior)}."
+            msg += " Did you perhaps use a filter instead of a smoother"
+            msg += ", or did you perhaps intend to use a different loss?"
             raise ValueError(msg)
 
-        model = ssm.conditional.observation_model(linop, std, jacobian)
-        marg = ssm.conditional.marginalise(marginals, model)
-        return marg.logpdf(u)
+        u = tree.tree_map(np.asarray, u)
+
+        std_expected = tree.tree_map(
+            func.vmap(lambda s: ssm.prototypes.error_estimate()), u
+        )
+        std = tree.tree_map(np.asarray, std)
+        shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
+        shapes_equal = tree.tree_all(shapes)
+
+        if not shapes_equal:
+            msg = "The standard deviation container differs from what was expected."
+            msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
+            msg += f" Received: shape={tree.tree_map(np.shape, std)}."
+            msg += f" For reference, data: shape={tree.tree_map(np.shape, u)}."
+            raise ValueError(msg)
+
+        def make_model(s):
+            return ssm.conditional.to_derivative(tcoeff_index, s)
+
+        model = func.vmap(make_model)(std)
+        return posterior.eval_lml(u, model=model, ssm=ssm)
 
     return loss
 
@@ -644,6 +653,52 @@ class MarkovSequence(Generic[T]):
 
         return tree.tree_array_prepend(self.marginal, marginals)
 
+    def eval_lml(self, u, *, model, ssm):
+        assert self.reverse
+
+        if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
+            markov_seq = self._select_terminal()
+            return markov_seq.eval_lml(u, model=model, ssm=ssm)
+
+        # Process the terminal value
+        u0 = tree.tree_map(lambda s: s[-1], u)
+        model0 = tree.tree_map(lambda s: s[-1], model)
+        marg = ssm.conditional.marginalise(self.marginal, model0)
+        pdf0 = marg.logpdf(u0)
+
+        # Process the remaining values
+        def body(rv_and_logpdf, prior_and_observation_and_data):
+            rv, logpdf = rv_and_logpdf
+            prior, observation, data = prior_and_observation_and_data
+
+            predicted = ssm.conditional.marginalise(rv, prior)
+            print(predicted)
+            print(observation)
+            observed, noise = ssm.conditional.revert(predicted, observation)
+
+            logpdf1 = observed.logpdf(data)
+            corrected = ssm.conditional.apply(data, noise)
+            return (corrected, logpdf1), ()
+
+        u1 = tree.tree_map(lambda s: s[:-1], u)
+        model1 = tree.tree_map(lambda s: s[:-1], model)
+        init = (self.marginal, pdf0)
+        xs = (self.conditional, model1, u1)
+        (_, pdf), _ = flow.scan(body, init=init, xs=xs, reverse=self.reverse)
+        return pdf
+        assert False
+        # Run the reverse Kalman filter
+        result, _ = filter_util.estimate_rev(
+            u,
+            init=self.marginal,
+            prior_transitions=self.conditional,
+            observation_model=model,
+            estimator=estimator,
+        )
+
+        # Return only the logpdf
+        return result.logpdf
+
     def _select_terminal(self):
         """Discard all intermediate filtering solutions from a Markov sequence.
 
@@ -785,109 +840,109 @@ class MarkovStrategy(Generic[T]):
 
         return func.vmap(self.ssm.stats.qoi_from_sample)(samples)
 
-    def log_marginal_likelihood_terminal_values(
-        self, u, /, *, standard_deviation, posterior: T
-    ):
-        """Compute the log-marginal-likelihood at the terminal value.
+    # def log_marginal_likelihood_terminal_values(
+    #     self, u, /, *, standard_deviation, posterior: T
+    # ):
+    #     """Compute the log-marginal-likelihood at the terminal value.
 
-        Parameters
-        ----------
-        u
-            Observation. Expected to have shape (d,) for an ODE with shape (d,).
-        standard_deviation
-            Standard deviation of the observation. Expected to be a scalar.
-        posterior
-            Posterior distribution.
-            Expected to correspond to a solution of an ODE with shape (d,).
-        """
-        [u_leaves], u_structure = tree.tree_flatten(u)
-        [_std_leaves], std_structure = tree.tree_flatten(standard_deviation)
+    #     Parameters
+    #     ----------
+    #     u
+    #         Observation. Expected to have shape (d,) for an ODE with shape (d,).
+    #     standard_deviation
+    #         Standard deviation of the observation. Expected to be a scalar.
+    #     posterior
+    #         Posterior distribution.
+    #         Expected to correspond to a solution of an ODE with shape (d,).
+    #     """
+    #     [u_leaves], u_structure = tree.tree_flatten(u)
+    #     [_std_leaves], std_structure = tree.tree_flatten(standard_deviation)
 
-        if u_structure != std_structure:
-            msg = (
-                f"Observation-noise tree structure {std_structure} "
-                f"does not match the observation structure {u_structure}. "
-            )
-            raise ValueError(msg)
+    #     if u_structure != std_structure:
+    #         msg = (
+    #             f"Observation-noise tree structure {std_structure} "
+    #             f"does not match the observation structure {u_structure}. "
+    #         )
+    #         raise ValueError(msg)
 
-        # Generate an observation-model for the QOI
-        model = self.ssm.conditional.to_derivative(0, u, standard_deviation)
-        rv = posterior.marginal if isinstance(posterior, MarkovSequence) else posterior
+    #     # Generate an observation-model for the QOI
+    #     model = self.ssm.conditional.to_derivative(0, u, standard_deviation)
+    #     rv = posterior.marginal if isinstance(posterior, MarkovSequence) else posterior
 
-        data = np.zeros_like(u_leaves)  # 'u' is baked into the observation model
-        observed, _conditional = self.ssm.conditional.revert(rv, model)
-        return observed.logpdf(data)
+    #     data = np.zeros_like(u_leaves)  # 'u' is baked into the observation model
+    #     observed, _conditional = self.ssm.conditional.revert(rv, model)
+    #     return observed.logpdf(data)
 
-    def log_marginal_likelihood(self, u, /, *, standard_deviation, posterior: T):
-        """Compute the log-marginal-likelihood of observations of the IVP solution.
+    # def log_marginal_likelihood(self, u, /, *, standard_deviation, posterior: T):
+    #     """Compute the log-marginal-likelihood of observations of the IVP solution.
 
-        Only works with smoothing-based estimators.
+    #     Only works with smoothing-based estimators.
 
-        !!! note
-            Use `log_marginal_likelihood_terminal_values`
-            to compute the log-likelihood at the terminal values.
+    #     !!! note
+    #         Use `log_marginal_likelihood_terminal_values`
+    #         to compute the log-likelihood at the terminal values.
 
-        Parameters
-        ----------
-        u
-            Observation. Expected to match the ODE's type/shape.
-        standard_deviation
-            Standard deviation of the observation. Expected to match 'u's
-            Pytree structure, but every leaf must be a scalar.
-        posterior
-            Posterior distribution.
-            Expected to correspond to a solution of an ODE with shape (d,).
-        """
-        [u_leaves], u_structure = tree.tree_flatten(u)
-        [std_leaves], std_structure = tree.tree_flatten(standard_deviation)
+    #     Parameters
+    #     ----------
+    #     u
+    #         Observation. Expected to match the ODE's type/shape.
+    #     standard_deviation
+    #         Standard deviation of the observation. Expected to match 'u's
+    #         Pytree structure, but every leaf must be a scalar.
+    #     posterior
+    #         Posterior distribution.
+    #         Expected to correspond to a solution of an ODE with shape (d,).
+    #     """
+    #     [u_leaves], u_structure = tree.tree_flatten(u)
+    #     [std_leaves], std_structure = tree.tree_flatten(standard_deviation)
 
-        if u_structure != std_structure:
-            msg = (
-                f"Observation-noise tree structure {std_structure} "
-                f"does not match the observation structure {u_structure}. "
-            )
-            raise ValueError(msg)
+    #     if u_structure != std_structure:
+    #         msg = (
+    #             f"Observation-noise tree structure {std_structure} "
+    #             f"does not match the observation structure {u_structure}. "
+    #         )
+    #         raise ValueError(msg)
 
-        qoi_flat, _ = tree.ravel_pytree(self.ssm.prototypes.qoi())
-        if np.ndim(std_leaves) < 1 or np.ndim(u_leaves) != np.ndim(qoi_flat) + 1:
-            msg = (
-                f"Time-series solution expected. "
-                f"ndim={np.ndim(u_leaves)}, shape={np.shape(u_leaves)} received."
-            )
-            raise ValueError(msg)
+    #     qoi_flat, _ = tree.ravel_pytree(self.ssm.prototypes.qoi())
+    #     if np.ndim(std_leaves) < 1 or np.ndim(u_leaves) != np.ndim(qoi_flat) + 1:
+    #         msg = (
+    #             f"Time-series solution expected. "
+    #             f"ndim={np.ndim(u_leaves)}, shape={np.shape(u_leaves)} received."
+    #         )
+    #         raise ValueError(msg)
 
-        if len(u_leaves) != len(np.asarray(std_leaves)):
-            msg = (
-                f"Observation-noise shape {np.shape(std_leaves)} "
-                f"does not match the observation shape {np.shape(u_leaves)}. "
-            )
-            raise ValueError(msg)
+    #     if len(u_leaves) != len(np.asarray(std_leaves)):
+    #         msg = (
+    #             f"Observation-noise shape {np.shape(std_leaves)} "
+    #             f"does not match the observation shape {np.shape(u_leaves)}. "
+    #         )
+    #         raise ValueError(msg)
 
-        if not isinstance(posterior, MarkovSequence):
-            msg1 = "Time-series marginal likelihoods "
-            msg2 = "cannot be computed with a filtering solution."
-            raise TypeError(msg1 + msg2)
+    #     if not isinstance(posterior, MarkovSequence):
+    #         msg1 = "Time-series marginal likelihoods "
+    #         msg2 = "cannot be computed with a filtering solution."
+    #         raise TypeError(msg1 + msg2)
 
-        # Generate an observation-model for the QOI
+    #     # Generate an observation-model for the QOI
 
-        model_fun = func.vmap(self.ssm.conditional.to_derivative, in_axes=(None, 0, 0))
-        models = model_fun(0, u, standard_deviation)
+    #     model_fun = func.vmap(self.ssm.conditional.to_derivative, in_axes=(None, 0, 0))
+    #     models = model_fun(0, u, standard_deviation)
 
-        # Select the terminal variable
-        rv = tree.tree_map(lambda s: s[-1, ...], posterior.marginal)
+    #     # Select the terminal variable
+    #     rv = tree.tree_map(lambda s: s[-1, ...], posterior.marginal)
 
-        # Run the reverse Kalman filter
-        estimator = filter_util.kalmanfilter_with_marginal_likelihood(ssm=self.ssm)
-        result, _ = filter_util.estimate_rev(
-            np.zeros_like(u_leaves),
-            init=rv,
-            prior_transitions=posterior.conditional,
-            observation_model=models,
-            estimator=estimator,
-        )
+    #     # Run the reverse Kalman filter
+    #     estimator = filter_util.kalmanfilter_with_marginal_likelihood(ssm=self.ssm)
+    #     result, _ = filter_util.estimate_rev(
+    #         np.zeros_like(u_leaves),
+    #         init=rv,
+    #         prior_transitions=posterior.conditional,
+    #         observation_model=models,
+    #         estimator=estimator,
+    #     )
 
-        # Return only the logpdf
-        return result.logpdf
+    #     # Return only the logpdf
+    #     return result.logpdf
 
 
 @tree.register_dataclass
@@ -2526,7 +2581,7 @@ class error_residual_std(ErrorEstimator):
 
         # Extrapolate from the zero-error state
         # TODO: should conditional.apply take the Pytree mean?
-        mean = previous.u.marginals.mean
+        mean = previous.u.marginals.eval_mean()
         rv = self.ssm.conditional.apply(mean, transition)
 
         # Optionally: re-linearize

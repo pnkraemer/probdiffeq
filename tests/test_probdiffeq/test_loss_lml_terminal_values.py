@@ -44,21 +44,10 @@ def fixture_solution_and_loss_and_data(strategy_func, fact):
     return sol, loss, data, std
 
 
-def test_output_is_scalar_with_custom_std(solution_and_loss_and_data):
+def test_output_is_scalar(solution_and_loss_and_data):
     solution, loss, data, std = solution_and_loss_and_data
 
     mll = func.jit(loss)(data, std=std, marginals=solution.u.marginals)
-
-    assert mll.shape == ()
-    assert not np.isnan(mll)
-    assert not np.isinf(mll)
-
-
-def test_output_is_scalar_with_default_std(solution_and_loss_and_data):
-    solution, loss, data, _std = solution_and_loss_and_data
-
-    std = tree.tree_map(np.ones_like, data)
-    mll = func.jit(loss)(data, marginals=solution.u.marginals)
 
     assert mll.shape == ()
     assert not np.isnan(mll)
