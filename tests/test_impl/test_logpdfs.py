@@ -37,12 +37,26 @@ def create_random_variable(fact):
     tcoeffs = [np.ones((3,))] * 5  # values irrelevant
     ssm = impl.choose(fact, tcoeffs_like=tcoeffs)
 
-    output_scale = np.ones_like(ssm.prototypes.error_estimate())
-    discretize = ssm.conditional.ibm_transitions(output_scale)
+    if fact == "dense":
+        output_scale = np.ones((3,))
+        discretize = ssm.conditional.ibm_transitions(output_scale)
 
-    output_scale = np.ones_like(ssm.prototypes.output_scale())
-    rv = discretize(0.1, output_scale)
+        output_scale = np.ones(())
+        rv = discretize(0.1, output_scale)
+    elif fact == "blockdiag":
+        output_scale = np.ones((3,))
+        discretize = ssm.conditional.ibm_transitions(output_scale)
 
+        output_scale = np.ones((3,))
+        rv = discretize(0.1, output_scale)
+    elif fact == "isotropic":
+        output_scale = np.ones(())
+        discretize = ssm.conditional.ibm_transitions(output_scale)
+
+        output_scale = np.ones(())
+        rv = discretize(0.1, output_scale)
+    else:
+        raise ValueError
     key = random.prng_key(seed=1)
     noise_flat, unravel = tree.ravel_pytree(rv.noise)
     noise_flat = random.normal(key, shape=noise_flat.shape)

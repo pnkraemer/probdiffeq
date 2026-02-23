@@ -2,7 +2,7 @@
 
 from probdiffeq.backend import func, structs, tree
 from probdiffeq.backend.typing import Callable
-from probdiffeq.impl import _conditional, _normal, _prototypes, _stats
+from probdiffeq.impl import _conditional, _normal, _prototypes
 
 
 @structs.dataclass
@@ -12,7 +12,6 @@ class FactImpl:
     name: str
     prototypes: _prototypes.PrototypeBackend
     normal: _normal.Normal
-    stats: _stats.StatsBackend
     linearize: _conditional.LinearizationFactoryBackend
     conditional: _conditional.ConditionalBackend
 
@@ -52,7 +51,6 @@ def _select_dense(*, tcoeffs_like) -> FactImpl:
     linearize = _conditional.DenseLinearizationFactory(
         ode_shape=ode_shape, unravel=unravel
     )
-    stats = _stats.DenseStats(ode_shape=ode_shape, unravel=unravel)
     conditional = _conditional.DenseConditional(
         ode_shape=ode_shape,
         num_derivatives=num_derivatives,
@@ -65,7 +63,6 @@ def _select_dense(*, tcoeffs_like) -> FactImpl:
         conditional=conditional,
         normal=normal,
         prototypes=prototypes,
-        stats=stats,
         num_derivatives=len(tcoeffs_like) - 1,
         unravel=unravel,
     )
@@ -87,9 +84,6 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
 
     prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
     normal = _normal.NormalIso
-    stats = _stats.IsotropicStats(
-        ode_shape=ode_shape, unravel=unravel, tree_structure=tree_structure
-    )
     linearize = _conditional.IsotropicLinearizationFactory(unravel=unravel)
     conditional = _conditional.IsotropicConditional(
         ode_shape=ode_shape,
@@ -101,7 +95,6 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
         name="isotropic",
         prototypes=prototypes,
         normal=normal,
-        stats=stats,
         linearize=linearize,
         conditional=conditional,
         num_derivatives=len(tcoeffs_like) - 1,
@@ -125,7 +118,6 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
 
     prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)
     normal = _normal.NormalBlockDiag  # (ode_shape=ode_shape)
-    stats = _stats.BlockDiagStats(ode_shape=ode_shape, unravel=unravel)
     linearize = _conditional.BlockDiagLinearizationFactory(unravel=unravel)
     conditional = _conditional.BlockDiagConditional(
         ode_shape=ode_shape,
@@ -138,7 +130,6 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
         name="blockdiag",
         prototypes=prototypes,
         normal=normal,
-        stats=stats,
         linearize=linearize,
         conditional=conditional,
         num_derivatives=len(tcoeffs_like) - 1,

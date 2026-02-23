@@ -2,7 +2,7 @@
 
 from probdiffeq.backend import abc, func, linalg, np, tree
 from probdiffeq.backend.typing import Any, Array, Callable
-from probdiffeq.impl import _normal, _stats
+from probdiffeq.impl import _normal
 from probdiffeq.util import cholesky_util
 
 
@@ -769,15 +769,6 @@ class DenseConditional(ConditionalBackend):
         noise = _normal.NormalDense.from_mean_and_std(data_like, std)
         return LatentCond.from_linop_and_noise(linop, noise)
 
-    def rescale_noise(self, cond, scale):
-        A = cond.A
-        noise = cond.noise
-        stats = _stats.DenseStats(ode_shape=self.ode_shape, unravel=self.unravel)
-        noise_new = stats.rescale_cholesky(noise, scale)
-        return LatentCond(
-            A, noise_new, to_latent=cond.to_latent, to_observed=cond.to_observed
-        )
-
 
 class IsotropicConditional(ConditionalBackend):
     def __init__(self, *, ode_shape, num_derivatives, unravel_tree, tree_structure):
@@ -899,15 +890,6 @@ class IsotropicConditional(ConditionalBackend):
         u_like = self.unravel_tree(m)[0]
         noise = _normal.NormalIso.from_mean_and_std(u_like, std)
         return LatentCond.from_linop_and_noise(linop, noise)
-
-    def rescale_noise(self, cond, scale):
-        stats = _stats.IsotropicStats(
-            ode_shape=self.ode_shape, unravel=self.unravel_tree
-        )
-        noise_new = stats.rescale_cholesky(cond.noise, scale)
-        return LatentCond(
-            cond.A, noise_new, to_latent=cond.to_latent, to_observed=cond.to_observed
-        )
 
 
 class BlockDiagConditional(ConditionalBackend):
@@ -1086,15 +1068,6 @@ class BlockDiagConditional(ConditionalBackend):
         u_like = tree.tree_map(np.zeros_like, u_like[0])
         noise = _normal.NormalBlockDiag.from_mean_and_std(u_like, std)
         return LatentCond.from_linop_and_noise(linop, noise)
-
-    def rescale_noise(self, cond, scale):
-        stats = _stats.BlockDiagStats(
-            ode_shape=self.ode_shape, unravel=self.unravel_tree
-        )
-        noise_new = stats.rescale_cholesky(cond.noise, scale)
-        return LatentCond(
-            cond.A, noise_new, to_latent=cond.to_latent, to_observed=cond.to_observed
-        )
 
 
 def _transpose(matrix):

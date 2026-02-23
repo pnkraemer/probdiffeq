@@ -333,7 +333,7 @@ def loss_lml_terminal_values(*, ssm, tcoeff_index=0):
     def loss(u, /, *, marginals, std):
         u = tree.tree_map(np.asarray, u)
 
-        std_expected = tree.tree_map(lambda _s: ssm.prototypes.error_estimate(), u)
+        std_expected = tree.tree_map(lambda _s: ssm.prototypes.standard_deviation(), u)
         std = tree.tree_map(np.asarray, std)
         shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
         shapes_equal = tree.tree_all(shapes)
@@ -367,7 +367,7 @@ def loss_lml_timeseries(*, ssm, tcoeff_index=0):
         u = tree.tree_map(np.asarray, u)
 
         std_expected = tree.tree_map(
-            func.vmap(lambda _s: ssm.prototypes.error_estimate()), u
+            func.vmap(lambda _s: ssm.prototypes.standard_deviation()), u
         )
         std = tree.tree_map(np.asarray, std)
         shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
@@ -1742,7 +1742,7 @@ class solver_mle(ProbabilisticSolver):
         u, prediction = self.strategy.init_posterior(u=u)
         cstate = self.constraint.init_linearization()
 
-        output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale())
+        output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
 
         # Update
         fx, cstate = self.constraint.linearize(u.marginals, cstate, damp=damp, t=t)
@@ -1775,7 +1775,7 @@ class solver_mle(ProbabilisticSolver):
 
     def step(self, state, *, dt: float, damp: float):
         # Discretize
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
         transition = self.prior(dt, output_scale)
 
         # Predict
@@ -1868,7 +1868,7 @@ class solver_dynamic(ProbabilisticSolver):
         u, prediction = self.strategy.init_posterior(u=u)
         lin_state = self.constraint.init_linearization()
 
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
 
         fx, lin_state = self.constraint.linearize(
             u.marginals, lin_state, damp=damp, t=t
@@ -1896,7 +1896,7 @@ class solver_dynamic(ProbabilisticSolver):
         lin_state = state.auxiliary
 
         # Calibrate the output scale
-        ones = np.ones_like(self.ssm.prototypes.output_scale())
+        ones = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
         transition = self.prior(dt, ones)
         mean = state.u.marginals.eval_mean()
         u = self.ssm.conditional.apply(mean, transition)
@@ -2017,7 +2017,7 @@ class solver(ProbabilisticSolver):
             rv=u_pred.marginals, state=cstate, damp=damp, t=t
         )
         fx = tree.tree_map(np.zeros_like, fx)
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
         return ProbabilisticSolution(
             t=t,
             u=u,
@@ -2200,7 +2200,7 @@ class solver_iterated(ProbabilisticSolver):
             rv=u_pred.marginals, state=cstate, damp=damp, t=t
         )
 
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
 
         # TODO: the number of function evaluations should also be reflected
         # in the solution object, so that we can communicate if an iterative
@@ -2448,7 +2448,7 @@ class error_residual_std(ErrorEstimator):
     ) -> tuple[float, tuple]:
         # Discretize; The output scale is set to one
         # since the error is multiplied with a local scale estimate anyway
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
@@ -2542,7 +2542,7 @@ class error_state_std(ErrorEstimator):
     ) -> tuple[float, tuple]:
         # Discretize; The output scale is set to one
         # since the error is multiplied with a local scale estimate anyway
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
