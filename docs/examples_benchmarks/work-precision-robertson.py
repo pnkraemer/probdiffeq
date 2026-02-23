@@ -251,7 +251,7 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
         )
         print(init.mean)
         print(init.std)
-        assert False
+        raise AssertionError()
         # We build a Jet constraint
         jet = probdiffeq.constraint_root_jet(root, ssm=ssm)
         ts = probdiffeq.constraint_root_ts1(root, ssm=ssm)

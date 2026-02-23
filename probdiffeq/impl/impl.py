@@ -11,7 +11,7 @@ class FactImpl:
 
     name: str
     prototypes: _prototypes.PrototypeBackend
-    normal: _normal.NormalBackend
+    normal: _normal.Normal
     stats: _stats.StatsBackend
     linearize: _conditional.LinearizationFactoryBackend
     conditional: _conditional.ConditionalBackend
@@ -48,7 +48,7 @@ def _select_dense(*, tcoeffs_like) -> FactImpl:
     num_derivatives = len(tcoeffs_like) - 1
 
     prototypes = _prototypes.DensePrototype(ode_shape=ode_shape)
-    normal = _normal.DenseNormal(ode_shape=ode_shape)
+    normal = _normal.NormalDense
     linearize = _conditional.DenseLinearizationFactory(
         ode_shape=ode_shape, unravel=unravel
     )
@@ -86,7 +86,7 @@ def _select_isotropic(*, tcoeffs_like) -> FactImpl:
         return tree.tree_map(unravel_leaf, pytree)
 
     prototypes = _prototypes.IsotropicPrototype(ode_shape=ode_shape)
-    normal = _normal.IsotropicNormal(ode_shape=ode_shape, tree_structure=tree_structure)
+    normal = _normal.NormalIso
     stats = _stats.IsotropicStats(
         ode_shape=ode_shape, unravel=unravel, tree_structure=tree_structure
     )
@@ -116,7 +116,7 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
     tcoeffs_tree_only = tree.tree_map(lambda *_a: 0.0, tcoeffs_like)
     _, unravel_tree = tree.ravel_pytree(tcoeffs_tree_only)
 
-    leaves, _ = tree.tree_flatten(tcoeffs_like)
+    leaves, treedef = tree.tree_flatten(tcoeffs_like)
     _, unravel_leaf = tree.ravel_pytree(leaves[0])
 
     def unravel(z):
@@ -124,11 +124,15 @@ def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
         return tree.tree_map(unravel_leaf, pytree)
 
     prototypes = _prototypes.BlockDiagPrototype(ode_shape=ode_shape)
-    normal = _normal.BlockDiagNormal(ode_shape=ode_shape)
+    normal = _normal.NormalBlockDiag  # (ode_shape=ode_shape)
     stats = _stats.BlockDiagStats(ode_shape=ode_shape, unravel=unravel)
     linearize = _conditional.BlockDiagLinearizationFactory(unravel=unravel)
     conditional = _conditional.BlockDiagConditional(
-        ode_shape=ode_shape, num_derivatives=num_derivatives, unravel_tree=unravel_tree
+        ode_shape=ode_shape,
+        num_derivatives=num_derivatives,
+        unravel_tree=unravel_tree,
+        treedef=treedef,
+        unravel_leaf=unravel_leaf,
     )
     return FactImpl(
         name="blockdiag",

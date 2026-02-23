@@ -225,6 +225,7 @@ class BlockDiagStats(StatsBackend):
         self.unravel = unravel
 
     def mahalanobis_norm_relative(self, u, /, rv):
+        raise RuntimeError
         # assumes rv.chol = (d,1,1)
         # return array of norms! See calibration
         mean = np.reshape(rv.mean, self.ode_shape)
@@ -232,6 +233,8 @@ class BlockDiagStats(StatsBackend):
         return (mean - u) / cholesky / np.sqrt(mean.size)
 
     def logpdf(self, u, /, rv):
+        raise RuntimeError
+
         def logpdf_scalar(x, r):
             cholesky = linalg.qr_r(r.cholesky.T).T
 
@@ -248,34 +251,42 @@ class BlockDiagStats(StatsBackend):
         return np.sum(func.vmap(logpdf_scalar)(u, rv))
 
     def mean(self, rv):
+        raise RuntimeError
         return rv.mean
 
     def hidden_shape(self, rv):
+        raise RuntimeError
         return rv.mean.shape
 
     def standard_deviation(self, rv):
+        raise RuntimeError
         diag = np.einsum("ijk,ikj->ij", rv.cholesky, rv.cholesky)
         std = np.sqrt(diag)
         return self.unravel(std)
 
     def transform_unit_sample(self, unit_sample, /, rv):
+        raise RuntimeError
         return rv.mean + (rv.cholesky @ unit_sample[..., None])[..., 0]
 
     def rescale_cholesky(self, rv, factor, /):
+        raise RuntimeError
         cholesky = factor[..., None, None] * rv.cholesky
         return _normal.Normal(rv.mean, cholesky)
 
     def to_multivariate_normal(self, rv):
+        raise RuntimeError
         mean = np.reshape(rv.mean.T, (-1,), order="F")
         cov = np.block_diag(self._cov_dense(rv.cholesky))
         return mean, cov
 
     def _cov_dense(self, cholesky):
+        raise RuntimeError
         if cholesky.ndim > 2:
             return func.vmap(self._cov_dense)(cholesky)
         return cholesky @ cholesky.T
 
     def qoi(self, rv):
+        raise RuntimeError
         return self.qoi_from_sample(rv.mean)
 
     def qoi_from_sample(self, sample, /):
@@ -285,6 +296,7 @@ class BlockDiagStats(StatsBackend):
         return self.unravel(sample)
 
     def update_mean(self, mean, x, /, num):  # TODO rename: update_mean_estimate
+        raise RuntimeError
         if np.ndim(mean) > 0:
             assert np.shape(mean) == np.shape(x)
             return func.vmap(self.update_mean, in_axes=(0, 0, None))(mean, x, num)

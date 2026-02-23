@@ -1,32 +1,43 @@
 """LatentConds."""
 
-from probdiffeq.backend import abc, func, linalg, np, structs, tree
+from probdiffeq.backend import abc, func, linalg, np, tree
 from probdiffeq.backend.typing import Any, Array, Callable
 from probdiffeq.impl import _normal, _stats
 from probdiffeq.util import cholesky_util
 
 
-@tree.register_dataclass
-@structs.dataclass
 class LatentCond:
     """Conditional distributions in latent space."""
 
-    A: Array
-    """Linear operator in latent space."""
+    def __init__(self, A, noise, to_latent, to_observed):
+        self.A = A
+        self.noise = noise
+        self.to_latent = to_latent
+        self.to_observed = to_observed
 
-    noise: _normal.Normal
-    """Additive Gaussian noise in latent space."""
+        assert A.ndim == to_latent.ndim + 1 == to_observed.ndim + 1
 
-    to_latent: Array
-    """Pull an observed vector into the latent space."""
+    @staticmethod
+    def register_pytree_node():
+        def flatten(normal):
+            children = normal.A, normal.noise, normal.to_latent, normal.to_observed
+            return children, ()
 
-    to_observed: Array
-    """Push a latent vector into the observed space."""
+        def unflatten(_aux, children):
+            A, noise, to_latent, to_observed = children
+            return LatentCond(A, noise, to_latent, to_observed)
+
+        tree.register_pytree_node(LatentCond, flatten, unflatten)
 
     @classmethod
     def from_linop_and_noise(cls, A, noise):
+        # Hack for blockdiagonal models (and possibly dense evaluations)
+        if A.ndim > 2:
+            return func.vmap(cls.from_linop_and_noise)(A, noise)
+
         d_out, d_in = A.shape
         to_latent, to_observed = np.ones((d_in,)), np.ones((d_out,))
+
         return cls(A, noise=noise, to_latent=to_latent, to_observed=to_observed)
 
     def rescale_noise(self, factor, /):
@@ -37,6 +48,9 @@ class LatentCond:
             to_latent=self.to_latent,
             to_observed=self.to_observed,
         )
+
+
+LatentCond.register_pytree_node()
 
 
 class Linearization:
@@ -407,21 +421,22 @@ class BlockDiagOdeTs0(LinearizationOde):
     def linearize(self, rv, state: None, *, damp: float, t):
         del state
         fun = func.partial(self.vector_field, t=t)
-        mean = rv.mean
-        fx = tree.ravel_pytree(fun(*self.unravel(mean)[: self.ode_order]))[0]
+        # print("rv", tree.tree_map(np.shape, rv))
+        mean = rv.eval_mean()
+        # print("mean", tree.tree_map(np.shape, mean))
+        fx, unravel = tree.ravel_pytree(fun(*(mean[: self.ode_order])))
+        # print("fx", tree.tree_map(np.shape, fx))
 
         def a1(s):
             return s[[self.ode_order], ...]
 
-        linop = func.vmap(func.jacrev(a1))(mean)
+        linop = func.vmap(func.jacrev(a1))(rv.mean)
 
-        d, *_ = linop.shape
-        cov_lower = damp * np.ones((d, 1, 1))
-        bias = _normal.Normal(-fx[:, None], cov_lower)
-
-        to_latent = np.ones((linop.shape[2],))
-        to_observed = np.ones((linop.shape[1],))
-        cond = LatentCond(linop, bias, to_latent=to_latent, to_observed=to_observed)
+        # todo: unravel fx before constructing the normal?
+        bias = _normal.NormalBlockDiag.from_dirac(unravel(-fx), damp=damp)
+        # print("linop", tree.tree_map(np.shape, linop))
+        # print("bias", tree.tree_map(np.shape, bias))
+        cond = LatentCond.from_linop_and_noise(linop, bias)
         return cond, None
 
 
@@ -464,13 +479,8 @@ class BlockDiagOdeTs1(LinearizationOde):
         diff = func.vmap(lambda a, b: a @ b)(linop, rv.mean)
         fx = fx - diff
 
-        d, *_ = linop.shape
-        cov_lower = damp * np.ones((d, 1, 1))
-        bias = _normal.Normal(fx, cov_lower)
-
-        to_latent = np.ones((linop.shape[2],))
-        to_observed = np.ones((linop.shape[1],))
-        cond = LatentCond(linop, bias, to_latent=to_latent, to_observed=to_observed)
+        bias = _normal.NormalBlockDiag.from_dirac(fx, damp=damp)
+        cond = LatentCond.from_linop_and_noise(linop, bias)
         return cond, state
 
 
@@ -923,29 +933,37 @@ class IsotropicConditional(ConditionalBackend):
 
 
 class BlockDiagConditional(ConditionalBackend):
-    def __init__(self, *, ode_shape, num_derivatives, unravel_tree):
+    def __init__(
+        self, *, ode_shape, num_derivatives, unravel_tree, treedef, unravel_leaf
+    ):
         self.ode_shape = ode_shape
         self.num_derivatives = num_derivatives
         self.unravel_tree = unravel_tree
+        self.treedef = treedef
+        self.unravel_leaf = unravel_leaf
 
     def apply(self, x, cond, /):
         if np.ndim(x) == 1:
             x = x[..., None]
 
-        def apply_unbatch(m, s, n):
-            s = cond.to_latent * s
-            m_new = cond.to_observed * (m @ s + n.mean)
-            c_new = cond.to_observed[:, None] * n.cholesky
-            return _normal.Normal(m_new, c_new)
+        def apply_unbatch(s, c):
+            s = c.to_latent * s
+            m_new = c.to_observed * (c.A @ s + c.noise.mean)
+            c_new = c.to_observed[:, None] * c.noise.cholesky
+            return _normal.NormalBlockDiag(
+                m_new,
+                c_new,
+                treedef=cond.noise.treedef,
+                unravel_leaf=cond.noise.unravel_leaf,
+            )
 
-        matrix, noise = cond.A, cond.noise
-        return func.vmap(apply_unbatch)(matrix, x, noise)
+        return func.vmap(apply_unbatch)(x, cond)
 
     def marginalise(self, rv, cond, /):
         matrix, noise = cond.A, cond.noise
         assert matrix.ndim == 3
-        mean = cond.to_latent[None, :] * rv.mean
-        cholesky = cond.to_latent[None, :, None] * rv.cholesky
+        mean = cond.to_latent * rv.mean
+        cholesky = cond.to_latent[:, :, None] * rv.cholesky
 
         mean_marg = np.einsum("ijk,ik->ij", matrix, mean) + noise.mean
 
@@ -954,39 +972,46 @@ class BlockDiagConditional(ConditionalBackend):
         R_stack = (chol1, chol2)
         cholesky = func.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack)
 
-        mean_new = cond.to_observed[None, :] * mean_marg
-        cholesky_new = cond.to_observed[None, :, None] * _transpose(cholesky)
-        return _normal.Normal(mean_new, cholesky_new)
+        mean_new = cond.to_observed * mean_marg
+        cholesky_new = cond.to_observed[:, :, None] * _transpose(cholesky)
+        return _normal.NormalBlockDiag(
+            mean_new,
+            cholesky_new,
+            treedef=cond.noise.treedef,
+            unravel_leaf=cond.noise.unravel_leaf,
+        )
 
     def merge(self, cond1, cond2, /):
         # Transform: latent (2) to latent (1)
         T = cond1.to_latent * cond2.to_observed
 
         # Linear operator
-        A1, A2 = cond1.A, T[None, :, None] * cond2.A
+        A1, A2 = cond1.A, T[:, :, None] * cond2.A
         g = func.vmap(lambda a, b: a @ b)(A1, A2)
 
         # Combined mean
-        m1, m2 = T[None, :] * cond2.noise.mean, cond1.noise.mean
+        m1, m2 = T * cond2.noise.mean, cond1.noise.mean
         xi = func.vmap(lambda a, b, c: a @ b + c)(A1, m1, m2)
 
         # Cholesky factor of combined covariance
-        C1, C2 = cond1.noise.cholesky, T[None, :, None] * cond2.noise.cholesky
+        C1, C2 = cond1.noise.cholesky, T[:, :, None] * cond2.noise.cholesky
         R1 = _transpose(func.vmap(lambda a, b: a @ b)(A1, C2))
         R2 = _transpose(C1)
         Xi = func.vmap(cholesky_util.sum_of_sqrtm_factors)((R1, R2))
         Xi = _transpose(Xi)
 
         # Gather and return
-        noise = _normal.Normal(xi, Xi)
+        noise = _normal.NormalBlockDiag(
+            xi, Xi, treedef=cond1.noise.treedef, unravel_leaf=cond1.noise.unravel_leaf
+        )
         return LatentCond(
             g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
         )
 
     def revert(self, rv, cond, /):
         # Pull RV into latent space
-        mean = cond.to_latent[None, :] * rv.mean
-        cholesky = cond.to_latent[None, :, None] * rv.cholesky
+        mean = cond.to_latent * rv.mean
+        cholesky = cond.to_latent[:, :, None] * rv.cholesky
 
         # QR decomposition
         rv_chol_upper = _transpose(cholesky)
@@ -1000,7 +1025,12 @@ class BlockDiagConditional(ConditionalBackend):
         # New backward conditional
         mean_observed = (cond.A @ mean[..., None])[..., 0] + cond.noise.mean
         mean_corrected = mean - (gain @ (mean_observed[..., None]))[..., 0]
-        corrected = _normal.Normal(mean_corrected, cholesky_cor)
+        corrected = _normal.NormalBlockDiag(
+            mean_corrected,
+            cholesky_cor,
+            treedef=rv.treedef,
+            unravel_leaf=rv.unravel_leaf,
+        )
         bwd = LatentCond(
             gain,
             corrected,
@@ -1009,18 +1039,24 @@ class BlockDiagConditional(ConditionalBackend):
         )
 
         # Gather observed RV
-        mean_observed = cond.to_observed[None, :] * mean_observed
-        cholesky_observed = cond.to_observed[None, :, None] * cholesky_obs
-        observed = _normal.Normal(mean_observed, cholesky_observed)
+        mean_observed = cond.to_observed * mean_observed
+        cholesky_observed = cond.to_observed[:, :, None] * cholesky_obs
+        observed = _normal.NormalBlockDiag(
+            mean_observed,
+            cholesky_observed,
+            treedef=cond.noise.treedef,
+            unravel_leaf=cond.noise.unravel_leaf,
+        )
         return observed, bwd
 
     def identity(self, ndim, /) -> LatentCond:
         m0 = np.zeros((*self.ode_shape, ndim))
         c0 = np.zeros((*self.ode_shape, ndim, ndim))
-        noise = _normal.Normal(m0, c0)
+        noise = _normal.NormalBlockDiag(
+            m0, c0, treedef=self.treedef, unravel_leaf=self.unravel_leaf
+        )
         matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
-        ones = np.ones((ndim,))
-        return LatentCond(matrix, noise, to_latent=ones, to_observed=ones)
+        return LatentCond.from_linop_and_noise(matrix, noise)
 
     def ibm_transitions(self, base_scale):
 
@@ -1035,12 +1071,16 @@ class BlockDiagConditional(ConditionalBackend):
         def discretise(dt, output_scale):
             p, p_inv = precon_fun(dt)
             scale = base_scale * output_scale
-            A_batch, noise_batch = func.vmap(discretise_1d)(scale)
-            return LatentCond(A_batch, noise_batch, to_latent=p_inv, to_observed=p)
 
-        def discretise_1d(scale):
-            noise = _normal.Normal(q0, scale * q_sqrtm)
-            return a, noise
+            A_batch = np.ones((d, 1, 1)) * a[None, :, :]
+            mean = np.ones((d, 1)) * q0[None, :]
+            cholesky = scale[:, None, None] * q_sqrtm[None, :, :]
+            noise = _normal.NormalBlockDiag(
+                mean, cholesky, treedef=self.treedef, unravel_leaf=self.unravel_leaf
+            )
+            p = np.ones((d, 1)) * p[None, :]
+            p_inv = np.ones((d, 1)) * p_inv[None, :]
+            return LatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
 
         return discretise
 

@@ -16,7 +16,10 @@ class Factory:
 
     This data structure ensures that we don't test
     the product space of all configurations, whose size
-    grows too quickly.
+    would grow too quickly.
+
+    Instead, we carry defaults for each parameter
+    and make each case only vary one of the parameters.
     """
 
     strategy: Callable = probdiffeq.strategy_filter
@@ -153,14 +156,6 @@ def case_factory_error_residual_std_not_cached():
 @testing.parametrize_with_cases("factory", ".", prefix="case_factory_")
 def test_output_matches_reference(ivp, ssm_fact, factory: Factory):
     vf, u0, (t0, t1) = ivp
-
-    msg = "\n\nContinue by creating a NormalBlockDiag data-type"
-    msg += ", slowly moving all methods from stats into there"
-    msg += ", fixing code as needed. Also, move strategy.markov_* methods"
-    msg += " to the MarkovSequence. Then, fix *all* tests,"
-    msg += " make TaylorCoeffTarget.std into a property, and rerun benchmarks"
-    msg += "Time for some docs and a new PR as well...\n\n"
-    raise RuntimeError(msg)
 
     # Build a solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)

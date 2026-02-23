@@ -6,7 +6,7 @@ from probdiffeq.backend import np, testing
 
 def test_default_yield_correct_transitions():
     tcoeffs = [2.0, 3.0, 4.0, 5.0]
-    init, iwp, ssm = probdiffeq.prior_wiener_integrated(tcoeffs)
+    init, iwp, _ssm = probdiffeq.prior_wiener_integrated(tcoeffs)
 
     assert testing.allclose(init.std, [0.0, 0.0, 0.0, 0.0])
 
@@ -33,7 +33,7 @@ def test_default_yield_correct_transitions():
 
 def test_diffuse_derivatives():
     tcoeffs = [2.0, 3.0]
-    init, iwp, ssm = probdiffeq.prior_wiener_integrated(
+    init, _iwp, _ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, diffuse_derivatives=3, diffuse_eps=123.0
     )
     assert testing.allclose(init.mean, [2.0, 3.0, 0.0, 0.0, 0.0])
@@ -43,7 +43,7 @@ def test_diffuse_derivatives():
 def test_differential_variables_dense():
     tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray([True, False, True])]
-    init, iwp, ssm = probdiffeq.prior_wiener_integrated(
+    init, _iwp, _ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, is_differential=isdiff, nondifferential_eps=0.123, ssm_fact="dense"
     )
 
@@ -60,7 +60,7 @@ def test_differential_variables_dense():
 def test_differential_variables_blockdiag():
     tcoeffs = [np.asarray([1.0, 2.0, 3.0]), np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray([True, False, True]), np.asarray([False, False, True])]
-    init, iwp, ssm = probdiffeq.prior_wiener_integrated(
+    init, _iwp, _ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, is_differential=isdiff, nondifferential_eps=0.123, ssm_fact="blockdiag"
     )
 
@@ -81,7 +81,7 @@ def test_differential_variables_blockdiag():
 def test_differential_variables_isotropic():
     tcoeffs = [np.asarray([1.0, 2.0, 3.0]), np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray(True), np.asarray(False)]
-    init, iwp, ssm = probdiffeq.prior_wiener_integrated(
+    init, _iwp, _ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, is_differential=isdiff, nondifferential_eps=0.123, ssm_fact="isotropic"
     )
 
