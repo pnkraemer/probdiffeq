@@ -651,26 +651,26 @@ class MarkovStrategy(Generic[T]):
         """Finalize the posterior before returning a solution."""
         raise NotImplementedError
 
-    def markov_marginals(self, markov_seq: MarkovSequence, *, reverse: bool):
-        """Extract the (time-)marginals from a Markov sequence.
+    # def markov_marginals(self, markov_seq: MarkovSequence, *, reverse: bool):
+    #     """Extract the (time-)marginals from a Markov sequence.
 
-        This is only needed in combination with smoothing-based strategies.
-        """
-        if markov_seq.marginal.mean.ndim == markov_seq.conditional.noise.mean.ndim:
-            markov_seq = self._markov_select_terminal(markov_seq)
+    #     This is only needed in combination with smoothing-based strategies.
+    #     """
+    #     if markov_seq.marginal.mean.ndim == markov_seq.conditional.noise.mean.ndim:
+    #         markov_seq = self._markov_select_terminal(markov_seq)
 
-        def step(x, cond):
-            extrapolated = self.ssm.conditional.marginalise(x, cond)
-            return extrapolated, extrapolated
+    #     def step(x, cond):
+    #         extrapolated = self.ssm.conditional.marginalise(x, cond)
+    #         return extrapolated, extrapolated
 
-        init, xs = markov_seq.marginal, markov_seq.conditional
-        _, marginals = flow.scan(step, init=init, xs=xs, reverse=reverse)
+    #     init, xs = markov_seq.marginal, markov_seq.conditional
+    #     _, marginals = flow.scan(step, init=init, xs=xs, reverse=reverse)
 
-        if reverse:
-            # Append the terminal marginal to the computed ones
-            return tree.tree_array_append(marginals, init)
+    #     if reverse:
+    #         # Append the terminal marginal to the computed ones
+    #         return tree.tree_array_append(marginals, init)
 
-        return tree.tree_array_prepend(init, marginals)
+    #     return tree.tree_array_prepend(init, marginals)
 
     def markov_sample(
         self, key, markov_seq: MarkovSequence, *, reverse: bool, shape: tuple = ()
@@ -1215,12 +1215,13 @@ def prior_wiener_integrated_diffuse(
     # Add derivatives to the Taylor coefficients.
     # Warning: This destroys pytree structure in the tcoeffs and the
     # resulting pytree will always be a list (for now at least)
-    tcoeffs_mean, tcoeffs_std = _add_diffuse_derivatives(
-        tcoeffs_mean,
-        tcoeffs_std,
-        diffuse_derivatives=diffuse_derivatives,
-        diffuse_eps=diffuse_eps,
-    )
+    if diffuse_derivatives > 0:
+        tcoeffs_mean, tcoeffs_std = _add_diffuse_derivatives(
+            tcoeffs_mean,
+            tcoeffs_std,
+            diffuse_derivatives=diffuse_derivatives,
+            diffuse_eps=diffuse_eps,
+        )
 
     # Choose a state-space model factorisation
     ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs_mean)
@@ -1344,59 +1345,47 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
 
     def init_posterior(self, *, u: TaylorCoeffTarget):
         cond = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
-        posterior = MarkovSequence(marginal=u.marginals, conditional=cond)
+        posterior = MarkovSequence(marginal=u.marginals, conditional=cond, reverse=True)
         return u, posterior
 
     def predict(
         self, posterior: MarkovSequence, *, transition
     ) -> tuple[TaylorCoeffTarget, MarkovSequence]:
         marginals, cond = self.ssm.conditional.revert(posterior.marginal, transition)
-        posterior = MarkovSequence(marginal=marginals, conditional=cond)
+        posterior = MarkovSequence(
+            marginal=marginals, conditional=cond, reverse=posterior.reverse
+        )
 
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget.from_marginals(marginals)
         return estimate, posterior
 
     def apply_updates(self, prediction, *, updates):
-        posterior = MarkovSequence(updates, prediction.conditional)
+        posterior = MarkovSequence(
+            updates, prediction.conditional, reverse=prediction.reverse
+        )
         marginals = updates
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        return TaylorCoeffTarget(u, u_std, marginals), posterior
+        estimate = TaylorCoeffTarget.from_marginals(marginals)
+        return estimate, posterior
 
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
     ):
         assert output_scale.shape == self.ssm.prototypes.output_scale().shape
-
-        init0 = self.ssm.stats.rescale_cholesky(posterior0.marginal, output_scale)
-        conditional0 = self.ssm.conditional.rescale_noise(
-            posterior0.conditional, output_scale
-        )
-        posterior0 = MarkovSequence(init0, conditional0)
-
-        # Calibrate
-        init = self.ssm.stats.rescale_cholesky(posterior.marginal, output_scale)
-        conditional = self.ssm.conditional.rescale_noise(
-            posterior.conditional, output_scale
-        )
-        posterior = MarkovSequence(init, conditional)
+        posterior0 = posterior0.rescale_cholesky(output_scale)
+        posterior = posterior.rescale_cholesky(output_scale)
 
         # Marginalise
-        marginals = self.markov_marginals(posterior, reverse=True)
+        marginals = posterior.eval_marginals(ssm=self.ssm)
+        # marginals = self.markov_marginals(posterior, reverse=True)
 
         # Prepend the initial condition to the filtering distributions
         init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
-        posterior = MarkovSequence(marginal=init, conditional=posterior.conditional)
+        posterior = MarkovSequence(
+            marginal=init, conditional=posterior.conditional, reverse=posterior.reverse
+        )
 
         # Extract targets
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget.from_marginals(marginals)
         return estimate, posterior
 
     def interpolate(
@@ -1441,27 +1430,25 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         marginal_t1 = posterior_t1.marginal
         conditional_t1_to_t = extrapolated_t1.conditional
         rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
-        solution_at_t = MarkovSequence(rv_at_t, extrapolated_t.conditional)
+        solution_at_t = MarkovSequence(
+            rv_at_t, extrapolated_t.conditional, reverse=extrapolated_t.reverse
+        )
 
         # The state at t1 gets a new backward model;
         # (it must remember how to get back to t, not to t0).
-        solution_at_t1 = MarkovSequence(marginal_t1, conditional_t1_to_t)
+        solution_at_t1 = MarkovSequence(
+            marginal_t1, conditional_t1_to_t, reverse=extrapolated_t.reverse
+        )
         interp_res = _InterpRes(step_from=solution_at_t1, interp_from=solution_at_t)
 
         # Extract targets
         marginals = solution_at_t.marginal
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget.from_marginals(marginals)
         return (estimate, solution_at_t), interp_res
 
     def interpolate_at_t1(self, posterior_t1):
         marginals = posterior_t1.marginal
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget.from_marginals(marginals)
 
         interp_res = _InterpRes(step_from=posterior_t1, interp_from=posterior_t1)
         return (estimate, posterior_t1), interp_res

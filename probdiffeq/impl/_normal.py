@@ -61,7 +61,6 @@ class NormalDense(Normal):
     def eval_mean(self):
         if self.mean.ndim > 1:
             return func.vmap(NormalDense.eval_mean)(self)
-
         return self.unravel(self.mean)
 
     def eval_standard_deviation(self):

@@ -54,7 +54,7 @@ def fixture_solution(constraint_ode_factory, fact):
     )
     error = probdiffeq.error_residual_std(constraint=constraint, prior=ibm, ssm=ssm)
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
-    return solve(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2, damp=1e-9)
+    return func.jit(solve)(init, t0=t0, t1=t1, atol=1e-4, rtol=1e-4, damp=1e-9)
 
 
 def test_terminal_value_simulation_matches_reference(solution):

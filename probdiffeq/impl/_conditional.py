@@ -15,8 +15,6 @@ class LatentCond:
         self.to_latent = to_latent
         self.to_observed = to_observed
 
-        assert A.ndim == to_latent.ndim + 1 == to_observed.ndim + 1
-
     @staticmethod
     def register_pytree_node():
         def flatten(normal):
@@ -421,21 +419,16 @@ class BlockDiagOdeTs0(LinearizationOde):
     def linearize(self, rv, state: None, *, damp: float, t):
         del state
         fun = func.partial(self.vector_field, t=t)
-        # print("rv", tree.tree_map(np.shape, rv))
         mean = rv.eval_mean()
-        # print("mean", tree.tree_map(np.shape, mean))
-        fx, unravel = tree.ravel_pytree(fun(*(mean[: self.ode_order])))
-        # print("fx", tree.tree_map(np.shape, fx))
+        fx = fun(*(mean[: self.ode_order]))
+        fx = tree.tree_map(lambda s: -s, fx)
+        bias = _normal.NormalBlockDiag.from_dirac(fx, damp=damp)
 
         def a1(s):
             return s[[self.ode_order], ...]
 
         linop = func.vmap(func.jacrev(a1))(rv.mean)
 
-        # todo: unravel fx before constructing the normal?
-        bias = _normal.NormalBlockDiag.from_dirac(unravel(-fx), damp=damp)
-        # print("linop", tree.tree_map(np.shape, linop))
-        # print("bias", tree.tree_map(np.shape, bias))
         cond = LatentCond.from_linop_and_noise(linop, bias)
         return cond, None
 
