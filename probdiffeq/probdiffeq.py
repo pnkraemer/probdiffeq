@@ -328,6 +328,56 @@ class jacobian_hutchinson_rev(JacobianHandler):
         return fx, J_diagonal, key
 
 
+def loss_lml_terminal_values(*, ssm, tcoeff_index=0):
+
+    def loss(u, /, *, marginals, std=None):
+        u = tree.tree_map(np.asarray, u)
+
+        std_expected = tree.tree_map(lambda s: ssm.prototypes.error_estimate(), u)
+        if std is None:
+            std = tree.tree_map(np.zeros_like, std_expected)
+        else:
+            std = tree.tree_map(np.asarray, std)
+            shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
+            shapes_equal = tree.tree_all(shapes)
+
+            if not shapes_equal:
+                msg = "The standard deviation container differs from what was expected."
+                msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
+                msg += f" Received: shape={tree.tree_map(np.shape, std)}."
+                msg += f" For reference, data: shape={tree.tree_map(np.shape, u)}."
+                raise ValueError(msg)
+
+        model = ssm.conditional.to_derivative(tcoeff_index, std)
+        marg = ssm.conditional.marginalise(marginals, model)
+        return marg.logpdf(u)
+
+    return loss
+
+
+def loss_log_marginal_likelihood_terminal_values_linop(linop, ssm):
+
+    jacobian = jacobian_materialize()
+
+    def loss(u, /, std, *, marginals):
+        u = tree.tree_map(np.asarray, u)
+        std = tree.tree_map(np.asarray, std)
+
+        shapes = tree.tree_map(lambda a, b: a.shape == b.shape, u, std)
+        shapes_equal = tree.tree_all(shapes)
+        if not shapes_equal:
+            msg = "The standard deviation container differs from that of the data."
+            msg += f" Data: shape={tree.tree_map(np.shape, u)}."
+            msg += f" Standard-deviations: shape={tree.tree_map(np.shape, std)}."
+            raise ValueError(msg)
+
+        model = ssm.conditional.observation_model(linop, std, jacobian)
+        marg = ssm.conditional.marginalise(marginals, model)
+        return marg.logpdf(u)
+
+    return loss
+
+
 class Constraint(Protocol):
     """An interface for constraints + linearization in probabilistic solvers.
 
@@ -766,7 +816,7 @@ class MarkovStrategy(Generic[T]):
 
         data = np.zeros_like(u_leaves)  # 'u' is baked into the observation model
         observed, _conditional = self.ssm.conditional.revert(rv, model)
-        return self.ssm.stats.logpdf(data, observed)
+        return observed.logpdf(data)
 
     def log_marginal_likelihood(self, u, /, *, standard_deviation, posterior: T):
         """Compute the log-marginal-likelihood of observations of the IVP solution.
@@ -1246,7 +1296,7 @@ def prior_wiener_integrated_diffuse(
     discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
 
     # Return the target
-    marginal = ssm.normal.from_tcoeffs(tcoeffs_mean, tcoeffs_std)
+    marginal = ssm.normal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
     target = TaylorCoeffTarget.from_marginals(marginal)
     return target, discretize, ssm
 

@@ -15,6 +15,9 @@ class LatentCond:
         self.to_latent = to_latent
         self.to_observed = to_observed
 
+    def __repr__(self):
+        return f"LatentCond(A={self.A}, noise={self.noise}, to_latent={self.to_latent}, to_observed={self.to_observed})"
+
     @staticmethod
     def register_pytree_node():
         def flatten(normal):
@@ -753,24 +756,30 @@ class DenseConditional(ConditionalBackend):
         to_latent = np.ones_like(cond.to_latent)
         return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
 
-    def to_derivative(self, i, u, standard_deviation):
+    def observation_model(self, linop, std, jacobian):
+
+        def linop_flat(x):
+            return tree.ravel_pytree(linop(self.unravel(x)))[0]
+
+        x_like = np.ones(self.flat_shape)
+        state = jacobian.init_jacobian_handler()
+        fx, A, _state = jacobian.materialize_dense(linop_flat, x_like, state)
+
+        fx_like = linop(self.unravel(x_like))
+        u_like = tree.tree_map(np.zeros_like, fx_like)
+        noise = _normal.NormalDense.from_mean_and_std(u_like, std)
+        return LatentCond.from_linop_and_noise(A, noise)
+
+    def to_derivative(self, i, std):
         def select(a):
             return tree.ravel_pytree(self.unravel(a)[i])[0]
 
         x = np.zeros(self.flat_shape)
-        linop = func.jacrev(select)(x)
+        linop = func.jacfwd(select)(x)
 
-        u_flat, _ = tree.ravel_pytree(u)
-        stdev, _ = tree.ravel_pytree(standard_deviation)
-        assert stdev.shape == (1,)
-
-        (s,) = stdev
-        cholesky = np.eye(len(u_flat)) * s
-        noise = _normal.Normal(-u_flat, cholesky)
-
-        to_latent = np.ones(linop.shape[1])
-        to_observed = np.ones(linop.shape[0])
-        return LatentCond(linop, noise, to_latent=to_latent, to_observed=to_observed)
+        data_like = self.unravel(x)[0]
+        noise = _normal.NormalDense.from_mean_and_std(data_like, std)
+        return LatentCond.from_linop_and_noise(linop, noise)
 
     def rescale_noise(self, cond, scale):
         A = cond.A
@@ -896,24 +905,29 @@ class IsotropicConditional(ConditionalBackend):
         to_latent = np.ones_like(cond.to_latent)
         return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
 
-    def to_derivative(self, i, u, standard_deviation):
+    def to_derivative(self, i, std):
+
         def select(a):
             return tree.ravel_pytree(self.unravel_tree(a)[i])[0]
 
         m = np.zeros((self.num_derivatives + 1,))
-        linop = func.jacrev(select)(m)
+        linop = func.jacfwd(select)(m)
 
-        u_flat, _ = tree.ravel_pytree(u)
+        u_like = self.unravel_tree(m)[0]
+        noise = _normal.NormalIso.from_mean_and_std(u_like, std)
+        return LatentCond.from_linop_and_noise(linop, noise)
 
-        stdev, _ = tree.ravel_pytree(standard_deviation)
+        # u_flat, _ = tree.ravel_pytree(u)
 
-        assert stdev.shape == (1,)
-        cholesky = linalg.diagonal_matrix(stdev)
-        noise = _normal.Normal(-u_flat, cholesky)
+        # stdev, _ = tree.ravel_pytree(standard_deviation)
 
-        to_latent = np.ones(linop.shape[1])
-        to_observed = np.ones(linop.shape[0])
-        return LatentCond(linop, noise, to_latent=to_latent, to_observed=to_observed)
+        # assert stdev.shape == (1,)
+        # cholesky = linalg.diagonal_matrix(stdev)
+        # noise = _normal.Normal(-u_flat, cholesky)
+
+        # to_latent = np.ones(linop.shape[1])
+        # to_observed = np.ones(linop.shape[0])
+        # return LatentCond(linop, noise, to_latent=to_latent, to_observed=to_observed)
 
     def rescale_noise(self, cond, scale):
         stats = _stats.IsotropicStats(
@@ -923,6 +937,26 @@ class IsotropicConditional(ConditionalBackend):
         return LatentCond(
             cond.A, noise_new, to_latent=cond.to_latent, to_observed=cond.to_observed
         )
+
+    def observation_model(self, linop, std, jacobian):
+        def linop_flat(x):
+            x_tree = tree.tree_unflatten(self.tree_structure, x)
+            return tree.ravel_pytree(linop(self.unravel(x)))[0]
+
+        n, d = self.num_derivatives + 1, *self.ode_shape
+        x_like = np.ones((n, d))
+        print(x_like)
+
+        state = jacobian.init_jacobian_handler()
+        fx, A, _state = jacobian.calculate_trace(linop_flat, x_like, state)
+
+        A = func.jacfwd(linop_flat)(np.ones(self.flat_shape))
+
+        u_like = tree.tree_map(
+            np.zeros_like, linop(self.unravel(np.ones(self.flat_shape)))
+        )
+        noise = _normal.NormalIso.from_mean_and_std(u_like, std)
+        return LatentCond.from_linop_and_noise(A, noise)
 
 
 class BlockDiagConditional(ConditionalBackend):
@@ -1086,25 +1120,19 @@ class BlockDiagConditional(ConditionalBackend):
         to_latent = np.ones_like(cond.to_latent)
         return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
 
-    def to_derivative(self, i, u, standard_deviation):
+    def to_derivative(self, i, std):
+
         def select(a):
             return tree.ravel_pytree(self.unravel_tree(a)[i])[0]
 
         x = np.zeros((*self.ode_shape, self.num_derivatives + 1))
         linop = func.vmap(func.jacrev(select))(x)
 
-        u_flat, _ = tree.ravel_pytree(u)
-        bias = u_flat[:, None]
-
-        eye = np.ones((*self.ode_shape, 1, 1)) * np.eye(1)[None, ...]
-        stdev, _ = tree.ravel_pytree(standard_deviation)
-        assert stdev.shape == (1,)
-        (s,) = stdev
-        cholesky = eye * s
-        noise = _normal.Normal(-bias, cholesky)
-        to_latent = np.ones((linop.shape[2],))
-        to_observed = np.ones((linop.shape[1],))
-        return LatentCond(linop, noise, to_latent=to_latent, to_observed=to_observed)
+        u_like = tree.tree_unflatten(self.treedef, x.T)
+        u_like = tree.tree_map(self.unravel_leaf, u_like)
+        u_like = tree.tree_map(np.zeros_like, u_like[0])
+        noise = _normal.NormalBlockDiag.from_mean_and_std(u_like, std)
+        return LatentCond.from_linop_and_noise(linop, noise)
 
     def rescale_noise(self, cond, scale):
         stats = _stats.BlockDiagStats(

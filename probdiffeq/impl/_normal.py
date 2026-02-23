@@ -39,15 +39,16 @@ class NormalDense(Normal):
 
     @classmethod
     def from_tcoeffs(cls, loc: C, scale: C | None = None):
-        if scale is None:
-            scale = tree.tree_map(np.ones_like, loc)
+        raise RuntimeError
 
-        loc_flat, unravel = tree.ravel_pytree(loc)
-        scale_flat, _ = tree.ravel_pytree(scale)
-        assert loc_flat.shape == scale_flat.shape
+    @classmethod
+    def from_mean_and_std(cls, mean, std):
+        mean_flat, unravel = tree.ravel_pytree(mean)
+        std_flat, _unravel = tree.ravel_pytree(std)
 
-        cholesky_flat = linalg.diagonal_matrix(scale_flat)
-        return cls(loc_flat, cholesky_flat, unravel=unravel)
+        assert mean_flat.shape == std_flat.shape
+        cholesky = linalg.diagonal_matrix(std_flat)
+        return cls(mean=mean_flat, cholesky=cholesky, unravel=unravel)
 
     @classmethod
     def from_standard(cls, ndim, /, output_scale):
@@ -57,6 +58,9 @@ class NormalDense(Normal):
         cholesky = np.kron(eye_d, eye_n)
         mean = np.zeros((*self.ode_shape, ndim)).reshape((-1,), order="F")
         return cls(mean, cholesky)
+
+    def __repr__(self):
+        return f"NormalDense(mean={self.mean}, cholesky={self.cholesky}, unravel={self.unravel})"
 
     def eval_mean(self):
         if self.mean.ndim > 1:
@@ -137,20 +141,22 @@ class NormalIso(Normal):
 
     @classmethod
     def from_tcoeffs(cls, loc: C, scale: C | None = None):
-        if scale is None:
-            scale = tree.tree_map(lambda _: np.ones(()), loc)
+        raise RuntimeError
+
+    @classmethod
+    def from_mean_and_std(cls, mean, std):
 
         def ravel(s):
             return tree.ravel_pytree(s)[0]
 
-        loc_leaves, treedef = tree.tree_flatten(loc)
+        loc_leaves, treedef = tree.tree_flatten(mean)
         leaves_flat = tree.tree_map(ravel, loc_leaves)
         loc_flat = np.stack(leaves_flat)
 
-        scale_leaves, _ = tree.tree_flatten(scale)
+        scale_leaves, _ = tree.tree_flatten(std)
         scale_flat = np.stack(scale_leaves)
 
-        num_coeffs = len(loc)
+        num_coeffs = len(mean)
         if scale_flat.shape != (num_coeffs,):
             msg = "'scale' must have the same pytree structure as loc, "
             msg += "but each leaf must be a scalar instead of an array"
@@ -275,14 +281,15 @@ class NormalBlockDiag(Normal):
 
     @classmethod
     def from_tcoeffs(cls, loc: C, scale: C | None = None):
-        if scale is None:
-            scale = tree.tree_map(np.ones_like, loc)
+        raise RuntimeError
 
+    @classmethod
+    def from_mean_and_std(cls, mean, std):
         def ravel(s):
             return tree.ravel_pytree(s)[0]
 
         # Flatten and reshape the mean
-        loc_leaves, treedef = tree.tree_flatten(loc)
+        loc_leaves, treedef = tree.tree_flatten(mean)
         loc_leaves_flat = tree.tree_map(ravel, loc_leaves)
         loc_flat = np.stack(loc_leaves_flat).T
         _, unravel_leaf = tree.ravel_pytree(loc_leaves[0])
@@ -292,12 +299,12 @@ class NormalBlockDiag(Normal):
             return tree.tree_map(unravel_leaf, z1)
 
         # Flatten and reshape the standard deviation
-        scale_leaves, _ = tree.tree_flatten(scale)
+        scale_leaves, _ = tree.tree_flatten(std)
         scale_leaves_flat = tree.tree_map(ravel, scale_leaves)
         scale_flat = np.stack(scale_leaves_flat).T
 
         # Promote std into covariance matrix and apply damping
-        num_coeffs = len(loc)
+        num_coeffs = len(mean)
         d = np.ones((num_coeffs,))
         cholesky = linalg.diagonal_matrix(d)
         cholesky_flat = scale_flat[..., None] * cholesky[None, ...]

@@ -25,7 +25,7 @@ def test_third_order_spherical_vs_unscented_transform(n):
     ut_points, ut_weights = ut.points, ut.weights_sqrtm
     for x, y in [(ut_weights, tos_weights), (ut_points, tos_points)]:
         assert testing.allclose(x[:n], y[:n])
-        assert testing.allclose(x[n], 0.0)
+        assert testing.allclose(x[n], 0.0, strict_shapes=False)
         assert testing.allclose(x[n + 1 :], y[n:])
 
 
