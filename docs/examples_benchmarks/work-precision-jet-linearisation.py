@@ -199,10 +199,8 @@ def solver_probdiffeq_jet(num_derivatives: int) -> Callable:
 
     @jax.jit
     def param_to_solution(tol):
-        zeros, ones = jnp.zeros_like(u0), jnp.ones_like(u0)
-        tcoeffs = [u0]
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            tcoeffs, diffuse_derivatives=num_derivatives
+            [u0], diffuse_derivatives=num_derivatives
         )
         strategy = probdiffeq.strategy_filter(ssm=ssm)
         jet = probdiffeq.constraint_root_jet(root, ssm=ssm)
@@ -317,7 +315,7 @@ def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
 
             precisions.append(precision)
             works_mean.append(statistics.mean(times))
-            works_std.append(statistics.stdev(times))
+            works_std.append(statistics.std(times))
         return {
             "work_mean": jnp.asarray(works_mean),
             "work_std": jnp.asarray(works_std),

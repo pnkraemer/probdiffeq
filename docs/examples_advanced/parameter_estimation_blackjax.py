@@ -244,12 +244,12 @@ cov = jnp.eye(2) * 30  # fairly uninformed prior
 
 
 @jax.jit
-def logposterior_fn(theta, *, data, ts, obs_stdev=0.1):
+def logposterior_fn(theta, *, data, ts, obs_std=0.1):
     """Evaluate the logposterior-function of the data."""
     solution = solve_fixed(theta, ts=ts)
     y_T = jax.tree.map(lambda s: s[-1], solution.u.marginals)
     loss = probdiffeq.loss_lml_terminal_values(ssm=ssm)
-    logpdf_data = loss(data, std=obs_stdev, marginals=y_T)
+    logpdf_data = loss(data, std=obs_std, marginals=y_T)
     logpdf_prior = jax.scipy.stats.multivariate_normal.logpdf(theta, mean=mean, cov=cov)
     return logpdf_data + logpdf_prior
 

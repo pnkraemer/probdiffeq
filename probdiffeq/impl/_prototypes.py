@@ -3,7 +3,7 @@ from probdiffeq.backend import abc, np
 
 class PrototypeBackend(abc.ABC):
     @abc.abstractmethod
-    def standard_deviation(self):
+    def std(self):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -15,7 +15,7 @@ class DensePrototype(PrototypeBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def standard_deviation(self):
+    def std(self):
         return np.ones(self.ode_shape)
 
     def output_scale_calibrated(self):
@@ -26,7 +26,7 @@ class IsotropicPrototype(PrototypeBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def standard_deviation(self):
+    def std(self):
         return np.ones(())
 
     def output_scale_calibrated(self):
@@ -37,7 +37,7 @@ class BlockDiagPrototype(PrototypeBackend):
     def __init__(self, ode_shape):
         self.ode_shape = ode_shape
 
-    def standard_deviation(self):
+    def std(self):
         return np.ones(self.ode_shape)
 
     def output_scale_calibrated(self):

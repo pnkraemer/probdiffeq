@@ -77,7 +77,7 @@ def main():
         ax_i[1].set_yticks(())
 
     axes[0][0].set_ylabel("PDE solution")
-    axes[1][0].set_ylabel("log(stdev)")
+    axes[1][0].set_ylabel("log(std)")
     plt.show()
 
 

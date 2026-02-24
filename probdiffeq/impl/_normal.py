@@ -44,9 +44,9 @@ class NormalDense(Normal):
             return func.vmap(NormalDense.eval_mean)(self)
         return self.unravel(self.mean)
 
-    def eval_standard_deviation(self):
+    def eval_std(self):
         if self.mean.ndim > 1:
-            return func.vmap(NormalDense.eval_standard_deviation)(self)
+            return func.vmap(NormalDense.eval_std)(self)
 
         diag = np.einsum("ij,ij->i", self.cholesky, self.cholesky)
         std = np.sqrt(diag)
@@ -153,9 +153,9 @@ class NormalIso(Normal):
 
         return tree.tree_unflatten(self.treedef, [*self.mean])
 
-    def eval_standard_deviation(self):
+    def eval_std(self):
         if self.mean.ndim > 2:
-            return func.vmap(NormalIso.eval_standard_deviation)(self)
+            return func.vmap(NormalIso.eval_std)(self)
         diag = np.einsum("ij,ji->i", self.cholesky, self.cholesky)
         std = np.sqrt(diag)
         return tree.tree_unflatten(self.treedef, [*std])
@@ -298,9 +298,9 @@ class NormalBlockDiag(Normal):
         mean_tree = tree.tree_unflatten(self.treedef, [*(self.mean.T)])
         return tree.tree_map(self.unravel_leaf, mean_tree)
 
-    def eval_standard_deviation(self):
+    def eval_std(self):
         if self.mean.ndim > 2:
-            return func.vmap(NormalBlockDiag.eval_standard_deviation)(self)
+            return func.vmap(NormalBlockDiag.eval_std)(self)
         diag = np.einsum("ijk,ikj->ij", self.cholesky, self.cholesky)
         std = np.sqrt(diag)
         std_tree = tree.tree_unflatten(self.treedef, [*(std.T)])

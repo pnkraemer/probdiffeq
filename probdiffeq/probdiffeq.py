@@ -316,7 +316,7 @@ def loss_lml_terminal_values(*, ssm, tcoeff_index=0):
     def loss(u, /, *, marginals, std):
         u = tree.tree_map(np.asarray, u)
 
-        std_expected = tree.tree_map(lambda _s: ssm.prototypes.standard_deviation(), u)
+        std_expected = tree.tree_map(lambda _s: ssm.prototypes.std(), u)
         std = tree.tree_map(np.asarray, std)
         shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
         shapes_equal = tree.tree_all(shapes)
@@ -350,7 +350,7 @@ def loss_lml_timeseries(*, ssm, average_pdfs: bool = True, tcoeff_index=0):
         u = tree.tree_map(np.asarray, u)
 
         def batch_std(s):
-            return func.vmap(lambda _s: ssm.prototypes.standard_deviation())(s)
+            return func.vmap(lambda _s: ssm.prototypes.std())(s)
 
         std_expected = tree.tree_map(batch_std, u)
         std = tree.tree_map(np.asarray, std)
@@ -592,7 +592,7 @@ class TaylorCoeffTarget(Generic[C, T]):
     @property
     def std(self) -> C:
         """A PyTree describing the mean of the Taylor coefficient."""
-        return self.marginals.eval_standard_deviation()
+        return self.marginals.eval_std()
 
 
 @tree.register_dataclass
@@ -2426,11 +2426,11 @@ class error_residual_std(ErrorEstimator):
         else:
             linearized = proposed.fun_evals
 
-        # Extract the local residual stdev from the linearization
+        # Extract the local residual std from the linearization
         observed = self.ssm.conditional.marginalise(rv, linearized)
         output_scale = observed.mahalanobis_norm_relative(0.0)
         observed = observed.rescale_cholesky(output_scale)
-        error = observed.eval_standard_deviation()
+        error = observed.eval_std()
         error, _ = tree.ravel_pytree(error)
 
         # Compute a reference
@@ -2519,7 +2519,7 @@ class error_state_std(ErrorEstimator):
         else:
             linearized = proposed.fun_evals
 
-        # Extract the local residual stdev from the linearization
+        # Extract the local residual std from the linearization
         observed, conditional = self.ssm.conditional.revert(rv, linearized)
         output_scale = observed.mahalanobis_norm_relative(0.0)
 
@@ -2527,8 +2527,8 @@ class error_state_std(ErrorEstimator):
         n = self.derivative_idx
 
         # *New:* Go back into solution space
-        stdev = conditional.noise.eval_standard_deviation()[n]
-        error, _ = tree.ravel_pytree(stdev)
+        std = conditional.noise.eval_std()[n]
+        error, _ = tree.ravel_pytree(std)
         error = output_scale * error
         error, _ = tree.ravel_pytree(error)
 

@@ -624,7 +624,7 @@ class ConditionalBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def to_derivative(self, i, standard_deviation):
+    def to_derivative(self, i, std):
         raise NotImplementedError
 
 

@@ -34,14 +34,14 @@ def main(num_data=100, epochs=1000, print_every=100, hidden=(20,), lr=0.2):
     # Create some data and construct a neural ODE
     grid = jnp.linspace(0, 1, num=num_data)
     data = jnp.sin(2.5 * jnp.pi * grid) * jnp.pi * grid
-    stdev = 1e-1
+    std = 1e-1
     output_scale = 1e1
     vf, u0, (t0, _t1), f_args = vf_neural_ode(hidden=hidden, t0=0.0, t1=1)
 
     # Create a loss (this is where probabilistic numerics enters!)
     loss = loss_log_marginal_likelihood(vf=vf, t0=t0)
     loss0, info0 = loss(
-        f_args, u0=u0, grid=grid, data=data, stdev=stdev, output_scale=output_scale
+        f_args, u0=u0, grid=grid, data=data, std=std, output_scale=output_scale
     )
 
     # Plot the data and the initial guess
@@ -65,7 +65,7 @@ def main(num_data=100, epochs=1000, print_every=100, hidden=(20,), lr=0.2):
             u0=u0,
             grid=grid,
             data=data,
-            stdev=stdev,
+            std=std,
             output_scale=output_scale,
         )
 
@@ -161,7 +161,7 @@ def loss_log_marginal_likelihood(vf, *, t0):
         u0: tuple,
         grid: jax.Array,
         data: jax.Array,
-        stdev: jax.Array,
+        std: jax.Array,
         output_scale: jax.Array,
     ):
         """Loss function: log-marginal likelihood of the data."""
@@ -186,7 +186,7 @@ def loss_log_marginal_likelihood(vf, *, t0):
 
         # Evaluate loss
         loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
-        std = jnp.ones_like(grid)[:, None] * stdev[None, None]
+        std = jnp.ones_like(grid)[:, None] * std[None, None]
 
         lml = loss_lml(data, std=std, posterior=sol.solution_full)
         return -lml, {"sol": sol}
