@@ -29,13 +29,13 @@ from probdiffeq import ivpsolve, probdiffeq
 jax.config.update("jax_debug_nans", True)
 
 
-def main(num_data=100, epochs=500, print_every=50, hidden=(20,), lr=0.2):
+def main(num_data=100, epochs=1000, print_every=100, hidden=(20,), lr=0.2):
     """Train a neural ODE using diffusion tempering."""
     # Create some data and construct a neural ODE
     grid = jnp.linspace(0, 1, num=num_data)
     data = jnp.sin(2.5 * jnp.pi * grid) * jnp.pi * grid
-    stdev = 1e-4
-    output_scale = stdev * 1e5
+    stdev = 1e-1
+    output_scale = 1e1
     vf, u0, (t0, _t1), f_args = vf_neural_ode(hidden=hidden, t0=0.0, t1=1)
 
     # Create a loss (this is where probabilistic numerics enters!)
@@ -76,7 +76,7 @@ def main(num_data=100, epochs=500, print_every=50, hidden=(20,), lr=0.2):
         # Diffusion tempering: https://arxiv.org/abs/2402.12231
         # To all users: Adjust this tempering and
         # see how it affects parameter estimation.
-        if i % 100 == 0:
+        if i % 100 == 99:
             output_scale /= 10.0
 
     # Plot the results
@@ -168,7 +168,7 @@ def loss_log_marginal_likelihood(vf, *, t0):
         # Build a solver
         tcoeffs = (*u0, vf(*u0, t=t0, p=p))
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            tcoeffs, output_scale=output_scale, ssm_fact="isotropic"
+            tcoeffs, output_scale=output_scale, ssm_fact="dense"
         )
 
         def vf_p(y, /, *, t):
@@ -186,7 +186,7 @@ def loss_log_marginal_likelihood(vf, *, t0):
 
         # Evaluate loss
         loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
-        std = jnp.ones_like(grid) * stdev
+        std = jnp.ones_like(grid)[:, None] * stdev[None, None]
 
         lml = loss_lml(data, std=std, posterior=sol.solution_full)
         return -lml, {"sol": sol}

@@ -883,6 +883,9 @@ class IsotropicConditional(ConditionalBackend):
         m = np.zeros((self.num_derivatives + 1,))
         linop = func.jacfwd(select)(m)
         u_like = self.unravel_tree(m)[0]
+
+        # Wrap u_like and std into a list because the random variable
+        # expects TaylorCoefficients.
         noise = _normal.NormalIso.from_mean_and_std([u_like], [std])
         return LatentCond.from_linop_and_noise(linop, noise)
 
