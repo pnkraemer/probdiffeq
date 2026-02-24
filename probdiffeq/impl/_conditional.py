@@ -902,7 +902,8 @@ class BlockDiagConditional(ConditionalBackend):
 
     def apply(self, x, cond, /):
         leaves = tree.tree_leaves(x)
-        x = np.stack(leaves).T
+        leaves_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], leaves)
+        x = np.stack(leaves_flat).T
 
         def apply_unbatch(s, c):
             s = c.to_latent * s

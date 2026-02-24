@@ -705,9 +705,6 @@ class MarkovSequence(Generic[T]):
             sample_ = func.partial(self.sample, ssm=ssm, shape=shape_remaining)
             return func.vmap(sample_)(keys)
 
-        # Currently, sampling is only implemented for reverse
-        assert self.reverse
-
         # Compute a single sample from the Markov sequence
 
         def body(smp0_and_key, cond):
@@ -722,46 +719,11 @@ class MarkovSequence(Generic[T]):
         _, smps = flow.scan(
             body, init=(smp, key), xs=self.conditional, reverse=self.reverse
         )
-        return tree.tree_array_append(smps, smp)
 
-    def _sample_shape(self):
-        # The number of samples is one larger than the number of conditionals
-        noise = self.conditional.noise
-        n, *shape_single_sample = self.ssm.stats.hidden_shape(noise)
-        return n + 1, *tuple(shape_single_sample)
-
-    def _transform_unit_sample(self, markov_seq, base_sample, *, reverse):
-        if base_sample.ndim > len(self._sample_shape(markov_seq)):
-            transform = func.partial(self._transform_unit_sample, reverse=reverse)
-            transform_vmap = func.vmap(transform, in_axes=(None, 0))
-            return transform_vmap(markov_seq, base_sample)
-
-        # Compute a single unit sample.
-
-        def body_fun(samp_prev, conditionals_and_base_samples):
-            conditional, base = conditionals_and_base_samples
-
-            rv = self.ssm.conditional.apply(samp_prev, conditional)
-            smp = self.ssm.stats.transform_unit_sample(base, rv)
-            return smp, smp
-
-        base_sample_init, base_sample_body = base_sample[0], base_sample[1:]
-
-        # Compute a sample at the terminal value
-        init_sample = self.ssm.stats.transform_unit_sample(
-            base_sample_init, markov_seq.marginal
-        )
-
-        # Loop over backward models and the remaining base samples
-        xs = (markov_seq.conditional, base_sample_body)
-        _, samples = flow.scan(body_fun, init=init_sample, xs=xs, reverse=reverse)
-
-        if reverse:
-            samples = np.concatenate([samples, init_sample[None, ...]])
-        else:
-            samples = np.concatenate([init_sample[None, ...], samples])
-
-        return func.vmap(self.ssm.stats.qoi_from_sample)(samples)
+        # Currently, sampling is only implemented for reverse
+        if self.reverse:
+            return tree.tree_array_append(smps, smp)
+        return tree.tree_array_prepend(smp, smps)
 
 
 class MarkovStrategy(Generic[T]):
@@ -1084,7 +1046,7 @@ def prior_wiener_integrated(
     output_scale: C = None,
     # How many extra derivatives to model in the state-space
     diffuse_derivatives: int = 0,
-    diffuse_eps: float = 1e6,  # a large value
+    diffuse_eps: float = 1.0,  # a large value
 ):
     """Construct an repeatedly-integrated Wiener process.
 
@@ -1167,7 +1129,7 @@ def prior_wiener_integrated_diffuse(
     output_scale: C = None,
     # How many extra derivatives to model in the state-space
     diffuse_derivatives: int = 0,
-    diffuse_eps: float = 1e6,  # a large value
+    diffuse_eps: float = 1.0,  # a large value
 ):
     """Construct an diffuse repeatedly-integrated Wiener process.
 
@@ -1233,26 +1195,31 @@ def _add_diffuse_derivatives(
 
 
 def prior_wiener_integrated_discrete(
-    ts,
     tcoeffs: C,
+    grid: Array,
     *,
-    tcoeffs_std: C | None = None,
+    is_differential: C | None = None,
+    nondifferential_eps: float = 1e-6,  # a small value
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    output_scale: Callable | None = None,
-    increase_std_by_eps: bool = False,
+    output_scale: C = None,
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value
 ):
     """Compute a time-discretization of an integrated Wiener process."""
     init, discretize, ssm = prior_wiener_integrated(
         tcoeffs,
-        tcoeffs_std=tcoeffs_std,
+        is_differential=is_differential,
+        nondifferential_eps=nondifferential_eps,
         ssm_fact=ssm_fact,
         output_scale=output_scale,
-        increase_std_by_eps=increase_std_by_eps,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
     )
     scales = np.ones_like(ssm.prototypes.output_scale_calibrated())
     discretize_vmap = func.vmap(discretize, in_axes=(0, None))
-    conditionals = discretize_vmap(np.diff(ts), scales)
-    markov_seq = MarkovSequence(init.marginals, conditionals)
+    conditionals = discretize_vmap(np.diff(grid), scales)
+    markov_seq = MarkovSequence(init.marginals, conditionals, reverse=False)
     return markov_seq, ssm
 
 
@@ -1740,6 +1707,7 @@ class solver_mle(ProbabilisticSolver):
         # Update
         fx, cstate = self.constraint.linearize(u.marginals, cstate, damp=damp, t=t)
         if self.update_at_init:
+            raise RuntimeError
             observed, reverted = self.ssm.conditional.revert(u.marginals, fx)
             updates = reverted.noise
             u, posterior = self.strategy.apply_updates(
@@ -1750,11 +1718,10 @@ class solver_mle(ProbabilisticSolver):
                 0.0, observed
             )
             auxiliary = (cstate, output_scale_running, 1)
-        else:
-            fx = tree.tree_map(np.zeros_like, fx)
-            posterior = prediction
-            output_scale_running = np.zeros_like(output_scale_prior)
-            auxiliary = (cstate, output_scale_running, 0)
+        fx = tree.tree_map(np.zeros_like, fx)
+        posterior = prediction
+        output_scale_running = np.zeros_like(output_scale_prior)
+        auxiliary = (cstate, output_scale_running, 0)
 
         return ProbabilisticSolution(
             t=t,
@@ -1869,12 +1836,12 @@ class solver_dynamic(ProbabilisticSolver):
         # TODO: avoid the linearization altogether if update is false.
         #  use jax.eval_shape instead.
         if self.update_at_init:
+            raise RuntimeError
             _, reverted = self.ssm.conditional.revert(u.marginals, fx)
             updates = reverted.noise
             u, posterior = self.strategy.apply_updates(prediction, updates=updates)
-        else:
-            fx = tree.tree_map(np.zeros_like, fx)
-            posterior = prediction
+        fx = tree.tree_map(np.zeros_like, fx)
+        posterior = prediction
         return ProbabilisticSolution(
             t=t,
             u=u,
@@ -2552,14 +2519,13 @@ class error_state_std(ErrorEstimator):
 
         # Extract the local residual stdev from the linearization
         observed, conditional = self.ssm.conditional.revert(rv, linearized)
-        output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
+        output_scale = observed.mahalanobis_norm_relative(0.0)
 
         # Measure error on the n-th state (usually, n=0 because why not)
         n = self.derivative_idx
 
         # *New:* Go back into solution space
-        stdev = self.ssm.stats.standard_deviation(conditional.noise)
-        stdev = self.ssm.stats.qoi_from_sample(stdev)[n]
+        stdev = conditional.noise.eval_standard_deviation()[n]
         error, _ = tree.ravel_pytree(stdev)
         error = output_scale * error
         error, _ = tree.ravel_pytree(error)

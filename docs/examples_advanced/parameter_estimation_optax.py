@@ -119,12 +119,6 @@ def parameter_to_data_fit(parameters_, /, standard_deviation=1e-1):
     std = jnp.ones_like(sol_.t) * standard_deviation
     lml = loss_lml(data, std=std, posterior=sol_.solution_full)
     return -lml
-    # strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-    # return -1.0 * strategy.log_marginal_likelihood(
-    #     data,
-    #     standard_deviation=,
-    #     posterior=sol_.solution_full,
-    # )
 
 
 sensitivities = jax.jit(jax.grad(parameter_to_data_fit))

@@ -141,6 +141,18 @@ def case_factory_constraint_ode_slr1():
 
 
 @testing.case
+def case_factory_error_state_std_cached():
+    error = func.partial(probdiffeq.error_state_std, re_linearize_before_error=True)
+    return Factory(error=error)
+
+
+@testing.case
+def case_factory_error_state_std_not_cached():
+    error = func.partial(probdiffeq.error_state_std, re_linearize_before_error=True)
+    return Factory(error=error)
+
+
+@testing.case
 def case_factory_error_residual_std_cached():
     error = func.partial(probdiffeq.error_residual_std, re_linearize_before_error=True)
     return Factory(error=error)
@@ -170,7 +182,7 @@ def test_output_matches_reference(ivp, ssm_fact, factory: Factory):
     # Compute the PN solution
     save_at = np.linspace(t0, t1, endpoint=True, num=7)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    received = func.jit(solve)(init, save_at=save_at, atol=1e-3, rtol=1e-3)
+    received = func.jit(solve)(init, save_at=save_at, atol=1e-4, rtol=1e-4)
 
     # Compute a reference solution
     expected = ode.odeint_and_save_at(vf, u0, save_at=save_at, atol=1e-7, rtol=1e-7)
