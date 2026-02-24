@@ -1171,6 +1171,8 @@ def _tcoeffs_std_from_differential_variables(
     if is_differential is None:
         return std_template
 
+    is_differential = tree.tree_map(np.asarray, is_differential)
+
     # Before using is_differential, verify it has the correct structure and shape
     try:
 
@@ -1187,8 +1189,8 @@ def _tcoeffs_std_from_differential_variables(
     # Wherever is_differential is True, initialize with zeros.
     # Elsewhere, initialize with a small positivec value.
 
-    def std_init(s):
-        if np.dtype(s) != np.dtype(bool):
+    def std_init(s: Array) -> Array:
+        if s.dtype != np.dtype(bool):
             msg = "Boolean entries expected in `is_differential`."
             msg += f" Received: dtype={np.dtype(s)}"
             raise TypeError(msg)
