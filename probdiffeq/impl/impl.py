@@ -1,7 +1,7 @@
 """State-space model implementations."""
 
 from probdiffeq.backend import func, structs, tree
-from probdiffeq.backend.typing import Callable
+from probdiffeq.backend.typing import Any, Callable
 from probdiffeq.impl import _conditional, _normal, _prototypes
 
 
@@ -11,7 +11,7 @@ class FactImpl:
 
     name: str
     prototypes: _prototypes.PrototypeBackend
-    normal: _normal.Normal
+    normal: Any  # objects in _normal.py
     linearize: _conditional.LinearizationFactoryBackend
     conditional: _conditional.ConditionalBackend
 

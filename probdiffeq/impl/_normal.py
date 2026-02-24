@@ -1,14 +1,34 @@
 from probdiffeq.backend import func, linalg, np, random, tree
-from probdiffeq.backend.typing import Callable, Sequence, TypeVar
+from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Array)
 C = TypeVar("C", bound=Sequence)
 
 
 class Normal:
     def __init__(self, mean):
         self.mean = mean
+
+    def evaluate_mean(self):
+        raise NotImplementedError
+
+    def evaluate_std(self):
+        raise NotImplementedError
+
+    def rescale_cholesky(self, factor, /):
+        raise NotImplementedError
+
+    def sample(self, key):
+        raise NotImplementedError
+
+    @classmethod
+    def from_mean_and_std(cls, mean, std):
+        raise NotImplementedError
+
+    @classmethod
+    def from_diract(cls, mean, *, damp):
+        raise NotImplementedError
 
 
 class NormalDense(Normal):
@@ -39,14 +59,14 @@ class NormalDense(Normal):
         msg += f", unravel={self.unravel})"
         return msg
 
-    def eval_mean(self):
+    def evaluate_mean(self):
         if self.mean.ndim > 1:
-            return func.vmap(NormalDense.eval_mean)(self)
+            return func.vmap(NormalDense.evaluate_mean)(self)
         return self.unravel(self.mean)
 
-    def eval_std(self):
+    def evaluate_std(self):
         if self.mean.ndim > 1:
-            return func.vmap(NormalDense.eval_std)(self)
+            return func.vmap(NormalDense.evaluate_std)(self)
 
         diag = np.einsum("ij,ij->i", self.cholesky, self.cholesky)
         std = np.sqrt(diag)
@@ -147,15 +167,15 @@ class NormalIso(Normal):
         cholesky_flat = linalg.diagonal_matrix(scale_flat)
         return cls(loc_flat, cholesky_flat, treedef=treedef)
 
-    def eval_mean(self):
+    def evaluate_mean(self):
         if self.mean.ndim > 2:
-            return func.vmap(NormalIso.eval_mean)(self)
+            return func.vmap(NormalIso.evaluate_mean)(self)
 
         return tree.tree_unflatten(self.treedef, [*self.mean])
 
-    def eval_std(self):
+    def evaluate_std(self):
         if self.mean.ndim > 2:
-            return func.vmap(NormalIso.eval_std)(self)
+            return func.vmap(NormalIso.evaluate_std)(self)
         diag = np.einsum("ij,ji->i", self.cholesky, self.cholesky)
         std = np.sqrt(diag)
         return tree.tree_unflatten(self.treedef, [*std])
@@ -292,15 +312,15 @@ class NormalBlockDiag(Normal):
         cholesky_flat = scale_flat[..., None] * cholesky[None, ...]
         return cls(loc_flat, cholesky_flat, treedef=treedef, unravel_leaf=unravel_leaf)
 
-    def eval_mean(self):
+    def evaluate_mean(self):
         if self.mean.ndim > 2:
-            return func.vmap(NormalBlockDiag.eval_mean)(self)
+            return func.vmap(NormalBlockDiag.evaluate_mean)(self)
         mean_tree = tree.tree_unflatten(self.treedef, [*(self.mean.T)])
         return tree.tree_map(self.unravel_leaf, mean_tree)
 
-    def eval_std(self):
+    def evaluate_std(self):
         if self.mean.ndim > 2:
-            return func.vmap(NormalBlockDiag.eval_std)(self)
+            return func.vmap(NormalBlockDiag.evaluate_std)(self)
         diag = np.einsum("ijk,ikj->ij", self.cholesky, self.cholesky)
         std = np.sqrt(diag)
         std_tree = tree.tree_unflatten(self.treedef, [*(std.T)])

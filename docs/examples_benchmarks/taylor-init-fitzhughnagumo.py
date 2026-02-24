@@ -190,7 +190,7 @@ def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
         arguments.append(len(tcoeffs))
         work_compile.append(time_compile)
         work_mean.append(statistics.mean(time_execute))
-        work_std.append(statistics.std(time_execute))
+        work_std.append(statistics.stdev(time_execute))
         arg += 1
     print(f"num = {arg} | elapsed = {elapsed:.2f} | max_time = {max_time}")
     return {

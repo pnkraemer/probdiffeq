@@ -331,7 +331,7 @@ def workprec(fun, *, precision_fun: Callable, work_fun: Callable) -> Callable:
 
             precisions.append(precision)
             works_mean.append(statistics.mean(work))
-            works_std.append(statistics.std(work))
+            works_std.append(statistics.stdev(work))
         return {
             "work_mean": jnp.asarray(works_mean),
             "work_std": jnp.asarray(works_std),

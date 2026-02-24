@@ -223,7 +223,7 @@ def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
             works_min.append(min(times))
             works_mean.append(statistics.mean(times))
             if len(times) > 1:
-                works_std.append(statistics.std(times))
+                works_std.append(statistics.stdev(times))
         return {
             "work_mean": jnp.asarray(works_mean),
             "work_min": jnp.asarray(works_min),

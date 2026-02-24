@@ -11,7 +11,7 @@ from probdiffeq.impl import impl
 def test_logpdf(fact):
     rv, _ssm = create_random_variable(fact=fact)
 
-    u = tree.tree_map(np.ones_like, rv.eval_mean())
+    u = tree.tree_map(np.ones_like, rv.evaluate_mean())
 
     (mean_dense, cov_dense) = rv.to_multivariate_normal()
     u_dense = np.ones_like(mean_dense)
@@ -24,7 +24,7 @@ def test_logpdf(fact):
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
 def test_grad_not_none(fact):
     rv, _ssm = create_random_variable(fact=fact)
-    u = tree.tree_map(np.ones_like, rv.eval_mean())
+    u = tree.tree_map(np.ones_like, rv.evaluate_mean())
 
     pdf = func.jacrev(lambda x, y: y.logpdf(x))(u, rv)
     pdf, _ = tree.ravel_pytree(pdf)

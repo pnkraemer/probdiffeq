@@ -424,7 +424,7 @@ class BlockDiagOdeTs0(LinearizationOde):
     def linearize(self, rv, state: None, *, damp: float, t):
         del state
         fun = func.partial(self.vector_field, t=t)
-        mean = rv.eval_mean()
+        mean = rv.evaluate_mean()
         fx = fun(*(mean[: self.ode_order]))
         fx = tree.tree_map(lambda s: -s, fx)
         bias = _normal.NormalBlockDiag.from_dirac(fx, damp=damp)
@@ -676,7 +676,7 @@ class DenseConditional(ConditionalBackend):
             g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
         )
 
-    def revert(self, rv: _normal.Normal, cond: LatentCond, /):
+    def revert(self, rv: _normal.NormalDense, cond: LatentCond, /):
         # Pull RV into the latent space
         mean = cond.to_latent * rv.mean
         cholesky = cond.to_latent[:, None] * rv.cholesky

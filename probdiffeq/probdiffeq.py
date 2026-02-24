@@ -29,7 +29,7 @@ from probdiffeq.backend.typing import (
 from probdiffeq.impl import impl
 
 C = TypeVar("C", bound=Sequence)
-T = TypeVar("T")
+N = TypeVar("N", bound=impl._normal.Normal)
 
 
 @tree.register_dataclass
@@ -368,7 +368,9 @@ def loss_lml_timeseries(*, ssm, average_pdfs: bool = True, tcoeff_index=0):
             return ssm.conditional.to_derivative(tcoeff_index, s)
 
         model = func.vmap(make_model)(std)
-        return posterior.eval_lml(u, model=model, ssm=ssm, average_pdfs=average_pdfs)
+        return posterior.evaluate_lml(
+            u, model=model, ssm=ssm, average_pdfs=average_pdfs
+        )
 
     return loss
 
@@ -569,7 +571,7 @@ def _verify_vector_field_signature_and_parse_order(vf) -> int:
 
 @tree.register_dataclass
 @structs.dataclass
-class TaylorCoeffTarget(Generic[C, T]):
+class TaylorCoeffTarget(Generic[C, N]):
     """A probabilistic description of Taylor coefficients.
 
     Includes means, standard deviations, and marginals.
@@ -577,7 +579,7 @@ class TaylorCoeffTarget(Generic[C, T]):
     for probabilistic differential equation solvers.
     """
 
-    marginals: T
+    marginals: N
     """The full marginal distribution of the Taylor coefficient."""
 
     @classmethod
@@ -587,24 +589,24 @@ class TaylorCoeffTarget(Generic[C, T]):
     @property
     def mean(self) -> C:
         """A PyTree describing the standard deviation of the Taylor coefficient."""
-        return self.marginals.eval_mean()
+        return self.marginals.evaluate_mean()
 
     @property
     def std(self) -> C:
         """A PyTree describing the mean of the Taylor coefficient."""
-        return self.marginals.eval_std()
+        return self.marginals.evaluate_std()
 
 
 @tree.register_dataclass
 @structs.dataclass
-class MarkovSequence(Generic[T]):
+class MarkovSequence(Generic[N]):
     """A datastructure for Markov sequences as batches of joint distributions.
 
     This is the output type of smoother-based estimators.
     (Filter-based estimators do not return specialised types.)
     """
 
-    marginal: T
+    marginal: N
     """The marginal distribution."""
 
     conditional: Any
@@ -618,14 +620,14 @@ class MarkovSequence(Generic[T]):
         cond = self.conditional.rescale_noise(factor)
         return MarkovSequence(marg, cond, reverse=self.reverse)
 
-    def eval_marginals(self, *, ssm):
+    def evaluate_marginals(self, *, ssm):
         """Extract the (time-)marginals from a Markov sequence.
 
         This is only needed in combination with smoothing-based strategies.
         """
         if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
             markov_seq = self._select_terminal()
-            return markov_seq.eval_marginals(ssm=ssm)
+            return markov_seq.evaluate_marginals(ssm=ssm)
 
         def step(x, cond):
             extrapolated = ssm.conditional.marginalise(x, cond)
@@ -641,12 +643,12 @@ class MarkovSequence(Generic[T]):
 
         return tree.tree_array_prepend(self.marginal, marginals)
 
-    def eval_lml(self, u, *, model, ssm, average_pdfs: bool):
+    def evaluate_lml(self, u, *, model, ssm, average_pdfs: bool):
         assert self.reverse
 
         if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
             markov_seq = self._select_terminal()
-            return markov_seq.eval_lml(
+            return markov_seq.evaluate_lml(
                 u, model=model, ssm=ssm, average_pdfs=average_pdfs
             )
 
@@ -728,6 +730,9 @@ class MarkovSequence(Generic[T]):
         return tree.tree_array_prepend(smp, smps)
 
 
+T = TypeVar("T", bound=MarkovSequence | impl._normal.Normal)
+
+
 class MarkovStrategy(Generic[T]):
     """An interface for estimation strategies in Markovian state-space models.
 
@@ -778,16 +783,16 @@ class MarkovStrategy(Generic[T]):
 
 @tree.register_dataclass
 @structs.dataclass
-class ProbabilisticSolution(Generic[C, T]):
+class ProbabilisticSolution(Generic[C, N, T]):
     """A datastructure for probabilistic solutions of differential equations."""
 
     t: Array
     """The current time-step."""
 
-    u: TaylorCoeffTarget[C, T]
+    u: TaylorCoeffTarget[C, N]
     """The current ODE solution estimate."""
 
-    solution_full: T | MarkovSequence[T]
+    solution_full: T
     """The current posterior estimate."""
 
     # Todo: merge 'output_scale' and 'auxiliary' and "fun_evals"?
@@ -811,6 +816,9 @@ class ProbabilisticSolution(Generic[C, T]):
     Used to cache observation models between solver steps
     and error estimates.
     """
+
+
+S = TypeVar("S", bound=ProbabilisticSolution | MarkovSequence)
 
 
 class ProbabilisticSolver:
@@ -1045,7 +1053,7 @@ def prior_wiener_integrated(
     # The state-space model factorisation
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     # Do we use a special output scale?
-    output_scale: C = None,
+    output_scale: ArrayLike | None = None,
     # How many extra derivatives to model in the state-space
     diffuse_derivatives: int = 0,
     diffuse_eps: float = 1.0,  # a large value
@@ -1128,7 +1136,7 @@ def prior_wiener_integrated_diffuse(
     # The state-space model factorisation
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     # Do we use a special output scale?
-    output_scale: C = None,
+    output_scale: ArrayLike | None = None,
     # How many extra derivatives to model in the state-space
     diffuse_derivatives: int = 0,
     diffuse_eps: float = 1.0,  # a large value
@@ -1203,7 +1211,7 @@ def prior_wiener_integrated_discrete(
     is_differential: C | None = None,
     nondifferential_eps: float = 1e-6,  # a small value
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    output_scale: C = None,
+    output_scale: ArrayLike | None = None,
     # How many extra derivatives to model in the state-space
     diffuse_derivatives: int = 0,
     diffuse_eps: float = 1.0,  # a large value
@@ -1227,7 +1235,7 @@ def prior_wiener_integrated_discrete(
 
 @tree.register_dataclass
 @structs.dataclass
-class _InterpRes(Generic[T]):
+class _InterpRes(Generic[S]):
     """A datastructure to store interpolation results.
 
     To ensure correct adaptive time-stepping, it is important
@@ -1237,7 +1245,7 @@ class _InterpRes(Generic[T]):
     both stepping and interpolating variables are adjusted during interpolation.
     """
 
-    step_from: T
+    step_from: S
     """The new 'step_from' field.
 
     At time `max(t, s1.t)`.
@@ -1245,7 +1253,7 @@ class _InterpRes(Generic[T]):
     in future interpolations, or continue time-stepping from here.
     """
 
-    interp_from: T
+    interp_from: S
     """The new `interp_from` field.
 
     At time `t`. Use this as the left-most reference state
@@ -1314,7 +1322,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         posterior = posterior.rescale_cholesky(output_scale)
 
         # Marginalise
-        marginals = posterior.eval_marginals(ssm=self.ssm)
+        marginals = posterior.evaluate_marginals(ssm=self.ssm)
         # marginals = self.markov_marginals(posterior, reverse=True)
 
         # Prepend the initial condition to the filtering distributions
@@ -1552,7 +1560,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         posterior = posterior.rescale_cholesky(output_scale)
 
         # Marginalise
-        marginals = posterior.eval_marginals(ssm=self.ssm)
+        marginals = posterior.evaluate_marginals(ssm=self.ssm)
 
         # Prepend the initial condition to the filtering distributions
         init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
@@ -1860,7 +1868,7 @@ class solver_dynamic(ProbabilisticSolver):
         # Calibrate the output scale
         ones = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
         transition = self.prior(dt, ones)
-        mean = state.u.marginals.eval_mean()
+        mean = state.u.marginals.evaluate_mean()
         u = self.ssm.conditional.apply(mean, transition)
 
         # Linearize
@@ -2415,7 +2423,7 @@ class error_residual_std(ErrorEstimator):
 
         # Extrapolate from the zero-error state
         # TODO: should conditional.apply take the Pytree mean?
-        mean = previous.u.marginals.eval_mean()
+        mean = previous.u.marginals.evaluate_mean()
         rv = self.ssm.conditional.apply(mean, transition)
 
         # Optionally: re-linearize
@@ -2430,7 +2438,7 @@ class error_residual_std(ErrorEstimator):
         observed = self.ssm.conditional.marginalise(rv, linearized)
         output_scale = observed.mahalanobis_norm_relative(0.0)
         observed = observed.rescale_cholesky(output_scale)
-        error = observed.eval_std()
+        error = observed.evaluate_std()
         error, _ = tree.ravel_pytree(error)
 
         # Compute a reference
@@ -2508,7 +2516,7 @@ class error_state_std(ErrorEstimator):
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
-        mean = previous.u.marginals.eval_mean()
+        mean = previous.u.marginals.evaluate_mean()
         rv = self.ssm.conditional.apply(mean, transition)
 
         # Optionally: re-linearize
@@ -2527,7 +2535,7 @@ class error_state_std(ErrorEstimator):
         n = self.derivative_idx
 
         # *New:* Go back into solution space
-        std = conditional.noise.eval_std()[n]
+        std = conditional.noise.evaluate_std()[n]
         error, _ = tree.ravel_pytree(std)
         error = output_scale * error
         error, _ = tree.ravel_pytree(error)
