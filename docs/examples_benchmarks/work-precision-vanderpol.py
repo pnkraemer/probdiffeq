@@ -159,8 +159,9 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         )
         error = probdiffeq.error_residual_std(constraint=ts, prior=ibm, ssm=ssm)
 
+        control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, error=error, clip_dt=True
+            solver=solver, error=error, control=control, clip_dt=True
         )
         solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
         return jax.block_until_ready(solution.u.mean[0])

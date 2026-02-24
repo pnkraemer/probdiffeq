@@ -577,20 +577,22 @@ class TaylorCoeffTarget(Generic[C, T]):
     for probabilistic differential equation solvers.
     """
 
-    mean: C
-    """A PyTree describing the mean of the Taylor coefficient."""
-
-    std: C
-    """A PyTree describing the standard deviation of the Taylor coefficient."""
-
     marginals: T
     """The full marginal distribution of the Taylor coefficient."""
 
     @classmethod
     def from_marginals(cls, marginals):
-        mean = marginals.eval_mean()
-        std = marginals.eval_standard_deviation()
-        return cls(mean, std, marginals)
+        return cls(marginals)
+
+    @property
+    def mean(self) -> C:
+        """A PyTree describing the standard deviation of the Taylor coefficient."""
+        return self.marginals.eval_mean()
+
+    @property
+    def std(self) -> C:
+        """A PyTree describing the mean of the Taylor coefficient."""
+        return self.marginals.eval_standard_deviation()
 
 
 @tree.register_dataclass

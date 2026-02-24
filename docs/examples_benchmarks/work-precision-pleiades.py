@@ -38,7 +38,7 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 jax.config.update("jax_debug_nans", True)
 
 
-def main(start=3.0, stop=11.0, step=1.0, repeats=2):
+def main(start=3.0, stop=11.0, step=0.5, repeats=2):
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
@@ -83,10 +83,11 @@ def main(start=3.0, stop=11.0, step=1.0, repeats=2):
 
     # Compute all work-precision diagrams
     results = {}
-    for label, algo in tqdm.tqdm(algorithms.items()):
+    pbar = tqdm.tqdm(algorithms.items())
+    for label, algo in pbar:
+        pbar.set_description(label)
         param_to_wp = workprec(algo, precision_fun=precision_fun, timeit_fun=timeit_fun)
         results[label] = param_to_wp(tolerances)
-
     _fig, ax = plt.subplots(figsize=(7, 3))
     for label, wp in results.items():
         ax.loglog(wp["precision"], wp["work_mean"], label=label)
@@ -190,7 +191,7 @@ def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
     def param_to_solution(tol):
         # Build a solver
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
+        tcoeffs = taylor.odejet_unroll(vf_auto, (u0, du0), num=num_derivatives - 1)
 
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(
             tcoeffs, ssm_fact="isotropic"
@@ -204,7 +205,7 @@ def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, error=error, control=control
+            solver=solver, error=error, control=control, clip_dt=True
         )
 
         # Solve
