@@ -178,19 +178,14 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
 
     @jax.jit
     def param_to_solution(tol):
-        # Do inside the function so we jit the Taylor code
-        zeros, ones = jnp.zeros_like(u0), jnp.ones_like(u0)
-        tcoeffs = [u0, *[zeros for _ in range(num_derivatives)]]
-        tcoeffs_std = [zeros, *[ones for _ in range(num_derivatives)]]
-
         # Build a solver
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            tcoeffs, tcoeffs_std=tcoeffs_std
+            [u0], diffuse_derivatives=num_derivatives
         )
         strategy = probdiffeq.strategy_filter(ssm=ssm)
-        ts = probdiffeq.constraint_root_jet_ts1(root, ssm=ssm)
+        ts = probdiffeq.constraint_root_jet(root, ssm=ssm)
         solver = probdiffeq.solver_iterated(
-            strategy=strategy, prior=ibm, constraint=ts, ssm=ssm, update_at_init=True
+            strategy=strategy, prior=ibm, constraint=ts, ssm=ssm, constraint_init=ts
         )
         error_norm = probdiffeq.error_norm_rms_then_scale()
         error = probdiffeq.error_residual_std(
@@ -200,7 +195,7 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
         solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
 
         # Solve
-        solution = solve(init, t0=t0, t1=t1, atol=1e-2 * tol, rtol=tol)
+        solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
 
         # Return the terminal value
         return solution.u.mean[0], solution.num_steps

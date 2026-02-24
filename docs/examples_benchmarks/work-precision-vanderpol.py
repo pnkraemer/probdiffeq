@@ -60,14 +60,9 @@ def main(start=4.0, stop=10.0, step=0.25, repeats=2):
 
     # Assemble algorithms
     algorithms = {
-        "New: JetMM(4)": solver_probdiffeq_jet_mm(num_derivatives=4),
-        "New: Jet(4)": solver_probdiffeq_jet(num_derivatives=4),
-        "Old: TS1(4)": solver_probdiffeq(num_derivatives=4),
-        "New: JetMM(8)": solver_probdiffeq_jet_mm(num_derivatives=8),
-        "New: Jet(8)": solver_probdiffeq_jet(num_derivatives=8),
-        "Old: TS1(8)": solver_probdiffeq(num_derivatives=8),
-        # "Context SciPy('Radau')": solver_scipy(method="Radau"),
-        "Context: SciPy('LSODA')": solver_scipy(method="LSODA"),
+        "TS1(4)": solver_probdiffeq(num_derivatives=4),
+        "TS1(8)": solver_probdiffeq(num_derivatives=8),
+        "SciPy('LSODA')": solver_scipy(method="LSODA"),
     }
 
     # Compute a reference solution
@@ -164,102 +159,8 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         )
         error = probdiffeq.error_residual_std(constraint=ts, prior=ibm, ssm=ssm)
 
-        control = ivpsolve.control_proportional_integral()
-
         solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, error=error, control=control, clip_dt=True
-        )
-        solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
-        return jax.block_until_ready(solution.u.mean[0])
-
-    return param_to_solution
-
-
-def solver_probdiffeq_jet(*, num_derivatives: int) -> Callable:
-    """Construct a solver that wraps ProbDiffEq's solution routines."""
-
-    @jax.jit
-    def vf_probdiffeq(u, du, *, t):  # noqa: ARG001
-        """Van-der-Pol dynamics as a second-order differential equation."""
-        return 1e5 * ((1.0 - u**2) * du - u)
-
-    def root(u, du, ddu, /, *, t):
-        """Evaluate a root to solve the 2nd-order problem directly."""
-        return ddu - vf_probdiffeq(u, du, t=t)
-
-    t0, t1 = 0.0, 3.0
-    u0, du0 = (jnp.atleast_1d(2.0), jnp.atleast_1d(0.0))
-    t0, t1 = (0.0, 6.3)
-
-    @jax.jit
-    def param_to_solution(tol):
-        # Build a solver
-        vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
-
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
-        ts = probdiffeq.constraint_root_jet_ts1(root, ssm=ssm)
-        strategy = probdiffeq.strategy_filter(ssm=ssm)
-
-        solver = probdiffeq.solver_dynamic(
-            strategy=strategy, prior=ibm, constraint=ts, ssm=ssm
-        )
-        error_norm = probdiffeq.error_norm_rms_then_scale()
-        error = probdiffeq.error_residual_std(
-            constraint=ts, prior=ibm, ssm=ssm, error_norm=error_norm
-        )
-
-        control = ivpsolve.control_proportional_integral()
-
-        solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, error=error, control=control, clip_dt=True
-        )
-        solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
-        return jax.block_until_ready(solution.u.mean[0])
-
-    return param_to_solution
-
-
-def solver_probdiffeq_jet_mm(*, num_derivatives: int) -> Callable:
-    """Construct a solver that wraps ProbDiffEq's solution routines."""
-
-    def root(u, du, ddu, /, *, t):
-        """Evaluate a root to solve the 2nd-order problem directly."""
-        # Mass matrix formulation
-        del t
-        return 1e-5 * ddu - ((1.0 - u**2) * du - u)
-
-    t0, t1 = 0.0, 3.0
-    u0, du0 = (jnp.atleast_1d(2.0), jnp.atleast_1d(0.0))
-    t0, t1 = (0.0, 6.3)
-
-    @jax.jit
-    def param_to_solution(tol):
-        # Build a solver
-        zeros, ones = jnp.zeros_like(u0), jnp.ones_like(u0)
-        tcoeffs = [u0, du0, *[zeros for _ in range(num_derivatives - 1)]]
-        tcoeffs_std = [zeros, zeros, *[ones for _ in range(num_derivatives - 1)]]
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            tcoeffs, tcoeffs_std=tcoeffs_std, ssm_fact="dense"
-        )
-        ts = probdiffeq.constraint_root_jet_ts1(root, ssm=ssm)
-        strategy = probdiffeq.strategy_filter(ssm=ssm)
-
-        # TODO: what about mass-matrix problems? Does the current code
-        #   assume that the highest derivative appears linearly?
-        #   Or is this an error estimator issue?
-        solver = probdiffeq.solver_dynamic(
-            strategy=strategy, prior=ibm, constraint=ts, ssm=ssm, update_at_init=True
-        )
-        error_norm = probdiffeq.error_norm_rms_then_scale()
-        error = probdiffeq.error_state_std(
-            constraint=ts, prior=ibm, ssm=ssm, error_norm=error_norm
-        )
-
-        control = ivpsolve.control_proportional_integral()
-
-        solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, error=error, control=control, clip_dt=True
+            solver=solver, error=error, clip_dt=True
         )
         solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
         return jax.block_until_ready(solution.u.mean[0])

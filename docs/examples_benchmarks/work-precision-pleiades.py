@@ -38,7 +38,7 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 jax.config.update("jax_debug_nans", True)
 
 
-def main(start=3.0, stop=11.0, step=1.0, repeats=2, use_diffrax: bool = False):
+def main(start=3.0, stop=11.0, step=1.0, repeats=2):
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
@@ -76,14 +76,6 @@ def main(start=3.0, stop=11.0, step=1.0, repeats=2, use_diffrax: bool = False):
         "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
         "Diffrax: Dopri8()": solver_diffrax(solver=diffrax.Dopri8()),
     }
-
-    if use_diffrax:
-        # TODO: this is a temporary fix because Diffrax doesn't work with JAX >= 0.7.0
-        # Revisit in the near future.
-        algorithms["Diffrax: Kvaerno3()"] = solver_diffrax(solver=diffrax.Kvaerno3())
-        algorithms["Diffrax: Kvaerno5()"] = solver_diffrax(solver=diffrax.Kvaerno5())
-    else:
-        print("\nSkipped Diffrax.\n")
 
     # Compute a reference solution
     reference = solver_scipy(method="LSODA", use_numba=False)(1e-14)

@@ -191,7 +191,7 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            tcoeffs, output_scale=lambda s: base_scale * s
+            tcoeffs, output_scale=base_scale
         )
         ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
@@ -199,10 +199,8 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
         solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts, ssm=ssm)
         error = probdiffeq.error_state_std(constraint=ts, prior=ibm, ssm=ssm)
 
-        control = ivpsolve.control_integral()
-
         solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, error=error, control=control, clip_dt=True
+            solver=solver, error=error, clip_dt=True
         )
         solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
 
@@ -241,13 +239,11 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
         #   and idea which ones arent to stabilise the solver initialisation
         y0 = [jnp.array([1.0, 0.0, 0.0])]
         is_differential = [jnp.array([True, True, False])]
-        is_differential = [jnp.array(True)]
         init, ibm, ssm = probdiffeq.prior_wiener_integrated(
             y0,
-            output_scale=lambda s: base_scale * s,
+            output_scale=base_scale,
             diffuse_derivatives=num_derivatives,
             is_differential=is_differential,
-            ssm_fact="isotropic",
         )
 
         # We build a Jet constraint
@@ -257,12 +253,7 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
 
         # For proper DAEs, non-iterated solver's simply don't cut it
         solver = probdiffeq.solver_iterated(
-            strategy=strategy,
-            prior=ibm,
-            constraint=jet,
-            ssm=ssm,
-            constraint_init=jet,
-            tol=1e-15,
+            strategy=strategy, prior=ibm, constraint=jet, ssm=ssm, constraint_init=jet
         )
 
         # The state-error-estimate doesn't care about the dimension
@@ -271,9 +262,8 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
 
         # Integral controllers just work better than proportional-integral ones
         # TODO: build PID controllers (is this "gustafsson"?) for iterated solvers?
-        control = ivpsolve.control_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, error=error, control=control, clip_dt=True
+            solver=solver, error=error, clip_dt=True
         )
         t0, t1 = time_span
         solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
