@@ -1,9 +1,9 @@
 """Tests for logpdfs.
 
-Necessary because the implementation has been faulty in the past. Never again.
+Necessary because the implementation has been faulty in the past.
 """
 
-from probdiffeq import impl
+from probdiffeq import statespace
 from probdiffeq.backend import func, np, random, stats, testing, tree
 
 
@@ -37,21 +37,21 @@ def create_random_variable(fact):
     tcoeffs = [np.ones((3,))] * 5  # values irrelevant
 
     if fact == "dense":
-        ssm = impl.FactImpl.from_tcoeffs_dense(tcoeffs_like=tcoeffs)
+        ssm = statespace.FactSsmImpl.from_tcoeffs_dense(tcoeffs)
         output_scale = np.ones((3,))
         discretize = ssm.conditional.transition_wiener_integrated(output_scale)
 
         output_scale = np.ones(())
         rv = discretize(0.1, output_scale)
     elif fact == "blockdiag":
-        ssm = impl.FactImpl.from_tcoeffs_blockdiag(tcoeffs_like=tcoeffs)
+        ssm = statespace.FactSsmImpl.from_tcoeffs_blockdiag(tcoeffs)
         output_scale = np.ones((3,))
         discretize = ssm.conditional.transition_wiener_integrated(output_scale)
 
         output_scale = np.ones((3,))
         rv = discretize(0.1, output_scale)
     elif fact == "isotropic":
-        ssm = impl.FactImpl.from_tcoeffs_isotropic(tcoeffs_like=tcoeffs)
+        ssm = statespace.FactSsmImpl.from_tcoeffs_isotropic(tcoeffs)
         output_scale = np.ones(())
         discretize = ssm.conditional.transition_wiener_integrated(output_scale)
 

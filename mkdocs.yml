@@ -110,7 +110,7 @@ nav:
       - probdiffeq: api_docs/probdiffeq.md
       - ivpsolve: api_docs/ivpsolve.md
       - taylor: api_docs/taylor.md
-      - impl: api_docs/impl.md
+      - statespace: api_docs/statespace.md
   - DOCUMENTATION | DEVELOPER:
       - dev_docs/creating_example_notebook.md
       - dev_docs/continuous_integration.md

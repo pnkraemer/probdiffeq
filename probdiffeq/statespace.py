@@ -1,11 +1,21 @@
-"""State-space model implementations."""
+"""Implementations of (factorized) state-space models."""
 
 from probdiffeq.backend import abc, func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
 
 T = TypeVar("T", bound=Array)
+"""A type-variable for Array types.
+
+For example, this variable is used for means and Cholesky factors
+in normal distributions.
+"""
+
 C = TypeVar("C", bound=Sequence)
+"""A type-variable for Sequence types.
+
+For example, this variable is used to type Taylor coefficients.
+"""
 
 
 class LatentCond:
@@ -24,6 +34,8 @@ class LatentCond:
 
     @staticmethod
     def register_pytree_node():
+        """Register the conditional as a pytree."""
+
         def flatten(normal):
             children = normal.A, normal.noise, normal.to_latent, normal.to_observed
             return children, ()
@@ -36,6 +48,7 @@ class LatentCond:
 
     @classmethod
     def from_linop_and_noise(cls, A, noise):
+        """Construct a latent conditional with unit en- and decoders."""
         # Hack for blockdiagonal models (and possibly dense evaluations)
         if A.ndim > 2:
             return func.vmap(cls.from_linop_and_noise)(A, noise)
@@ -46,6 +59,7 @@ class LatentCond:
         return cls(A, noise=noise, to_latent=to_latent, to_observed=to_observed)
 
     def rescale_noise(self, factor, /):
+        """Rescale the noise in a conditional."""
         noise = self.noise.rescale_cholesky(factor)
         return LatentCond(
             A=self.A,
@@ -59,143 +73,183 @@ LatentCond.register_pytree_node()
 
 
 class AbstractPrototype(abc.ABC):
+    """Interface for state-space model prototyped variables."""
+
     @abc.abstractmethod
     def std(self):
+        """Prototype the standard deviation."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def output_scale_calibrated(self):
+        """Prototype the calibrated output scale.
+
+        Note how this may differ from the base-output scale.
+        For example, base output scales for dense factorisations
+        are vector-valued even though the calibrations are scalar.
+        See the Robertson DAE examples for why this is helpful.
+        """
         raise NotImplementedError
 
 
 class AbstractLinearization:
-    """Linearization API."""
+    """Interface for linearizations."""
 
     def init_linearization(self):
+        """Initialize a linearization."""
         raise NotImplementedError
 
     def linearize(self, rv, state: None, *, damp: float, t):
+        """Evaluate a linearization."""
         raise NotImplementedError
 
 
 class AbstractLinearizationRoot(AbstractLinearization):
+    """Interface for linearizations of general roots."""
+
     def __init__(self, root, /, *, root_order):
         self.root = root
         self.root_order = root_order
 
 
 class AbstractLinearizationOde(AbstractLinearization):
+    """Interface for linearizations of ODEs."""
+
     def __init__(self, vf, /, *, ode_order):
         self.vector_field = vf
         self.ode_order = ode_order
 
     @property
     def root_order(self):
+        """The order of the root constraint."""
         return self.ode_order + 1
 
 
 class AbstractLinearizationFactory(abc.ABC):
+    """Interface for linearization factories."""
+
     @abc.abstractmethod
     def root_taylor_1st(
         self, root, *, jacobian, root_order: int
     ) -> AbstractLinearizationRoot:
+        """Construct an implementation of 1st-order Taylor-linearization for roots."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def ode_taylor_0th(self, ode_order: int) -> AbstractLinearizationOde:
+        """Construct an implementation of 0th-order Taylor-linearization for ODEs."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def ode_taylor_1st(self, vf, *, ode_order: int) -> AbstractLinearizationOde:
+        """Construct an implementation of 1st-order Taylor-linearization for ODEs."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def ode_statistical_1st(
         self, vf, *, cubature_fun: Callable
     ) -> AbstractLinearizationOde:
+        """Construct an implementation of 1st-order SLR for ODEs."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def ode_statistical_0th(
         self, vf, *, cubature_fun: Callable
     ) -> AbstractLinearizationOde:
+        """Construct an implementation of 0th-order SLR for ODEs."""
         raise NotImplementedError
 
 
-class AbstractNormal:
+class AbstractTreeNormal:
+    """Interface for pytree-valued normal distributions."""
+
     def __init__(self, mean):
         self.mean = mean
 
     def evaluate_mean(self):
+        """Evaluate the mean."""
         raise NotImplementedError
 
     def evaluate_std(self):
+        """Evaluate the standard deviation."""
         raise NotImplementedError
 
     def rescale_cholesky(self, factor, /):
+        """Rescale the Cholesky factor of a normal distribution."""
         raise NotImplementedError
 
     def sample(self, key):
+        """Sample from a normal distribution."""
         raise NotImplementedError
 
     @classmethod
     def from_mean_and_std(cls, mean, std):
+        """Construct a normal distribution from mean and standard deviation."""
         raise NotImplementedError
 
     @classmethod
     def from_dirac(cls, mean, *, damp):
+        """Construct a normal distribution from a Dirac distribution."""
         raise NotImplementedError
 
 
 class AbstractConditional(abc.ABC):
+    """Interface for implementations of manipulating conditionals."""
+
     @abc.abstractmethod
     def marginalise(self, rv, conditional, /):
+        """Compute a marginal of a random variable and conditional."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def revert(self, rv, conditional, /):
+        """Revert a parametrisation of a joint distribution."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def apply(self, x, conditional, /):
+        """Apply a conditional to a target."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def merge(self, cond1, cond2, /):
+        """Merge two conditionals."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def identity(self, ndim, /):
+        """Construct an identity conditional (unit linop, zero noise)."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def transition_wiener_integrated(self, num_derivatives, output_scale=None):
+        """Construct the transitions for an integrated Wiener process."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def preconditioner_apply(self, cond, /):
+    def preconditioner_apply(self, cond: LatentCond, /) -> LatentCond:
+        """Apply a preconditioner to a conditional."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def to_derivative(self, i, std):
+    def to_derivative(self, i, std) -> LatentCond:
+        """Construct an observation model for the i'th derivative."""
         raise NotImplementedError
 
 
 @structs.dataclass
-class FactImpl:
+class FactSsmImpl:
     """Implementation of factorized state-space models."""
 
-    name: str
     prototypes: AbstractPrototype
-    normal: type[AbstractNormal]
+    normal: type[AbstractTreeNormal]
     linearize: AbstractLinearizationFactory
     conditional: AbstractConditional
-
     num_derivatives: int
-    unravel: Callable
 
     @classmethod
-    def from_tcoeffs_dense(cls, tcoeffs_like):
+    def from_tcoeffs_dense(cls, tcoeffs_like, /):
+        """Construct a factorised state-space model implementation."""
         ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
         flat, unravel = tree.ravel_pytree(tcoeffs_like)
 
@@ -211,17 +265,16 @@ class FactImpl:
             flat_shape=flat.shape,
         )
         return cls(
-            name="dense",
             linearize=linearize,
             conditional=conditional,
             normal=normal,
             prototypes=prototypes,
             num_derivatives=len(tcoeffs_like) - 1,
-            unravel=unravel,
         )
 
     @classmethod
-    def from_tcoeffs_isotropic(cls, tcoeffs_like):
+    def from_tcoeffs_isotropic(cls, tcoeffs_like, /):
+        """Construct a factorised state-space model implementation."""
         ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
         num_derivatives = len(tcoeffs_like) - 1
 
@@ -245,17 +298,16 @@ class FactImpl:
             tree_structure=tree_structure,
         )
         return cls(
-            name="isotropic",
             prototypes=prototypes,
             normal=normal,
             linearize=linearize,
             conditional=conditional,
             num_derivatives=len(tcoeffs_like) - 1,
-            unravel=unravel,
         )
 
     @classmethod
-    def from_tcoeffs_blockdiag(cls, tcoeffs_like):
+    def from_tcoeffs_blockdiag(cls, tcoeffs_like, /):
+        """Construct a factorised state-space model implementation."""
         ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
         num_derivatives = len(tcoeffs_like) - 1
 
@@ -270,7 +322,7 @@ class FactImpl:
             return tree.tree_map(unravel_leaf, pytree)
 
         prototypes = _BlockDiagPrototype(ode_shape=ode_shape)
-        normal = _BlockDiagNormal  # (ode_shape=ode_shape)
+        normal = _BlockDiagNormal
         linearize = _BlockDiagLinearizationFactory(unravel=unravel)
         conditional = _BlockDiagConditional(
             ode_shape=ode_shape,
@@ -280,13 +332,11 @@ class FactImpl:
             unravel_leaf=unravel_leaf,
         )
         return cls(
-            name="blockdiag",
             prototypes=prototypes,
             normal=normal,
             linearize=linearize,
             conditional=conditional,
             num_derivatives=len(tcoeffs_like) - 1,
-            unravel=unravel,
         )
 
 
@@ -301,7 +351,7 @@ class _DensePrototype(AbstractPrototype):
         return np.ones(())
 
 
-class _DenseNormal(AbstractNormal):
+class _DenseNormal(AbstractTreeNormal):
     def __init__(self, mean: T, cholesky: T, unravel: Callable[[T], C]):
         super().__init__(mean=mean)
         self.cholesky = cholesky
@@ -529,7 +579,7 @@ class _DenseConditional(AbstractConditional):
 
     def transition_wiener_integrated(self, base_scale):
 
-        a, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
+        a, q_sqrtm = system_matrices_1d_iwp(self.num_derivatives)
         (d,) = self.ode_shape
 
         eye_d = np.eye(d)
@@ -551,7 +601,6 @@ class _DenseConditional(AbstractConditional):
             p = np.repeat(p, d)
             p_inv = np.repeat(p_inv, d)
 
-            # unravel = tree.Partial(self.unravel)
             noise = _DenseNormal(q0, output_scale * Q, unravel=self.unravel)
             return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
@@ -710,7 +759,7 @@ class _DenseOdeSlr0(AbstractLinearizationOde):
         extract_ = func.vmap(lambda s: select_0(s)[0], in_axes=1, out_axes=1)
         r_0_nonsquare = extract_(rv.cholesky)
 
-        # # Extract the linearisation point
+        # Extract the linearisation point
         r_0_square = cholesky_util.triu_via_qr(r_0_nonsquare.T)
         linearisation_pt = _DenseNormal(m0, r_0_square.T, unravel=unravel)
 
@@ -788,7 +837,7 @@ class _DenseOdeSlr1(AbstractLinearizationOde):
         extract_ = func.vmap(lambda s: select_0(s)[0], in_axes=1, out_axes=1)
         r_0_nonsquare = extract_(rv.cholesky)
 
-        # # Extract the linearisation point
+        # Extract the linearisation point
         r_0_square = cholesky_util.triu_via_qr(r_0_nonsquare.T)
         linearisation_pt = _DenseNormal(m0, r_0_square.T, unravel=unravel)
 
@@ -1107,7 +1156,7 @@ class _IsotropicConditional(AbstractConditional):
 
     def transition_wiener_integrated(self, base_scale):
 
-        A, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
+        A, q_sqrtm = system_matrices_1d_iwp(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1, *self.ode_shape))
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
 
@@ -1273,7 +1322,7 @@ class _BlockDiagConditional(AbstractConditional):
 
     def transition_wiener_integrated(self, base_scale):
 
-        a, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
+        a, q_sqrtm = system_matrices_1d_iwp(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1,))
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
 
@@ -1327,8 +1376,8 @@ def _transpose(matrix):
     return np.transpose(matrix, axes=(0, 2, 1))
 
 
-def wiener_integrated_system_matrices_1d(num_derivatives):
-    """Construct the IBM system matrices."""
+def system_matrices_1d_iwp(num_derivatives):
+    """Construct the system matrices of the integrated Wiener process."""
     x = np.arange(0, num_derivatives + 1)
 
     A_1d = np.flip(_pascal(x)[0])  # no idea why the [0] is necessary...
@@ -1341,7 +1390,7 @@ def wiener_integrated_system_matrices_1d(num_derivatives):
 
 
 def preconditioner_taylor(*, num_derivatives):
-    """Construct the diagonal preconditioner for Taylor-coefficient state spaces."""
+    """Construct the diagonal preconditioner for Taylor-coefficient state-spaces."""
     powers = np.arange(num_derivatives, -1.0, step=-1.0)
     scales = np.factorial(powers)
     powers = powers + 0.5
@@ -1368,7 +1417,7 @@ def _binom(n, k):
     return np.factorial(n) / (np.factorial(n - k) * np.factorial(k))
 
 
-class _IsotropicNormal(AbstractNormal):
+class _IsotropicNormal(AbstractTreeNormal):
     def __init__(self, mean: T, cholesky: T, treedef):
         super().__init__(mean=mean)
         self.cholesky = cholesky
@@ -1440,11 +1489,6 @@ class _IsotropicNormal(AbstractNormal):
         u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
         u_latent = np.stack(u_flat)
 
-        # # if the gain is qoi-to-hidden, the data is a (d,) array.
-        # # this is problematic for the isotropic model unless we explicitly broadcast.
-        # if np.ndim(u) == 1:
-        #     u = u[None, :]
-
         # Batch in the "mean" dimension and sum the results.
         rv_batch = _IsotropicNormal(1, None, treedef=self.treedef)
         logpdf_vmap = func.vmap(_IsotropicNormal.logpdf_scalar, in_axes=(rv_batch, 1))
@@ -1503,7 +1547,7 @@ class _IsotropicNormal(AbstractNormal):
         tree.register_pytree_node(_IsotropicNormal, flatten, unflatten)
 
 
-class _BlockDiagNormal(AbstractNormal):
+class _BlockDiagNormal(AbstractTreeNormal):
     def __init__(self, mean, cholesky, treedef, unravel_leaf):
         super().__init__(mean=mean)
         self.cholesky = cholesky

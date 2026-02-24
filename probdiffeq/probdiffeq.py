@@ -3,7 +3,7 @@
 See the tutorials for example use cases.
 """
 
-from probdiffeq import impl, taylor
+from probdiffeq import statespace, taylor
 from probdiffeq.backend import (
     flow,
     func,
@@ -28,7 +28,7 @@ from probdiffeq.backend.typing import (
 )
 
 C = TypeVar("C", bound=Sequence)
-N = TypeVar("N", bound=impl.AbstractNormal)
+N = TypeVar("N", bound=statespace.AbstractTreeNormal)
 
 
 @tree.register_dataclass
@@ -729,7 +729,7 @@ class MarkovSequence(Generic[N]):
         return tree.tree_array_prepend(smp, smps)
 
 
-T = TypeVar("T", bound=MarkovSequence | impl.AbstractNormal)
+T = TypeVar("T", bound=MarkovSequence | statespace.AbstractTreeNormal)
 
 
 class MarkovStrategy(Generic[T]):
@@ -1165,11 +1165,11 @@ def prior_wiener_integrated_diffuse(
     # Choose a state-space model factorisation
     match ssm_fact:
         case "dense":
-            ssm = impl.FactImpl.from_tcoeffs_dense(tcoeffs_mean)
+            ssm = statespace.FactSsmImpl.from_tcoeffs_dense(tcoeffs_mean)
         case "blockdiag":
-            ssm = impl.FactImpl.from_tcoeffs_blockdiag(tcoeffs_mean)
+            ssm = statespace.FactSsmImpl.from_tcoeffs_blockdiag(tcoeffs_mean)
         case "isotropic":
-            ssm = impl.FactImpl.from_tcoeffs_isotropic(tcoeffs_mean)
+            ssm = statespace.FactSsmImpl.from_tcoeffs_isotropic(tcoeffs_mean)
         case _:
             msg = f"Factorisation ssm_fact='{ssm_fact}' unknown. "
             msg += "Choose one out of {'dense', 'isotropic', 'blockdiag'}."
