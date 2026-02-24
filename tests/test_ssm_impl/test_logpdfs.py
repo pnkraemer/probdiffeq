@@ -3,7 +3,7 @@
 Necessary because the implementation has been faulty in the past.
 """
 
-from probdiffeq import statespace
+from probdiffeq import ssm_impl
 from probdiffeq.backend import func, np, random, stats, testing, tree
 
 
@@ -37,21 +37,21 @@ def create_random_variable(fact):
     tcoeffs = [np.ones((3,))] * 5  # values irrelevant
 
     if fact == "dense":
-        ssm = statespace.FactSsmImpl.from_tcoeffs_dense(tcoeffs)
+        ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(tcoeffs)
         output_scale = np.ones((3,))
         discretize = ssm.conditional.transition_wiener_integrated(output_scale)
 
         output_scale = np.ones(())
         rv = discretize(0.1, output_scale)
     elif fact == "blockdiag":
-        ssm = statespace.FactSsmImpl.from_tcoeffs_blockdiag(tcoeffs)
+        ssm = ssm_impl.FactSsmImpl.from_tcoeffs_blockdiag(tcoeffs)
         output_scale = np.ones((3,))
         discretize = ssm.conditional.transition_wiener_integrated(output_scale)
 
         output_scale = np.ones((3,))
         rv = discretize(0.1, output_scale)
     elif fact == "isotropic":
-        ssm = statespace.FactSsmImpl.from_tcoeffs_isotropic(tcoeffs)
+        ssm = ssm_impl.FactSsmImpl.from_tcoeffs_isotropic(tcoeffs)
         output_scale = np.ones(())
         discretize = ssm.conditional.transition_wiener_integrated(output_scale)
 

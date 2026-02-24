@@ -460,7 +460,7 @@ def constraint_root_jet(root, /, *, ssm: ssm_impl.FactSsmImpl, jacobian=None):
     def root_jet(*tcoeffs_all, t):
         # TODO: if we apply the preconditioner before passing
         #   things in here, we can set is_tcoeff to True and possibly
-        #   gain a bunch of numerical robustness
+        #   gain a bunch of numerical robustness? (And speed?)
         ps, ss = taylor.jet_unpack_series(tcoeffs_all, root_order)
         primals, series = func.jet(lambda *y: root(*y, t=t), ps, ss, is_tcoeff=False)
         return [primals, *series]
@@ -1725,10 +1725,8 @@ class solver_mle(ProbabilisticSolver):
         prior: Callable,
         ssm: Any,
         strategy: MarkovStrategy,
-        update_at_init: bool = False,
     ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
-        self.update_at_init = update_at_init
 
     def init(self, t, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
@@ -1738,18 +1736,6 @@ class solver_mle(ProbabilisticSolver):
 
         # Update
         fx, cstate = self.constraint.linearize(u.marginals, cstate, damp=damp, t=t)
-        if self.update_at_init:
-            raise RuntimeError
-            observed, reverted = self.ssm.conditional.revert(u.marginals, fx)
-            updates = reverted.noise
-            u, posterior = self.strategy.apply_updates(
-                prediction=prediction, updates=updates
-            )
-            # Calibrate the output scale
-            output_scale_running = self.ssm.stats.mahalanobis_norm_relative(
-                0.0, observed
-            )
-            auxiliary = (cstate, output_scale_running, 1)
         fx = tree.tree_map(np.zeros_like, fx)
         posterior = prediction
         output_scale_running = np.zeros_like(output_scale_prior)
@@ -1850,11 +1836,9 @@ class solver_dynamic(ProbabilisticSolver):
         constraint: Constraint,
         ssm: Any,
         re_linearize_after_calibration=False,
-        update_at_init: bool = False,
     ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
         self.re_linearize_after_calibration = re_linearize_after_calibration
-        self.update_at_init = update_at_init
 
     def init(self, t, u, *, damp) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
@@ -1867,11 +1851,6 @@ class solver_dynamic(ProbabilisticSolver):
         )
         # TODO: avoid the linearization altogether if update is false.
         #  use jax.eval_shape instead.
-        if self.update_at_init:
-            raise RuntimeError
-            _, reverted = self.ssm.conditional.revert(u.marginals, fx)
-            updates = reverted.noise
-            u, posterior = self.strategy.apply_updates(prediction, updates=updates)
         fx = tree.tree_map(np.zeros_like, fx)
         posterior = prediction
         return ProbabilisticSolution(

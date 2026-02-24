@@ -242,10 +242,19 @@ class FactSsmImpl:
     """Implementation of factorized state-space models."""
 
     prototypes: AbstractPrototype
+    """An implementation of variable prototypes."""
+
     normal: type[AbstractTreeNormal]
+    """An implementation of normal distributions."""
+
     linearize: AbstractLinearizationFactory
+    """An implementation of linearization constructors."""
+
     conditional: AbstractConditional
+    """An implementation of manipulating conditionals."""
+
     num_derivatives: int
+    """The number of derivatives in the state-space model."""
 
     @classmethod
     def from_tcoeffs_dense(cls, tcoeffs_like, /):
@@ -450,12 +459,12 @@ class DenseLinearizationFactory(AbstractLinearizationFactory):
         self.unravel = unravel
 
     def root_taylor_1st(self, root, *, jacobian, root_order: int):
-        return DenseRootTs1(
+        return DenseLinearizationRootTs1(
             root, unravel=self.unravel, jacobian=jacobian, root_order=root_order
         )
 
     def ode_taylor_0th(self, vf, *, ode_order):
-        return DenseOdeTs0(
+        return DenseLinearizationOdeTs0(
             vf, ode_order=ode_order, ode_shape=self.ode_shape, unravel=self.unravel
         )
 
@@ -463,7 +472,7 @@ class DenseLinearizationFactory(AbstractLinearizationFactory):
         if ode_order > 1:
             raise ValueError
 
-        return DenseOdeTs1(
+        return DenseLinearizationOdeTs1(
             vf,
             ode_order=ode_order,
             ode_shape=self.ode_shape,
@@ -473,7 +482,7 @@ class DenseLinearizationFactory(AbstractLinearizationFactory):
 
     def ode_statistical_1st(self, vf, *, cubature_fun):
         cubature_rule = cubature_fun(input_shape=self.ode_shape)
-        return DenseOdeSlr1(
+        return DenseLinearizationOdeSlr1(
             vf,
             cubature_rule=cubature_rule,
             ode_shape=self.ode_shape,
@@ -482,7 +491,7 @@ class DenseLinearizationFactory(AbstractLinearizationFactory):
 
     def ode_statistical_0th(self, vf, *, cubature_fun):
         cubature_rule = cubature_fun(input_shape=self.ode_shape)
-        return DenseOdeSlr0(
+        return DenseLinearizationOdeSlr0(
             vf,
             cubature_rule=cubature_rule,
             ode_shape=self.ode_shape,
@@ -625,7 +634,7 @@ class DenseConditional(AbstractConditional):
         return LatentCond.from_linop_and_noise(linop, noise)
 
 
-class DenseOdeTs0(AbstractLinearizationOde):
+class DenseLinearizationOdeTs0(AbstractLinearizationOde):
     def __init__(
         self, vf, *, ode_order: int, ode_shape: tuple, unravel: Callable
     ) -> None:
@@ -651,7 +660,7 @@ class DenseOdeTs0(AbstractLinearizationOde):
         return cond, None
 
 
-class DenseOdeTs1(AbstractLinearizationOde):
+class DenseLinearizationOdeTs1(AbstractLinearizationOde):
     def __init__(
         self,
         vf: Callable,
@@ -696,7 +705,7 @@ class DenseOdeTs1(AbstractLinearizationOde):
         return cond, state
 
 
-class DenseRootTs1(AbstractLinearizationRoot):
+class DenseLinearizationRootTs1(AbstractLinearizationRoot):
     def __init__(self, root, *, root_order, unravel, jacobian) -> None:
         super().__init__(root, root_order=root_order)
         self.unravel = unravel
@@ -736,7 +745,7 @@ class DenseRootTs1(AbstractLinearizationRoot):
         return cond, state
 
 
-class DenseOdeSlr0(AbstractLinearizationOde):
+class DenseLinearizationOdeSlr0(AbstractLinearizationOde):
     def __init__(self, vf, *, cubature_rule, ode_shape, unravel) -> None:
         # No higher order ODEs supported for any SLR,
         # not even in dense models
@@ -812,7 +821,7 @@ class DenseOdeSlr0(AbstractLinearizationOde):
         return DenseNormal(fx_mean, cov_sqrtm.T, unravel=x.unravel)
 
 
-class DenseOdeSlr1(AbstractLinearizationOde):
+class DenseLinearizationOdeSlr1(AbstractLinearizationOde):
     def __init__(self, vf, *, cubature_rule, ode_shape, unravel) -> None:
         super().__init__(vf, ode_order=1)
 
@@ -887,7 +896,7 @@ class DenseOdeSlr1(AbstractLinearizationOde):
         return linop_cond, rv_cond
 
 
-class IsotropicOdeTs0(AbstractLinearizationOde):
+class IsotropicLinearizationOdeTs0(AbstractLinearizationOde):
     def __init__(self, vf, *, ode_order, unravel) -> None:
         super().__init__(vf, ode_order=ode_order)
         self.unravel = unravel
@@ -918,7 +927,7 @@ class IsotropicOdeTs0(AbstractLinearizationOde):
         return cond, None
 
 
-class IsotropicOdeTs1(AbstractLinearizationOde):
+class IsotropicLinearizationOdeTs1(AbstractLinearizationOde):
     def __init__(self, vf, *, ode_order: int, unravel: Callable, jacobian: Any) -> None:
         if ode_order > 1:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
@@ -958,7 +967,7 @@ class IsotropicOdeTs1(AbstractLinearizationOde):
         return cond, state
 
 
-class BlockDiagOdeTs0(AbstractLinearizationOde):
+class BlockDiagLinearizationOdeTs0(AbstractLinearizationOde):
     def __init__(self, vf, *, ode_order: int, unravel: Callable) -> None:
         super().__init__(vf, ode_order=ode_order)
         self.unravel = unravel
@@ -983,7 +992,7 @@ class BlockDiagOdeTs0(AbstractLinearizationOde):
         return cond, None
 
 
-class BlockDiagOdeTs1(AbstractLinearizationOde):
+class BlockDiagLinearizationOdeTs1(AbstractLinearizationOde):
     def __init__(self, vf, *, ode_order: int, unravel: Callable, jacobian: Any) -> None:
         if ode_order > 1:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
@@ -1035,12 +1044,14 @@ class IsotropicLinearizationFactory(AbstractLinearizationFactory):
         raise NotImplementedError
 
     def ode_taylor_1st(self, vf, *, ode_order, jacobian):
-        return IsotropicOdeTs1(
+        return IsotropicLinearizationOdeTs1(
             vf, jacobian=jacobian, ode_order=ode_order, unravel=self.unravel
         )
 
     def ode_taylor_0th(self, vf, *, ode_order):
-        return IsotropicOdeTs0(vf, ode_order=ode_order, unravel=self.unravel)
+        return IsotropicLinearizationOdeTs0(
+            vf, ode_order=ode_order, unravel=self.unravel
+        )
 
     def ode_statistical_0th(self, vf, *, cubature_fun):
         raise NotImplementedError
@@ -1057,10 +1068,12 @@ class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
         raise NotImplementedError
 
     def ode_taylor_0th(self, vf, *, ode_order):
-        return BlockDiagOdeTs0(vf, ode_order=ode_order, unravel=self.unravel)
+        return BlockDiagLinearizationOdeTs0(
+            vf, ode_order=ode_order, unravel=self.unravel
+        )
 
     def ode_taylor_1st(self, vf, *, ode_order, jacobian):
-        return BlockDiagOdeTs1(
+        return BlockDiagLinearizationOdeTs1(
             vf, ode_order=ode_order, unravel=self.unravel, jacobian=jacobian
         )
 
