@@ -335,7 +335,7 @@ def loss_lml_terminal_values(*, ssm, tcoeff_index=0):
     return loss
 
 
-def loss_lml_timeseries(*, ssm, tcoeff_index=0):
+def loss_lml_timeseries(*, ssm, average_pdfs: bool = True, tcoeff_index=0):
     """Construct a log-marginal-likelihood loss for a time-series."""
 
     def loss(u, /, *, posterior, std):
@@ -368,7 +368,7 @@ def loss_lml_timeseries(*, ssm, tcoeff_index=0):
             return ssm.conditional.to_derivative(tcoeff_index, s)
 
         model = func.vmap(make_model)(std)
-        return posterior.eval_lml(u, model=model, ssm=ssm)
+        return posterior.eval_lml(u, model=model, ssm=ssm, average_pdfs=average_pdfs)
 
     return loss
 
@@ -639,12 +639,14 @@ class MarkovSequence(Generic[T]):
 
         return tree.tree_array_prepend(self.marginal, marginals)
 
-    def eval_lml(self, u, *, model, ssm):
+    def eval_lml(self, u, *, model, ssm, average_pdfs: bool):
         assert self.reverse
 
         if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
             markov_seq = self._select_terminal()
-            return markov_seq.eval_lml(u, model=model, ssm=ssm)
+            return markov_seq.eval_lml(
+                u, model=model, ssm=ssm, average_pdfs=average_pdfs
+            )
 
         # Process the terminal value
         u0 = tree.tree_map(lambda s: s[-1], u)
@@ -660,9 +662,17 @@ class MarkovSequence(Generic[T]):
 
             predicted = ssm.conditional.marginalise(rv, prior)
             observed, noise = ssm.conditional.revert(predicted, observation)
-
-            logpdf1 = (logpdf * num_data + observed.logpdf(data)) / (num_data + 1)
+            logpdf_n = observed.logpdf(data)
             corrected = ssm.conditional.apply(data, noise)
+
+            # The mean of the PDFs usually leads to LML values that are more
+            # "human-readable" (ie O(1) instead O(N)). This is technically not
+            # a log-marginal-likelihood, but much nicer to work with.
+            if average_pdfs:
+                logpdf1 = (logpdf * num_data + logpdf_n) / (num_data + 1)
+            else:
+                logpdf = logpdf + logpdf_n
+
             return (corrected, logpdf1, num_data + 1), ()
 
         u1 = tree.tree_map(lambda s: s[:-1], u)
@@ -1186,15 +1196,17 @@ def prior_wiener_integrated_diffuse(
 
     if output_scale is None:
         output_scale = tree.tree_map(np.ones_like, tcoeffs_std[0])
+    else:
+        output_scale = tree.tree_map(np.asarray, output_scale)
 
-    def shape_equal(A, B):
-        return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
+        def shape_equal(A, B):
+            return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
 
-    if not tree.tree_all(shape_equal(output_scale, tcoeffs_std[0])):
-        msg = "Output scale has the wrong shape."
-        msg += f" Expected: output_scale.shape={tcoeffs_std[0].shape}."
-        msg += f" Received: output_scale.shape={output_scale.shape}."
-        raise ValueError(msg)
+        if not tree.tree_all(shape_equal(output_scale, tcoeffs_std[0])):
+            msg = "Output scale has the wrong shape."
+            msg += f" Expected: output_scale.shape={tcoeffs_std[0].shape}."
+            msg += f" Received: output_scale.shape={output_scale.shape}."
+            raise ValueError(msg)
 
     [output_scale_leaf] = tree.tree_leaves(output_scale)
     std_leaves, structure = tree.tree_flatten(tcoeffs_std)
