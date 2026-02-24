@@ -147,13 +147,10 @@ split-on-trailing-comma = false
 "probdiffeq/backend/typing*" = ["F401"]
 # Auxiliary functions and tests don't need docstring-enforcement:
 "probdiffeq/util/*" = ["D102", "D103"]
-"probdiffeq/impl/*" = ["D102"]
 "probdiffeq/backend/*" = ["D103"]
 "tests/*" = ["D103"]
 # Examples shouldn't fail with print statements:
 "docs/*" = ["T20"]
-# Examples shouldn't fail with print statements:
-"probdiffeq/util/doc_util*" = ["T20"]
 # Subclasses inherit docstrings, but D102 doesn't understand this.
 "probdiffeq/probdiffeq.py" = ["D102"]
 "probdiffeq/ivpsolve.py" = ["D102"]
@@ -168,3 +165,4 @@ line-ending = "lf"
 # Prefer single quotes over double quotes.
 quote-style = "double"
 skip-magic-trailing-comma = true
+docstring-code-format = true

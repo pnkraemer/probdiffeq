@@ -35,21 +35,23 @@ def test_grad_not_none(fact):
 
 def create_random_variable(fact):
     tcoeffs = [np.ones((3,))] * 5  # values irrelevant
-    ssm = impl.choose(fact, tcoeffs_like=tcoeffs)
 
     if fact == "dense":
+        ssm = impl.FactImpl.from_tcoeffs_dense(tcoeffs_like=tcoeffs)
         output_scale = np.ones((3,))
         discretize = ssm.conditional.transition_wiener_integrated(output_scale)
 
         output_scale = np.ones(())
         rv = discretize(0.1, output_scale)
     elif fact == "blockdiag":
+        ssm = impl.FactImpl.from_tcoeffs_blockdiag(tcoeffs_like=tcoeffs)
         output_scale = np.ones((3,))
         discretize = ssm.conditional.transition_wiener_integrated(output_scale)
 
         output_scale = np.ones((3,))
         rv = discretize(0.1, output_scale)
     elif fact == "isotropic":
+        ssm = impl.FactImpl.from_tcoeffs_isotropic(tcoeffs_like=tcoeffs)
         output_scale = np.ones(())
         discretize = ssm.conditional.transition_wiener_integrated(output_scale)
 

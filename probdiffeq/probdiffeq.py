@@ -1163,7 +1163,17 @@ def prior_wiener_integrated_diffuse(
         )
 
     # Choose a state-space model factorisation
-    ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs_mean)
+    match ssm_fact:
+        case "dense":
+            ssm = impl.FactImpl.from_tcoeffs_dense(tcoeffs_mean)
+        case "blockdiag":
+            ssm = impl.FactImpl.from_tcoeffs_blockdiag(tcoeffs_mean)
+        case "isotropic":
+            ssm = impl.FactImpl.from_tcoeffs_isotropic(tcoeffs_mean)
+        case _:
+            msg = f"Factorisation ssm_fact='{ssm_fact}' unknown. "
+            msg += "Choose one out of {'dense', 'isotropic', 'blockdiag'}."
+            raise ValueError(msg)
 
     if output_scale is None:
         output_scale = tree.tree_map(np.ones_like, tcoeffs_std[0])
