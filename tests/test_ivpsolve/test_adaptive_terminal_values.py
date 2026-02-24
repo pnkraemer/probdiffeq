@@ -5,7 +5,7 @@ from probdiffeq.backend import func, np, ode, testing, tree
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def test_output_matches_reference(fact):
+def test_output_matches_reference(fact) -> None:
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     # Don't try all solvers because they're tested in a different file.

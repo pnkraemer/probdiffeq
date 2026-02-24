@@ -34,7 +34,7 @@ from probdiffeq import taylor
 jax.config.update("jax_debug_nans", True)
 
 
-def main(max_time=0.5, repeats=2):
+def main(max_time=0.5, repeats=2) -> None:
     """Run the script."""
     # Set JAX config
     jax.config.update("jax_enable_x64", True)

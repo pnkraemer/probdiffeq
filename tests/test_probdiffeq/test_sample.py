@@ -23,7 +23,7 @@ def fixture_solution_and_ssm(fact):
 
 
 @testing.parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
-def test_sample_shape(solution_and_ssm, shape):
+def test_sample_shape(solution_and_ssm, shape) -> None:
     solution, ssm = solution_and_ssm
     key = random.prng_key(seed=15)
     samples = solution.solution_full.sample(key, ssm=ssm, shape=shape)

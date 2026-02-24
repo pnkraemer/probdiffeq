@@ -8,7 +8,7 @@ from probdiffeq.backend import func, np, random, stats, testing, tree
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def test_logpdf(fact):
+def test_logpdf(fact) -> None:
     rv, _ssm = create_random_variable(fact=fact)
 
     u = tree.tree_map(np.ones_like, rv.evaluate_mean())
@@ -22,7 +22,7 @@ def test_logpdf(fact):
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def test_grad_not_none(fact):
+def test_grad_not_none(fact) -> None:
     rv, _ssm = create_random_variable(fact=fact)
     u = tree.tree_map(np.ones_like, rv.evaluate_mean())
 

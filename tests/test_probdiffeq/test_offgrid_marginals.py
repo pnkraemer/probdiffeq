@@ -6,7 +6,7 @@ from probdiffeq.util import test_util
 
 
 @testing.parametrize("fact", ["dense", "blockdiag", "isotropic"])
-def test_save_at_result_matches_interpolated_adaptive_result(fact):
+def test_save_at_result_matches_interpolated_adaptive_result(fact) -> None:
     """Test that the save_at result matches the interpolation (using a filter)."""
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
@@ -51,7 +51,7 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
 
 
 @testing.parametrize("fact", ["isotropic", "dense", "blockdiag"])
-def test_filter_marginals_close_only_to_left_boundary(fact):
+def test_filter_marginals_close_only_to_left_boundary(fact) -> None:
     """Assert that the filter-marginals interpolate well close to the left boundary."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
@@ -80,7 +80,7 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
 
 
 @testing.parametrize("fact", ["isotropic", "dense", "blockdiag"])
-def test_smoother_marginals_close_to_both_boundaries(fact):
+def test_smoother_marginals_close_to_both_boundaries(fact) -> None:
     """Assert that the smoother-marginals interpolate well close to the boundary."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 

@@ -4,7 +4,7 @@ from probdiffeq import probdiffeq
 from probdiffeq.backend import testing
 
 
-def test_third_order_spherical_vs_unscented_transform_scalar_input():
+def test_third_order_spherical_vs_unscented_transform_scalar_input() -> None:
     """Assert that UT with r=0 equals the third-order spherical rule."""
     tos = probdiffeq.cubature_third_order_spherical(input_shape=())
     ut = probdiffeq.cubature_unscented_transform(input_shape=(), r=0.0)
@@ -17,7 +17,7 @@ def test_third_order_spherical_vs_unscented_transform_scalar_input():
 
 
 @testing.parametrize("n", [4])
-def test_third_order_spherical_vs_unscented_transform(n):
+def test_third_order_spherical_vs_unscented_transform(n) -> None:
     """Assert that UT with r=0 equals the third-order spherical rule."""
     tos = probdiffeq.cubature_third_order_spherical(input_shape=(n,))
     ut = probdiffeq.cubature_unscented_transform(input_shape=(n,), r=0.0)

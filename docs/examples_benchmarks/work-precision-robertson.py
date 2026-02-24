@@ -45,7 +45,7 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 jax.config.update("jax_debug_nans", True)
 
 
-def main(start=2.0, stop=10.0, step=1.0, repeats=2, time_span=(1e-6, 1e5)):
+def main(start=2.0, stop=10.0, step=1.0, repeats=2, time_span=(1e-6, 1e5)) -> None:
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)

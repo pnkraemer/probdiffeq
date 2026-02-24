@@ -44,7 +44,7 @@ def fixture_solution_and_loss_and_data(strategy_func, fact):
     return sol, loss, data, std
 
 
-def test_output_is_scalar(solution_and_loss_and_data):
+def test_output_is_scalar(solution_and_loss_and_data) -> None:
     solution, loss, data, std = solution_and_loss_and_data
 
     mll = func.jit(loss)(data, std=std, marginals=solution.u.marginals)
@@ -54,7 +54,7 @@ def test_output_is_scalar(solution_and_loss_and_data):
     assert not np.isinf(mll)
 
 
-def test_raise_error_if_std_shape_is_wrong(solution_and_loss_and_data):
+def test_raise_error_if_std_shape_is_wrong(solution_and_loss_and_data) -> None:
     solution, loss, data, std = solution_and_loss_and_data
 
     std = tree.tree_map(lambda s: s[None], std)

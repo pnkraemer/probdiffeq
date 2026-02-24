@@ -4,7 +4,7 @@ from probdiffeq import probdiffeq
 from probdiffeq.backend import np, testing
 
 
-def test_default_yield_correct_transitions():
+def test_default_yield_correct_transitions() -> None:
     tcoeffs = [2.0, 3.0, 4.0, 5.0]
     init, iwp, _ssm = probdiffeq.prior_wiener_integrated(tcoeffs)
 
@@ -31,7 +31,7 @@ def test_default_yield_correct_transitions():
     assert testing.allclose(cond.noise.cholesky @ cond.noise.cholesky.T, Q_expected)
 
 
-def test_diffuse_derivatives():
+def test_diffuse_derivatives() -> None:
     tcoeffs = [2.0, 3.0]
     init, _iwp, _ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, diffuse_derivatives=3, diffuse_eps=123.0
@@ -40,7 +40,7 @@ def test_diffuse_derivatives():
     assert testing.allclose(init.std, [0.0, 0.0, 123.0, 123.0, 123.0])
 
 
-def test_differential_variables_dense():
+def test_differential_variables_dense() -> None:
     tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray([True, False, True])]
     init, _iwp, _ssm = probdiffeq.prior_wiener_integrated(
@@ -57,7 +57,7 @@ def test_differential_variables_dense():
         _ = probdiffeq.prior_wiener_integrated(tcoeffs, is_differential=isdiff)
 
 
-def test_differential_variables_blockdiag():
+def test_differential_variables_blockdiag() -> None:
     tcoeffs = [np.asarray([1.0, 2.0, 3.0]), np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray([True, False, True]), np.asarray([False, False, True])]
     init, _iwp, _ssm = probdiffeq.prior_wiener_integrated(
@@ -78,7 +78,7 @@ def test_differential_variables_blockdiag():
         )
 
 
-def test_differential_variables_isotropic():
+def test_differential_variables_isotropic() -> None:
     tcoeffs = [np.asarray([1.0, 2.0, 3.0]), np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray(True), np.asarray(False)]
     init, _iwp, _ssm = probdiffeq.prior_wiener_integrated(
@@ -100,7 +100,7 @@ def test_differential_variables_isotropic():
 
 
 @testing.parametrize("ssm_fact", ["dense", "blockdiag"])
-def test_output_scale_dense_blockdiag(ssm_fact):
+def test_output_scale_dense_blockdiag(ssm_fact) -> None:
 
     # 1d problem, but "unusual" shapes. Values don't matter.
     tcoeffs = [np.ones((1, 1, 1)), np.ones((1, 1, 1))]
@@ -141,7 +141,7 @@ def test_output_scale_dense_blockdiag(ssm_fact):
             )
 
 
-def test_output_scale_isotropic():
+def test_output_scale_isotropic() -> None:
 
     # 1d problem, but "unusual" shapes. Values don't matter.
     tcoeffs = [np.ones((1, 1, 1)), np.ones((1, 1, 1))]

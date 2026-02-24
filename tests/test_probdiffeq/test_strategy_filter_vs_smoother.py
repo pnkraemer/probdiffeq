@@ -40,7 +40,7 @@ def fixture_smoother_solution(solver_setup):
     return func.jit(solve)(init, grid=solver_setup["grid"])
 
 
-def test_compare_filter_smoother_rmse(filter_solution, smoother_solution):
+def test_compare_filter_smoother_rmse(filter_solution, smoother_solution) -> None:
     assert testing.allclose(filter_solution.t, smoother_solution.t)  # sanity check
 
     reference = _reference_solution(filter_solution.t)

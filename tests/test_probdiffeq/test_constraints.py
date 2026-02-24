@@ -57,7 +57,7 @@ def fixture_solution(constraint_ode_factory, fact):
     return func.jit(solve)(init, t0=t0, t1=t1, atol=1e-4, rtol=1e-4, damp=1e-9)
 
 
-def test_terminal_value_simulation_matches_reference(solution):
+def test_terminal_value_simulation_matches_reference(solution) -> None:
     expected = reference_solution(solution.t)
     received = solution.u.mean[0]
     assert testing.allclose(received, expected, rtol=1e-2)

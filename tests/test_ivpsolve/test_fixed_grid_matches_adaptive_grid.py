@@ -7,7 +7,7 @@ from probdiffeq.util import test_util
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def test_fixed_grid_result_matches_adaptive_grid_result_when_reusing_grid(fact):
+def test_fixed_grid_result_matches_adaptive_grid_result_when_reusing_grid(fact) -> None:
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     class Taylor(structs.NamedTuple):

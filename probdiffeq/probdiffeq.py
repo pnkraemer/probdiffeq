@@ -196,7 +196,7 @@ class jacobian_materialize(JacobianHandler):
     Use this Jacobian if the dimension of the problem is relatively small.
     """
 
-    def __init__(self, *, jacfun=func.jacfwd):
+    def __init__(self, *, jacfun=func.jacfwd) -> None:
         self.jacfun = jacfun
 
     def init_jacobian_handler(self):
@@ -231,7 +231,7 @@ class jacobian_hutchinson_fwd(JacobianHandler):
     This implementation uses **forward-mode** automatic differentiation.
     """
 
-    def __init__(self, *, seed=1, num_probes=10):
+    def __init__(self, *, seed=1, num_probes=10) -> None:
         self.seed = seed
         self.num_probes = num_probes
 
@@ -274,7 +274,7 @@ class jacobian_hutchinson_rev(JacobianHandler):
     This implementation uses **reverse-mode** automatic differentiation.
     """
 
-    def __init__(self, *, seed=1, num_probes=10):
+    def __init__(self, *, seed=1, num_probes=10) -> None:
         self.seed = seed
         self.num_probes = num_probes
 
@@ -309,7 +309,7 @@ class jacobian_hutchinson_rev(JacobianHandler):
         return fx, J_diagonal, key
 
 
-def loss_lml_terminal_values(*, ssm, tcoeff_index=0):
+def loss_lml_terminal_values(*, ssm: statespace.FactSsmImpl, tcoeff_index=0):
     """Construct a log-marginal-likelihood loss for the terminal value."""
 
     def loss(u, /, *, marginals, std):
@@ -334,7 +334,9 @@ def loss_lml_terminal_values(*, ssm, tcoeff_index=0):
     return loss
 
 
-def loss_lml_timeseries(*, ssm, average_pdfs: bool = True, tcoeff_index=0):
+def loss_lml_timeseries(
+    *, ssm: statespace.FactSsmImpl, average_pdfs: bool = True, tcoeff_index=0
+):
     """Construct a log-marginal-likelihood loss for a time-series."""
 
     def loss(u, /, *, posterior, std):
@@ -410,7 +412,7 @@ def constraint_ode_ts0(vf, /, *, ssm):
     return ssm.linearize.ode_taylor_0th(vf, ode_order=ode_order)
 
 
-def constraint_root_ts1(root, /, *, ssm, jacobian=None):
+def constraint_root_ts1(root, /, *, ssm: statespace.FactSsmImpl, jacobian=None):
     """Construct a constraint based on a custom root.
 
     See the custom information operator tutorial for details.
@@ -429,7 +431,7 @@ def constraint_root_ts1(root, /, *, ssm, jacobian=None):
     return ssm.linearize.root_taylor_1st(root, root_order=root_order, jacobian=jacobian)
 
 
-def constraint_root_jet(root, /, *, ssm, jacobian=None):
+def constraint_root_jet(root, /, *, ssm: statespace.FactSsmImpl, jacobian=None):
     """Construct a constraint based on a custom root.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -461,7 +463,9 @@ def constraint_root_jet(root, /, *, ssm, jacobian=None):
     )
 
 
-def constraint_ode_ts1(vf, /, *, ssm, jacobian: JacobianHandler | None = None):
+def constraint_ode_ts1(
+    vf, /, *, ssm: statespace.FactSsmImpl, jacobian: JacobianHandler | None = None
+):
     """Create an ODE constraint with first-order Taylor linearisation.
 
     Related:
@@ -481,7 +485,9 @@ def constraint_ode_ts1(vf, /, *, ssm, jacobian: JacobianHandler | None = None):
     return ssm.linearize.ode_taylor_1st(vf, ode_order=ode_order, jacobian=jacobian)
 
 
-def constraint_ode_slr0(vf, /, *, ssm, cubature_fun=cubature_third_order_spherical):
+def constraint_ode_slr0(
+    vf, /, *, ssm: statespace.FactSsmImpl, cubature_fun=cubature_third_order_spherical
+):
     """Create an ODE constraint with zeroth-order statistical linear regression.
 
     Related:
@@ -496,7 +502,9 @@ def constraint_ode_slr0(vf, /, *, ssm, cubature_fun=cubature_third_order_spheric
     return ssm.linearize.ode_statistical_0th(vf, cubature_fun=cubature_fun)
 
 
-def constraint_ode_slr1(vf, *, ssm, cubature_fun=cubature_third_order_spherical):
+def constraint_ode_slr1(
+    vf, *, ssm: statespace.FactSsmImpl, cubature_fun=cubature_third_order_spherical
+):
     """Create an ODE constraint with first-order statistical linear regression.
 
     Related:
@@ -642,7 +650,9 @@ class MarkovSequence(Generic[N]):
 
         return tree.tree_array_prepend(self.marginal, marginals)
 
-    def evaluate_lml(self, u, *, model, ssm, average_pdfs: bool):
+    def evaluate_lml(
+        self, u, *, model, ssm: statespace.FactSsmImpl, average_pdfs: bool
+    ):
         assert self.reverse
 
         if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
@@ -694,7 +704,7 @@ class MarkovSequence(Generic[N]):
         init = tree.tree_map(lambda x: x[-1, ...], self.marginal)
         return MarkovSequence(init, self.conditional, reverse=self.reverse)
 
-    def sample(self, key, *, ssm, shape: tuple = ()):
+    def sample(self, key, *, ssm: statespace.FactSsmImpl, shape: tuple = ()):
         """Sample from a Markov sequence."""
         # If the MarkovSequence carries unnecessary filtering marginals, remove them
         if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
@@ -747,7 +757,7 @@ class MarkovStrategy(Generic[T]):
         is_suitable_for_save_at: int,
         is_suitable_for_save_every_step: int,
         is_suitable_for_offgrid_marginals: int,
-    ):
+    ) -> None:
         self.ssm = ssm
         self.is_suitable_for_save_at = is_suitable_for_save_at
         self.is_suitable_for_save_every_step = is_suitable_for_save_every_step
@@ -837,7 +847,7 @@ class ProbabilisticSolver:
         prior: Callable,
         constraint: Constraint,
         ssm: Any,
-    ):
+    ) -> None:
         self.ssm = ssm
         self.strategy = strategy
         self.prior = prior
@@ -1291,7 +1301,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
     [`MarkovStrategy`](#probdiffeq.probdiffeq.MarkovStrategy).
     """
 
-    def __init__(self, ssm):
+    def __init__(self, ssm) -> None:
         super().__init__(
             ssm=ssm,
             is_suitable_for_save_at=False,
@@ -1424,7 +1434,7 @@ class strategy_filter(MarkovStrategy):
     [`MarkovStrategy`](#probdiffeq.probdiffeq.MarkovStrategy).
     """
 
-    def __init__(self, ssm):
+    def __init__(self, ssm) -> None:
         super().__init__(
             ssm=ssm,
             is_suitable_for_save_at=True,
@@ -1528,7 +1538,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
 
     """
 
-    def __init__(self, ssm):
+    def __init__(self, ssm) -> None:
         super().__init__(
             ssm=ssm,
             is_suitable_for_save_at=True,
@@ -1713,7 +1723,7 @@ class solver_mle(ProbabilisticSolver):
         ssm: Any,
         strategy: MarkovStrategy,
         update_at_init: bool = False,
-    ):
+    ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
         self.update_at_init = update_at_init
 
@@ -1838,7 +1848,7 @@ class solver_dynamic(ProbabilisticSolver):
         ssm: Any,
         re_linearize_after_calibration=False,
         update_at_init: bool = False,
-    ):
+    ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
         self.re_linearize_after_calibration = re_linearize_after_calibration
         self.update_at_init = update_at_init
@@ -1970,7 +1980,7 @@ class solver(ProbabilisticSolver):
         ssm: Any,
         strategy: MarkovStrategy,
         constraint_init: Constraint | None = None,
-    ):
+    ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
         self.constraint_init = constraint_init
 
@@ -2096,7 +2106,7 @@ class solver_iterated(ProbabilisticSolver):
         tol: float | None = None,
         maxiter: int = 10,
         while_loop=flow.while_loop,
-    ):
+    ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
         self.constraint_init = constraint_init
 
@@ -2401,7 +2411,7 @@ class error_residual_std(ErrorEstimator):
         ssm: Any,
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default
-    ):
+    ) -> None:
         if error_norm is None:
             error_norm = error_norm_scale_then_rms()
 
@@ -2494,7 +2504,7 @@ class error_state_std(ErrorEstimator):
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default
         derivative_idx: int = 0,
-    ):
+    ) -> None:
         if error_norm is None:
             error_norm = error_norm_scale_then_rms()
 

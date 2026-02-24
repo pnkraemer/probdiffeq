@@ -30,7 +30,9 @@ def fixture_pb_with_solution():
 
 @testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_odejet_")
 @testing.parametrize("num", [1, 4])
-def test_approximation_identical_to_reference_odejet(pb_with_solution, taylor_fun, num):
+def test_approximation_identical_to_reference_odejet(
+    pb_with_solution, taylor_fun, num
+) -> None:
     (f, init), solution = pb_with_solution
 
     derivatives = taylor_fun(f, init, num=num)
@@ -47,7 +49,7 @@ def case_doubling_odejet_unroll():
 @testing.parametrize("num_doublings", [1, 2])
 def test_approximation_identical_to_reference_doubling(
     pb_with_solution, taylor_fun, num_doublings
-):
+) -> None:
     """Separately test the doubling-function, because its API is different."""
     (f, init), solution = pb_with_solution
 

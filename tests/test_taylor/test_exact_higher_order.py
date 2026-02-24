@@ -25,7 +25,9 @@ def fixture_pb_with_solution():
 
 @testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_")
 @testing.parametrize("num", [1, 3])
-def test_approximation_identical_to_reference(pb_with_solution, taylor_fun, num):
+def test_approximation_identical_to_reference(
+    pb_with_solution, taylor_fun, num
+) -> None:
     (f, init), solution = pb_with_solution
 
     derivatives = taylor_fun(f, init, num=num)

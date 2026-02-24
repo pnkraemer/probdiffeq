@@ -10,7 +10,7 @@ from probdiffeq.backend import func, linalg, np, ode, testing, tree
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def test_exponential_approximated_well(fact):
+def test_exponential_approximated_well(fact) -> None:
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = (*u0, vf(*u0, t=t0))

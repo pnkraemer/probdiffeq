@@ -166,7 +166,7 @@ def case_factory_error_residual_std_not_cached():
 
 @testing.parametrize("ssm_fact", ["dense", "isotropic", "blockdiag"])
 @testing.parametrize_with_cases("factory", ".", prefix="case_factory_")
-def test_output_matches_reference(ivp, ssm_fact, factory: Factory):
+def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
     vf, u0, (t0, t1) = ivp
 
     # Build a solver

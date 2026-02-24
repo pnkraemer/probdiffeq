@@ -32,7 +32,7 @@ def fixture_solution(fact):
     return sol, loss, data, std
 
 
-def test_output_is_a_scalar(solution):
+def test_output_is_a_scalar(solution) -> None:
     sol, loss, data, std = solution
 
     lml = func.jit(loss)(data, posterior=sol.solution_full, std=std)
@@ -42,7 +42,7 @@ def test_output_is_a_scalar(solution):
     assert not np.isinf(lml)
 
 
-def test_that_function_raises_error_for_wrong_number_of_timesteps(solution):
+def test_that_function_raises_error_for_wrong_number_of_timesteps(solution) -> None:
     """Test that the log-marginal-likelihood function complains about the wrong shape.
 
     Specifically, about receiving fewer standard-deviations than data-points.
@@ -54,7 +54,7 @@ def test_that_function_raises_error_for_wrong_number_of_timesteps(solution):
         _ = loss(data, posterior=sol.solution_full, std=std)
 
 
-def test_raises_error_if_terminal_values_were_intended(solution):
+def test_raises_error_if_terminal_values_were_intended(solution) -> None:
     """Test that the log-marginal-likelihood function complains when called incorrectly.
 
     Specifically, raise an error when calling log_marginal_likelihood even though

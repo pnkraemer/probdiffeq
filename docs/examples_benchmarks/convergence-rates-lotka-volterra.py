@@ -37,7 +37,7 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 jax.config.update("jax_debug_nans", True)
 
 
-def main():
+def main() -> None:
     """Run the script."""
     # High order solvers need double precision
     jax.config.update("jax_enable_x64", True)

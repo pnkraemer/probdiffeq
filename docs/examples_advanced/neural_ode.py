@@ -29,7 +29,7 @@ from probdiffeq import ivpsolve, probdiffeq
 jax.config.update("jax_debug_nans", True)
 
 
-def main(num_data=100, epochs=1000, print_every=100, hidden=(20,), lr=0.2):
+def main(num_data=100, epochs=1000, print_every=100, hidden=(20,), lr=0.2) -> None:
     """Train a neural ODE using diffusion tempering."""
     # Create some data and construct a neural ODE
     grid = jnp.linspace(0, 1, num=num_data)

@@ -31,7 +31,7 @@ from probdiffeq import ivpsolve, probdiffeq
 jax.config.update("jax_debug_nans", True)
 
 
-def main():
+def main() -> None:
     """Simulate a PDE."""
     key = jax.random.PRNGKey(1)
     f, (u0,), (t0, t1) = fhn_2d(key, num=40, t1=10.0)
