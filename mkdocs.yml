@@ -64,7 +64,8 @@ plugins:
             inherited_members: false
             show_if_no_docstring: true
             merge_init_into_class: true
-            group_by_category: true
+            members_order: alphabetical
+            group_by_category: false
   - exclude:
       glob:
         - examples*/*.py
@@ -111,7 +112,7 @@ nav:
       - probdiffeq: api_docs/probdiffeq.md
       - ivpsolve: api_docs/ivpsolve.md
       - taylor: api_docs/taylor.md
-      - statespace: api_docs/statespace.md
+      - ssm_impl: api_docs/ssm_impl.md
   - DOCUMENTATION | DEVELOPER:
       - dev_docs/creating_example_notebook.md
       - dev_docs/continuous_integration.md

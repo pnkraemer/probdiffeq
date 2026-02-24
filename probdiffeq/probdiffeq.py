@@ -3,7 +3,7 @@
 See the tutorials for example use cases.
 """
 
-from probdiffeq import statespace, taylor
+from probdiffeq import ssm_impl, taylor
 from probdiffeq.backend import (
     flow,
     func,
@@ -28,7 +28,16 @@ from probdiffeq.backend.typing import (
 )
 
 C = TypeVar("C", bound=Sequence)
-N = TypeVar("N", bound=statespace.AbstractTreeNormal)
+"""A type-variable to describe sequences.
+
+Used to type Taylor coefficients, for example.
+"""
+
+N = TypeVar("N", bound=ssm_impl.AbstractTreeNormal)
+"""A type-variable to describe normal distributions.
+
+Used to type marginals, for example.
+"""
 
 
 @tree.register_dataclass
@@ -309,7 +318,7 @@ class jacobian_hutchinson_rev(JacobianHandler):
         return fx, J_diagonal, key
 
 
-def loss_lml_terminal_values(*, ssm: statespace.FactSsmImpl, tcoeff_index=0):
+def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
     """Construct a log-marginal-likelihood loss for the terminal value."""
 
     def loss(u, /, *, marginals, std):
@@ -335,7 +344,7 @@ def loss_lml_terminal_values(*, ssm: statespace.FactSsmImpl, tcoeff_index=0):
 
 
 def loss_lml_timeseries(
-    *, ssm: statespace.FactSsmImpl, average_pdfs: bool = True, tcoeff_index=0
+    *, ssm: ssm_impl.FactSsmImpl, average_pdfs: bool = True, tcoeff_index=0
 ):
     """Construct a log-marginal-likelihood loss for a time-series."""
 
@@ -412,7 +421,7 @@ def constraint_ode_ts0(vf, /, *, ssm):
     return ssm.linearize.ode_taylor_0th(vf, ode_order=ode_order)
 
 
-def constraint_root_ts1(root, /, *, ssm: statespace.FactSsmImpl, jacobian=None):
+def constraint_root_ts1(root, /, *, ssm: ssm_impl.FactSsmImpl, jacobian=None):
     """Construct a constraint based on a custom root.
 
     See the custom information operator tutorial for details.
@@ -431,7 +440,7 @@ def constraint_root_ts1(root, /, *, ssm: statespace.FactSsmImpl, jacobian=None):
     return ssm.linearize.root_taylor_1st(root, root_order=root_order, jacobian=jacobian)
 
 
-def constraint_root_jet(root, /, *, ssm: statespace.FactSsmImpl, jacobian=None):
+def constraint_root_jet(root, /, *, ssm: ssm_impl.FactSsmImpl, jacobian=None):
     """Construct a constraint based on a custom root.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -464,7 +473,7 @@ def constraint_root_jet(root, /, *, ssm: statespace.FactSsmImpl, jacobian=None):
 
 
 def constraint_ode_ts1(
-    vf, /, *, ssm: statespace.FactSsmImpl, jacobian: JacobianHandler | None = None
+    vf, /, *, ssm: ssm_impl.FactSsmImpl, jacobian: JacobianHandler | None = None
 ):
     """Create an ODE constraint with first-order Taylor linearisation.
 
@@ -486,7 +495,7 @@ def constraint_ode_ts1(
 
 
 def constraint_ode_slr0(
-    vf, /, *, ssm: statespace.FactSsmImpl, cubature_fun=cubature_third_order_spherical
+    vf, /, *, ssm: ssm_impl.FactSsmImpl, cubature_fun=cubature_third_order_spherical
 ):
     """Create an ODE constraint with zeroth-order statistical linear regression.
 
@@ -503,7 +512,7 @@ def constraint_ode_slr0(
 
 
 def constraint_ode_slr1(
-    vf, *, ssm: statespace.FactSsmImpl, cubature_fun=cubature_third_order_spherical
+    vf, *, ssm: ssm_impl.FactSsmImpl, cubature_fun=cubature_third_order_spherical
 ):
     """Create an ODE constraint with first-order statistical linear regression.
 
@@ -646,9 +655,7 @@ class MarkovSequence(Generic[N]):
 
         return tree.tree_array_prepend(self.marginal, marginals)
 
-    def evaluate_lml(
-        self, u, *, model, ssm: statespace.FactSsmImpl, average_pdfs: bool
-    ):
+    def evaluate_lml(self, u, *, model, ssm: ssm_impl.FactSsmImpl, average_pdfs: bool):
         assert self.reverse
 
         if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
@@ -700,7 +707,7 @@ class MarkovSequence(Generic[N]):
         init = tree.tree_map(lambda x: x[-1, ...], self.marginal)
         return MarkovSequence(init, self.conditional, reverse=self.reverse)
 
-    def sample(self, key, *, ssm: statespace.FactSsmImpl, shape: tuple = ()):
+    def sample(self, key, *, ssm: ssm_impl.FactSsmImpl, shape: tuple = ()):
         """Sample from a Markov sequence."""
         # If the MarkovSequence carries unnecessary filtering marginals, remove them
         if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
@@ -735,7 +742,8 @@ class MarkovSequence(Generic[N]):
         return tree.tree_array_prepend(smp, smps)
 
 
-T = TypeVar("T", bound=MarkovSequence | statespace.AbstractTreeNormal)
+T = TypeVar("T", bound=MarkovSequence | ssm_impl.AbstractTreeNormal)
+"""A type-variable to describe posterior distributions."""
 
 
 @tree.register_dataclass
@@ -776,8 +784,9 @@ class ProbabilisticSolution(Generic[N, T]):
 
 
 S = TypeVar(
-    "S", bound=ProbabilisticSolution | MarkovSequence | statespace.AbstractTreeNormal
+    "S", bound=ProbabilisticSolution | MarkovSequence | ssm_impl.AbstractTreeNormal
 )
+"""A type-variable to describe interpolation results."""
 
 
 @tree.register_dataclass
@@ -1105,13 +1114,7 @@ def prior_wiener_integrated(
     diffuse_derivatives: int = 0,
     diffuse_eps: float = 1.0,  # a large value
 ):
-    """Construct an repeatedly-integrated Wiener process.
-
-    Tip: Choose nonzero standard deviations
-    to get visually more pleasing uncertainties and more numerical robustness for
-    high-order solvers in low precision arithmetic. Outside of these cases,
-    leave the standard deviations at zero to improve accuracy.
-    """
+    """Construct an repeatedly-integrated Wiener process."""
     tcoeffs_std = _tcoeffs_std_from_differential_variables(
         tcoeffs,
         is_differential=is_differential,
@@ -1213,11 +1216,11 @@ def prior_wiener_integrated_diffuse(
     # Choose a state-space model factorisation
     match ssm_fact:
         case "dense":
-            ssm = statespace.FactSsmImpl.from_tcoeffs_dense(tcoeffs_mean)
+            ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(tcoeffs_mean)
         case "blockdiag":
-            ssm = statespace.FactSsmImpl.from_tcoeffs_blockdiag(tcoeffs_mean)
+            ssm = ssm_impl.FactSsmImpl.from_tcoeffs_blockdiag(tcoeffs_mean)
         case "isotropic":
-            ssm = statespace.FactSsmImpl.from_tcoeffs_isotropic(tcoeffs_mean)
+            ssm = ssm_impl.FactSsmImpl.from_tcoeffs_isotropic(tcoeffs_mean)
         case _:
             msg = f"Factorisation ssm_fact='{ssm_fact}' unknown. "
             msg += "Choose one out of {'dense', 'isotropic', 'blockdiag'}."
@@ -2081,14 +2084,10 @@ class solver(ProbabilisticSolver):
 class solver_iterated(ProbabilisticSolver):
     """Create a solver that does not calibrate the output scale automatically.
 
-    This is the text-book implementation of probabilistic solvers.
-    It is typically used in parameter estimation:
-
-    - In combination with gradient-based optimisation of the output scale.
-    - In combination with diffusion tempering.
-
-    See the tutorials for example applications.
-
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This function is highly experimental and not safe to use.
+        There is no guarantee that it works correctly (or at all).
+        It might be deleted tomorrow and without any deprecation policy.
 
     Related:
     [`ProbabilisticSolver`](#probdiffeq.probdiffeq.ProbabilisticSolver).
