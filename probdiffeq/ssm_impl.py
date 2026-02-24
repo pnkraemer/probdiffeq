@@ -350,6 +350,8 @@ class FactSsmImpl:
 
 
 class DensePrototype(AbstractPrototype):
+    """Construct a dense implementation of prototypes."""
+
     def __init__(self, ode_shape) -> None:
         self.ode_shape = ode_shape
 
@@ -361,6 +363,8 @@ class DensePrototype(AbstractPrototype):
 
 
 class DenseNormal(AbstractTreeNormal):
+    """Construct a dense implementation of a normal distribution."""
+
     def __init__(self, mean: T, cholesky: T, unravel: Callable[[T], C]) -> None:
         super().__init__(mean=mean)
         self.cholesky = cholesky
@@ -454,6 +458,8 @@ class DenseNormal(AbstractTreeNormal):
 
 
 class DenseLinearizationFactory(AbstractLinearizationFactory):
+    """Construct a dense linearization factory."""
+
     def __init__(self, ode_shape, unravel) -> None:
         self.ode_shape = ode_shape
         self.unravel = unravel
@@ -500,6 +506,8 @@ class DenseLinearizationFactory(AbstractLinearizationFactory):
 
 
 class DenseConditional(AbstractConditional):
+    """Construct a dense implementation of manipulating conditionals."""
+
     def __init__(self, ode_shape, num_derivatives, unravel, flat_shape) -> None:
         self.ode_shape = ode_shape
         self.num_derivatives = num_derivatives
@@ -635,6 +643,8 @@ class DenseConditional(AbstractConditional):
 
 
 class DenseLinearizationOdeTs0(AbstractLinearizationOde):
+    """Construct a dense implementation of ODE-TS0 linearization."""
+
     def __init__(
         self, vf, *, ode_order: int, ode_shape: tuple, unravel: Callable
     ) -> None:
@@ -661,6 +671,8 @@ class DenseLinearizationOdeTs0(AbstractLinearizationOde):
 
 
 class DenseLinearizationOdeTs1(AbstractLinearizationOde):
+    """Construct a dense implementation of ODE-TS1 linearization."""
+
     def __init__(
         self,
         vf: Callable,
@@ -706,6 +718,8 @@ class DenseLinearizationOdeTs1(AbstractLinearizationOde):
 
 
 class DenseLinearizationRootTs1(AbstractLinearizationRoot):
+    """Construct a dense implementation of root-TS1 linearization."""
+
     def __init__(self, root, *, root_order, unravel, jacobian) -> None:
         super().__init__(root, root_order=root_order)
         self.unravel = unravel
@@ -746,6 +760,8 @@ class DenseLinearizationRootTs1(AbstractLinearizationRoot):
 
 
 class DenseLinearizationOdeSlr0(AbstractLinearizationOde):
+    """Construct a dense implementation of ODE-SLR0 linearization."""
+
     def __init__(self, vf, *, cubature_rule, ode_shape, unravel) -> None:
         # No higher order ODEs supported for any SLR,
         # not even in dense models
@@ -822,6 +838,8 @@ class DenseLinearizationOdeSlr0(AbstractLinearizationOde):
 
 
 class DenseLinearizationOdeSlr1(AbstractLinearizationOde):
+    """Construct a dense implementation of ODE-SLR1 linearization."""
+
     def __init__(self, vf, *, cubature_rule, ode_shape, unravel) -> None:
         super().__init__(vf, ode_order=1)
 
@@ -897,6 +915,8 @@ class DenseLinearizationOdeSlr1(AbstractLinearizationOde):
 
 
 class IsotropicLinearizationOdeTs0(AbstractLinearizationOde):
+    """Construct an isotropic implementation of ODE-TS0 linearization."""
+
     def __init__(self, vf, *, ode_order, unravel) -> None:
         super().__init__(vf, ode_order=ode_order)
         self.unravel = unravel
@@ -928,6 +948,8 @@ class IsotropicLinearizationOdeTs0(AbstractLinearizationOde):
 
 
 class IsotropicLinearizationOdeTs1(AbstractLinearizationOde):
+    """Construct an isotropic implementation of ODE-TS1 linearization."""
+
     def __init__(self, vf, *, ode_order: int, unravel: Callable, jacobian: Any) -> None:
         if ode_order > 1:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
@@ -968,6 +990,8 @@ class IsotropicLinearizationOdeTs1(AbstractLinearizationOde):
 
 
 class BlockDiagLinearizationOdeTs0(AbstractLinearizationOde):
+    """Construct a block-diagonal implementation of ODE-TS0 linearization."""
+
     def __init__(self, vf, *, ode_order: int, unravel: Callable) -> None:
         super().__init__(vf, ode_order=ode_order)
         self.unravel = unravel
@@ -993,6 +1017,8 @@ class BlockDiagLinearizationOdeTs0(AbstractLinearizationOde):
 
 
 class BlockDiagLinearizationOdeTs1(AbstractLinearizationOde):
+    """Construct a block-diagonal implementation of ODE-TS1 linearization."""
+
     def __init__(self, vf, *, ode_order: int, unravel: Callable, jacobian: Any) -> None:
         if ode_order > 1:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
@@ -1037,6 +1063,8 @@ class BlockDiagLinearizationOdeTs1(AbstractLinearizationOde):
 
 
 class IsotropicLinearizationFactory(AbstractLinearizationFactory):
+    """Construct an isotropic linearization-factory."""
+
     def __init__(self, unravel) -> None:
         self.unravel = unravel
 
@@ -1061,6 +1089,8 @@ class IsotropicLinearizationFactory(AbstractLinearizationFactory):
 
 
 class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
+    """Construct a block-diagonal linearization-factory."""
+
     def __init__(self, unravel) -> None:
         self.unravel = unravel
 
@@ -1085,6 +1115,8 @@ class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
 
 
 class IsotropicConditional(AbstractConditional):
+    """Construct an isotropic implementation of manipulating conditionals."""
+
     def __init__(
         self, *, ode_shape, num_derivatives, unravel_tree, tree_structure
     ) -> None:
@@ -1211,6 +1243,8 @@ class IsotropicConditional(AbstractConditional):
 
 
 class BlockDiagConditional(AbstractConditional):
+    """Construct a block-diagonal implementation of manipulating conditionals."""
+
     def __init__(
         self, *, ode_shape, num_derivatives, unravel_tree, treedef, unravel_leaf
     ) -> None:
@@ -1435,6 +1469,8 @@ def _binom(n, k):
 
 
 class IsotropicNormal(AbstractTreeNormal):
+    """Construct an isotropic normal distribution."""
+
     def __init__(self, mean: T, cholesky: T, treedef) -> None:
         super().__init__(mean=mean)
         self.cholesky = cholesky
@@ -1565,6 +1601,8 @@ class IsotropicNormal(AbstractTreeNormal):
 
 
 class BlockDiagNormal(AbstractTreeNormal):
+    """Construct a block-diagonal normal distribution."""
+
     def __init__(self, mean, cholesky, treedef, unravel_leaf) -> None:
         super().__init__(mean=mean)
         self.cholesky = cholesky
@@ -1717,6 +1755,8 @@ BlockDiagNormal.register_pytree_node()
 
 
 class IsotropicPrototype(AbstractPrototype):
+    """Construct an isotropic implementation of prototypes."""
+
     def __init__(self, ode_shape) -> None:
         self.ode_shape = ode_shape
 
@@ -1728,6 +1768,8 @@ class IsotropicPrototype(AbstractPrototype):
 
 
 class BlockDiagPrototype(AbstractPrototype):
+    """Construct a block-diagonal implementation of prototypes."""
+
     def __init__(self, ode_shape) -> None:
         self.ode_shape = ode_shape
 

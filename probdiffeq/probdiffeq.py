@@ -238,6 +238,12 @@ class jacobian_hutchinson_fwd(JacobianHandler):
     Use a Hutchinson handler if the dimension of the problem is large.
 
     This implementation uses **forward-mode** automatic differentiation.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This function is highly experimental and not safe to use.
+        There is no guarantee that it works correctly (or at all).
+        It might be deleted tomorrow and without any deprecation policy.
+
     """
 
     def __init__(self, *, seed=1, num_probes=10) -> None:
@@ -281,6 +287,12 @@ class jacobian_hutchinson_rev(JacobianHandler):
     Use a Hutchinson handler if the dimension of the problem is large.
 
     This implementation uses **reverse-mode** automatic differentiation.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This function is highly experimental and not safe to use.
+        There is no guarantee that it works correctly (or at all).
+        It might be deleted tomorrow and without any deprecation policy.
+
     """
 
     def __init__(self, *, seed=1, num_probes=10) -> None:
@@ -501,6 +513,12 @@ def constraint_ode_slr0(
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This function is highly experimental and not safe to use.
+        There is no guarantee that it works correctly (or at all).
+        It might be deleted tomorrow and without any deprecation policy.
+
     """
     ode_order = _verify_vector_field_signature_and_parse_order(vf)
     if ode_order > 1:
