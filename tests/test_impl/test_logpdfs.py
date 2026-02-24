@@ -3,8 +3,8 @@
 Necessary because the implementation has been faulty in the past. Never again.
 """
 
+from probdiffeq import impl
 from probdiffeq.backend import func, np, random, stats, testing, tree
-from probdiffeq.impl import impl
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])

@@ -3,7 +3,7 @@
 See the tutorials for example use cases.
 """
 
-from probdiffeq import taylor
+from probdiffeq import impl, taylor
 from probdiffeq.backend import (
     flow,
     func,
@@ -26,10 +26,9 @@ from probdiffeq.backend.typing import (
     Sequence,
     TypeVar,
 )
-from probdiffeq.impl import impl
 
 C = TypeVar("C", bound=Sequence)
-N = TypeVar("N", bound=impl._normal.Normal)
+N = TypeVar("N", bound=impl.AbstractNormal)
 
 
 @tree.register_dataclass
@@ -730,7 +729,7 @@ class MarkovSequence(Generic[N]):
         return tree.tree_array_prepend(smp, smps)
 
 
-T = TypeVar("T", bound=MarkovSequence | impl._normal.Normal)
+T = TypeVar("T", bound=MarkovSequence | impl.AbstractNormal)
 
 
 class MarkovStrategy(Generic[T]):

@@ -1,0 +1,1691 @@
+"""State-space model implementations."""
+
+from probdiffeq.backend import abc, func, linalg, np, random, structs, tree
+from probdiffeq.backend.typing import Any, Array, Callable, Sequence, TypeVar
+from probdiffeq.util import cholesky_util
+
+T = TypeVar("T", bound=Array)
+C = TypeVar("C", bound=Sequence)
+
+
+class LatentCond:
+    """Conditional distributions in latent space."""
+
+    def __init__(self, A, noise, to_latent, to_observed):
+        self.A = A
+        self.noise = noise
+        self.to_latent = to_latent
+        self.to_observed = to_observed
+
+    def __repr__(self):
+        msg = f"LatentCond(A={self.A}, noise={self.noise}"
+        msg += f", to_latent={self.to_latent}, to_observed={self.to_observed})"
+        return msg
+
+    @staticmethod
+    def register_pytree_node():
+        def flatten(normal):
+            children = normal.A, normal.noise, normal.to_latent, normal.to_observed
+            return children, ()
+
+        def unflatten(_aux, children):
+            A, noise, to_latent, to_observed = children
+            return LatentCond(A, noise, to_latent, to_observed)
+
+        tree.register_pytree_node(LatentCond, flatten, unflatten)
+
+    @classmethod
+    def from_linop_and_noise(cls, A, noise):
+        # Hack for blockdiagonal models (and possibly dense evaluations)
+        if A.ndim > 2:
+            return func.vmap(cls.from_linop_and_noise)(A, noise)
+
+        d_out, d_in = A.shape
+        to_latent, to_observed = np.ones((d_in,)), np.ones((d_out,))
+
+        return cls(A, noise=noise, to_latent=to_latent, to_observed=to_observed)
+
+    def rescale_noise(self, factor, /):
+        noise = self.noise.rescale_cholesky(factor)
+        return LatentCond(
+            A=self.A,
+            noise=noise,
+            to_latent=self.to_latent,
+            to_observed=self.to_observed,
+        )
+
+
+LatentCond.register_pytree_node()
+
+
+class AbstractPrototype(abc.ABC):
+    @abc.abstractmethod
+    def std(self):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def output_scale_calibrated(self):
+        raise NotImplementedError
+
+
+class AbstractLinearization:
+    """Linearization API."""
+
+    def init_linearization(self):
+        raise NotImplementedError
+
+    def linearize(self, rv, state: None, *, damp: float, t):
+        raise NotImplementedError
+
+
+class AbstractLinearizationRoot(AbstractLinearization):
+    def __init__(self, root, /, *, root_order):
+        self.root = root
+        self.root_order = root_order
+
+
+class AbstractLinearizationOde(AbstractLinearization):
+    def __init__(self, vf, /, *, ode_order):
+        self.vector_field = vf
+        self.ode_order = ode_order
+
+    @property
+    def root_order(self):
+        return self.ode_order + 1
+
+
+class AbstractLinearizationFactory(abc.ABC):
+    @abc.abstractmethod
+    def root_taylor_1st(
+        self, root, *, jacobian, root_order: int
+    ) -> AbstractLinearizationRoot:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def ode_taylor_0th(self, ode_order: int) -> AbstractLinearizationOde:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def ode_taylor_1st(self, vf, *, ode_order: int) -> AbstractLinearizationOde:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def ode_statistical_1st(
+        self, vf, *, cubature_fun: Callable
+    ) -> AbstractLinearizationOde:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def ode_statistical_0th(
+        self, vf, *, cubature_fun: Callable
+    ) -> AbstractLinearizationOde:
+        raise NotImplementedError
+
+
+class AbstractNormal:
+    def __init__(self, mean):
+        self.mean = mean
+
+    def evaluate_mean(self):
+        raise NotImplementedError
+
+    def evaluate_std(self):
+        raise NotImplementedError
+
+    def rescale_cholesky(self, factor, /):
+        raise NotImplementedError
+
+    def sample(self, key):
+        raise NotImplementedError
+
+    @classmethod
+    def from_mean_and_std(cls, mean, std):
+        raise NotImplementedError
+
+    @classmethod
+    def from_dirac(cls, mean, *, damp):
+        raise NotImplementedError
+
+
+class AbstractConditional(abc.ABC):
+    @abc.abstractmethod
+    def marginalise(self, rv, conditional, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def revert(self, rv, conditional, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def apply(self, x, conditional, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def merge(self, cond1, cond2, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def identity(self, ndim, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def transition_wiener_integrated(self, num_derivatives, output_scale=None):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def preconditioner_apply(self, cond, /):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def to_derivative(self, i, std):
+        raise NotImplementedError
+
+
+@structs.dataclass
+class FactImpl:
+    """Implementation of factorized state-space models."""
+
+    name: str
+    prototypes: AbstractPrototype
+    normal: type[AbstractNormal]
+    linearize: AbstractLinearizationFactory
+    conditional: AbstractConditional
+
+    num_derivatives: int
+    unravel: Callable
+
+
+def choose(which: str, /, *, tcoeffs_like) -> FactImpl:
+    """Choose a state-space model implementation."""
+    if which == "dense":
+        return _select_dense(tcoeffs_like=tcoeffs_like)
+    if which == "isotropic":
+        return _select_isotropic(tcoeffs_like=tcoeffs_like)
+    if which == "blockdiag":
+        return _select_blockdiag(tcoeffs_like=tcoeffs_like)
+
+    msg1 = f"Implementation '{which}' unknown. "
+    msg2 = "Choose one out of {'dense', 'isotropic', 'blockdiag'}."
+    raise ValueError(msg1 + msg2)
+
+
+def _select_dense(*, tcoeffs_like) -> FactImpl:
+    ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
+    flat, unravel = tree.ravel_pytree(tcoeffs_like)
+
+    num_derivatives = len(tcoeffs_like) - 1
+
+    prototypes = DensePrototype(ode_shape=ode_shape)
+    normal = DenseNormal
+    linearize = DenseLinearizationFactory(ode_shape=ode_shape, unravel=unravel)
+    conditional = DenseConditional(
+        ode_shape=ode_shape,
+        num_derivatives=num_derivatives,
+        unravel=unravel,
+        flat_shape=flat.shape,
+    )
+    return FactImpl(
+        name="dense",
+        linearize=linearize,
+        conditional=conditional,
+        normal=normal,
+        prototypes=prototypes,
+        num_derivatives=len(tcoeffs_like) - 1,
+        unravel=unravel,
+    )
+
+
+class DensePrototype(AbstractPrototype):
+    def __init__(self, ode_shape):
+        self.ode_shape = ode_shape
+
+    def std(self):
+        return np.ones(self.ode_shape)
+
+    def output_scale_calibrated(self):
+        return np.ones(())
+
+
+class DenseNormal(AbstractNormal):
+    def __init__(self, mean: T, cholesky: T, unravel: Callable[[T], C]):
+        super().__init__(mean=mean)
+        self.cholesky = cholesky
+        self.unravel = unravel
+
+    @classmethod
+    def from_dirac(cls, mean, *, damp):
+        mean_flat, unravel = tree.ravel_pytree(mean)
+        (d,) = mean_flat.shape
+        cholesky = np.eye(d) * damp
+        return cls(mean=mean_flat, cholesky=cholesky, unravel=unravel)
+
+    @classmethod
+    def from_mean_and_std(cls, mean, std):
+        mean_flat, unravel = tree.ravel_pytree(mean)
+        std_flat, _unravel = tree.ravel_pytree(std)
+
+        assert mean_flat.shape == std_flat.shape
+        cholesky = linalg.diagonal_matrix(std_flat)
+        return cls(mean=mean_flat, cholesky=cholesky, unravel=unravel)
+
+    def __repr__(self):
+        msg = f"DenseNormal(mean={self.mean}"
+        msg += f", cholesky={self.cholesky}"
+        msg += f", unravel={self.unravel})"
+        return msg
+
+    def evaluate_mean(self):
+        if self.mean.ndim > 1:
+            return func.vmap(DenseNormal.evaluate_mean)(self)
+        return self.unravel(self.mean)
+
+    def evaluate_std(self):
+        if self.mean.ndim > 1:
+            return func.vmap(DenseNormal.evaluate_std)(self)
+
+        diag = np.einsum("ij,ij->i", self.cholesky, self.cholesky)
+        std = np.sqrt(diag)
+        return self.unravel(std)
+
+    def mahalanobis_norm_relative(self, u):
+        dx = u - self.mean
+        residual_white = linalg.solve_triangular(self.cholesky.T, dx, trans="T")
+        mahalanobis = linalg.qr_r(residual_white[:, None])
+        return np.reshape(np.abs(mahalanobis) / np.sqrt(self.mean.size), ())
+
+    def rescale_cholesky(self, factor, /):
+        cholesky = factor[..., None, None] * self.cholesky
+        return DenseNormal(self.mean, cholesky, unravel=self.unravel)
+
+    def logpdf(self, u, /):
+        u, _ = tree.ravel_pytree(u)
+        cholesky = linalg.qr_r(self.cholesky.T).T
+        diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
+        slogdet = np.sum(np.log(np.abs(diagonal)))
+
+        dx = u - self.mean
+        residual_white = linalg.solve_triangular(cholesky, dx, lower=True, trans=0)
+        sqrnorm = linalg.vector_dot(residual_white, residual_white)
+
+        const = np.log(np.pi() * 2)
+        return -1 / 2 * sqrnorm - u.size / 2 * const - slogdet
+
+    def to_multivariate_normal(self):
+        return self.mean, self.cholesky @ self.cholesky.T
+
+    def sample(self, key):
+        base = random.normal(key, shape=self.mean.shape)
+        sample_latent = self.mean + self.cholesky @ base
+        return self.unravel(sample_latent)
+
+    @staticmethod
+    def update_moving_avg(mean, x, /, num):
+        nominator = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
+        denominator = np.sqrt(num + 1)
+        return nominator / denominator
+
+    @staticmethod
+    def register_pytree_node():
+        def flatten(normal):
+            children = normal.mean, normal.cholesky
+            aux = (normal.unravel,)
+            return children, aux
+
+        def unflatten(aux, children):
+            (unravel,) = aux
+            mean, cholesky = children
+            return DenseNormal(mean, cholesky, unravel)
+
+        tree.register_pytree_node(DenseNormal, flatten, unflatten)
+
+
+class DenseLinearizationFactory(AbstractLinearizationFactory):
+    def __init__(self, ode_shape, unravel):
+        self.ode_shape = ode_shape
+        self.unravel = unravel
+
+    def root_taylor_1st(self, root, *, jacobian, root_order: int):
+        return DenseRootTs1(
+            root, unravel=self.unravel, jacobian=jacobian, root_order=root_order
+        )
+
+    def ode_taylor_0th(self, vf, *, ode_order):
+        return DenseOdeTs0(
+            vf, ode_order=ode_order, ode_shape=self.ode_shape, unravel=self.unravel
+        )
+
+    def ode_taylor_1st(self, vf, *, ode_order, jacobian):
+        if ode_order > 1:
+            raise ValueError
+
+        return DenseOdeTs1(
+            vf,
+            ode_order=ode_order,
+            ode_shape=self.ode_shape,
+            unravel=self.unravel,
+            jacobian=jacobian,
+        )
+
+    def ode_statistical_1st(self, vf, *, cubature_fun):
+        cubature_rule = cubature_fun(input_shape=self.ode_shape)
+        return DenseOdeSlr1(
+            vf,
+            cubature_rule=cubature_rule,
+            ode_shape=self.ode_shape,
+            unravel=self.unravel,
+        )
+
+    def ode_statistical_0th(self, vf, *, cubature_fun):
+        cubature_rule = cubature_fun(input_shape=self.ode_shape)
+        return DenseOdeSlr0(
+            vf,
+            cubature_rule=cubature_rule,
+            ode_shape=self.ode_shape,
+            unravel=self.unravel,
+        )
+
+
+class DenseConditional(AbstractConditional):
+    def __init__(self, ode_shape, num_derivatives, unravel, flat_shape):
+        self.ode_shape = ode_shape
+        self.num_derivatives = num_derivatives
+        self.unravel = unravel
+        self.flat_shape = flat_shape
+
+    def apply(self, x, cond, /):
+        # 'x' is expected to live in target-space,
+        # so we ravel it before applying the conditional
+        x, _ = tree.ravel_pytree(x)
+        x = cond.to_latent * x
+        mean = cond.to_observed * (cond.A @ x + cond.noise.mean)
+        cholesky = cond.to_observed[:, None] * cond.noise.cholesky
+        return DenseNormal(mean, cholesky, unravel=cond.noise.unravel)
+
+    def marginalise(self, rv, cond, /):
+        mean = cond.to_latent * rv.mean
+        cholesky = cond.to_latent[:, None] * rv.cholesky
+
+        R_stack = ((cond.A @ cholesky).T, cond.noise.cholesky.T)
+        cholesky_new = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
+
+        mean_new = cond.to_observed * (cond.A @ mean + cond.noise.mean)
+        cholesky_new = cond.to_observed[:, None] * cholesky_new
+        return DenseNormal(mean_new, cholesky_new, unravel=cond.noise.unravel)
+
+    def merge(self, cond1: LatentCond, cond2: LatentCond, /) -> LatentCond:
+        # Transform: latent (2) to latent (1)
+        T = cond1.to_latent * cond2.to_observed
+
+        # Linear operator
+        g = cond1.A @ (T[:, None] * cond2.A)
+
+        # Combined mean
+        xi = cond1.A @ (T * cond2.noise.mean) + cond1.noise.mean
+
+        # Cholesky factor of combined covariance
+        R1 = (cond1.A @ (T[:, None] * cond2.noise.cholesky)).T
+        R2 = cond1.noise.cholesky.T
+        Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
+
+        # Gather and return
+        noise = DenseNormal(xi, Xi.T, unravel=cond1.noise.unravel)
+        return LatentCond(
+            g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
+        )
+
+    def revert(self, rv: DenseNormal, cond: LatentCond, /):
+        # Pull RV into the latent space
+        mean = cond.to_latent * rv.mean
+        cholesky = cond.to_latent[:, None] * rv.cholesky
+
+        # QR-decomposition
+        R_X_F, R_X, R_YX = (cond.A @ cholesky).T, cholesky.T, cond.noise.cholesky.T
+        tmp = cholesky_util.revert_conditional(R_X_F=R_X_F, R_X=R_X, R_YX=R_YX)
+        r_obs, (r_cor, gain) = tmp
+
+        # Push correction into observed space
+        mean_observed = cond.A @ mean + cond.noise.mean
+        mean_corrected = mean - gain @ mean_observed
+        cholesky_corrected = r_cor.T
+        corrected = DenseNormal(mean_corrected, cholesky_corrected, unravel=rv.unravel)
+        cond_new = LatentCond(
+            gain,
+            corrected,
+            to_latent=1 / cond.to_observed,
+            to_observed=1 / cond.to_latent,
+        )
+
+        # Gather the observed variable
+        mean = cond.to_observed * mean_observed
+        cholesky = cond.to_observed[:, None] * r_obs.T
+        observed = DenseNormal(mean, cholesky, unravel=cond.noise.unravel)
+        return observed, cond_new
+
+    def identity(self, ndim, /) -> LatentCond:
+        (d,) = self.ode_shape
+        n = ndim * d
+
+        A = np.eye(n)
+        m = np.zeros((n,))
+        C = np.zeros((n, n))
+        noise = DenseNormal(m, C, unravel=self.unravel)
+        ones = np.ones((n,))
+        return LatentCond(A, noise, to_latent=ones, to_observed=ones)
+
+    def transition_wiener_integrated(self, base_scale):
+
+        a, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
+        (d,) = self.ode_shape
+
+        eye_d = np.eye(d)
+        A = np.kron(a, eye_d)
+
+        base_scale, _ = tree.ravel_pytree(base_scale)
+        assert base_scale.shape == (d,), base_scale.shape
+
+        Lambda = linalg.diagonal_matrix(base_scale)
+        Q = np.kron(q_sqrtm, Lambda)
+
+        q0 = np.zeros(self.flat_shape)
+        precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
+
+        def discretise(dt, output_scale):
+            output_scale = np.asarray(output_scale)
+            assert output_scale.shape == ()
+            p, p_inv = precon_fun(dt)
+            p = np.repeat(p, d)
+            p_inv = np.repeat(p_inv, d)
+
+            # unravel = tree.Partial(self.unravel)
+            noise = DenseNormal(q0, output_scale * Q, unravel=self.unravel)
+            return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
+
+        return discretise
+
+    def preconditioner_apply(self, cond, /):
+        A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
+        mean = cond.to_observed * cond.noise.mean
+        cholesky = cond.to_observed[:, None] * cond.noise.cholesky
+        noise = DenseNormal(mean, cholesky, unravel=self.unravel)
+        return LatentCond.from_linop_and_noise(A, noise)
+
+    def to_derivative(self, i, std):
+        def select(a):
+            return tree.ravel_pytree(self.unravel(a)[i])[0]
+
+        x = np.zeros(self.flat_shape)
+        linop = func.jacfwd(select)(x)
+
+        data_like = self.unravel(x)[0]
+        noise = DenseNormal.from_mean_and_std(data_like, std)
+        return LatentCond.from_linop_and_noise(linop, noise)
+
+
+def _select_isotropic(*, tcoeffs_like) -> FactImpl:
+    ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
+    num_derivatives = len(tcoeffs_like) - 1
+
+    tcoeffs_tree_only = tree.tree_map(lambda *_a: 0.0, tcoeffs_like)
+    _, unravel_tree = tree.ravel_pytree(tcoeffs_tree_only)
+
+    leaves, tree_structure = tree.tree_flatten(tcoeffs_like)
+    _, unravel_leaf = tree.ravel_pytree(leaves[0])
+
+    def unravel(z):
+        pytree = func.vmap(unravel_tree, in_axes=1, out_axes=0)(z)
+        return tree.tree_map(unravel_leaf, pytree)
+
+    prototypes = IsotropicPrototype(ode_shape=ode_shape)
+    normal = IsotropicNormal
+    linearize = IsotropicLinearizationFactory(unravel=unravel)
+    conditional = IsotropicConditional(
+        ode_shape=ode_shape,
+        num_derivatives=num_derivatives,
+        unravel_tree=unravel_tree,
+        tree_structure=tree_structure,
+    )
+    return FactImpl(
+        name="isotropic",
+        prototypes=prototypes,
+        normal=normal,
+        linearize=linearize,
+        conditional=conditional,
+        num_derivatives=len(tcoeffs_like) - 1,
+        unravel=unravel,
+    )
+
+
+def _select_blockdiag(*, tcoeffs_like) -> FactImpl:
+    ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
+    num_derivatives = len(tcoeffs_like) - 1
+
+    tcoeffs_tree_only = tree.tree_map(lambda *_a: 0.0, tcoeffs_like)
+    _, unravel_tree = tree.ravel_pytree(tcoeffs_tree_only)
+
+    leaves, treedef = tree.tree_flatten(tcoeffs_like)
+    _, unravel_leaf = tree.ravel_pytree(leaves[0])
+
+    def unravel(z):
+        pytree = func.vmap(unravel_tree, in_axes=0, out_axes=0)(z)
+        return tree.tree_map(unravel_leaf, pytree)
+
+    prototypes = BlockDiagPrototype(ode_shape=ode_shape)
+    normal = BlockDiagNormal  # (ode_shape=ode_shape)
+    linearize = BlockDiagLinearizationFactory(unravel=unravel)
+    conditional = BlockDiagConditional(
+        ode_shape=ode_shape,
+        num_derivatives=num_derivatives,
+        unravel_tree=unravel_tree,
+        treedef=treedef,
+        unravel_leaf=unravel_leaf,
+    )
+    return FactImpl(
+        name="blockdiag",
+        prototypes=prototypes,
+        normal=normal,
+        linearize=linearize,
+        conditional=conditional,
+        num_derivatives=len(tcoeffs_like) - 1,
+        unravel=unravel,
+    )
+
+
+class DenseOdeTs0(AbstractLinearizationOde):
+    def __init__(self, vf, *, ode_order: int, ode_shape: tuple, unravel: Callable):
+        super().__init__(vf, ode_order=ode_order)
+        self.ode_shape = ode_shape
+        self.unravel = unravel
+
+    def init_linearization(self):
+        return None
+
+    def linearize(self, rv, state: None, *, damp: float, t):
+        fun = func.partial(self.vector_field, t=t)
+        del state
+
+        def a1(m):
+            """Select the 'n'-th derivative."""
+            return tree.ravel_pytree(self.unravel(m)[self.ode_order])[0]
+
+        fx, unravel = tree.ravel_pytree(fun(*self.unravel(rv.mean)[: self.ode_order]))
+        linop = func.jacrev(a1)(rv.mean)
+        noise = DenseNormal.from_dirac(unravel(-fx), damp=damp)
+        cond = LatentCond.from_linop_and_noise(linop, noise)
+        return cond, None
+
+
+class DenseOdeTs1(AbstractLinearizationOde):
+    def __init__(
+        self,
+        vf: Callable,
+        ode_order: int,
+        ode_shape: tuple,
+        unravel: Callable,
+        jacobian: Any,
+    ):
+        if ode_order > 1:
+            msg = "Not implemented. Try the a root-based TS1 constraint instead."
+            raise ValueError(msg)
+        super().__init__(vf, ode_order=ode_order)
+        self.ode_shape = ode_shape
+        self.unravel = unravel
+        self.jacobian = jacobian
+
+    @property
+    def root_order(self):
+        return self.ode_order + 1
+
+    def init_linearization(self):
+        return self.jacobian.init_jacobian_handler()
+
+    def linearize(self, rv, state: None, *, damp: float, t):
+        fun = func.partial(self.vector_field, t=t)
+        m0, unravel = tree.ravel_pytree(self.unravel(rv.mean)[0])
+
+        def vf_flat(s):
+            s0 = unravel(s)
+            fs0 = fun(s0)
+            return tree.ravel_pytree(fs0)[0]
+
+        E0 = func.jacfwd(lambda s: tree.ravel_pytree(self.unravel(s)[0])[0])(rv.mean)
+        E1 = func.jacfwd(lambda s: tree.ravel_pytree(self.unravel(s)[1])[0])(rv.mean)
+
+        fx, J, state = self.jacobian.materialize_dense(vf_flat, m0, state)
+        linop = E1 - J @ E0
+        fx = fx - J @ m0
+
+        noise = DenseNormal.from_dirac(unravel(-fx), damp=damp)
+        cond = LatentCond.from_linop_and_noise(linop, noise)
+        return cond, state
+
+
+class DenseRootTs1(AbstractLinearizationRoot):
+    def __init__(self, root, *, root_order, unravel, jacobian):
+        super().__init__(root, root_order=root_order)
+        self.unravel = unravel
+        self.jacobian = jacobian
+
+    def init_linearization(self):
+        return self.jacobian.init_jacobian_handler()
+
+    def linearize(self, rv, state, *, damp: float, t):
+        def constraint_flat(m: Array) -> Array:
+            """Evaluate a flattened version of the root constraint."""
+            # Unravel the location and extract derivatives
+            m_tree = self.unravel(m)
+            relevant_tcoeffs = m_tree[: self.root_order]
+
+            # Evaluate the vector field
+            root_eval = self.root(*relevant_tcoeffs, t=t)
+
+            # Flatten the output so that the Jacobians are matrices, not Pytrees.
+            return tree.ravel_pytree(root_eval)[0]
+
+        # Linearize the constraint
+        mean = rv.mean
+        fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
+        fx = fx - linop @ mean
+
+        # Understand how to unravel
+        m_tree = func.eval_shape(self.unravel, rv.mean)
+        relevant_tcoeffs = m_tree[: self.root_order]
+        root_eval = func.eval_shape(lambda s: self.root(*s, t=t), relevant_tcoeffs)
+        root_eval = tree.tree_map(np.zeros_like, root_eval)
+        _, unravel = tree.ravel_pytree(root_eval)
+
+        # Turn the linearization into a conditional
+        noise = DenseNormal.from_dirac(unravel(fx), damp=damp)
+        cond = LatentCond.from_linop_and_noise(linop, noise)
+        return cond, state
+
+
+class DenseOdeSlr0(AbstractLinearizationOde):
+    def __init__(self, vf, *, cubature_rule, ode_shape, unravel):
+        # No higher order ODEs supported for any SLR,
+        # not even in dense models
+        super().__init__(vf, ode_order=1)
+
+        self.cubature_rule = cubature_rule
+        self.ode_shape = ode_shape
+        self.unravel = unravel
+
+    def init_linearization(self) -> None:
+        return None
+
+    def linearize(self, rv, state: None, *, damp: float, t):
+        del state
+        fun = func.partial(self.vector_field, t=t)
+
+        def select_0(s):
+            return tree.ravel_pytree(self.unravel(s)[0])
+
+        m0, unravel = select_0(rv.mean)
+
+        extract_ = func.vmap(lambda s: select_0(s)[0], in_axes=1, out_axes=1)
+        r_0_nonsquare = extract_(rv.cholesky)
+
+        # # Extract the linearisation point
+        r_0_square = cholesky_util.triu_via_qr(r_0_nonsquare.T)
+        linearisation_pt = DenseNormal(m0, r_0_square.T, unravel=unravel)
+
+        def vf_flat(u):
+            return tree.ravel_pytree(fun(unravel(u)))[0]
+
+        # linearize
+        noise = self.slr0(vf_flat, linearisation_pt)
+        mean, cov_lower = noise.mean, noise.cholesky
+
+        # Include the damping term. (TODO: use a single qr?)
+        damping = damp * np.eye(len(cov_lower))
+        stack = np.concatenate((cov_lower.T, damping.T))
+        cov_lower = cholesky_util.triu_via_qr(stack).T
+
+        def select_1(s):
+            return tree.ravel_pytree(self.unravel(s)[1])
+
+        linop = func.jacrev(lambda s: select_1(s)[0])(rv.mean)
+        bias = DenseNormal(-mean, cov_lower, unravel=unravel)
+        to_latent = np.ones(linop.shape[1])
+        to_observed = np.ones(linop.shape[0])
+        cond = LatentCond(linop, bias, to_latent=to_latent, to_observed=to_observed)
+        return cond, None
+
+    def slr0(self, fn, x):
+        """Linearize a function with zeroth-order statistical linear regression.
+
+        !!! warning "Warning: highly EXPERIMENTAL feature!"
+            This feature is highly experimental.
+            There is no guarantee that it works correctly.
+            It might be deleted tomorrow
+            and without any deprecation policy.
+
+        """
+        # Create sigma-points
+        pts_centered = self.cubature_rule.points @ x.cholesky.T
+        pts = x.mean[None, :] + pts_centered
+
+        # Evaluate the nonlinear function
+        fx = func.vmap(fn)(pts)
+        fx_mean = self.cubature_rule.weights_sqrtm**2 @ fx
+        fx_centered = fx - fx_mean[None, :]
+        fx_centered_normed = fx_centered * self.cubature_rule.weights_sqrtm[:, None]
+
+        cov_sqrtm = cholesky_util.triu_via_qr(fx_centered_normed)
+
+        return DenseNormal(fx_mean, cov_sqrtm.T, unravel=x.unravel)
+
+
+class DenseOdeSlr1(AbstractLinearizationOde):
+    def __init__(self, vf, *, cubature_rule, ode_shape, unravel):
+        super().__init__(vf, ode_order=1)
+
+        self.cubature_rule = cubature_rule
+        self.ode_shape = ode_shape
+        self.unravel = unravel
+
+    def init_linearization(self) -> None:
+        return None
+
+    def linearize(self, rv, state: None, *, damp: float, t):
+        del state
+        fun = func.partial(self.vector_field, t=t)
+
+        # TODO: Implement a DenseRootSlr1
+        def select_0(s):
+            return tree.ravel_pytree(self.unravel(s)[0])
+
+        def select_1(s):
+            return tree.ravel_pytree(self.unravel(s)[1])
+
+        m0, unravel = select_0(rv.mean)
+
+        extract_ = func.vmap(lambda s: select_0(s)[0], in_axes=1, out_axes=1)
+        r_0_nonsquare = extract_(rv.cholesky)
+
+        # # Extract the linearisation point
+        r_0_square = cholesky_util.triu_via_qr(r_0_nonsquare.T)
+        linearisation_pt = DenseNormal(m0, r_0_square.T, unravel=unravel)
+
+        def vf_flat(u):
+            return tree.ravel_pytree(fun(unravel(u)))[0]
+
+        # Gather the variables and return
+        J, noise = self.slr1(vf_flat, linearisation_pt)
+        mean, cov_lower = noise.mean, noise.cholesky
+
+        def A(x):
+            return select_1(x)[0] - J @ select_0(x)[0]
+
+        linop = func.jacrev(A)(rv.mean)
+
+        # Include the damping term. (TODO: use a single qr?)
+        damping = damp * np.eye(len(cov_lower))
+        stack = np.concatenate((cov_lower.T, damping.T))
+        cov_lower = cholesky_util.triu_via_qr(stack).T
+        bias = DenseNormal(-mean, cov_lower, unravel=unravel)
+        to_latent = np.ones(linop.shape[1])
+        to_observed = np.ones(linop.shape[0])
+        cond = LatentCond(linop, bias, to_latent=to_latent, to_observed=to_observed)
+        return cond, None
+
+    def slr1(self, fn, x):
+        """Linearize a function with first-order statistical linear regression."""
+        # Create sigma-points
+        pts_centered = self.cubature_rule.points @ x.cholesky.T
+        pts = x.mean[None, :] + pts_centered
+        pts_centered_normed = pts_centered * self.cubature_rule.weights_sqrtm[:, None]
+
+        # Evaluate the nonlinear function
+        fx = func.vmap(fn)(pts)
+        fx_mean = self.cubature_rule.weights_sqrtm**2 @ fx
+        fx_centered = fx - fx_mean[None, :]
+        fx_centered_normed = fx_centered * self.cubature_rule.weights_sqrtm[:, None]
+
+        # Compute statistical linear regression matrices
+        _, (cov_sqrtm_cond, linop_cond) = cholesky_util.revert_conditional_noisefree(
+            R_X_F=pts_centered_normed, R_X=fx_centered_normed
+        )
+        mean_cond = fx_mean - linop_cond @ x.mean
+        rv_cond = DenseNormal(mean_cond, cov_sqrtm_cond.T, unravel=x.unravel)
+        return linop_cond, rv_cond
+
+
+class IsotropicOdeTs0(AbstractLinearizationOde):
+    def __init__(self, vf, *, ode_order, unravel):
+        super().__init__(vf, ode_order=ode_order)
+        self.unravel = unravel
+
+    @property
+    def root_order(self):
+        return self.ode_order + 1
+
+    def init_linearization(self):
+        return None
+
+    def linearize(self, rv, state: None, *, damp: float, t):
+        del state
+        fun = func.partial(self.vector_field, t=t)
+        mean = rv.mean
+
+        mean_tree = self.unravel(mean)
+        m1 = mean_tree[: self.ode_order]
+        fx_tree = fun(*m1)
+        fx, unravel_obs = tree.ravel_pytree(fx_tree)
+
+        bias = IsotropicNormal.from_dirac(unravel_obs(-fx), damp=damp)
+
+        linop = func.jacrev(lambda s: s[[self.ode_order], ...])(mean[..., 0])
+        to_latent = np.ones((linop.shape[1],))
+        to_observed = np.ones((linop.shape[0],))
+        cond = LatentCond(linop, bias, to_latent=to_latent, to_observed=to_observed)
+        return cond, None
+
+
+class IsotropicOdeTs1(AbstractLinearizationOde):
+    def __init__(self, vf, *, ode_order: int, unravel: Callable, jacobian: Any):
+        if ode_order > 1:
+            msg = "This linearization is not compatible with high-order ODEs as of yet."
+            raise ValueError(msg)
+        super().__init__(vf, ode_order=1)
+
+        self.unravel = unravel
+        self.jacobian = jacobian
+
+    def init_linearization(self):
+        return self.jacobian.init_jacobian_handler()
+
+    def linearize(self, rv, state, *, damp: float, t):
+        fun = func.partial(self.vector_field, t=t)
+        # Evaluate the linearisation
+        m0, unravel = tree.ravel_pytree(self.unravel(rv.mean)[0])
+
+        def vf_ravel(s):
+            return tree.ravel_pytree(fun(unravel(s)))[0]
+
+        # Estimate the trace using Hutchinson's estimator
+        fx, J_trace, state = self.jacobian.calculate_trace(vf_ravel, m0, state)
+
+        n, _d = rv.mean.shape
+        eye = np.eye(n)
+        E0, E1 = eye[np.asarray([0])], eye[np.asarray([1])]
+        linop = E1 - J_trace * E0
+        fx = rv.mean[1, ...] - fx
+        fx = fx - linop @ rv.mean
+
+        # Turn fx and J_trace into an observation model
+        vf_dummy = func.eval_shape(lambda s: fun(unravel(s)), m0)
+        _, structure = tree.tree_flatten(vf_dummy)
+        fx = tree.tree_unflatten(structure, [*fx])
+        noise = IsotropicNormal.from_dirac(fx, damp=damp)
+        cond = LatentCond.from_linop_and_noise(linop, noise)
+        return cond, state
+
+
+class BlockDiagOdeTs0(AbstractLinearizationOde):
+    def __init__(self, vf, *, ode_order: int, unravel: Callable):
+        super().__init__(vf, ode_order=ode_order)
+        self.unravel = unravel
+
+    def init_linearization(self) -> None:
+        return None
+
+    def linearize(self, rv, state: None, *, damp: float, t):
+        del state
+        fun = func.partial(self.vector_field, t=t)
+        mean = rv.evaluate_mean()
+        fx = fun(*(mean[: self.ode_order]))
+        fx = tree.tree_map(lambda s: -s, fx)
+        bias = BlockDiagNormal.from_dirac(fx, damp=damp)
+
+        def a1(s):
+            return s[[self.ode_order], ...]
+
+        linop = func.vmap(func.jacrev(a1))(rv.mean)
+
+        cond = LatentCond.from_linop_and_noise(linop, bias)
+        return cond, None
+
+
+class BlockDiagOdeTs1(AbstractLinearizationOde):
+    def __init__(self, vf, *, ode_order: int, unravel: Callable, jacobian: Any):
+        if ode_order > 1:
+            msg = "This linearization is not compatible with high-order ODEs as of yet."
+            raise ValueError(msg)
+        super().__init__(vf, ode_order=1)
+        self.unravel = unravel
+        self.jacobian = jacobian
+
+    def init_linearization(self):
+        return self.jacobian.init_jacobian_handler()
+
+    def linearize(self, rv, state, *, damp: float, t):
+        fun = func.partial(self.vector_field, t=t)
+        mean = rv.mean
+
+        def a1(s):
+            return s[[1], ...]
+
+        linop = func.vmap(func.jacrev(a1))(mean)
+
+        def vf_flat(u):
+            return tree.ravel_pytree(fun(unravel(u)))[0]
+
+        def select_0(s):
+            return tree.ravel_pytree(self.unravel(s)[0])
+
+        # Evaluate the linearisation
+        m0, unravel = select_0(rv.mean)
+        fx, J_diag, state = self.jacobian.calculate_diagonal(vf_flat, m0, state)
+
+        E1 = func.jacrev(lambda s: s[0])(rv.mean[0])
+        linop = linop - J_diag[:, None, None] * E1[None, None, :]
+
+        fx = rv.mean[:, 1] - fx
+        fx = fx[..., None]
+        diff = func.vmap(lambda a, b: a @ b)(linop, rv.mean)
+        fx = fx - diff
+
+        bias = BlockDiagNormal.from_dirac(fx, damp=damp)
+        cond = LatentCond.from_linop_and_noise(linop, bias)
+        return cond, state
+
+
+class IsotropicLinearizationFactory(AbstractLinearizationFactory):
+    def __init__(self, unravel):
+        self.unravel = unravel
+
+    def root_taylor_1st(self, root, *, jacobian, root_order: int):
+        raise NotImplementedError
+
+    def ode_taylor_1st(self, vf, *, ode_order, jacobian):
+        return IsotropicOdeTs1(
+            vf, jacobian=jacobian, ode_order=ode_order, unravel=self.unravel
+        )
+
+    def ode_taylor_0th(self, vf, *, ode_order):
+        return IsotropicOdeTs0(vf, ode_order=ode_order, unravel=self.unravel)
+
+    def ode_statistical_0th(self, vf, *, cubature_fun):
+        raise NotImplementedError
+
+    def ode_statistical_1st(self, vf, *, cubature_fun):
+        raise NotImplementedError
+
+
+class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
+    def __init__(self, unravel):
+        self.unravel = unravel
+
+    def root_taylor_1st(self, root, *, jacobian, root_order: int):
+        raise NotImplementedError
+
+    def ode_taylor_0th(self, vf, *, ode_order):
+        return BlockDiagOdeTs0(vf, ode_order=ode_order, unravel=self.unravel)
+
+    def ode_taylor_1st(self, vf, *, ode_order, jacobian):
+        return BlockDiagOdeTs1(
+            vf, ode_order=ode_order, unravel=self.unravel, jacobian=jacobian
+        )
+
+    def ode_statistical_0th(self, vf, *, cubature_fun):
+        raise NotImplementedError
+
+    def ode_statistical_1st(self, vf, *, cubature_fun):
+        raise NotImplementedError
+
+
+class IsotropicConditional(AbstractConditional):
+    def __init__(self, *, ode_shape, num_derivatives, unravel_tree, tree_structure):
+        self.ode_shape = ode_shape
+        self.num_derivatives = num_derivatives
+        self.unravel_tree = unravel_tree
+        self.tree_structure = tree_structure
+
+    def apply(self, x, cond, /):
+        leaves = tree.tree_leaves(x)
+        x = np.stack(leaves)
+
+        x = cond.to_latent[:, None] * x
+        mean_new = cond.to_observed[:, None] * cond.A @ x + cond.noise.mean
+        cholesky_new = cond.to_observed[:, None] * cond.noise.cholesky
+        return IsotropicNormal(mean_new, cholesky_new, treedef=cond.noise.treedef)
+
+    def marginalise(self, rv, cond, /):
+        mean = cond.to_latent[:, None] * rv.mean
+        cholesky = cond.to_latent[:, None] * rv.cholesky
+        R_stack = ((cond.A @ cholesky).T, cond.noise.cholesky.T)
+        cholesky_new = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
+
+        mean_new = cond.to_observed[:, None] * (cond.A @ mean + cond.noise.mean)
+        cholesky_new = cond.to_observed[:, None] * cholesky_new
+        return IsotropicNormal(mean_new, cholesky_new, treedef=cond.noise.treedef)
+
+    def merge(self, cond1, cond2, /):
+        # Transform: latent (2) to latent (1)
+        T = cond1.to_latent * cond2.to_observed
+
+        # Linear operator
+        g = cond1.A @ (T[:, None] * cond2.A)
+
+        # Combined mean
+        xi = cond1.A @ (T[:, None] * cond2.noise.mean) + cond1.noise.mean
+
+        # Cholesky factor of combined covariance
+        R1 = (cond1.A @ (T[:, None] * cond2.noise.cholesky)).T
+        R2 = cond1.noise.cholesky.T
+        Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
+
+        # Gather and return
+        noise = IsotropicNormal(xi, Xi.T, treedef=cond1.noise.treedef)
+        return LatentCond(
+            g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
+        )
+
+    def revert(self, rv, cond, /):
+        # Pull RV into the latent space
+        mean = cond.to_latent[:, None] * rv.mean
+        cholesky = cond.to_latent[:, None] * rv.cholesky
+
+        # QR-decomposition
+        R_X_F, R_X, R_YX = (cond.A @ cholesky).T, cholesky.T, cond.noise.cholesky.T
+        tmp = cholesky_util.revert_conditional(R_X_F=R_X_F, R_X=R_X, R_YX=R_YX)
+        r_obs, (r_cor, gain) = tmp
+
+        # Push correction into observed space
+        mean_observed = cond.A @ mean + cond.noise.mean
+        mean_corrected = mean - gain @ mean_observed
+        cholesky_corrected = r_cor.T
+        corrected = IsotropicNormal(
+            mean_corrected, cholesky_corrected, treedef=rv.treedef
+        )
+        cond_new = LatentCond(
+            gain,
+            corrected,
+            to_latent=1 / cond.to_observed,
+            to_observed=1 / cond.to_latent,
+        )
+
+        # Gather the observed variable
+        mean = cond.to_observed[:, None] * mean_observed
+        cholesky = cond.to_observed[:, None] * r_obs.T
+        observed = IsotropicNormal(mean, cholesky, treedef=cond.noise.treedef)
+        return observed, cond_new
+
+    def identity(self, num, /) -> LatentCond:
+        m0 = np.zeros((num, *self.ode_shape))
+        c0 = np.zeros((num, num))
+        noise = IsotropicNormal(m0, c0, treedef=self.tree_structure)
+        matrix = np.eye(num)
+        ones = np.ones((num,))
+        return LatentCond(matrix, noise, to_latent=ones, to_observed=ones)
+
+    def transition_wiener_integrated(self, base_scale):
+
+        A, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
+        q0 = np.zeros((self.num_derivatives + 1, *self.ode_shape))
+        precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
+
+        [base_scale] = tree.tree_leaves(base_scale)
+        assert base_scale.shape == ()
+
+        def discretise(dt, output_scale):
+            scale = base_scale * output_scale
+            p, p_inv = precon_fun(dt)
+            noise = IsotropicNormal(q0, scale * q_sqrtm, treedef=self.tree_structure)
+            return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
+
+        return discretise
+
+    def preconditioner_apply(self, cond, /):
+        A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
+        mean = cond.to_observed[:, None] * cond.noise.mean
+        cholesky = cond.to_observed[:, None] * cond.noise.cholesky
+        noise = IsotropicNormal(mean, cholesky, treedef=self.tree_structure)
+        return LatentCond.from_linop_and_noise(A, noise)
+
+    def to_derivative(self, i, std):
+
+        def select(a):
+            return tree.ravel_pytree(self.unravel_tree(a)[i])[0]
+
+        m = np.zeros((self.num_derivatives + 1,))
+        linop = func.jacfwd(select)(m)
+        u_like = self.unravel_tree(m)[0]
+
+        # Wrap u_like and std into a list because the random variable
+        # expects TaylorCoefficients.
+        noise = IsotropicNormal.from_mean_and_std([u_like], [std])
+        return LatentCond.from_linop_and_noise(linop, noise)
+
+
+class BlockDiagConditional(AbstractConditional):
+    def __init__(
+        self, *, ode_shape, num_derivatives, unravel_tree, treedef, unravel_leaf
+    ):
+        self.ode_shape = ode_shape
+        self.num_derivatives = num_derivatives
+        self.unravel_tree = unravel_tree
+        self.treedef = treedef
+        self.unravel_leaf = unravel_leaf
+
+    def apply(self, x, cond, /):
+        leaves = tree.tree_leaves(x)
+        leaves_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], leaves)
+        x = np.stack(leaves_flat).T
+
+        def apply_unbatch(s, c):
+            s = c.to_latent * s
+            m_new = c.to_observed * (c.A @ s + c.noise.mean)
+            c_new = c.to_observed[:, None] * c.noise.cholesky
+            return BlockDiagNormal(
+                m_new,
+                c_new,
+                treedef=cond.noise.treedef,
+                unravel_leaf=cond.noise.unravel_leaf,
+            )
+
+        return func.vmap(apply_unbatch)(x, cond)
+
+    def marginalise(self, rv, cond, /):
+        matrix, noise = cond.A, cond.noise
+        assert matrix.ndim == 3
+        mean = cond.to_latent * rv.mean
+        cholesky = cond.to_latent[:, :, None] * rv.cholesky
+
+        mean_marg = np.einsum("ijk,ik->ij", matrix, mean) + noise.mean
+
+        chol1 = _transpose(matrix @ cholesky)
+        chol2 = _transpose(noise.cholesky)
+        R_stack = (chol1, chol2)
+        cholesky = func.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack)
+
+        mean_new = cond.to_observed * mean_marg
+        cholesky_new = cond.to_observed[:, :, None] * _transpose(cholesky)
+        return BlockDiagNormal(
+            mean_new,
+            cholesky_new,
+            treedef=cond.noise.treedef,
+            unravel_leaf=cond.noise.unravel_leaf,
+        )
+
+    def merge(self, cond1, cond2, /):
+        # Transform: latent (2) to latent (1)
+        T = cond1.to_latent * cond2.to_observed
+
+        # Linear operator
+        A1, A2 = cond1.A, T[:, :, None] * cond2.A
+        g = func.vmap(lambda a, b: a @ b)(A1, A2)
+
+        # Combined mean
+        m1, m2 = T * cond2.noise.mean, cond1.noise.mean
+        xi = func.vmap(lambda a, b, c: a @ b + c)(A1, m1, m2)
+
+        # Cholesky factor of combined covariance
+        C1, C2 = cond1.noise.cholesky, T[:, :, None] * cond2.noise.cholesky
+        R1 = _transpose(func.vmap(lambda a, b: a @ b)(A1, C2))
+        R2 = _transpose(C1)
+        Xi = func.vmap(cholesky_util.sum_of_sqrtm_factors)((R1, R2))
+        Xi = _transpose(Xi)
+
+        # Gather and return
+        noise = BlockDiagNormal(
+            xi, Xi, treedef=cond1.noise.treedef, unravel_leaf=cond1.noise.unravel_leaf
+        )
+        return LatentCond(
+            g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
+        )
+
+    def revert(self, rv, cond, /):
+        # Pull RV into latent space
+        mean = cond.to_latent * rv.mean
+        cholesky = cond.to_latent[:, :, None] * rv.cholesky
+
+        # QR decomposition
+        rv_chol_upper = _transpose(cholesky)
+        noise_chol_upper = _transpose(cond.noise.cholesky)
+        A_rv_chol_upper = _transpose(cond.A @ cholesky)
+        revert = func.vmap(cholesky_util.revert_conditional)
+        r_obs, (r_cor, gain) = revert(A_rv_chol_upper, rv_chol_upper, noise_chol_upper)
+        cholesky_obs = np.transpose(r_obs, axes=(0, 2, 1))
+        cholesky_cor = np.transpose(r_cor, axes=(0, 2, 1))
+
+        # New backward conditional
+        mean_observed = (cond.A @ mean[..., None])[..., 0] + cond.noise.mean
+        mean_corrected = mean - (gain @ (mean_observed[..., None]))[..., 0]
+        corrected = BlockDiagNormal(
+            mean_corrected,
+            cholesky_cor,
+            treedef=rv.treedef,
+            unravel_leaf=rv.unravel_leaf,
+        )
+        bwd = LatentCond(
+            gain,
+            corrected,
+            to_latent=1 / cond.to_observed,
+            to_observed=1 / cond.to_latent,
+        )
+
+        # Gather observed RV
+        mean_observed = cond.to_observed * mean_observed
+        cholesky_observed = cond.to_observed[:, :, None] * cholesky_obs
+        observed = BlockDiagNormal(
+            mean_observed,
+            cholesky_observed,
+            treedef=cond.noise.treedef,
+            unravel_leaf=cond.noise.unravel_leaf,
+        )
+        return observed, bwd
+
+    def identity(self, ndim, /) -> LatentCond:
+        m0 = np.zeros((*self.ode_shape, ndim))
+        c0 = np.zeros((*self.ode_shape, ndim, ndim))
+        noise = BlockDiagNormal(
+            m0, c0, treedef=self.treedef, unravel_leaf=self.unravel_leaf
+        )
+        matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
+        return LatentCond.from_linop_and_noise(matrix, noise)
+
+    def transition_wiener_integrated(self, base_scale):
+
+        a, q_sqrtm = wiener_integrated_system_matrices_1d(self.num_derivatives)
+        q0 = np.zeros((self.num_derivatives + 1,))
+        precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
+
+        (d,) = self.ode_shape
+        base_scale, _ = tree.ravel_pytree(base_scale)
+        assert base_scale.shape == (d,)
+
+        def discretise(dt, output_scale):
+            p, p_inv = precon_fun(dt)
+            scale = base_scale * output_scale
+
+            A_batch = np.ones((d, 1, 1)) * a[None, :, :]
+            mean = np.ones((d, 1)) * q0[None, :]
+            cholesky = scale[:, None, None] * q_sqrtm[None, :, :]
+            noise = BlockDiagNormal(
+                mean, cholesky, treedef=self.treedef, unravel_leaf=self.unravel_leaf
+            )
+            p = np.ones((d, 1)) * p[None, :]
+            p_inv = np.ones((d, 1)) * p_inv[None, :]
+            return LatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
+
+        return discretise
+
+    def preconditioner_apply(self, cond, /):
+        A = cond.to_observed[:, :, None] * cond.A * cond.to_latent[:, None, :]
+        mean = cond.to_observed * cond.noise.mean
+        cholesky = cond.to_observed[:, :, None] * cond.noise.cholesky
+        noise = BlockDiagNormal(
+            mean, cholesky, treedef=self.treedef, unravel_leaf=self.unravel_leaf
+        )
+        to_observed = np.ones_like(cond.to_observed)
+        to_latent = np.ones_like(cond.to_latent)
+        return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
+
+    def to_derivative(self, i, std):
+
+        def select(a):
+            return tree.ravel_pytree(self.unravel_tree(a)[i])[0]
+
+        x = np.zeros((*self.ode_shape, self.num_derivatives + 1))
+        linop = func.vmap(func.jacrev(select))(x)
+
+        u_like = tree.tree_unflatten(self.treedef, x.T)
+        u_like = tree.tree_map(self.unravel_leaf, u_like)
+        u_like = tree.tree_map(np.zeros_like, u_like[0])
+        noise = BlockDiagNormal.from_mean_and_std(u_like, std)
+        return LatentCond.from_linop_and_noise(linop, noise)
+
+
+def _transpose(matrix):
+    return np.transpose(matrix, axes=(0, 2, 1))
+
+
+def wiener_integrated_system_matrices_1d(num_derivatives):
+    """Construct the IBM system matrices."""
+    x = np.arange(0, num_derivatives + 1)
+
+    A_1d = np.flip(_pascal(x)[0])  # no idea why the [0] is necessary...
+
+    # Cholesky factor of flip(hilbert(n))
+    Q_1d = cholesky_util.cholesky_hilbert(num_derivatives + 1)
+    Q_1d_flipped = np.flip(Q_1d, axis=0)
+    Q_1d = linalg.qr_r(Q_1d_flipped.T).T
+    return A_1d, Q_1d
+
+
+def preconditioner_taylor(*, num_derivatives):
+    """Construct the diagonal preconditioner for Taylor-coefficient state spaces."""
+    powers = np.arange(num_derivatives, -1.0, step=-1.0)
+    scales = np.factorial(powers)
+    powers = powers + 0.5
+
+    def precon(dt):
+        dt_abs = np.abs(dt)
+        scaling_vector = np.power(dt_abs, powers) / scales
+        scaling_vector_inv = np.power(dt_abs, -powers) * scales
+        return scaling_vector, scaling_vector_inv
+
+    return precon
+
+
+def _pascal(a, /):
+    return _batch_gram(_binom)(a[:, None], a[None, :])
+
+
+def _batch_gram(k, /):
+    k_vmapped_x = func.vmap(k, in_axes=(0, None), out_axes=-1)
+    return func.vmap(k_vmapped_x, in_axes=(None, 1), out_axes=-1)
+
+
+def _binom(n, k):
+    return np.factorial(n) / (np.factorial(n - k) * np.factorial(k))
+
+
+class IsotropicNormal(AbstractNormal):
+    def __init__(self, mean: T, cholesky: T, treedef):
+        super().__init__(mean=mean)
+        self.cholesky = cholesky
+        self.treedef = treedef
+
+    def __repr__(self):
+        msg = f"IsotropicNormal(mean={self.mean}"
+        msg += f", cholesky={self.cholesky}"
+        msg += f", treedef={self.treedef})"
+        return msg
+
+    @classmethod
+    def from_dirac(cls, mean, *, damp):
+        leaves, structure = tree.tree_flatten(mean)
+        mean_array = np.stack(leaves)
+        n, _ = mean_array.shape
+        cholesky = np.eye(n) * damp
+        return cls(mean=mean_array, cholesky=cholesky, treedef=structure)
+
+    @classmethod
+    def from_mean_and_std(cls, mean, std):
+
+        def ravel(s):
+            return tree.ravel_pytree(s)[0]
+
+        loc_leaves, treedef = tree.tree_flatten(mean)
+        leaves_flat = tree.tree_map(ravel, loc_leaves)
+        loc_flat = np.stack(leaves_flat)
+
+        scale_leaves, _ = tree.tree_flatten(std)
+        scale_flat = np.stack(scale_leaves)
+
+        num_coeffs = len(mean)
+        if scale_flat.shape != (num_coeffs,):
+            msg = "'std' must have the same pytree structure as mean, "
+            msg += "but each leaf must be a scalar instead of an array"
+            msg += f"Received: {std}"
+            raise ValueError(msg)
+
+        cholesky_flat = linalg.diagonal_matrix(scale_flat)
+        return cls(loc_flat, cholesky_flat, treedef=treedef)
+
+    def evaluate_mean(self):
+        if self.mean.ndim > 2:
+            return func.vmap(IsotropicNormal.evaluate_mean)(self)
+
+        return tree.tree_unflatten(self.treedef, [*self.mean])
+
+    def evaluate_std(self):
+        if self.mean.ndim > 2:
+            return func.vmap(IsotropicNormal.evaluate_std)(self)
+        diag = np.einsum("ij,ji->i", self.cholesky, self.cholesky)
+        std = np.sqrt(diag)
+        return tree.tree_unflatten(self.treedef, [*std])
+
+    def mahalanobis_norm_relative(self, u):
+        if self.cholesky.size > 1:
+            raise ValueError
+        residual_white = (self.mean - u) / self.cholesky
+        residual_white_matrix = linalg.qr_r(residual_white.T)
+        return np.reshape(np.abs(residual_white_matrix) / np.sqrt(self.mean.size), ())
+
+    def rescale_cholesky(self, factor, /):
+        cholesky = factor[..., None, None] * self.cholesky
+        return IsotropicNormal(self.mean, cholesky, treedef=self.treedef)
+
+    def logpdf(self, u, /):
+        u_leaves = tree.tree_leaves(u)
+        u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
+        u_latent = np.stack(u_flat)
+
+        # # if the gain is qoi-to-hidden, the data is a (d,) array.
+        # # this is problematic for the isotropic model unless we explicitly broadcast.
+        # if np.ndim(u) == 1:
+        #     u = u[None, :]
+
+        # Batch in the "mean" dimension and sum the results.
+        rv_batch = IsotropicNormal(1, None, treedef=self.treedef)
+        logpdf_vmap = func.vmap(IsotropicNormal.logpdf_scalar, in_axes=(rv_batch, 1))
+        logpdfs = logpdf_vmap(self, u_latent)
+        return np.sum(logpdfs)
+
+    def logpdf_scalar(self, u, /):
+        cholesky = linalg.qr_r(self.cholesky.T).T
+
+        dx = u - self.mean
+        w = linalg.solve_triangular(cholesky.T, dx, trans="T")
+
+        maha_term = linalg.vector_dot(w, w)
+
+        diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
+        slogdet = np.sum(np.log(np.abs(diagonal)))
+        logdet_term = 2.0 * slogdet
+        return -0.5 * (logdet_term + maha_term + u.size * np.log(np.pi() * 2))
+
+    def to_multivariate_normal(self):
+        ode_state = tree.tree_unflatten(self.treedef, self.mean)[0]
+        ode_shape = tree.ravel_pytree(ode_state)[0].shape
+        eye_d = np.eye(*ode_shape)
+
+        cov = self.cholesky @ self.cholesky.T
+
+        cov = np.kron(eye_d, cov)
+        mean = self.mean.reshape((-1,), order="F")
+        return (mean, cov)
+
+    def sample(self, key):
+        n, _n = self.cholesky.shape
+
+        base = random.normal(key, shape=(n,))
+        sample_latent = self.mean + (self.cholesky @ base)[:, None]
+
+        return tree.tree_unflatten(self.treedef, [*sample_latent])
+
+    @staticmethod
+    def update_moving_avg(mean, x, /, num):
+        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
+        return sum_updated / np.sqrt(num + 1)
+
+    @staticmethod
+    def register_pytree_node():
+        def flatten(normal):
+            children = normal.mean, normal.cholesky
+            aux = (normal.treedef,)
+            return children, aux
+
+        def unflatten(aux, children):
+            (treedef,) = aux
+            mean, cholesky = children
+            return IsotropicNormal(mean, cholesky, treedef)
+
+        tree.register_pytree_node(IsotropicNormal, flatten, unflatten)
+
+
+class BlockDiagNormal(AbstractNormal):
+    def __init__(self, mean, cholesky, treedef, unravel_leaf):
+        super().__init__(mean=mean)
+        self.cholesky = cholesky
+        self.treedef = treedef
+        self.unravel_leaf = unravel_leaf
+
+    def __repr__(self):
+        msg = f"BlockDiagNormal(mean={self.mean}"
+        msg += f", cholesky={self.cholesky}"
+        msg += f", treedef={self.treedef}"
+        msg += f", unravel_leaf={self.unravel_leaf}>)"
+        return msg
+
+    @classmethod
+    def from_dirac(cls, mean, *, damp):
+        leaves, treedef = tree.tree_flatten(mean)
+        leaves_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], leaves)
+        flat = np.stack(leaves_flat).T
+        _, unravel_leaf = tree.ravel_pytree(leaves[0])
+
+        mean_array = flat
+        d, n = np.shape(mean_array)
+        cholesky = np.ones((d, 1, 1)) * (np.eye(n) * damp)[None, :, :]
+        return cls(mean_array, cholesky, treedef=treedef, unravel_leaf=unravel_leaf)
+
+    @classmethod
+    def from_mean_and_std(cls, mean, std):
+        def ravel(s):
+            return tree.ravel_pytree(s)[0]
+
+        # Flatten and reshape the mean
+        loc_leaves, treedef = tree.tree_flatten(mean)
+        loc_leaves_flat = tree.tree_map(ravel, loc_leaves)
+        loc_flat = np.stack(loc_leaves_flat).T
+        _, unravel_leaf = tree.ravel_pytree(loc_leaves[0])
+
+        def unravel(z):
+            z1 = tree.tree_unflatten(treedef, z.T)
+            return tree.tree_map(unravel_leaf, z1)
+
+        # Flatten and reshape the standard deviation
+        scale_leaves, _ = tree.tree_flatten(std)
+        scale_leaves_flat = tree.tree_map(ravel, scale_leaves)
+        scale_flat = np.stack(scale_leaves_flat).T
+
+        # Promote std into covariance matrix and apply damping
+        num_coeffs = len(mean)
+        d = np.ones((num_coeffs,))
+        cholesky = linalg.diagonal_matrix(d)
+        cholesky_flat = scale_flat[..., None] * cholesky[None, ...]
+        return cls(loc_flat, cholesky_flat, treedef=treedef, unravel_leaf=unravel_leaf)
+
+    def evaluate_mean(self):
+        if self.mean.ndim > 2:
+            return func.vmap(BlockDiagNormal.evaluate_mean)(self)
+        mean_tree = tree.tree_unflatten(self.treedef, [*(self.mean.T)])
+        return tree.tree_map(self.unravel_leaf, mean_tree)
+
+    def evaluate_std(self):
+        if self.mean.ndim > 2:
+            return func.vmap(BlockDiagNormal.evaluate_std)(self)
+        diag = np.einsum("ijk,ikj->ij", self.cholesky, self.cholesky)
+        std = np.sqrt(diag)
+        std_tree = tree.tree_unflatten(self.treedef, [*(std.T)])
+        return tree.tree_map(self.unravel_leaf, std_tree)
+
+    def mahalanobis_norm_relative(self, u, /):
+        # assumes rv.chol = (d,1,1)
+        # return array of norms! See calibration
+        mean = np.reshape(self.mean, (-1,))
+        cholesky = np.reshape(self.cholesky, (-1,))
+        return (mean - u) / cholesky / np.sqrt(mean.size)
+
+    def rescale_cholesky(self, factor, /):
+        cholesky = factor[..., None, None] * self.cholesky
+        return BlockDiagNormal(
+            self.mean, cholesky, treedef=self.treedef, unravel_leaf=self.unravel_leaf
+        )
+
+    def logpdf(self, u, /):
+        u_leaves = tree.tree_leaves(u)
+        u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
+        u_ = np.stack(u_flat).T
+        return np.sum(func.vmap(BlockDiagNormal.logpdf_scalar)(self, u_))
+
+    def logpdf_scalar(self, u):
+        cholesky = linalg.qr_r(self.cholesky.T).T
+
+        dx = u - self.mean
+        w = linalg.solve_triangular(cholesky.T, dx, trans="T")
+
+        maha_term = linalg.vector_dot(w, w)
+
+        diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
+        slogdet = np.sum(np.log(np.abs(diagonal)))
+        logdet_term = 2.0 * slogdet
+        return -0.5 * (logdet_term + maha_term + u.size * np.log(np.pi() * 2))
+
+    def to_multivariate_normal(self):
+        mean = np.reshape(self.mean.T, (-1,), order="F")
+        cov = np.block_diag(self._cov_dense())
+        return mean, cov
+
+    def _cov_dense(self):
+        if self.cholesky.ndim > 2:
+            return func.vmap(BlockDiagNormal._cov_dense)(self)
+        return self.cholesky @ self.cholesky.T
+
+    def sample(self, key):
+        if self.cholesky.ndim > 3:
+            d, *_ = self.cholesky.shape
+            keys = random.split(key, num=d)
+            return func.vmap(BlockDiagNormal.sample)(self, keys)
+
+        d, _n, n = self.cholesky.shape
+        base = random.normal(key, shape=(d, n))
+        sample_latent = self.mean + np.einsum("ijk,ij->ik", self.cholesky, base)
+
+        tree_sample = tree.tree_unflatten(self.treedef, [*(sample_latent.T)])
+        return tree.tree_map(self.unravel_leaf, tree_sample)
+
+    @staticmethod
+    def update_moving_avg(mean, x, /, num):
+        if np.ndim(mean) > 0:
+            assert np.shape(mean) == np.shape(x)
+            fun = BlockDiagNormal.update_moving_avg
+            return func.vmap(fun, in_axes=(0, 0, None))(mean, x, num)
+
+        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
+        return sum_updated / np.sqrt(num + 1)
+
+    @staticmethod
+    def register_pytree_node():
+        def flatten(normal):
+            children = normal.mean, normal.cholesky
+            aux = (normal.treedef, normal.unravel_leaf)
+            return children, aux
+
+        def unflatten(aux, children):
+            (treedef, unravel_leaf) = aux
+            mean, cholesky = children
+            return BlockDiagNormal(mean, cholesky, treedef, unravel_leaf)
+
+        tree.register_pytree_node(BlockDiagNormal, flatten, unflatten)
+
+
+DenseNormal.register_pytree_node()
+IsotropicNormal.register_pytree_node()
+BlockDiagNormal.register_pytree_node()
+
+
+class IsotropicPrototype(AbstractPrototype):
+    def __init__(self, ode_shape):
+        self.ode_shape = ode_shape
+
+    def std(self):
+        return np.ones(())
+
+    def output_scale_calibrated(self):
+        return np.ones(())
+
+
+class BlockDiagPrototype(AbstractPrototype):
+    def __init__(self, ode_shape):
+        self.ode_shape = ode_shape
+
+    def std(self):
+        return np.ones(self.ode_shape)
+
+    def output_scale_calibrated(self):
+        return np.ones(self.ode_shape)

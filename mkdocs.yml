@@ -62,7 +62,7 @@ plugins:
             show_bases: false
             show_source: false
             inherited_members: false
-            show_if_no_docstring: false
+            show_if_no_docstring: true
             merge_init_into_class: true
             group_by_category: true
   - exclude:
