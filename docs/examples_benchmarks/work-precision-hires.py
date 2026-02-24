@@ -13,10 +13,10 @@
 #     name: python3
 # ---
 
-# # WP diagram: HIRES
+# # WP diagram: Hires
 
 # +
-"""HIRES work-precision diagram."""
+"""Hires work-precision diagram."""
 
 import functools
 import statistics

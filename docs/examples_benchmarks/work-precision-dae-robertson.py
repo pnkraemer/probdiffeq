@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # WP diagram: Robertson (ODE vs DAE)
+# # WP diagram: Robertson DAE
 
 # +
 """Work-precision diagram on the Robertson problem.

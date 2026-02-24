@@ -578,7 +578,7 @@ def _verify_vector_field_signature_and_parse_order(vf) -> int:
 
 @tree.register_dataclass
 @structs.dataclass
-class TaylorCoeffTarget(Generic[C, N]):
+class TaylorCoeffTarget(Generic[N]):
     """A probabilistic description of Taylor coefficients.
 
     Includes means, standard deviations, and marginals.
@@ -589,17 +589,13 @@ class TaylorCoeffTarget(Generic[C, N]):
     marginals: N
     """The full marginal distribution of the Taylor coefficient."""
 
-    @classmethod
-    def from_marginals(cls, marginals):
-        return cls(marginals)
-
     @property
-    def mean(self) -> C:
+    def mean(self):
         """A PyTree describing the standard deviation of the Taylor coefficient."""
         return self.marginals.evaluate_mean()
 
     @property
-    def std(self) -> C:
+    def std(self):
         """A PyTree describing the mean of the Taylor coefficient."""
         return self.marginals.evaluate_std()
 
@@ -742,6 +738,86 @@ class MarkovSequence(Generic[N]):
 T = TypeVar("T", bound=MarkovSequence | statespace.AbstractTreeNormal)
 
 
+@tree.register_dataclass
+@structs.dataclass
+class ProbabilisticSolution(Generic[N, T]):
+    """A datastructure for probabilistic solutions of differential equations."""
+
+    t: Array
+    """The current time-step."""
+
+    u: TaylorCoeffTarget[N]
+    """The current ODE solution estimate."""
+
+    solution_full: T
+    """The current posterior estimate."""
+
+    # Todo: merge 'output_scale' and 'auxiliary' and "fun_evals"?
+    output_scale: Any
+    """The current output scale."""
+
+    num_steps: int
+    """The number of steps taken until the current point."""
+
+    auxiliary: Any
+    """Auxiliary states.
+
+    For instance, random keys for Hutchinson-based
+    diagonal linearisation in the correction,
+    or running means of the MLE calibration.
+    """
+
+    fun_evals: Any
+    """Function evaluations.
+
+    Used to cache observation models between solver steps
+    and error estimates.
+    """
+
+
+S = TypeVar(
+    "S", bound=ProbabilisticSolution | MarkovSequence | statespace.AbstractTreeNormal
+)
+
+
+@tree.register_dataclass
+@structs.dataclass
+class InterpResult(Generic[S]):
+    """A datastructure to store interpolation results.
+
+    To ensure correct adaptive time-stepping, it is important
+    to distinguish step-from variables from interpolate-from variables.
+
+    For some solvers, e.g. fixed-point-smoother-based ones,
+    both stepping and interpolating variables are adjusted during interpolation.
+    """
+
+    step_from: S
+    """The new 'step_from' field.
+
+    At time `max(t, s1.t)`.
+    Use this as the right-most reference state
+    in future interpolations, or continue time-stepping from here.
+    """
+
+    interp_from: S
+    """The new `interp_from` field.
+
+    At time `t`. Use this as the left-most reference state
+    in future interpolations.
+
+    The difference between `interpolated` and `interp_from`
+    is important around checkpoints:
+
+    - `interpolated` belongs to the just-concluded time interval,
+    - `interp_from` belongs to the to-be-started time interval.
+
+    Concretely, this means that for fixed-point smoothers,
+    `interp_from` has a unit backward model whereas `interpolated`
+    remembers how to step back to the previous target location.
+    """
+
+
 class MarkovStrategy(Generic[T]):
     """An interface for estimation strategies in Markovian state-space models.
 
@@ -777,57 +853,19 @@ class MarkovStrategy(Generic[T]):
 
     def interpolate(
         self, *, posterior_t0: T, posterior_t1: T, transition_t0_t, transition_t_t1
-    ):
+    ) -> tuple[tuple[TaylorCoeffTarget, T], InterpResult[T]]:
         """Interpolate between two points."""
         raise NotImplementedError
 
-    def interpolate_at_t1(self, *, posterior_t1: T):
+    def interpolate_at_t1(
+        self, *, posterior_t1: T
+    ) -> tuple[tuple[TaylorCoeffTarget, T], InterpResult[T]]:
         """Interpolate at a checkpoint."""
         raise NotImplementedError
 
     def finalize(self, *, posterior0: T, posterior: T, output_scale) -> T:
         """Finalize the posterior before returning a solution."""
         raise NotImplementedError
-
-
-@tree.register_dataclass
-@structs.dataclass
-class ProbabilisticSolution(Generic[C, N, T]):
-    """A datastructure for probabilistic solutions of differential equations."""
-
-    t: Array
-    """The current time-step."""
-
-    u: TaylorCoeffTarget[C, N]
-    """The current ODE solution estimate."""
-
-    solution_full: T
-    """The current posterior estimate."""
-
-    # Todo: merge 'output_scale' and 'auxiliary' and "fun_evals"?
-    output_scale: Any
-    """The current output scale."""
-
-    num_steps: int
-    """The number of steps taken until the current point."""
-
-    auxiliary: Any
-    """Auxiliary states.
-
-    For instance, random keys for Hutchinson-based
-    diagonal linearisation in the correction,
-    or running means of the MLE calibration.
-    """
-
-    fun_evals: Any
-    """Function evaluations.
-
-    Used to cache observation models between solver steps
-    and error estimates.
-    """
-
-
-S = TypeVar("S", bound=ProbabilisticSolution | MarkovSequence)
 
 
 class ProbabilisticSolver:
@@ -1006,7 +1044,7 @@ class ProbabilisticSolver:
             fun_evals=interp_from.fun_evals,
         )
 
-        interp_res = _InterpRes(step_from=step_from, interp_from=interp_from)
+        interp_res = InterpResult(step_from=step_from, interp_from=interp_from)
         return interpolated, interp_res
 
     def interpolate_at_t1(
@@ -1050,7 +1088,7 @@ class ProbabilisticSolver:
             num_steps=interp_to.num_steps,
             fun_evals=interp_to.fun_evals,
         )
-        return sol, _InterpRes(step_from=acc, interp_from=prev)
+        return sol, InterpResult(step_from=acc, interp_from=prev)
 
 
 def prior_wiener_integrated(
@@ -1208,7 +1246,7 @@ def prior_wiener_integrated_diffuse(
 
     # Return the target
     marginal = ssm.normal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
-    target = TaylorCoeffTarget.from_marginals(marginal)
+    target = TaylorCoeffTarget(marginal)
     return target, discretize, ssm
 
 
@@ -1252,44 +1290,6 @@ def prior_wiener_integrated_discrete(
     return markov_seq, ssm
 
 
-@tree.register_dataclass
-@structs.dataclass
-class _InterpRes(Generic[S]):
-    """A datastructure to store interpolation results.
-
-    To ensure correct adaptive time-stepping, it is important
-    to distinguish step-from variables from interpolate-from variables.
-
-    For some solvers, e.g. fixed-point-smoother-based ones,
-    both stepping and interpolating variables are adjusted during interpolation.
-    """
-
-    step_from: S
-    """The new 'step_from' field.
-
-    At time `max(t, s1.t)`.
-    Use this as the right-most reference state
-    in future interpolations, or continue time-stepping from here.
-    """
-
-    interp_from: S
-    """The new `interp_from` field.
-
-    At time `t`. Use this as the left-most reference state
-    in future interpolations.
-
-    The difference between `interpolated` and `interp_from`
-    is important around checkpoints:
-
-    - `interpolated` belongs to the just-concluded time interval,
-    - `interp_from` belongs to the to-be-started time interval.
-
-    Concretely, this means that for fixed-point smoothers,
-    `interp_from` has a unit backward model whereas `interpolated`
-    remembers how to step back to the previous target location.
-    """
-
-
 class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
     """Construct a fixed-interval smoother.
 
@@ -1322,7 +1322,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
             marginal=marginals, conditional=cond, reverse=posterior.reverse
         )
 
-        estimate = TaylorCoeffTarget.from_marginals(marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, posterior
 
     def apply_updates(self, prediction, *, updates):
@@ -1330,7 +1330,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
             updates, prediction.conditional, reverse=prediction.reverse
         )
         marginals = updates
-        estimate = TaylorCoeffTarget.from_marginals(marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, posterior
 
     def finalize(
@@ -1351,7 +1351,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         )
 
         # Extract targets
-        estimate = TaylorCoeffTarget.from_marginals(marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, posterior
 
     def interpolate(
@@ -1405,18 +1405,18 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         solution_at_t1 = MarkovSequence(
             marginal_t1, conditional_t1_to_t, reverse=extrapolated_t.reverse
         )
-        interp_res = _InterpRes(step_from=solution_at_t1, interp_from=solution_at_t)
+        interp_res = InterpResult(step_from=solution_at_t1, interp_from=solution_at_t)
 
         # Extract targets
         marginals = solution_at_t.marginal
-        estimate = TaylorCoeffTarget.from_marginals(marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return (estimate, solution_at_t), interp_res
 
     def interpolate_at_t1(self, posterior_t1):
         marginals = posterior_t1.marginal
-        estimate = TaylorCoeffTarget.from_marginals(marginals)
+        estimate = TaylorCoeffTarget(marginals)
 
-        interp_res = _InterpRes(step_from=posterior_t1, interp_from=posterior_t1)
+        interp_res = InterpResult(step_from=posterior_t1, interp_from=posterior_t1)
         return (estimate, posterior_t1), interp_res
 
 
@@ -1447,13 +1447,13 @@ class strategy_filter(MarkovStrategy):
 
     def predict(self, posterior: T, *, transition) -> tuple[TaylorCoeffTarget, T]:
         marginals = self.ssm.conditional.marginalise(posterior, transition)
-        estimate = TaylorCoeffTarget.from_marginals(marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, marginals
 
     def apply_updates(self, prediction, *, updates):
         del prediction
         marginals = updates
-        estimate = TaylorCoeffTarget.from_marginals(marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, marginals
 
     def finalize(self, *, posterior0, posterior, output_scale):
@@ -1469,7 +1469,7 @@ class strategy_filter(MarkovStrategy):
         posterior = tree.tree_array_prepend(posterior0, posterior)
 
         marginals = posterior
-        estimate = TaylorCoeffTarget.from_marginals(marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, posterior
 
     def interpolate(
@@ -1480,15 +1480,15 @@ class strategy_filter(MarkovStrategy):
             posterior=posterior_t0, transition=transition_t0_t
         )
         marginals = interpolated
-        estimate = TaylorCoeffTarget.from_marginals(marginals)
-        interp_res = _InterpRes(step_from=posterior_t1, interp_from=interpolated)
+        estimate = TaylorCoeffTarget(marginals)
+        interp_res = InterpResult(step_from=posterior_t1, interp_from=interpolated)
         return (estimate, interpolated), interp_res
 
     def interpolate_at_t1(self, *, posterior_t1):
         marginals = posterior_t1
-        estimate = TaylorCoeffTarget.from_marginals(marginals)
+        estimate = TaylorCoeffTarget(marginals)
 
-        interp_res = _InterpRes(step_from=posterior_t1, interp_from=posterior_t1)
+        interp_res = InterpResult(step_from=posterior_t1, interp_from=posterior_t1)
         return (estimate, posterior_t1), interp_res
 
 
@@ -1560,7 +1560,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         cond = self.ssm.conditional.merge(bw0, cond)
         predicted = MarkovSequence(marginals, cond, reverse=posterior.reverse)
 
-        estimate = TaylorCoeffTarget.from_marginals(marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, predicted
 
     def apply_updates(self, prediction: MarkovSequence, *, updates):
@@ -1568,7 +1568,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
             updates, prediction.conditional, reverse=prediction.reverse
         )
         marginals = updates
-        estimate = TaylorCoeffTarget.from_marginals(marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, posterior
 
     def finalize(
@@ -1588,7 +1588,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         )
 
         # Extract targets
-        estimate = TaylorCoeffTarget.from_marginals(marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, posterior
 
     def interpolate_at_t1(self, *, posterior_t1: MarkovSequence):
@@ -1598,11 +1598,11 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
             conditional=cond_identity,
             reverse=posterior_t1.reverse,
         )
-        interp_res = _InterpRes(step_from=resume_from, interp_from=resume_from)
+        interp_res = InterpResult(step_from=resume_from, interp_from=resume_from)
 
         interpolated = posterior_t1
         marginals = interpolated.marginal
-        estimate = TaylorCoeffTarget.from_marginals(marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return (estimate, interpolated), interp_res
 
     def interpolate(
@@ -1700,10 +1700,10 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
             conditional=conditional_t1_to_t,
             reverse=posterior_t1.reverse,
         )
-        interp_res = _InterpRes(step_from=step_from, interp_from=previous_new)
+        interp_res = InterpResult(step_from=step_from, interp_from=previous_new)
 
         marginals = interpolated.marginal
-        estimate = TaylorCoeffTarget.from_marginals(marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return (estimate, interpolated), interp_res
 
 
