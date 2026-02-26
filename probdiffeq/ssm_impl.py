@@ -665,10 +665,12 @@ class DenseConditional(AbstractConditional):
 
             # A_p = dt * A
             # B_p = np.sqrt(dt) * B
+            # p_inv = np.ones_like(p_inv)
+            # p = np.ones_like(p)
 
             eA, L = exp_gram(A_p, B_p)
             noise = DenseNormal(q0, output_scale * L, unravel=self.unravel)
-            return LatentCond(eA, noise, to_latent=(p_inv), to_observed=(p))
+            return LatentCond(eA, noise, to_latent=p_inv, to_observed=p)
 
         return discretise
 

@@ -36,13 +36,12 @@ def main(t0=1e-6, t1=1e5) -> None:
     # (but don't vary much within these scales).
     # TODO: what is the best "base output scale" for the solver?
     #       this should be an expectation-maximisation thing right?
-    base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
+    base_scale = jnp.asarray([1e0, 1e-5, 0.1])
 
     # For DAEs, not all variables are differential, and we need to have
     #   and idea which ones arent to stabilise the solver initialisation
     y0 = [jnp.array([1.0, 0.0, 0.0])]
     is_differential = [jnp.array([True, True, False])]
-
     M = jnp.asarray([[-0.04, 0.0, 0.0], [0.04, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
     # TODO: the transpose feels wrong. Am I transposing somewhere?
@@ -60,29 +59,36 @@ def main(t0=1e-6, t1=1e5) -> None:
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 
     # For proper DAEs, non-iterated solver's simply don't cut it
-    solver = probdiffeq.solver_iterated(
-        strategy=strategy, prior=ibm, constraint=jet, ssm=ssm, constraint_init=jet
+    solver = probdiffeq.solver_dynamic_iterated(
+        strategy=strategy,
+        prior=ibm,
+        constraint=jet,
+        ssm=ssm,
+        constraint_init=jet,
+        maxiter=100,
     )
 
     # The state-error-estimate doesn't care about the dimension
     # of the DAE, which is exactly what we need here
-    error = probdiffeq.error_state_std(constraint=ts, prior=ibm, ssm=ssm)
+    error = probdiffeq.error_state_std(constraint=jet, prior=ibm, ssm=ssm)
 
     # Linear spacing on a log-scale
     save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=200)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    solution = solve(init, save_at=save_at, atol=1e-4, rtol=1e-8)
+    solution = solve(init, save_at=save_at, atol=1e-4, rtol=1e-4)
     print(solution.num_steps)
 
     _fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(5, 5), sharex=True)
     ax[0][0].set_title("Robertson solution")
-    ax[0][0].semilogx(save_at, solution.u.mean[0][:, 0])
-    ax[1][0].semilogx(save_at, solution.u.mean[0][:, 1])
-    ax[2][0].semilogx(save_at, solution.u.mean[0][:, 2])
+    # TODO: build an iterated dynamic solver
+    i = 0
+    ax[0][0].semilogx(save_at, solution.u.mean[i][:, 0])
+    ax[1][0].semilogx(save_at, solution.u.mean[i][:, 1])
+    ax[2][0].semilogx(save_at, solution.u.mean[i][:, 2])
 
-    ax[0][1].loglog(save_at, solution.u.std[0][:, 0])
-    ax[1][1].loglog(save_at, solution.u.std[0][:, 1])
-    ax[2][1].loglog(save_at, solution.u.std[0][:, 2])
+    ax[0][1].loglog(save_at, solution.u.std[i][:, 0])
+    ax[1][1].loglog(save_at, solution.u.std[i][:, 1])
+    ax[2][1].loglog(save_at, solution.u.std[i][:, 2])
 
     ax[0][0].set_ylabel("State $y_1$")
     ax[1][0].set_ylabel("State $y_2$")
