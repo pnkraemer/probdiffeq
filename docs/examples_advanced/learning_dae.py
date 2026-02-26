@@ -46,8 +46,6 @@ def main(t0=1e-6, t1=1e5) -> None:
     M = jnp.asarray([[-0.04, 0.0, 0.0], [0.04, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
     # TODO: the transpose feels wrong. Am I transposing somewhere?
-    print(M)
-    print(jax.jacfwd(dynamics)(*y0))
     init, ibm, ssm = probdiffeq.prior_ornstein_uhlenbeck_integrated(
         y0,
         M=M,
@@ -73,7 +71,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     # Linear spacing on a log-scale
     save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=200)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    solution = solve(init, save_at=save_at, atol=1e-6, rtol=1e-6)
+    solution = solve(init, save_at=save_at, atol=1e-4, rtol=1e-8)
     print(solution.num_steps)
 
     _fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(5, 5), sharex=True)
@@ -139,7 +137,7 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         # For proper DAEs, non-iterated solver's simply don't cut it
-        solver = probdiffeq.solver_iterated(
+        solver = probdiffeq.solver_dynamic(
             strategy=strategy, prior=ibm, constraint=jet, ssm=ssm, constraint_init=jet
         )
 

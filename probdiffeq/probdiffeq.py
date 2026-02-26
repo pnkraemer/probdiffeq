@@ -1974,22 +1974,40 @@ class solver_dynamic(ProbabilisticSolver):
         constraint: Constraint,
         ssm: Any,
         re_linearize_after_calibration=False,
+        constraint_init=None,
     ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
         self.re_linearize_after_calibration = re_linearize_after_calibration
+        self.constraint_init = constraint_init
 
     def init(self, t, u, *, damp) -> ProbabilisticSolution:
-        u, prediction = self.strategy.init_posterior(u=u)
+        u_pred, prediction = self.strategy.init_posterior(u=u)
         lin_state = self.constraint.init_linearization()
 
         output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
 
         fx, lin_state = self.constraint.linearize(
-            u.marginals, lin_state, damp=damp, t=t
+            u_pred.marginals, lin_state, damp=damp, t=t
         )
         # TODO: avoid the linearization altogether if update is false.
         #  use jax.eval_shape instead.
         fx = tree.tree_map(np.zeros_like, fx)
+
+        if self.constraint_init is not None:
+            cstate2 = self.constraint_init.init_linearization()
+            fx, _cstate2 = self.constraint.linearize(
+                u_pred.marginals, cstate2, damp=damp, t=t
+            )
+            observed, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
+            updates = reverted.noise
+            u, posterior = self.strategy.apply_updates(
+                prediction=prediction, updates=updates
+            )
+
+        else:
+            u = u_pred
+            posterior = prediction
+
         posterior = prediction
         return ProbabilisticSolution(
             t=t,

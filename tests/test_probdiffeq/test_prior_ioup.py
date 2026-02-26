@@ -9,7 +9,7 @@ def test_ioup_reduces_to_iwp():
     M = np.zeros((2, 2))
     tcoeffs = [u, u, u, u, u]
 
-    init, ioup, ssm = probdiffeq.prior_ornstein_uhlenbeck_integrated(tcoeffs, M=M)
+    _init, ioup, _ssm = probdiffeq.prior_ornstein_uhlenbeck_integrated(tcoeffs, M=M)
     _init, iwp, _ssm = probdiffeq.prior_wiener_integrated(tcoeffs)
 
     scale = 12.3456

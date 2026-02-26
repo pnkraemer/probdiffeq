@@ -45,7 +45,7 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 jax.config.update("jax_debug_nans", True)
 
 
-def main(start=2.0, stop=10.0, step=0.25, repeats=3, time_span=(1e-6, 1e5)) -> None:
+def main(start=4.0, stop=8.0, step=1.0, repeats=3, time_span=(1e-6, 1e5)) -> None:
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
@@ -75,13 +75,15 @@ def main(start=2.0, stop=10.0, step=0.25, repeats=3, time_span=(1e-6, 1e5)) -> N
 
     # Assemble algorithms
     algorithms = {
-        "DAE | Jet(3)": solver_dae(num_derivatives=3, time_span=time_span),
-        "DAE | Jet(4)": solver_dae(num_derivatives=4, time_span=time_span),
+        "DAE | IoupJet(3)": solver_dae_ioup(num_derivatives=3, time_span=time_span),
+        "DAE | IoupJet(4)": solver_dae_ioup(num_derivatives=4, time_span=time_span),
+        "DAE | IwpJet(3)": solver_dae(num_derivatives=3, time_span=time_span),
+        "DAE | IwpJet(4)": solver_dae(num_derivatives=4, time_span=time_span),
         "ODE | TS1(3)": solver_ode(num_derivatives=3, time_span=time_span),
         "ODE | TS1(7)": solver_ode(num_derivatives=7, time_span=time_span),
         # "ODE | BDF (Scipy)": solver_scipy(method="BDF", time_span=time_span),
         "ODE | LSODA (Scipy)": solver_scipy(method="LSODA", time_span=time_span),
-        "ODE | Radau (Scipy)": solver_scipy(method="Radau", time_span=time_span),
+        # "ODE | Radau (Scipy)": solver_scipy(method="Radau", time_span=time_span),
     }
 
     # Compute a reference solution
@@ -253,6 +255,72 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
 
         # For proper DAEs, non-iterated solver's simply don't cut it
         solver = probdiffeq.solver_iterated(
+            strategy=strategy, prior=ibm, constraint=jet, ssm=ssm, constraint_init=jet
+        )
+
+        # The state-error-estimate doesn't care about the dimension
+        # of the DAE, which is exactly what we need here
+        error = probdiffeq.error_state_std(constraint=ts, prior=ibm, ssm=ssm)
+
+        # Integral controllers just work better than proportional-integral ones
+        # TODO: build PID controllers (is this "gustafsson"?) for iterated solvers?
+        solve = ivpsolve.solve_adaptive_terminal_values(
+            solver=solver, error=error, clip_dt=True
+        )
+        t0, t1 = time_span
+        solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
+
+        return jax.block_until_ready(solution.u.mean[0])
+
+    return param_to_solution
+
+
+def solver_dae_ioup(*, num_derivatives: int, time_span) -> Callable:
+    """Construct a method that solves Robertson as a DAE."""
+
+    def root(u, du, /, *, t):
+        del t
+        return [du[:2] - dynamics(u), vf_algebraic(u)]
+
+    def dynamics(y):
+        k1, k2, k3 = 0.04, 3e7, 1e4
+        f0 = -k1 * y[0] + k3 * y[1] * y[2]
+        f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
+        return jnp.stack([f0, f1])
+
+    def vf_algebraic(u):
+        return u[0] + u[1] + u[2] - 1
+
+    @jax.jit
+    def param_to_solution(tol):
+
+        # This base scale is critical to Robertson, because
+        # the solutions live on vastly different scales
+        # (but don't vary much within these scales).
+        # TODO: what is the best "base output scale" for the solver?
+        #       this should be an expectation-maximisation thing right?
+        base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
+
+        # For DAEs, not all variables are differential, and we need to have
+        #   and idea which ones arent to stabilise the solver initialisation
+        y0 = [jnp.array([1.0, 0.0, 0.0])]
+        is_differential = [jnp.array([True, True, False])]
+        M = jnp.asarray([[-0.4, 0.0, 0.0], [0.4, 0.0, 0.0], [0.0, 0.0, 0.0]])
+        init, ibm, ssm = probdiffeq.prior_ornstein_uhlenbeck_integrated(
+            y0,
+            M=M,
+            output_scale=base_scale,
+            diffuse_derivatives=num_derivatives,
+            is_differential=is_differential,
+        )
+
+        # We build a Jet constraint
+        jet = probdiffeq.constraint_root_jet(root, ssm=ssm)
+        ts = probdiffeq.constraint_root_ts1(root, ssm=ssm)
+        strategy = probdiffeq.strategy_filter(ssm=ssm)
+
+        # For proper DAEs, non-iterated solver's simply don't cut it
+        solver = probdiffeq.solver_dynamic(
             strategy=strategy, prior=ibm, constraint=jet, ssm=ssm, constraint_init=jet
         )
 

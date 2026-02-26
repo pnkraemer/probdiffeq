@@ -636,6 +636,8 @@ class DenseConditional(AbstractConditional):
         A = np.kron(a, eye_d)
         E = np.zeros((self.num_derivatives + 1, self.num_derivatives + 1))
         E = E.at[-1, -1].set(1.0)
+
+        # Something something Kronecker -> we seem to have to transpose M here
         A += np.kron(E, M.T)
 
         b = np.eye(self.num_derivatives + 1)[-1][:, None]
@@ -647,10 +649,10 @@ class DenseConditional(AbstractConditional):
         exp_gram = gram_util.exp_gram_cholesky(pade_legendre=pl, solve=linalg.solve_lu)
         q0 = np.zeros(self.flat_shape)
 
-        import jax
+        # import jax
 
         def discretise(dt, output_scale):
-            jax.debug.print("{}", dt)
+            # jax.debug.print("{}", dt)
             output_scale = np.asarray(output_scale)
             assert output_scale.shape == ()
 
@@ -661,14 +663,12 @@ class DenseConditional(AbstractConditional):
             A_p = dt * p_inv[:, None] * A * p[None, :]
             B_p = np.sqrt(dt) * p_inv[:, None] * B
 
-            A_p = dt * A
-            B_p = np.sqrt(dt) * B
+            # A_p = dt * A
+            # B_p = np.sqrt(dt) * B
 
             eA, L = exp_gram(A_p, B_p)
             noise = DenseNormal(q0, output_scale * L, unravel=self.unravel)
-            return LatentCond(
-                eA, noise, to_latent=np.ones_like(p_inv), to_observed=np.ones_like(p)
-            )
+            return LatentCond(eA, noise, to_latent=(p_inv), to_observed=(p))
 
         return discretise
 
