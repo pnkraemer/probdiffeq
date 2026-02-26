@@ -44,8 +44,8 @@ def main(t0=1e-6, t1=1e5) -> None:
     is_differential = [jnp.array([True, True, False])]
     M = jnp.asarray([[-0.04, 0.0, 0.0], [0.04, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
-    # TODO: the transpose feels wrong. Am I transposing somewhere?
-    init, ibm, ssm = probdiffeq.prior_ornstein_uhlenbeck_integrated(
+    # TODO: clean up the IOUP api. also, what about isotropic etc.?
+    init, ioup, ssm = probdiffeq.prior_ornstein_uhlenbeck_integrated(
         y0,
         M=M,
         output_scale=base_scale,
@@ -58,10 +58,11 @@ def main(t0=1e-6, t1=1e5) -> None:
     ts = probdiffeq.constraint_root_ts1(root, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 
+    # TODO: should the dynamic solver calibrate inside the iteration step?
     # For proper DAEs, non-iterated solver's simply don't cut it
     solver = probdiffeq.solver_dynamic_iterated(
         strategy=strategy,
-        prior=ibm,
+        prior=ioup,
         constraint=jet,
         ssm=ssm,
         constraint_init=jet,
@@ -70,25 +71,26 @@ def main(t0=1e-6, t1=1e5) -> None:
 
     # The state-error-estimate doesn't care about the dimension
     # of the DAE, which is exactly what we need here
-    error = probdiffeq.error_state_std(constraint=jet, prior=ibm, ssm=ssm)
+    error = probdiffeq.error_state_std(constraint=jet, prior=ioup, ssm=ssm)
 
     # Linear spacing on a log-scale
-    save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=200)
+    save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=100)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
     solution = solve(init, save_at=save_at, atol=1e-4, rtol=1e-4)
     print(solution.num_steps)
 
     _fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(5, 5), sharex=True)
     ax[0][0].set_title("Robertson solution")
-    # TODO: build an iterated dynamic solver
-    i = 0
-    ax[0][0].semilogx(save_at, solution.u.mean[i][:, 0])
-    ax[1][0].semilogx(save_at, solution.u.mean[i][:, 1])
-    ax[2][0].semilogx(save_at, solution.u.mean[i][:, 2])
 
-    ax[0][1].loglog(save_at, solution.u.std[i][:, 0])
-    ax[1][1].loglog(save_at, solution.u.std[i][:, 1])
-    ax[2][1].loglog(save_at, solution.u.std[i][:, 2])
+    # Plot a special index
+    i = 0
+    ax[0][0].semilogx(save_at, solution.u.mean[i][:, 0] / scipy.special.factorial(i))
+    ax[1][0].semilogx(save_at, solution.u.mean[i][:, 1] / scipy.special.factorial(i))
+    ax[2][0].semilogx(save_at, solution.u.mean[i][:, 2] / scipy.special.factorial(i))
+
+    ax[0][1].loglog(save_at, solution.u.std[i][:, 0] / scipy.special.factorial(i))
+    ax[1][1].loglog(save_at, solution.u.std[i][:, 1] / scipy.special.factorial(i))
+    ax[2][1].loglog(save_at, solution.u.std[i][:, 2] / scipy.special.factorial(i))
 
     ax[0][0].set_ylabel("State $y_1$")
     ax[1][0].set_ylabel("State $y_2$")

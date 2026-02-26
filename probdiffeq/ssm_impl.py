@@ -663,10 +663,10 @@ class DenseConditional(AbstractConditional):
             A_p = dt * p_inv[:, None] * A * p[None, :]
             B_p = np.sqrt(dt) * p_inv[:, None] * B
 
-            # A_p = dt * A
-            # B_p = np.sqrt(dt) * B
-            # p_inv = np.ones_like(p_inv)
-            # p = np.ones_like(p)
+            A_p = dt * A
+            B_p = np.sqrt(dt) * B
+            p_inv = np.ones_like(p_inv)
+            p = np.ones_like(p)
 
             eA, L = exp_gram(A_p, B_p)
             noise = DenseNormal(q0, output_scale * L, unravel=self.unravel)

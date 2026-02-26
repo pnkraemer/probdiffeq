@@ -2728,6 +2728,7 @@ class solver_dynamic_iterated(ProbabilisticSolver):
     def step(self, state: ProbabilisticSolution, *, dt, damp):
 
         # Calibrate the output scale
+        # TODO: should this happen inside the iteration?
         ones = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
         transition = self.prior(dt, ones)
         mean = state.u.marginals.evaluate_mean()
