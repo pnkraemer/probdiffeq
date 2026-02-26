@@ -20,13 +20,13 @@ def main(t0=1e-6, t1=1e5) -> None:
 
     def root(u, du, /, *, t):
         del t
-        return [vf_differential(u, du), vf_algebraic(u)]
+        return [du[:2] - dynamics(u), vf_algebraic(u)]
 
-    def vf_differential(y, du):
+    def dynamics(y):
         k1, k2, k3 = 0.04, 3e7, 1e4
         f0 = -k1 * y[0] + k3 * y[1] * y[2]
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
-        return jnp.stack([du[0] - f0, du[1] - f1])
+        return jnp.stack([f0, f1])
 
     def vf_algebraic(u):
         return u[0] + u[1] + u[2] - 1
@@ -42,20 +42,17 @@ def main(t0=1e-6, t1=1e5) -> None:
     #   and idea which ones arent to stabilise the solver initialisation
     y0 = [jnp.array([1.0, 0.0, 0.0])]
     is_differential = [jnp.array([True, True, False])]
-    # init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-    #     y0,
-    #     output_scale=base_scale,
-    #     diffuse_derivatives=4,
-    #     is_differential=is_differential,
-    # )
 
     M = jnp.asarray([[-0.04, 0.0, 0.0], [0.04, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
+    # TODO: the transpose feels wrong. Am I transposing somewhere?
+    print(M)
+    print(jax.jacfwd(dynamics)(*y0))
     init, ibm, ssm = probdiffeq.prior_ornstein_uhlenbeck_integrated(
         y0,
         M=M,
         output_scale=base_scale,
-        diffuse_derivatives=2,
+        diffuse_derivatives=4,
         is_differential=is_differential,
     )
 
@@ -66,7 +63,7 @@ def main(t0=1e-6, t1=1e5) -> None:
 
     # For proper DAEs, non-iterated solver's simply don't cut it
     solver = probdiffeq.solver_iterated(
-        strategy=strategy, prior=ibm, constraint=ts, ssm=ssm, constraint_init=jet
+        strategy=strategy, prior=ibm, constraint=jet, ssm=ssm, constraint_init=jet
     )
 
     # The state-error-estimate doesn't care about the dimension
@@ -76,7 +73,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     # Linear spacing on a log-scale
     save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=200)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    solution = solve(init, save_at=save_at, atol=1e-9, rtol=1e-9)
+    solution = solve(init, save_at=save_at, atol=1e-6, rtol=1e-6)
     print(solution.num_steps)
 
     _fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(5, 5), sharex=True)
@@ -94,6 +91,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     ax[2][0].set_ylabel("State $y_3$")
     ax[2][0].set_xlabel("Time $t$")
     ax[0][0].set_xlim((t0, t1))
+
     plt.tight_layout()
     plt.show()
 

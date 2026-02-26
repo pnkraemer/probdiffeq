@@ -7,7 +7,7 @@ from probdiffeq.backend import np, testing
 def test_ioup_reduces_to_iwp():
     u = np.ones((2,))
     M = np.zeros((2, 2))
-    tcoeffs = [u, u, u]
+    tcoeffs = [u, u, u, u, u]
 
     init, ioup, ssm = probdiffeq.prior_ornstein_uhlenbeck_integrated(tcoeffs, M=M)
     _init, iwp, _ssm = probdiffeq.prior_wiener_integrated(tcoeffs)
@@ -17,12 +17,4 @@ def test_ioup_reduces_to_iwp():
 
     cond1 = ioup(dt, scale)
     cond2 = iwp(dt, scale)
-
-    print(cond1.A)
-    print(cond2.A)
-    print(cond1.noise.mean)
-    print(cond2.noise.mean)
-    print(cond1.noise.cholesky)
-    print(cond2.noise.cholesky)
-
     assert testing.allclose(cond1, cond2)

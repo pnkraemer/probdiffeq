@@ -22,6 +22,7 @@ class Factory:
     and make each case only vary one of the parameters.
     """
 
+    prior: Callable = probdiffeq.prior_wiener_integrated
     strategy: Callable = probdiffeq.strategy_filter
     solver: Callable = probdiffeq.solver
     constraint: Callable = probdiffeq.constraint_ode_ts0
@@ -31,6 +32,21 @@ class Factory:
 @testing.case
 def case_factory_strategy_filter():
     return Factory(strategy=probdiffeq.strategy_filter)
+
+
+@testing.case
+def case_factory_prior_wiener_integrated():
+    return Factory(prior=probdiffeq.prior_wiener_integrated)
+
+
+@testing.case
+def case_factory_prior_ornstein_uhlenbeck_integrated():
+    M = np.eye(2)
+    return Factory(
+        prior=lambda *args, **kwargs: probdiffeq.prior_ornstein_uhlenbeck_integrated(
+            *args, M=M, **kwargs
+        )
+    )
 
 
 @testing.case
@@ -171,7 +187,7 @@ def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
 
     # Build a solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
-    init, iwp, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=ssm_fact)
+    init, iwp, ssm = factory.prior(tcoeffs, ssm_fact=ssm_fact)
     strategy = factory.strategy(ssm=ssm)
     constraint = factory.constraint(vf, ssm=ssm)
     solver = factory.solver(
