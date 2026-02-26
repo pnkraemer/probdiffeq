@@ -34,6 +34,10 @@ def tree_flatten(tree, /):
     return jax.tree_util.tree_flatten(tree)
 
 
+def tree_unflatten(structure, leaves, /):
+    return jax.tree_util.tree_unflatten(structure, leaves)
+
+
 def tree_leaves(tree, /):
     return jax.tree_util.tree_leaves(tree)
 

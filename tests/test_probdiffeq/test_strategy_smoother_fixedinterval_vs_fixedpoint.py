@@ -30,7 +30,9 @@ def fixture_solution_smoother(solver_setup):
     return solve(init, t0=t0, t1=t1, dt0=0.1, atol=1e-3, rtol=1e-3)
 
 
-def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoother):
+def test_fixedpoint_smoother_equivalent_same_grid(
+    solver_setup, solution_smoother
+) -> None:
     """Test that with save_at=smoother_solution.t, the results should be identical."""
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
     init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
@@ -66,7 +68,9 @@ def test_fixedpoint_smoother_equivalent_same_grid(solver_setup, solution_smoothe
     assert testing.allclose(cond_fp, cond_sm)
 
 
-def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_smoother):
+def test_fixedpoint_smoother_equivalent_different_grid(
+    solver_setup, solution_smoother
+) -> None:
     """Test that the interpolated smoother result equals the save_at result."""
     save_at = solution_smoother.t
 
@@ -110,6 +114,5 @@ def test_fixedpoint_smoother_equivalent_different_grid(solver_setup, solution_sm
     assert testing.allclose(u_std_fixedpoint, interpolated.std)
 
     # Compare QOI and marginals
-    marginals_allclose_func = func.partial(testing.marginals_allclose, ssm=ssm)
-    marginals_allclose_func = func.vmap(marginals_allclose_func)
+    marginals_allclose_func = func.vmap(testing.marginals_allclose)
     assert np.all(marginals_allclose_func(marginals_fixedpoint, interpolated.marginals))

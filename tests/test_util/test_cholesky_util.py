@@ -10,7 +10,7 @@ _SHAPES = ([(4, 3), (3, 3), (4, 4)], [(2, 3), (3, 3), (2, 2)])
 
 
 @testing.parametrize("HCshape, Cshape, Xshape", _SHAPES)
-def test_revert_conditional(HCshape, Cshape, Xshape):
+def test_revert_conditional(HCshape, Cshape, Xshape) -> None:
     HC = _some_array(HCshape) + 1.0
     C = _some_array(Cshape) + 2.0
     X = _some_array(Xshape) + 3.0 + np.eye(Xshape[0])
@@ -32,7 +32,7 @@ def test_revert_conditional(HCshape, Cshape, Xshape):
 
 
 @testing.parametrize("Cshape, Hshape", ([(3, 3), (2, 3)],))
-def test_revert_kernel_noisefree(Cshape, Hshape):
+def test_revert_kernel_noisefree(Cshape, Hshape) -> None:
     C = _some_array(Cshape) + 1.0
     H = _some_array(Hshape) + 2.0
     HC = H @ C
@@ -59,7 +59,7 @@ def _some_array(shape):
     return random.normal(key, shape=shape)
 
 
-def test_sqrt_sum_square_scalar():
+def test_sqrt_sum_square_scalar() -> None:
     a = 3.0
     b = 4.0
     c = 5.0
@@ -68,7 +68,7 @@ def test_sqrt_sum_square_scalar():
     assert testing.allclose(expected, received)
 
 
-def test_sqrt_sum_square_error():
+def test_sqrt_sum_square_error() -> None:
     a = 3.0 * np.eye(2)
     b = 4.0 * np.eye(2)
     c = 5.0 * np.eye(2)
@@ -76,7 +76,7 @@ def test_sqrt_sum_square_error():
         _ = cholesky_util.sqrt_sum_square_scalar(a, b, c)
 
 
-def test_reverse_conditional_jacrev_zero_matrix():
+def test_reverse_conditional_jacrev_zero_matrix() -> None:
     """For zero-valued input covariances, reverse-mode gradients need a trick.
 
     This resolves issue #668.
@@ -90,7 +90,7 @@ def test_reverse_conditional_jacrev_zero_matrix():
     assert is_not_nan
 
 
-def test_sum_of_sqrtm_factors_jacrev_zero_matrix():
+def test_sum_of_sqrtm_factors_jacrev_zero_matrix() -> None:
     """For zero-valued input covariances, reverse-mode gradients need a trick.
 
     This resolves issue #668.
@@ -103,7 +103,7 @@ def test_sum_of_sqrtm_factors_jacrev_zero_matrix():
     assert is_not_nan
 
 
-def test_sqrt_sum_square_scalar_derivative_value_test():
+def test_sqrt_sum_square_scalar_derivative_value_test() -> None:
     """Test that the values match previous versions.
 
     Why? Because we implement custom derivatives for triangularisation
@@ -124,7 +124,7 @@ def test_sqrt_sum_square_scalar_derivative_value_test():
     assert testing.allclose(expected, received)
 
 
-def test_sqrt_sum_square_scalar_derivative_value_test_at_origin():
+def test_sqrt_sum_square_scalar_derivative_value_test_at_origin() -> None:
     """Like the previous test, but for zero inputs.
 
     This ensures that the QR decomposition is differentiable at the origin,

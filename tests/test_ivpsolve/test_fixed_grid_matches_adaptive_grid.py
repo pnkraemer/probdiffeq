@@ -1,13 +1,13 @@
 """Compare solve_fixed_grid to solve_adaptive_save_every_step."""
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
-from probdiffeq.backend import func, np, ode, structs, testing, tree
+from probdiffeq.backend import func, ode, structs, testing, tree
 from probdiffeq.backend.typing import Array
 from probdiffeq.util import test_util
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def test_fixed_grid_result_matches_adaptive_grid_result_when_reusing_grid(fact):
+def test_fixed_grid_result_matches_adaptive_grid_result_when_reusing_grid(fact) -> None:
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     class Taylor(structs.NamedTuple):
@@ -37,7 +37,6 @@ def test_fixed_grid_result_matches_adaptive_grid_result_when_reusing_grid(fact):
     assert testing.allclose(solution_adaptive, solution_fixed)
 
     # Assert u and u_std have matching shapes (that was wrong before)
-    u_shape = tree.tree_map(np.shape, solution_fixed.u.mean)
-    u_std_shape = tree.tree_map(np.shape, solution_fixed.u.std)
-    match = tree.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
-    assert tree.tree_all(match)
+    _, u_shape = tree.tree_flatten(solution_fixed.u.mean)
+    _, u_std_shape = tree.tree_flatten(solution_fixed.u.std)
+    assert u_shape == u_std_shape

@@ -6,7 +6,7 @@ from probdiffeq.backend import np, testing
 
 @testing.parametrize("num", [1, 2, 4])
 @testing.parametrize("num_derivatives_max", [5])
-def test_affine_recursion(num, num_derivatives_max):
+def test_affine_recursion(num, num_derivatives_max) -> None:
     """The approximation should coincide with the reference."""
     f, init, solution = _affine_problem(num_derivatives_max)
     derivatives = taylor.odejet_affine(f, init, num=num)

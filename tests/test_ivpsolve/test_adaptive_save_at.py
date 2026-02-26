@@ -16,7 +16,10 @@ class Factory:
 
     This data structure ensures that we don't test
     the product space of all configurations, whose size
-    grows too quickly.
+    would grow too quickly.
+
+    Instead, we carry defaults for each parameter
+    and make each case only vary one of the parameters.
     """
 
     strategy: Callable = probdiffeq.strategy_filter
@@ -138,6 +141,18 @@ def case_factory_constraint_ode_slr1():
 
 
 @testing.case
+def case_factory_error_state_std_cached():
+    error = func.partial(probdiffeq.error_state_std, re_linearize_before_error=True)
+    return Factory(error=error)
+
+
+@testing.case
+def case_factory_error_state_std_not_cached():
+    error = func.partial(probdiffeq.error_state_std, re_linearize_before_error=True)
+    return Factory(error=error)
+
+
+@testing.case
 def case_factory_error_residual_std_cached():
     error = func.partial(probdiffeq.error_residual_std, re_linearize_before_error=True)
     return Factory(error=error)
@@ -151,7 +166,7 @@ def case_factory_error_residual_std_not_cached():
 
 @testing.parametrize("ssm_fact", ["dense", "isotropic", "blockdiag"])
 @testing.parametrize_with_cases("factory", ".", prefix="case_factory_")
-def test_output_matches_reference(ivp, ssm_fact, factory: Factory):
+def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
     vf, u0, (t0, t1) = ivp
 
     # Build a solver
@@ -167,7 +182,7 @@ def test_output_matches_reference(ivp, ssm_fact, factory: Factory):
     # Compute the PN solution
     save_at = np.linspace(t0, t1, endpoint=True, num=7)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    received = func.jit(solve)(init, save_at=save_at, atol=1e-3, rtol=1e-3)
+    received = func.jit(solve)(init, save_at=save_at, atol=1e-4, rtol=1e-4)
 
     # Compute a reference solution
     expected = ode.odeint_and_save_at(vf, u0, save_at=save_at, atol=1e-7, rtol=1e-7)
@@ -175,8 +190,10 @@ def test_output_matches_reference(ivp, ssm_fact, factory: Factory):
     # The results should be very similar
     assert testing.allclose(received.u.mean[0], expected)
 
-    # Assert u and u_std have matching shapes (that was wrong before)
-    u_shape = tree.tree_map(np.shape, received.u.mean)
-    u_std_shape = tree.tree_map(np.shape, received.u.std)
-    match = tree.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
+    # Assert u and u_std have matching treedefs (that was wrong before)
+    # but the shapes of the leaves may be different, e.g. STDs in isotropic
+    # models are always scalar
+    _, mean_treedef = tree.tree_flatten(received.u.mean)
+    _, std_treedef = tree.tree_flatten(received.u.std)
+    match = tree.tree_map(lambda a, b: a == b, mean_treedef, std_treedef)
     assert tree.tree_all(match)

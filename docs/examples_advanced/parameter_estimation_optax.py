@@ -112,15 +112,13 @@ plt.show()
 
 # +
 @jax.jit
-def parameter_to_data_fit(parameters_, /, standard_deviation=1e-1):
+def parameter_to_data_fit(parameters_, /, std=1e-1):
     """Evaluate the data fit as a function of the parameters."""
     sol_ = solve(parameters_)
-    strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-    return -1.0 * strategy.log_marginal_likelihood(
-        data,
-        standard_deviation=jnp.ones_like(sol_.t) * standard_deviation,
-        posterior=sol_.solution_full,
-    )
+    loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
+    std = jnp.ones_like(sol_.t) * std
+    lml = loss_lml(data, std=std, posterior=sol_.solution_full)
+    return -lml
 
 
 sensitivities = jax.jit(jax.grad(parameter_to_data_fit))

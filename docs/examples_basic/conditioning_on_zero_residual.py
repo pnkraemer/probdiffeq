@@ -54,47 +54,36 @@ def vector_field(y, /, *, t):
 
 
 t0, t1 = 0.0, 0.5
-u0 = jnp.asarray([0.1])
+u0 = jnp.asarray(0.1)
 
 # -
 
 # Assemble the discretised prior (with and without the correct Taylor coefficients).
 
 # +
-
-NUM_DERIVATIVES = 2
-tcoeffs_mean = [u0] * (NUM_DERIVATIVES + 1)
-tcoeffs_std = [jnp.ones_like(u0)] * (NUM_DERIVATIVES + 1)
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
-markov_seq_prior, ssm = probdiffeq.prior_wiener_integrated_discrete(
-    ts, tcoeffs_mean, tcoeffs_std=tcoeffs_std, output_scale=100.0, ssm_fact="dense"
+
+# "Bad" prior (no Taylor coefficients)
+mseq_prior, ssm = probdiffeq.prior_wiener_integrated_discrete(
+    (u0,), grid=ts, diffuse_derivatives=2, output_scale=10.0
 )
 
-tcoeffs = taylor.odejet_padded_scan(
-    lambda y: vector_field(y, t=t0), (u0,), num=NUM_DERIVATIVES
+# "Good" prior (Taylor coefficients)
+tcoeffs = taylor.odejet_padded_scan(lambda y: vector_field(y, t=t0), (u0,), num=2)
+mseq_tcoeffs, ssm = probdiffeq.prior_wiener_integrated_discrete(
+    tcoeffs, grid=ts, output_scale=10.0
 )
-markov_seq_tcoeffs, _ssm = probdiffeq.prior_wiener_integrated_discrete(
-    ts, tcoeffs, output_scale=100.0, ssm_fact="dense"
-)
 
-# -
 
-# Compute the posterior.
-
-# +
-
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-    tcoeffs, output_scale=1.0, ssm_fact="dense"
-)
+# Posterior
+init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, output_scale=10.0)
 ts1 = probdiffeq.constraint_ode_ts1(vector_field, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm)
 error = probdiffeq.error_residual_std(constraint=ts1, prior=ibm, ssm=ssm)
-
-dt0 = ivpsolve.dt0(lambda y: vector_field(y, t=t0), (u0,))
 solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-sol = solve(init, save_at=ts, dt0=dt0, atol=1e-1, rtol=1e-1)
-markov_seq_posterior = sol.solution_full
+sol = solve(init, save_at=ts, atol=1e-1, rtol=1e-1)
+mseq_posterior = sol.solution_full
 
 # -
 
@@ -102,17 +91,11 @@ markov_seq_posterior = sol.solution_full
 
 # +
 
-num_samples = 5
+num_samples = 20
 key = jax.random.PRNGKey(seed=1)
-samples_prior = strategy.markov_sample(
-    key, markov_seq_prior, shape=(num_samples,), reverse=False
-)
-samples_tcoeffs = strategy.markov_sample(
-    key, markov_seq_tcoeffs, shape=(num_samples,), reverse=False
-)
-samples_posterior = strategy.markov_sample(
-    key, markov_seq_posterior, shape=(num_samples,), reverse=True
-)
+samples_prior = mseq_prior.sample(key, ssm=ssm, shape=(num_samples,))
+samples_tcoeffs = mseq_tcoeffs.sample(key, ssm=ssm, shape=(num_samples,))
+samples_posterior = mseq_posterior.sample(key, ssm=ssm, shape=(num_samples,))
 
 # -
 
@@ -123,8 +106,8 @@ samples_posterior = strategy.markov_sample(
 fig, (axes_state, axes_residual, axes_log_abs) = plt.subplots(
     nrows=3, ncols=3, sharex=True, sharey="row", constrained_layout=True, figsize=(8, 5)
 )
-axes_state[0].set_title("Prior")
-axes_state[1].set_title("w/ Initial condition")
+axes_state[0].set_title("w/ Initial condition")
+axes_state[1].set_title("w/ Taylor coefficients")
 axes_state[2].set_title("Posterior")
 
 sample_style = {"marker": "None", "alpha": 0.99, "linewidth": 0.75}
@@ -143,9 +126,9 @@ residual_posterior = residual(samples_posterior, ts)
 
 for i in range(num_samples):
     # Plot all state-samples
-    axes_state[0].plot(ts, samples_prior[0][i, ..., 0], **sample_style, color="C0")
-    axes_state[1].plot(ts, samples_tcoeffs[0][i, ..., 0], **sample_style, color="C1")
-    axes_state[2].plot(ts, samples_posterior[0][i, ..., 0], **sample_style, color="C2")
+    axes_state[0].plot(ts, samples_prior[0][i, ...], **sample_style, color="C0")
+    axes_state[1].plot(ts, samples_tcoeffs[0][i, ...], **sample_style, color="C1")
+    axes_state[2].plot(ts, samples_posterior[0][i, ...], **sample_style, color="C2")
 
     # Plot all residual-samples
     axes_residual[0].plot(ts, residual_prior[i, ...], **sample_style, color="C0")

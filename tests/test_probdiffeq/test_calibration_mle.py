@@ -69,7 +69,7 @@ def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
 # fixedpoint-solver in save_every_step gives nonsensical results
 # (which raises a warning), but the test remains valid!
 @testing.filterwarnings("ignore")
-def test_calibration_changes_the_posterior(uncalibrated_and_mle_solution):
+def test_calibration_changes_the_posterior(uncalibrated_and_mle_solution) -> None:
     (uncalibrated, mle) = uncalibrated_and_mle_solution
 
     # Assert the means are identical, but the stds & scales are not.

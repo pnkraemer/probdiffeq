@@ -4,9 +4,9 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 from probdiffeq.backend import func, np, ode, random, testing, tree
 
 
-@testing.fixture(name="approximation_and_strategy")
+@testing.fixture(name="solution_and_ssm")
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def fixture_approximation_and_strategy(fact):
+def fixture_solution_and_ssm(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
@@ -17,20 +17,18 @@ def fixture_approximation_and_strategy(fact):
 
     error = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    save_at = np.linspace(t0, t1, endpoint=True, num=7)
-    sol = func.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
-    return sol, strategy
+    save_at = np.linspace(t0, t1, endpoint=True, num=12)
+    solution = func.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
+    return solution, ssm
 
 
 @testing.parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
-def test_sample_shape(approximation_and_strategy, shape):
-    approximation, strategy = approximation_and_strategy
-
+def test_sample_shape(solution_and_ssm, shape) -> None:
+    solution, ssm = solution_and_ssm
     key = random.prng_key(seed=15)
-    samples = strategy.markov_sample(
-        key, approximation.solution_full, shape=shape, reverse=True
-    )
-    for s, u in zip(samples, approximation.u.mean):
+    samples = solution.solution_full.sample(key, ssm=ssm, shape=shape)
+
+    for s, u in zip(samples, solution.u.mean):
         s_shape = tree.tree_map(lambda x: x.shape, s)
         u_inner_shape = tree.tree_map(lambda x: shape + x.shape, u)
         assert testing.allclose(s_shape, u_inner_shape)

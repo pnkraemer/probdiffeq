@@ -33,9 +33,9 @@ def fixture_pn_solution(fact):
     return func.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
 
 
-def test_u_inherits_data_structure(pn_solution):
+def test_u_inherits_data_structure(pn_solution) -> None:
     assert isinstance(pn_solution.u.mean, Taylor)
 
 
-def test_u_std_inherits_data_structure(pn_solution):
+def test_u_std_inherits_data_structure(pn_solution) -> None:
     assert isinstance(pn_solution.u.std, Taylor)

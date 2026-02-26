@@ -3,6 +3,7 @@
 See the tutorials for example use cases.
 """
 
+from probdiffeq import ssm_impl, taylor
 from probdiffeq.backend import (
     flow,
     func,
@@ -25,28 +26,18 @@ from probdiffeq.backend.typing import (
     Sequence,
     TypeVar,
 )
-from probdiffeq.impl import impl
-from probdiffeq.util import filter_util
 
 C = TypeVar("C", bound=Sequence)
-T = TypeVar("T")
+"""A type-variable to describe sequences.
 
+Used to type Taylor coefficients, for example.
+"""
 
-class VectorField(Protocol[T]):
-    """A protocol for the vector-field type expected by the solvers.
+N = TypeVar("N", bound=ssm_impl.AbstractTreeNormal)
+"""A type-variable to describe normal distributions.
 
-    Examples of valid call signatures:
-
-    - `f(u: T, /, *, t: ArrayLike) -> T`
-    - `f(u: T, du: T, /, *, t: ArrayLike) -> T`
-    - `f(u: T, du: T, ddu: T, /, *, t: ArrayLike) -> T`
-    - `f(u: T, du: T, ddu: T, dddy: T, /, *, t: ArrayLike) -> T`
-
-    If a type-checker complains, try jitting the vector field.
-    If the error persists, open an issue.
-    """
-
-    def __call__(self, *ys: T, t: ArrayLike) -> T: ...
+Used to type marginals, for example.
+"""
 
 
 @tree.register_dataclass
@@ -214,7 +205,7 @@ class jacobian_materialize(JacobianHandler):
     Use this Jacobian if the dimension of the problem is relatively small.
     """
 
-    def __init__(self, *, jacfun=func.jacfwd):
+    def __init__(self, *, jacfun=func.jacfwd) -> None:
         self.jacfun = jacfun
 
     def init_jacobian_handler(self):
@@ -247,9 +238,15 @@ class jacobian_hutchinson_fwd(JacobianHandler):
     Use a Hutchinson handler if the dimension of the problem is large.
 
     This implementation uses **forward-mode** automatic differentiation.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This function is highly experimental and not safe to use.
+        There is no guarantee that it works correctly (or at all).
+        It might be deleted tomorrow and without any deprecation policy.
+
     """
 
-    def __init__(self, *, seed=1, num_probes=10):
+    def __init__(self, *, seed=1, num_probes=10) -> None:
         self.seed = seed
         self.num_probes = num_probes
 
@@ -290,9 +287,15 @@ class jacobian_hutchinson_rev(JacobianHandler):
     Use a Hutchinson handler if the dimension of the problem is large.
 
     This implementation uses **reverse-mode** automatic differentiation.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This function is highly experimental and not safe to use.
+        There is no guarantee that it works correctly (or at all).
+        It might be deleted tomorrow and without any deprecation policy.
+
     """
 
-    def __init__(self, *, seed=1, num_probes=10):
+    def __init__(self, *, seed=1, num_probes=10) -> None:
         self.seed = seed
         self.num_probes = num_probes
 
@@ -325,6 +328,73 @@ class jacobian_hutchinson_rev(JacobianHandler):
         vJv = func.vmap(lambda s: s * vjp(s)[0])(v)
         J_diagonal = vJv.mean(axis=0)
         return fx, J_diagonal, key
+
+
+def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
+    """Construct a log-marginal-likelihood loss for the terminal value."""
+
+    def loss(u, /, *, marginals, std):
+        u = tree.tree_map(np.asarray, u)
+
+        std_expected = tree.tree_map(lambda _s: ssm.prototypes.std(), u)
+        std = tree.tree_map(np.asarray, std)
+        shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
+        shapes_equal = tree.tree_all(shapes)
+
+        if not shapes_equal:
+            msg = "The standard deviation container differs from what was expected."
+            msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
+            msg += f" Received: shape={tree.tree_map(np.shape, std)}."
+            msg += f" For reference, data: shape={tree.tree_map(np.shape, u)}."
+            raise ValueError(msg)
+
+        model = ssm.conditional.to_derivative(tcoeff_index, std)
+        marg = ssm.conditional.marginalise(marginals, model)
+        return marg.logpdf(u)
+
+    return loss
+
+
+def loss_lml_timeseries(
+    *, ssm: ssm_impl.FactSsmImpl, average_pdfs: bool = True, tcoeff_index=0
+):
+    """Construct a log-marginal-likelihood loss for a time-series."""
+
+    def loss(u, /, *, posterior, std):
+        if not isinstance(posterior, MarkovSequence):
+            msg = "The datatype of the posterior is not as expected."
+            msg += f" Expected: {MarkovSequence}."
+            msg += f" Received: {type(posterior)}."
+            msg += " Did you perhaps use a filter instead of a smoother"
+            msg += ", or did you perhaps intend to use a different loss?"
+            raise TypeError(msg)
+
+        u = tree.tree_map(np.asarray, u)
+
+        def batch_std(s):
+            return func.vmap(lambda _s: ssm.prototypes.std())(s)
+
+        std_expected = tree.tree_map(batch_std, u)
+        std = tree.tree_map(np.asarray, std)
+        shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
+        shapes_equal = tree.tree_all(shapes)
+
+        if not shapes_equal:
+            msg = "The standard deviation container differs from what was expected."
+            msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
+            msg += f" Received: shape={tree.tree_map(np.shape, std)}."
+            msg += f" For reference, data: shape={tree.tree_map(np.shape, u)}."
+            raise ValueError(msg)
+
+        def make_model(s):
+            return ssm.conditional.to_derivative(tcoeff_index, s)
+
+        model = func.vmap(make_model)(std)
+        return posterior.evaluate_lml(
+            u, model=model, ssm=ssm, average_pdfs=average_pdfs
+        )
+
+    return loss
 
 
 class Constraint(Protocol):
@@ -363,7 +433,7 @@ def constraint_ode_ts0(vf, /, *, ssm):
     return ssm.linearize.ode_taylor_0th(vf, ode_order=ode_order)
 
 
-def constraint_root_ts1(root, /, *, ssm, jacobian=None):
+def constraint_root_ts1(root, /, *, ssm: ssm_impl.FactSsmImpl, jacobian=None):
     """Construct a constraint based on a custom root.
 
     See the custom information operator tutorial for details.
@@ -372,6 +442,9 @@ def constraint_root_ts1(root, /, *, ssm, jacobian=None):
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
     root_order = _verify_vector_field_signature_and_parse_order(root)
+    if root_order == 1:
+        msg = "Did you accidentally pass a vector field instead of a root-constraint?"
+        raise ValueError(msg)
 
     if jacobian is None:
         # Use hutchinson Jacobian handling for backward compatibility.
@@ -379,7 +452,41 @@ def constraint_root_ts1(root, /, *, ssm, jacobian=None):
     return ssm.linearize.root_taylor_1st(root, root_order=root_order, jacobian=jacobian)
 
 
-def constraint_ode_ts1(vf, /, *, ssm, jacobian: JacobianHandler | None = None):
+def constraint_root_jet(root, /, *, ssm: ssm_impl.FactSsmImpl, jacobian=None):
+    """Construct a constraint based on a custom root.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This function is highly experimental and not safe to use.
+        There is no guarantee that it works correctly (or at all).
+        It might be deleted tomorrow and without any deprecation policy.
+
+    """
+    root_order = _verify_vector_field_signature_and_parse_order(root)
+    if root_order == 1:
+        msg = "Did you accidentally pass a vector field instead of a root-constraint?"
+        raise ValueError(msg)
+
+    if jacobian is None:
+        jacobian = jacobian_hutchinson_fwd()
+
+    def root_jet(*tcoeffs_all, t):
+        # TODO: if we apply the preconditioner before passing
+        #   things in here, we can set is_tcoeff to True and possibly
+        #   gain a bunch of numerical robustness? (And speed?)
+        ps, ss = taylor.jet_unpack_series(tcoeffs_all, root_order)
+        primals, series = func.jet(lambda *y: root(*y, t=t), ps, ss, is_tcoeff=False)
+        return [primals, *series]
+
+    # TODO: once we have a second root constraint (eg slr1),
+    #       offer the below as a function argument.
+    return ssm.linearize.root_taylor_1st(
+        root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian
+    )
+
+
+def constraint_ode_ts1(
+    vf, /, *, ssm: ssm_impl.FactSsmImpl, jacobian: JacobianHandler | None = None
+):
     """Create an ODE constraint with first-order Taylor linearisation.
 
     Related:
@@ -399,11 +506,19 @@ def constraint_ode_ts1(vf, /, *, ssm, jacobian: JacobianHandler | None = None):
     return ssm.linearize.ode_taylor_1st(vf, ode_order=ode_order, jacobian=jacobian)
 
 
-def constraint_ode_slr0(vf, /, *, ssm, cubature_fun=cubature_third_order_spherical):
+def constraint_ode_slr0(
+    vf, /, *, ssm: ssm_impl.FactSsmImpl, cubature_fun=cubature_third_order_spherical
+):
     """Create an ODE constraint with zeroth-order statistical linear regression.
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This function is highly experimental and not safe to use.
+        There is no guarantee that it works correctly (or at all).
+        It might be deleted tomorrow and without any deprecation policy.
+
     """
     ode_order = _verify_vector_field_signature_and_parse_order(vf)
     if ode_order > 1:
@@ -414,7 +529,9 @@ def constraint_ode_slr0(vf, /, *, ssm, cubature_fun=cubature_third_order_spheric
     return ssm.linearize.ode_statistical_0th(vf, cubature_fun=cubature_fun)
 
 
-def constraint_ode_slr1(vf, *, ssm, cubature_fun=cubature_third_order_spherical):
+def constraint_ode_slr1(
+    vf, *, ssm: ssm_impl.FactSsmImpl, cubature_fun=cubature_third_order_spherical
+):
     """Create an ODE constraint with first-order statistical linear regression.
 
     Related:
@@ -488,7 +605,7 @@ def _verify_vector_field_signature_and_parse_order(vf) -> int:
 
 @tree.register_dataclass
 @structs.dataclass
-class TaylorCoeffTarget(Generic[C, T]):
+class TaylorCoeffTarget(Generic[N]):
     """A probabilistic description of Taylor coefficients.
 
     Includes means, standard deviations, and marginals.
@@ -496,280 +613,169 @@ class TaylorCoeffTarget(Generic[C, T]):
     for probabilistic differential equation solvers.
     """
 
-    mean: C
-    """A PyTree describing the mean of the Taylor coefficient."""
-
-    std: C
-    """A PyTree describing the standard deviation of the Taylor coefficient."""
-
-    marginals: T
+    marginals: N
     """The full marginal distribution of the Taylor coefficient."""
+
+    @property
+    def mean(self):
+        """A PyTree describing the standard deviation of the Taylor coefficient."""
+        return self.marginals.evaluate_mean()
+
+    @property
+    def std(self):
+        """A PyTree describing the mean of the Taylor coefficient."""
+        return self.marginals.evaluate_std()
 
 
 @tree.register_dataclass
 @structs.dataclass
-class MarkovSequence(Generic[T]):
+class MarkovSequence(Generic[N]):
     """A datastructure for Markov sequences as batches of joint distributions.
 
     This is the output type of smoother-based estimators.
     (Filter-based estimators do not return specialised types.)
     """
 
-    marginal: T
+    marginal: N
     """The marginal distribution."""
 
     conditional: Any
     """The conditional distribution."""
 
+    reverse: bool = structs.dataclass_field(metadata={"static": True})
+    """The direction of factorisations."""
 
-class MarkovStrategy(Generic[T]):
-    """An interface for estimation strategies in Markovian state-space models.
+    def rescale_cholesky(self, factor, /):
+        marg = self.marginal.rescale_cholesky(factor)
+        cond = self.conditional.rescale_noise(factor)
+        return MarkovSequence(marg, cond, reverse=self.reverse)
 
-    Related:
-    [`strategy_filter`](#probdiffeq.probdiffeq.strategy_filter),
-    [`strategy_smoother_fixedpoint`](#probdiffeq.probdiffeq.strategy_smoother_fixedpoint),
-    [`strategy_smoother_fixedinterval`](#probdiffeq.probdiffeq.strategy_smoother_fixedinterval).
-    """
-
-    def __init__(
-        self,
-        ssm: Any,
-        is_suitable_for_save_at: int,
-        is_suitable_for_save_every_step: int,
-        is_suitable_for_offgrid_marginals: int,
-    ):
-        self.ssm = ssm
-        self.is_suitable_for_save_at = is_suitable_for_save_at
-        self.is_suitable_for_save_every_step = is_suitable_for_save_every_step
-        self.is_suitable_for_offgrid_marginals = is_suitable_for_offgrid_marginals
-
-    def init_posterior(self, *, u: TaylorCoeffTarget) -> T:
-        """Initialize a posterior distribution."""
-        raise NotImplementedError
-
-    def predict(self, posterior: T, *, transition) -> tuple[TaylorCoeffTarget, T]:
-        """Make a prediction."""
-        raise NotImplementedError
-
-    def apply_updates(self, prediction: T, *, updates) -> tuple[TaylorCoeffTarget, T]:
-        """Apply updates to a prediction."""
-        raise NotImplementedError
-
-    def interpolate(
-        self, *, posterior_t0: T, posterior_t1: T, transition_t0_t, transition_t_t1
-    ):
-        """Interpolate between two points."""
-        raise NotImplementedError
-
-    def interpolate_at_t1(self, *, posterior_t1: T):
-        """Interpolate at a checkpoint."""
-        raise NotImplementedError
-
-    def finalize(self, *, posterior0: T, posterior: T, output_scale) -> T:
-        """Finalize the posterior before returning a solution."""
-        raise NotImplementedError
-
-    def markov_marginals(self, markov_seq: MarkovSequence, *, reverse: bool):
+    def evaluate_marginals(self, *, ssm):
         """Extract the (time-)marginals from a Markov sequence.
 
         This is only needed in combination with smoothing-based strategies.
         """
-        if markov_seq.marginal.mean.ndim == markov_seq.conditional.noise.mean.ndim:
-            markov_seq = self._markov_select_terminal(markov_seq)
+        if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
+            markov_seq = self._select_terminal()
+            return markov_seq.evaluate_marginals(ssm=ssm)
 
         def step(x, cond):
-            extrapolated = self.ssm.conditional.marginalise(x, cond)
+            extrapolated = ssm.conditional.marginalise(x, cond)
             return extrapolated, extrapolated
 
-        init, xs = markov_seq.marginal, markov_seq.conditional
-        _, marginals = flow.scan(step, init=init, xs=xs, reverse=reverse)
+        _, marginals = flow.scan(
+            step, init=self.marginal, xs=self.conditional, reverse=self.reverse
+        )
 
-        if reverse:
+        if self.reverse:
             # Append the terminal marginal to the computed ones
-            return tree.tree_array_append(marginals, init)
+            return tree.tree_array_append(marginals, self.marginal)
 
-        return tree.tree_array_prepend(init, marginals)
+        return tree.tree_array_prepend(self.marginal, marginals)
 
-    def markov_sample(
-        self, key, markov_seq: MarkovSequence, *, reverse: bool, shape: tuple = ()
-    ):
-        """Sample from a Markov sequence."""
-        if markov_seq.marginal.mean.ndim == markov_seq.conditional.noise.mean.ndim:
-            markov_seq = self._markov_select_terminal(markov_seq)
-        # A smoother samples on the grid by sampling i.i.d values
-        # from the terminal RV x_N and the backward noises z_(1:N)
-        # and then combining them backwards as
-        # x_(n-1) = l_n @ x_n + z_n, for n=1,...,N.
-        markov_seq_shape = self._sample_shape(markov_seq)
-        base_samples = random.normal(key, shape=shape + markov_seq_shape)
-        return self._transform_unit_sample(markov_seq, base_samples, reverse=reverse)
+    def evaluate_lml(self, u, *, model, ssm: ssm_impl.FactSsmImpl, average_pdfs: bool):
+        assert self.reverse
 
-    @staticmethod
-    def _markov_select_terminal(markov_seq):
+        if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
+            markov_seq = self._select_terminal()
+            return markov_seq.evaluate_lml(
+                u, model=model, ssm=ssm, average_pdfs=average_pdfs
+            )
+
+        # Process the terminal value
+        u0 = tree.tree_map(lambda s: s[-1], u)
+        model0 = tree.tree_map(lambda s: s[-1], model)
+        marg, cond = ssm.conditional.revert(self.marginal, model0)
+        updated = ssm.conditional.apply(u0, cond)
+        pdf0 = marg.logpdf(u0)
+
+        # Process the remaining values
+        def body(rv_and_logpdf, prior_and_observation_and_data):
+            rv, logpdf, num_data = rv_and_logpdf
+            prior, observation, data = prior_and_observation_and_data
+
+            predicted = ssm.conditional.marginalise(rv, prior)
+            observed, noise = ssm.conditional.revert(predicted, observation)
+            logpdf_n = observed.logpdf(data)
+            corrected = ssm.conditional.apply(data, noise)
+
+            # The mean of the PDFs usually leads to LML values that are more
+            # "human-readable" (ie O(1) instead O(N)). This is technically not
+            # a log-marginal-likelihood, but much nicer to work with.
+            if average_pdfs:
+                logpdf1 = (logpdf * num_data + logpdf_n) / (num_data + 1)
+            else:
+                logpdf = logpdf + logpdf_n
+
+            return (corrected, logpdf1, num_data + 1), ()
+
+        u1 = tree.tree_map(lambda s: s[:-1], u)
+        model1 = tree.tree_map(lambda s: s[:-1], model)
+        init = (updated, pdf0, 1)
+        xs = (self.conditional, model1, u1)
+        (_, pdf, _), _ = flow.scan(body, init=init, xs=xs, reverse=self.reverse)
+        return pdf
+
+    def _select_terminal(self):
         """Discard all intermediate filtering solutions from a Markov sequence.
 
         This function is useful to convert a smoothing-solution into a Markov sequence
         that is compatible with sampling or marginalisation.
         """
-        init = tree.tree_map(lambda x: x[-1, ...], markov_seq.marginal)
-        return MarkovSequence(init, markov_seq.conditional)
+        init = tree.tree_map(lambda x: x[-1, ...], self.marginal)
+        return MarkovSequence(init, self.conditional, reverse=self.reverse)
 
-    def _sample_shape(self, markov_seq):
-        # The number of samples is one larger than the number of conditionals
-        noise = markov_seq.conditional.noise
-        n, *shape_single_sample = self.ssm.stats.hidden_shape(noise)
-        return n + 1, *tuple(shape_single_sample)
+    def sample(self, key, *, ssm: ssm_impl.FactSsmImpl, shape: tuple = ()):
+        """Sample from a Markov sequence."""
+        # If the MarkovSequence carries unnecessary filtering marginals, remove them
+        if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
+            markov_seq = self._select_terminal()
+            return markov_seq.sample(key, ssm=ssm, shape=shape)
 
-    def _transform_unit_sample(self, markov_seq, base_sample, *, reverse):
-        if base_sample.ndim > len(self._sample_shape(markov_seq)):
-            transform = func.partial(self._transform_unit_sample, reverse=reverse)
-            transform_vmap = func.vmap(transform, in_axes=(None, 0))
-            return transform_vmap(markov_seq, base_sample)
+        # If many samples are required, vmap over recursive calls to sample()
+        if len(shape) > 0:
+            n, *shape_remaining = shape
+            keys = random.split(key, num=n)
+            sample_ = func.partial(self.sample, ssm=ssm, shape=shape_remaining)
+            return func.vmap(sample_)(keys)
 
-        # Compute a single unit sample.
+        # Compute a single sample from the Markov sequence
 
-        def body_fun(samp_prev, conditionals_and_base_samples):
-            conditional, base = conditionals_and_base_samples
+        def body(smp0_and_key, cond):
+            smp0, key = smp0_and_key
+            predicted = ssm.conditional.apply(smp0, cond)
+            key, subkey = random.split(key, num=2)
+            smp1 = predicted.sample(subkey)
+            return (smp1, key), smp1
 
-            rv = self.ssm.conditional.apply(samp_prev, conditional)
-            smp = self.ssm.stats.transform_unit_sample(base, rv)
-            return smp, smp
-
-        base_sample_init, base_sample_body = base_sample[0], base_sample[1:]
-
-        # Compute a sample at the terminal value
-        init_sample = self.ssm.stats.transform_unit_sample(
-            base_sample_init, markov_seq.marginal
+        key, subkey = random.split(key, num=2)
+        smp = self.marginal.sample(subkey)
+        _, smps = flow.scan(
+            body, init=(smp, key), xs=self.conditional, reverse=self.reverse
         )
 
-        # Loop over backward models and the remaining base samples
-        xs = (markov_seq.conditional, base_sample_body)
-        _, samples = flow.scan(body_fun, init=init_sample, xs=xs, reverse=reverse)
+        # Currently, sampling is only implemented for reverse
+        if self.reverse:
+            return tree.tree_array_append(smps, smp)
+        return tree.tree_array_prepend(smp, smps)
 
-        if reverse:
-            samples = np.concatenate([samples, init_sample[None, ...]])
-        else:
-            samples = np.concatenate([init_sample[None, ...], samples])
 
-        return func.vmap(self.ssm.stats.qoi_from_sample)(samples)
-
-    def log_marginal_likelihood_terminal_values(
-        self, u, /, *, standard_deviation, posterior: T
-    ):
-        """Compute the log-marginal-likelihood at the terminal value.
-
-        Parameters
-        ----------
-        u
-            Observation. Expected to have shape (d,) for an ODE with shape (d,).
-        standard_deviation
-            Standard deviation of the observation. Expected to be a scalar.
-        posterior
-            Posterior distribution.
-            Expected to correspond to a solution of an ODE with shape (d,).
-        """
-        [u_leaves], u_structure = tree.tree_flatten(u)
-        [_std_leaves], std_structure = tree.tree_flatten(standard_deviation)
-
-        if u_structure != std_structure:
-            msg = (
-                f"Observation-noise tree structure {std_structure} "
-                f"does not match the observation structure {u_structure}. "
-            )
-            raise ValueError(msg)
-
-        # Generate an observation-model for the QOI
-        model = self.ssm.conditional.to_derivative(0, u, standard_deviation)
-        rv = posterior.marginal if isinstance(posterior, MarkovSequence) else posterior
-
-        data = np.zeros_like(u_leaves)  # 'u' is baked into the observation model
-        observed, _conditional = self.ssm.conditional.revert(rv, model)
-        return self.ssm.stats.logpdf(data, observed)
-
-    def log_marginal_likelihood(self, u, /, *, standard_deviation, posterior: T):
-        """Compute the log-marginal-likelihood of observations of the IVP solution.
-
-        Only works with smoothing-based estimators.
-
-        !!! note
-            Use `log_marginal_likelihood_terminal_values`
-            to compute the log-likelihood at the terminal values.
-
-        Parameters
-        ----------
-        u
-            Observation. Expected to match the ODE's type/shape.
-        standard_deviation
-            Standard deviation of the observation. Expected to match 'u's
-            Pytree structure, but every leaf must be a scalar.
-        posterior
-            Posterior distribution.
-            Expected to correspond to a solution of an ODE with shape (d,).
-        """
-        [u_leaves], u_structure = tree.tree_flatten(u)
-        [std_leaves], std_structure = tree.tree_flatten(standard_deviation)
-
-        if u_structure != std_structure:
-            msg = (
-                f"Observation-noise tree structure {std_structure} "
-                f"does not match the observation structure {u_structure}. "
-            )
-            raise ValueError(msg)
-
-        qoi_flat, _ = tree.ravel_pytree(self.ssm.prototypes.qoi())
-        if np.ndim(std_leaves) < 1 or np.ndim(u_leaves) != np.ndim(qoi_flat) + 1:
-            msg = (
-                f"Time-series solution expected. "
-                f"ndim={np.ndim(u_leaves)}, shape={np.shape(u_leaves)} received."
-            )
-            raise ValueError(msg)
-
-        if len(u_leaves) != len(np.asarray(std_leaves)):
-            msg = (
-                f"Observation-noise shape {np.shape(std_leaves)} "
-                f"does not match the observation shape {np.shape(u_leaves)}. "
-            )
-            raise ValueError(msg)
-
-        if not isinstance(posterior, MarkovSequence):
-            msg1 = "Time-series marginal likelihoods "
-            msg2 = "cannot be computed with a filtering solution."
-            raise TypeError(msg1 + msg2)
-
-        # Generate an observation-model for the QOI
-
-        model_fun = func.vmap(self.ssm.conditional.to_derivative, in_axes=(None, 0, 0))
-        models = model_fun(0, u, standard_deviation)
-
-        # Select the terminal variable
-        rv = tree.tree_map(lambda s: s[-1, ...], posterior.marginal)
-
-        # Run the reverse Kalman filter
-        estimator = filter_util.kalmanfilter_with_marginal_likelihood(ssm=self.ssm)
-        result, _ = filter_util.estimate_rev(
-            np.zeros_like(u_leaves),
-            init=rv,
-            prior_transitions=posterior.conditional,
-            observation_model=models,
-            estimator=estimator,
-        )
-
-        # Return only the logpdf
-        return result.logpdf
+T = TypeVar("T", bound=MarkovSequence | ssm_impl.AbstractTreeNormal)
+"""A type-variable to describe posterior distributions."""
 
 
 @tree.register_dataclass
 @structs.dataclass
-class ProbabilisticSolution(Generic[C, T]):
+class ProbabilisticSolution(Generic[N, T]):
     """A datastructure for probabilistic solutions of differential equations."""
 
     t: Array
     """The current time-step."""
 
-    u: TaylorCoeffTarget[C, T]
+    u: TaylorCoeffTarget[N]
     """The current ODE solution estimate."""
 
-    solution_full: T | MarkovSequence[T]
+    solution_full: T
     """The current posterior estimate."""
 
     # Todo: merge 'output_scale' and 'auxiliary' and "fun_evals"?
@@ -795,6 +801,100 @@ class ProbabilisticSolution(Generic[C, T]):
     """
 
 
+S = TypeVar(
+    "S", bound=ProbabilisticSolution | MarkovSequence | ssm_impl.AbstractTreeNormal
+)
+"""A type-variable to describe interpolation results."""
+
+
+@tree.register_dataclass
+@structs.dataclass
+class InterpResult(Generic[S]):
+    """A datastructure to store interpolation results.
+
+    To ensure correct adaptive time-stepping, it is important
+    to distinguish step-from variables from interpolate-from variables.
+
+    For some solvers, e.g. fixed-point-smoother-based ones,
+    both stepping and interpolating variables are adjusted during interpolation.
+    """
+
+    step_from: S
+    """The new 'step_from' field.
+
+    At time `max(t, s1.t)`.
+    Use this as the right-most reference state
+    in future interpolations, or continue time-stepping from here.
+    """
+
+    interp_from: S
+    """The new `interp_from` field.
+
+    At time `t`. Use this as the left-most reference state
+    in future interpolations.
+
+    The difference between `interpolated` and `interp_from`
+    is important around checkpoints:
+
+    - `interpolated` belongs to the just-concluded time interval,
+    - `interp_from` belongs to the to-be-started time interval.
+
+    Concretely, this means that for fixed-point smoothers,
+    `interp_from` has a unit backward model whereas `interpolated`
+    remembers how to step back to the previous target location.
+    """
+
+
+class MarkovStrategy(Generic[T]):
+    """An interface for estimation strategies in Markovian state-space models.
+
+    Related:
+    [`strategy_filter`](#probdiffeq.probdiffeq.strategy_filter),
+    [`strategy_smoother_fixedpoint`](#probdiffeq.probdiffeq.strategy_smoother_fixedpoint),
+    [`strategy_smoother_fixedinterval`](#probdiffeq.probdiffeq.strategy_smoother_fixedinterval).
+    """
+
+    def __init__(
+        self,
+        ssm: Any,
+        is_suitable_for_save_at: int,
+        is_suitable_for_save_every_step: int,
+        is_suitable_for_offgrid_marginals: int,
+    ) -> None:
+        self.ssm = ssm
+        self.is_suitable_for_save_at = is_suitable_for_save_at
+        self.is_suitable_for_save_every_step = is_suitable_for_save_every_step
+        self.is_suitable_for_offgrid_marginals = is_suitable_for_offgrid_marginals
+
+    def init_posterior(self, *, u: TaylorCoeffTarget) -> T:
+        """Initialize a posterior distribution."""
+        raise NotImplementedError
+
+    def predict(self, posterior: T, *, transition) -> tuple[TaylorCoeffTarget, T]:
+        """Make a prediction."""
+        raise NotImplementedError
+
+    def apply_updates(self, prediction: T, *, updates) -> tuple[TaylorCoeffTarget, T]:
+        """Apply updates to a prediction."""
+        raise NotImplementedError
+
+    def interpolate(
+        self, *, posterior_t0: T, posterior_t1: T, transition_t0_t, transition_t_t1
+    ) -> tuple[tuple[TaylorCoeffTarget, T], InterpResult[T]]:
+        """Interpolate between two points."""
+        raise NotImplementedError
+
+    def interpolate_at_t1(
+        self, *, posterior_t1: T
+    ) -> tuple[tuple[TaylorCoeffTarget, T], InterpResult[T]]:
+        """Interpolate at a checkpoint."""
+        raise NotImplementedError
+
+    def finalize(self, *, posterior0: T, posterior: T, output_scale) -> T:
+        """Finalize the posterior before returning a solution."""
+        raise NotImplementedError
+
+
 class ProbabilisticSolver:
     """An interface for probabilistic differential equation solvers.
 
@@ -812,7 +912,7 @@ class ProbabilisticSolver:
         prior: Callable,
         constraint: Constraint,
         ssm: Any,
-    ):
+    ) -> None:
         self.ssm = ssm
         self.strategy = strategy
         self.prior = prior
@@ -971,7 +1071,7 @@ class ProbabilisticSolver:
             fun_evals=interp_from.fun_evals,
         )
 
-        interp_res = _InterpRes(step_from=step_from, interp_from=interp_from)
+        interp_res = InterpResult(step_from=step_from, interp_from=interp_from)
         return interpolated, interp_res
 
     def interpolate_at_t1(
@@ -987,10 +1087,10 @@ class ProbabilisticSolver:
             # New
             solution_full=step_and_interpolate_from.interp_from,
             # Old
-            u=interp_from.u,  # incorrect?
-            output_scale=interp_from.output_scale,  # incorrect?
-            auxiliary=interp_from.auxiliary,  # incorrect?
-            num_steps=interp_from.num_steps,  # incorrect?
+            u=interp_from.u,
+            output_scale=interp_from.output_scale,
+            auxiliary=interp_from.auxiliary,
+            num_steps=interp_from.num_steps,
             fun_evals=interp_from.fun_evals,
         )
         sol = ProbabilisticSolution(
@@ -1015,116 +1115,202 @@ class ProbabilisticSolver:
             num_steps=interp_to.num_steps,
             fun_evals=interp_to.fun_evals,
         )
-        return sol, _InterpRes(step_from=acc, interp_from=prev)
+        return sol, InterpResult(step_from=acc, interp_from=prev)
 
 
 def prior_wiener_integrated(
     tcoeffs: C,
     *,
-    tcoeffs_std: C | None = None,
+    # Which of the Taylor coefficients are differential variables
+    is_differential: C | None = None,
+    nondifferential_eps: float = 1e-6,  # a small value
+    # The state-space model factorisation
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
+    # Do we use a special output scale?
     output_scale: ArrayLike | None = None,
-    increase_std_by_eps: bool = False,
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value
 ):
-    """Construct an repeatedly-integrated Wiener process.
+    """Construct an repeatedly-integrated Wiener process."""
+    tcoeffs_std = _tcoeffs_std_from_differential_variables(
+        tcoeffs,
+        is_differential=is_differential,
+        nondifferential_eps=nondifferential_eps,
+        ssm_fact=ssm_fact,
+    )
 
-    Tip: Choose nonzero standard deviations
-    to get visually more pleasing uncertainties and more numerical robustness for
-    high-order solvers in low precision arithmetic. Outside of these cases,
-    leave the standard deviations at zero to improve accuracy.
+    return prior_wiener_integrated_diffuse(
+        tcoeffs,
+        tcoeffs_std,
+        ssm_fact=ssm_fact,
+        output_scale=output_scale,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+    )
+
+
+def _tcoeffs_std_from_differential_variables(
+    tcoeffs, *, ssm_fact, is_differential, nondifferential_eps
+):
+    # Decide the standard deviation template based on the factorisations
+    if ssm_fact in ["dense", "blockdiag"]:
+        leaves = tree.tree_leaves(tcoeffs)
+        std_per_leaf = np.zeros_like(leaves[0])
+    elif ssm_fact in ["isotropic"]:
+        std_per_leaf = np.zeros(())
+    else:
+        msg = f"ssm_fact={ssm_fact} is unknown."
+        raise ValueError(msg)
+
+    # Infer the expected standard-deviation tree structure
+    leaves, structure = tree.tree_flatten(tcoeffs)
+    std_template = tree.tree_unflatten(structure, [std_per_leaf for _ in leaves])
+
+    # If 'is_differential' hasn't been provided, simply return zeros everywhere
+    if is_differential is None:
+        return std_template
+
+    is_differential = tree.tree_map(np.asarray, is_differential)
+
+    # Before using is_differential, verify it has the correct structure and shape
+    try:
+
+        def shape_equal(A, B):
+            return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
+
+        assert tree.tree_all(shape_equal(is_differential, std_template))
+    except (ValueError, AssertionError) as err:
+        msg = "Input 'is_differential' has the wrong PyTree structure."
+        msg += f" Expected: {tree.tree_map(np.shape, std_template)}."
+        msg += f" Received: {tree.tree_map(np.shape, is_differential)}."
+        raise ValueError(msg) from err
+
+    # Wherever is_differential is True, initialize with zeros.
+    # Elsewhere, initialize with a small positivec value.
+
+    def std_init(s: Array) -> Array:
+        if s.dtype != np.dtype(bool):
+            msg = "Boolean entries expected in `is_differential`."
+            msg += f" Received: dtype={np.dtype(s)}"
+            raise TypeError(msg)
+        return np.where(s, 0.0, nondifferential_eps)
+
+    return tree.tree_map(std_init, is_differential)
+
+
+def prior_wiener_integrated_diffuse(
+    tcoeffs_mean: C,
+    tcoeffs_std: C,
+    *,
+    # The state-space model factorisation
+    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
+    # Do we use a special output scale?
+    output_scale: ArrayLike | None = None,
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value
+):
+    """Construct an diffuse repeatedly-integrated Wiener process.
+
+    The diffuse process has a nonzero initial standard deviation.
+    This is typically used to:
+    - Either get more visually-pleasing uncertainties and gain
+      numerical robustness for high-order solvers in low precision arithmetic.
+    - Communicate to the solvers that the prior has not seen any data
+      (and solvers can handle data at initialisation themselves.)
+
+    Outside of these cases, use the usual integrated Wiener process.
     """
+    # Add derivatives to the Taylor coefficients.
+    # Warning: This destroys pytree structure in the tcoeffs and the
+    # resulting pytree will always be a list (for now at least)
+    if diffuse_derivatives > 0:
+        tcoeffs_mean, tcoeffs_std = _add_diffuse_derivatives(
+            tcoeffs_mean,
+            tcoeffs_std,
+            diffuse_derivatives=diffuse_derivatives,
+            diffuse_eps=diffuse_eps,
+        )
+
     # Choose a state-space model factorisation
-    ssm = impl.choose(ssm_fact, tcoeffs_like=tcoeffs)
+    match ssm_fact:
+        case "dense":
+            ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(tcoeffs_mean)
+        case "blockdiag":
+            ssm = ssm_impl.FactSsmImpl.from_tcoeffs_blockdiag(tcoeffs_mean)
+        case "isotropic":
+            ssm = ssm_impl.FactSsmImpl.from_tcoeffs_isotropic(tcoeffs_mean)
+        case _:
+            msg = f"Factorisation ssm_fact='{ssm_fact}' unknown. "
+            msg += "Choose one out of {'dense', 'isotropic', 'blockdiag'}."
+            raise ValueError(msg)
 
-    # Set up the transitions
-
-    # TODO: should the output_scale be an argument to solve()?
     if output_scale is None:
-        output_scale = np.ones_like(ssm.prototypes.output_scale())
+        output_scale = tree.tree_map(np.ones_like, tcoeffs_std[0])
+    else:
+        output_scale = tree.tree_map(np.asarray, output_scale)
 
-    output_scale = np.asarray(output_scale)
-    discretize = ssm.conditional.ibm_transitions(base_scale=output_scale)
+        def shape_equal(A, B):
+            return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
 
-    if tcoeffs_std is None:
-        error_like = np.zeros_like(ssm.prototypes.error_estimate())
-        tcoeffs_std = tree.tree_map(lambda _: error_like, tcoeffs)
+        if not tree.tree_all(shape_equal(output_scale, tcoeffs_std[0])):
+            msg = "Output scale has the wrong shape."
+            msg += f" Expected: output_scale.shape={tcoeffs_std[0].shape}."
+            msg += f" Received: output_scale.shape={output_scale.shape}."
+            raise ValueError(msg)
 
-    # Increase the Taylor coefficient STD by a machine epsilon
-    # because the solver initialisation carries out an update
-    # and if the inputs are fully certain, this update yields NaNs.
-    if increase_std_by_eps:
-        eps = np.finfo_eps(output_scale.dtype)
-        tcoeffs_std = tree.tree_map(lambda s: s + eps, tcoeffs_std)
+    [output_scale_leaf] = tree.tree_leaves(output_scale)
+    std_leaves, structure = tree.tree_flatten(tcoeffs_std)
+    std_leaves_scaled = [output_scale_leaf * s for s in std_leaves]
+    tcoeffs_std = tree.tree_unflatten(structure, std_leaves_scaled)
+
+    discretize = ssm.conditional.transition_wiener_integrated(base_scale=output_scale)
 
     # Return the target
-    marginal = ssm.normal.from_tcoeffs(tcoeffs, tcoeffs_std)
-    u_mean = ssm.stats.qoi(marginal)
-    std = ssm.stats.standard_deviation(marginal)
-    u_std = ssm.stats.qoi_from_sample(std)
-    target = TaylorCoeffTarget(u_mean, u_std, marginal)
+    marginal = ssm.normal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
+    target = TaylorCoeffTarget(marginal)
     return target, discretize, ssm
 
 
+def _add_diffuse_derivatives(
+    tcoeffs_mean, tcoeffs_std, *, diffuse_eps, diffuse_derivatives
+):
+    zeros = tree.tree_map(np.zeros_like, tcoeffs_mean[0])
+    tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(diffuse_derivatives)]]
+
+    unknowns = tree.tree_map(lambda s: diffuse_eps * np.ones_like(s), tcoeffs_std[0])
+    tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
+    return tcoeffs_mean, tcoeffs_std
+
+
 def prior_wiener_integrated_discrete(
-    ts,
     tcoeffs: C,
+    grid: Array,
     *,
-    tcoeffs_std: C | None = None,
+    is_differential: C | None = None,
+    nondifferential_eps: float = 1e-6,  # a small value
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     output_scale: ArrayLike | None = None,
-    increase_std_by_eps: bool = False,
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value
 ):
     """Compute a time-discretization of an integrated Wiener process."""
     init, discretize, ssm = prior_wiener_integrated(
         tcoeffs,
-        tcoeffs_std=tcoeffs_std,
+        is_differential=is_differential,
+        nondifferential_eps=nondifferential_eps,
         ssm_fact=ssm_fact,
         output_scale=output_scale,
-        increase_std_by_eps=increase_std_by_eps,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
     )
-    scales = np.ones_like(ssm.prototypes.output_scale())
+    scales = np.ones_like(ssm.prototypes.output_scale_calibrated())
     discretize_vmap = func.vmap(discretize, in_axes=(0, None))
-    conditionals = discretize_vmap(np.diff(ts), scales)
-    markov_seq = MarkovSequence(init.marginals, conditionals)
+    conditionals = discretize_vmap(np.diff(grid), scales)
+    markov_seq = MarkovSequence(init.marginals, conditionals, reverse=False)
     return markov_seq, ssm
-
-
-@tree.register_dataclass
-@structs.dataclass
-class _InterpRes(Generic[T]):
-    """A datastructure to store interpolation results.
-
-    To ensure correct adaptive time-stepping, it is important
-    to distinguish step-from variables from interpolate-from variables.
-
-    For some solvers, e.g. fixed-point-smoother-based ones,
-    both stepping and interpolating variables are adjusted during interpolation.
-    """
-
-    step_from: T
-    """The new 'step_from' field.
-
-    At time `max(t, s1.t)`.
-    Use this as the right-most reference state
-    in future interpolations, or continue time-stepping from here.
-    """
-
-    interp_from: T
-    """The new `interp_from` field.
-
-    At time `t`. Use this as the left-most reference state
-    in future interpolations.
-
-    The difference between `interpolated` and `interp_from`
-    is important around checkpoints:
-
-    - `interpolated` belongs to the just-concluded time interval,
-    - `interp_from` belongs to the to-be-started time interval.
-
-    Concretely, this means that for fixed-point smoothers,
-    `interp_from` has a unit backward model whereas `interpolated`
-    remembers how to step back to the previous target location.
-    """
 
 
 class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
@@ -1138,7 +1324,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
     [`MarkovStrategy`](#probdiffeq.probdiffeq.MarkovStrategy).
     """
 
-    def __init__(self, ssm):
+    def __init__(self, ssm) -> None:
         super().__init__(
             ssm=ssm,
             is_suitable_for_save_at=False,
@@ -1148,59 +1334,47 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
 
     def init_posterior(self, *, u: TaylorCoeffTarget):
         cond = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
-        posterior = MarkovSequence(marginal=u.marginals, conditional=cond)
+        posterior = MarkovSequence(marginal=u.marginals, conditional=cond, reverse=True)
         return u, posterior
 
     def predict(
         self, posterior: MarkovSequence, *, transition
     ) -> tuple[TaylorCoeffTarget, MarkovSequence]:
         marginals, cond = self.ssm.conditional.revert(posterior.marginal, transition)
-        posterior = MarkovSequence(marginal=marginals, conditional=cond)
+        posterior = MarkovSequence(
+            marginal=marginals, conditional=cond, reverse=posterior.reverse
+        )
 
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, posterior
 
     def apply_updates(self, prediction, *, updates):
-        posterior = MarkovSequence(updates, prediction.conditional)
+        posterior = MarkovSequence(
+            updates, prediction.conditional, reverse=prediction.reverse
+        )
         marginals = updates
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        return TaylorCoeffTarget(u, u_std, marginals), posterior
+        estimate = TaylorCoeffTarget(marginals)
+        return estimate, posterior
 
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
     ):
-        assert output_scale.shape == self.ssm.prototypes.output_scale().shape
-
-        init0 = self.ssm.stats.rescale_cholesky(posterior0.marginal, output_scale)
-        conditional0 = self.ssm.conditional.rescale_noise(
-            posterior0.conditional, output_scale
-        )
-        posterior0 = MarkovSequence(init0, conditional0)
-
-        # Calibrate
-        init = self.ssm.stats.rescale_cholesky(posterior.marginal, output_scale)
-        conditional = self.ssm.conditional.rescale_noise(
-            posterior.conditional, output_scale
-        )
-        posterior = MarkovSequence(init, conditional)
+        assert output_scale.shape == self.ssm.prototypes.output_scale_calibrated().shape
+        posterior0 = posterior0.rescale_cholesky(output_scale)
+        posterior = posterior.rescale_cholesky(output_scale)
 
         # Marginalise
-        marginals = self.markov_marginals(posterior, reverse=True)
+        marginals = posterior.evaluate_marginals(ssm=self.ssm)
+        # marginals = self.markov_marginals(posterior, reverse=True)
 
         # Prepend the initial condition to the filtering distributions
         init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
-        posterior = MarkovSequence(marginal=init, conditional=posterior.conditional)
+        posterior = MarkovSequence(
+            marginal=init, conditional=posterior.conditional, reverse=posterior.reverse
+        )
 
         # Extract targets
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, posterior
 
     def interpolate(
@@ -1245,29 +1419,27 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         marginal_t1 = posterior_t1.marginal
         conditional_t1_to_t = extrapolated_t1.conditional
         rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
-        solution_at_t = MarkovSequence(rv_at_t, extrapolated_t.conditional)
+        solution_at_t = MarkovSequence(
+            rv_at_t, extrapolated_t.conditional, reverse=extrapolated_t.reverse
+        )
 
         # The state at t1 gets a new backward model;
         # (it must remember how to get back to t, not to t0).
-        solution_at_t1 = MarkovSequence(marginal_t1, conditional_t1_to_t)
-        interp_res = _InterpRes(step_from=solution_at_t1, interp_from=solution_at_t)
+        solution_at_t1 = MarkovSequence(
+            marginal_t1, conditional_t1_to_t, reverse=extrapolated_t.reverse
+        )
+        interp_res = InterpResult(step_from=solution_at_t1, interp_from=solution_at_t)
 
         # Extract targets
         marginals = solution_at_t.marginal
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return (estimate, solution_at_t), interp_res
 
     def interpolate_at_t1(self, posterior_t1):
         marginals = posterior_t1.marginal
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget(marginals)
 
-        interp_res = _InterpRes(step_from=posterior_t1, interp_from=posterior_t1)
+        interp_res = InterpResult(step_from=posterior_t1, interp_from=posterior_t1)
         return (estimate, posterior_t1), interp_res
 
 
@@ -1285,7 +1457,7 @@ class strategy_filter(MarkovStrategy):
     [`MarkovStrategy`](#probdiffeq.probdiffeq.MarkovStrategy).
     """
 
-    def __init__(self, ssm):
+    def __init__(self, ssm) -> None:
         super().__init__(
             ssm=ssm,
             is_suitable_for_save_at=True,
@@ -1298,38 +1470,29 @@ class strategy_filter(MarkovStrategy):
 
     def predict(self, posterior: T, *, transition) -> tuple[TaylorCoeffTarget, T]:
         marginals = self.ssm.conditional.marginalise(posterior, transition)
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, marginals
 
     def apply_updates(self, prediction, *, updates):
         del prediction
         marginals = updates
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, marginals
 
     def finalize(self, *, posterior0, posterior, output_scale):
-        assert output_scale.shape == self.ssm.prototypes.output_scale().shape
+        assert output_scale.shape == self.ssm.prototypes.output_scale_calibrated().shape
 
         # No rescaling because no calibration at the initial step
-        posterior0 = self.ssm.stats.rescale_cholesky(posterior0, output_scale)
+        posterior0 = posterior0.rescale_cholesky(output_scale)
 
         # Calibrate
-        posterior = self.ssm.stats.rescale_cholesky(posterior, output_scale)
+        posterior = posterior.rescale_cholesky(output_scale)
 
         # Stack
         posterior = tree.tree_array_prepend(posterior0, posterior)
 
         marginals = posterior
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, posterior
 
     def interpolate(
@@ -1339,24 +1502,16 @@ class strategy_filter(MarkovStrategy):
         _, interpolated = self.predict(
             posterior=posterior_t0, transition=transition_t0_t
         )
-
-        u = self.ssm.stats.qoi(interpolated)
-        std = self.ssm.stats.standard_deviation(interpolated)
-        u_std = self.ssm.stats.qoi_from_sample(std)
         marginals = interpolated
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
-
-        interp_res = _InterpRes(step_from=posterior_t1, interp_from=interpolated)
+        estimate = TaylorCoeffTarget(marginals)
+        interp_res = InterpResult(step_from=posterior_t1, interp_from=interpolated)
         return (estimate, interpolated), interp_res
 
     def interpolate_at_t1(self, *, posterior_t1):
-        u = self.ssm.stats.qoi(posterior_t1)
-        std = self.ssm.stats.standard_deviation(posterior_t1)
-        u_std = self.ssm.stats.qoi_from_sample(std)
         marginals = posterior_t1
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget(marginals)
 
-        interp_res = _InterpRes(step_from=posterior_t1, interp_from=posterior_t1)
+        interp_res = InterpResult(step_from=posterior_t1, interp_from=posterior_t1)
         return (estimate, posterior_t1), interp_res
 
 
@@ -1406,7 +1561,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
 
     """
 
-    def __init__(self, ssm):
+    def __init__(self, ssm) -> None:
         super().__init__(
             ssm=ssm,
             is_suitable_for_save_at=True,
@@ -1416,7 +1571,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
 
     def init_posterior(self, *, u):
         cond = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
-        posterior = MarkovSequence(u.marginals, cond)
+        posterior = MarkovSequence(u.marginals, cond, reverse=True)
         return u, posterior
 
     def predict(
@@ -1426,66 +1581,51 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         bw0 = posterior.conditional
         marginals, cond = self.ssm.conditional.revert(rv, transition)
         cond = self.ssm.conditional.merge(bw0, cond)
-        predicted = MarkovSequence(marginals, cond)
+        predicted = MarkovSequence(marginals, cond, reverse=posterior.reverse)
 
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, predicted
 
     def apply_updates(self, prediction: MarkovSequence, *, updates):
-        posterior = MarkovSequence(updates, prediction.conditional)
-        rv = updates
-        u = self.ssm.stats.qoi(rv)
-        std = self.ssm.stats.standard_deviation(rv)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        marginals = rv
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        posterior = MarkovSequence(
+            updates, prediction.conditional, reverse=prediction.reverse
+        )
+        marginals = updates
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, posterior
 
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
     ):
-        assert output_scale.shape == self.ssm.prototypes.output_scale().shape
-        init = self.ssm.stats.rescale_cholesky(posterior0.marginal, output_scale)
-        conditional = self.ssm.conditional.rescale_noise(
-            posterior0.conditional, output_scale
-        )
-        posterior0 = MarkovSequence(init, conditional)
-
-        # Calibrate the time series
-        init = self.ssm.stats.rescale_cholesky(posterior.marginal, output_scale)
-        conditional = self.ssm.conditional.rescale_noise(
-            posterior.conditional, output_scale
-        )
-        posterior = MarkovSequence(init, conditional)
+        assert output_scale.shape == self.ssm.prototypes.output_scale_calibrated().shape
+        posterior0 = posterior0.rescale_cholesky(output_scale)
+        posterior = posterior.rescale_cholesky(output_scale)
 
         # Marginalise
-        marginals = self.markov_marginals(posterior, reverse=True)
+        marginals = posterior.evaluate_marginals(ssm=self.ssm)
 
         # Prepend the initial condition to the filtering distributions
         init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
-        posterior = MarkovSequence(marginal=init, conditional=posterior.conditional)
+        posterior = MarkovSequence(
+            marginal=init, conditional=posterior.conditional, reverse=posterior.reverse
+        )
 
         # Extract targets
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return estimate, posterior
 
     def interpolate_at_t1(self, *, posterior_t1: MarkovSequence):
         cond_identity = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
-        resume_from = MarkovSequence(posterior_t1.marginal, conditional=cond_identity)
-        interp_res = _InterpRes(step_from=resume_from, interp_from=resume_from)
+        resume_from = MarkovSequence(
+            posterior_t1.marginal,
+            conditional=cond_identity,
+            reverse=posterior_t1.reverse,
+        )
+        interp_res = InterpResult(step_from=resume_from, interp_from=resume_from)
 
         interpolated = posterior_t1
         marginals = interpolated.marginal
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return (estimate, interpolated), interp_res
 
     def interpolate(
@@ -1562,7 +1702,9 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
             posterior=posterior_t0, transition=transition_t0_t
         )
         conditional_id = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
-        previous_new = MarkovSequence(extrapolated_t.marginal, conditional_id)
+        previous_new = MarkovSequence(
+            extrapolated_t.marginal, conditional_id, reverse=extrapolated_t.reverse
+        )
         _, extrapolated_t1 = self.predict(
             posterior=previous_new, transition=transition_t_t1
         )
@@ -1573,17 +1715,18 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
 
         # Return the right combination of marginals and conditionals.
-        interpolated = MarkovSequence(rv_at_t, extrapolated_t.conditional)
-        step_from = MarkovSequence(
-            posterior_t1.marginal, conditional=conditional_t1_to_t
+        interpolated = MarkovSequence(
+            rv_at_t, extrapolated_t.conditional, reverse=extrapolated_t.reverse
         )
-        interp_res = _InterpRes(step_from=step_from, interp_from=previous_new)
+        step_from = MarkovSequence(
+            posterior_t1.marginal,
+            conditional=conditional_t1_to_t,
+            reverse=posterior_t1.reverse,
+        )
+        interp_res = InterpResult(step_from=step_from, interp_from=previous_new)
 
         marginals = interpolated.marginal
-        u = self.ssm.stats.qoi(marginals)
-        std = self.ssm.stats.standard_deviation(marginals)
-        u_std = self.ssm.stats.qoi_from_sample(std)
-        estimate = TaylorCoeffTarget(u, u_std, marginals)
+        estimate = TaylorCoeffTarget(marginals)
         return (estimate, interpolated), interp_res
 
 
@@ -1602,37 +1745,21 @@ class solver_mle(ProbabilisticSolver):
         prior: Callable,
         ssm: Any,
         strategy: MarkovStrategy,
-        update_at_init: bool = False,
-    ):
+    ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
-        self.update_at_init = update_at_init
 
     def init(self, t, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
-        correction_state = self.constraint.init_linearization()
+        cstate = self.constraint.init_linearization()
 
-        output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale())
+        output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
 
         # Update
-        fx, correction_state = self.constraint.linearize(
-            u.marginals, correction_state, damp=damp, t=t
-        )
-        if self.update_at_init:
-            observed, reverted = self.ssm.conditional.revert(u.marginals, fx)
-            updates = reverted.noise
-            u, posterior = self.strategy.apply_updates(
-                prediction=prediction, updates=updates
-            )
-            # Calibrate the output scale
-            output_scale_running = self.ssm.stats.mahalanobis_norm_relative(
-                0.0, observed
-            )
-            auxiliary = (correction_state, output_scale_running, 1)
-        else:
-            fx = tree.tree_map(np.zeros_like, fx)
-            posterior = prediction
-            output_scale_running = np.zeros_like(output_scale_prior)
-            auxiliary = (correction_state, output_scale_running, 0)
+        fx, cstate = self.constraint.linearize(u.marginals, cstate, damp=damp, t=t)
+        fx = tree.tree_map(np.zeros_like, fx)
+        posterior = prediction
+        output_scale_running = np.zeros_like(output_scale_prior)
+        auxiliary = (cstate, output_scale_running, 0)
 
         return ProbabilisticSolution(
             t=t,
@@ -1646,7 +1773,7 @@ class solver_mle(ProbabilisticSolver):
 
     def step(self, state, *, dt: float, damp: float):
         # Discretize
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
         transition = self.prior(dt, output_scale)
 
         # Predict
@@ -1656,7 +1783,7 @@ class solver_mle(ProbabilisticSolver):
 
         # Linearize
         (lin_state, output_scale_running, num_data) = state.auxiliary
-        fx, correction_state = self.constraint.linearize(
+        fx, cstate = self.constraint.linearize(
             u.marginals, state=lin_state, damp=damp, t=state.t + dt
         )
 
@@ -1668,13 +1795,13 @@ class solver_mle(ProbabilisticSolver):
         )
 
         # Calibrate the output scale
-        new_term = self.ssm.stats.mahalanobis_norm_relative(0.0, observed)
-        output_scale_running = self.ssm.stats.update_mean(
+        new_term = observed.mahalanobis_norm_relative(0.0)
+        output_scale_running = self.ssm.normal.update_moving_avg(
             output_scale_running, new_term, num=num_data
         )
 
         # Return the state
-        auxiliary = (correction_state, output_scale_running, num_data + 1)
+        auxiliary = (cstate, output_scale_running, num_data + 1)
         return ProbabilisticSolution(
             t=state.t + dt,
             u=u,
@@ -1729,31 +1856,23 @@ class solver_dynamic(ProbabilisticSolver):
         constraint: Constraint,
         ssm: Any,
         re_linearize_after_calibration=False,
-        update_at_init: bool = False,
-    ):
+    ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
         self.re_linearize_after_calibration = re_linearize_after_calibration
-        self.update_at_init = update_at_init
 
     def init(self, t, u, *, damp) -> ProbabilisticSolution:
         u, prediction = self.strategy.init_posterior(u=u)
         lin_state = self.constraint.init_linearization()
 
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
 
         fx, lin_state = self.constraint.linearize(
             u.marginals, lin_state, damp=damp, t=t
         )
         # TODO: avoid the linearization altogether if update is false.
         #  use jax.eval_shape instead.
-        if self.update_at_init:
-            _, reverted = self.ssm.conditional.revert(u.marginals, fx)
-            updates = reverted.noise
-            u, posterior = self.strategy.apply_updates(prediction, updates=updates)
-        else:
-            fx = tree.tree_map(np.zeros_like, fx)
-            posterior = prediction
-
+        fx = tree.tree_map(np.zeros_like, fx)
+        posterior = prediction
         return ProbabilisticSolution(
             t=t,
             u=u,
@@ -1768,9 +1887,9 @@ class solver_dynamic(ProbabilisticSolver):
         lin_state = state.auxiliary
 
         # Calibrate the output scale
-        ones = np.ones_like(self.ssm.prototypes.output_scale())
+        ones = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
         transition = self.prior(dt, ones)
-        mean = self.ssm.stats.mean(state.u.marginals)
+        mean = state.u.marginals.evaluate_mean()
         u = self.ssm.conditional.apply(mean, transition)
 
         # Linearize
@@ -1779,7 +1898,7 @@ class solver_dynamic(ProbabilisticSolver):
             u, state=lin_state, damp=damp, t=state.t + dt
         )
         observed = self.ssm.conditional.marginalise(u, fx)
-        output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
+        output_scale = observed.mahalanobis_norm_relative(0.0)
 
         # Do the full extrapolation with the calibrated output scale
         # (Includes re-discretisation)
@@ -1862,33 +1981,40 @@ class solver(ProbabilisticSolver):
         prior: Callable,
         ssm: Any,
         strategy: MarkovStrategy,
-        update_at_init: bool = False,
-    ):
+        constraint_init: Constraint | None = None,
+    ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
-        self.update_at_init = update_at_init
+        self.constraint_init = constraint_init
 
     def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
-        u, prediction = self.strategy.init_posterior(u=u)
+        u_pred, prediction = self.strategy.init_posterior(u=u)
 
-        correction_state = self.constraint.init_linearization()
-        fx, correction_state = self.constraint.linearize(
-            rv=u.marginals, state=correction_state, damp=damp, t=t
-        )
-        if self.update_at_init:
-            _, reverted = self.ssm.conditional.revert(u.marginals, fx)
+        if self.constraint_init is not None:
+            co = self.constraint.init_linearization()
+            fx, _co = self.constraint_init.linearize(
+                rv=u_pred.marginals, state=co, damp=damp, t=t
+            )
+            _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
             u, posterior = self.strategy.apply_updates(
                 prediction, updates=reverted.noise
             )
         else:
-            posterior = prediction
-            fx = tree.tree_map(np.zeros_like, fx)
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+            u, posterior = u_pred, prediction
+
+        cstate = self.constraint.init_linearization()
+        # TODO: replace the below with jax.eval_shape
+        # because we don't really want to evaluate anything here
+        fx, cstate = self.constraint.linearize(
+            rv=u_pred.marginals, state=cstate, damp=damp, t=t
+        )
+        fx = tree.tree_map(np.zeros_like, fx)
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
         return ProbabilisticSolution(
             t=t,
             u=u,
             solution_full=posterior,
             num_steps=0,
-            auxiliary=correction_state,
+            auxiliary=cstate,
             output_scale=output_scale,
             fun_evals=fx,
         )
@@ -1899,9 +2025,11 @@ class solver(ProbabilisticSolver):
         transition = self.prior(dt, output_scale)
 
         # Predict
-        u, prediction = self.strategy.predict(
+        u_pred, prediction = self.strategy.predict(
             state.solution_full, transition=transition
         )
+
+        u = u_pred
 
         # Linearize
         fx, auxiliary = self.constraint.linearize(
@@ -1909,7 +2037,7 @@ class solver(ProbabilisticSolver):
         )
 
         # Update
-        _, reverted = self.ssm.conditional.revert(u.marginals, fx)
+        _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
         u, posterior = self.strategy.apply_updates(prediction, updates=reverted.noise)
 
         # Return solution
@@ -1921,6 +2049,191 @@ class solver(ProbabilisticSolver):
             auxiliary=auxiliary,
             num_steps=state.num_steps + 1,
             fun_evals=fx,
+        )
+
+    def userfriendly_output(
+        self, *, solution0: ProbabilisticSolution, solution: ProbabilisticSolution
+    ) -> ProbabilisticSolution:
+        assert solution.t.ndim > 0
+
+        # This is the uncalibrated solver, so scale=1
+        ones = np.ones_like(solution.output_scale)
+        output_scale = np.ones_like(solution.output_scale[-1])
+
+        init = solution0.solution_full
+        posterior = solution.solution_full
+        u, posterior = self.strategy.finalize(
+            posterior0=init, posterior=posterior, output_scale=output_scale
+        )
+
+        output_scale = ones * output_scale[None, ...]
+
+        ts = np.concatenate([solution0.t[None], solution.t])
+        return ProbabilisticSolution(
+            t=ts,
+            u=u,
+            solution_full=posterior,
+            output_scale=output_scale,
+            num_steps=solution.num_steps,
+            auxiliary=solution.auxiliary,
+            fun_evals=solution.fun_evals,
+        )
+
+
+class solver_iterated(ProbabilisticSolver):
+    """Create a solver that does not calibrate the output scale automatically.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This function is highly experimental and not safe to use.
+        There is no guarantee that it works correctly (or at all).
+        It might be deleted tomorrow and without any deprecation policy.
+
+    Related:
+    [`ProbabilisticSolver`](#probdiffeq.probdiffeq.ProbabilisticSolver).
+
+    """
+
+    def __init__(
+        self,
+        *,
+        constraint: Constraint,
+        prior: Callable,
+        ssm: Any,
+        strategy: MarkovStrategy,
+        constraint_init: Constraint | None = None,
+        tol: float | None = None,
+        maxiter: int = 10,
+        while_loop=flow.while_loop,
+    ) -> None:
+        super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
+        self.constraint_init = constraint_init
+
+        float_eps = np.finfo_eps(np.asarray(1.0).dtype)
+        self.tol = tol if tol is not None else float_eps**0.5
+        self.maxiter = maxiter
+        self.while_loop = while_loop
+
+    # TODO: move this outside the init and reuse in the step
+    @tree.register_dataclass
+    @structs.dataclass
+    class IState:
+        """A data structure for carrying state in iterated solvers."""
+
+        do_continue: float
+        i: int
+        linearize_at: Any
+        cstate: Any  # constraint-state
+        updated_u: Any
+        updated_posterior: Any
+        fx: Any = None
+
+    def make_body_fun(self, u_pred, prediction, *, constraint, damp, t):
+        """Create the body-function for the while-loop in an iterated solver."""
+
+        def body_fun(carry: solver_iterated.IState) -> solver_iterated.IState:
+            # _do_continue, i, lin_at, corrstate, _updated = carry
+            # Linearize
+            fx, cstate = constraint.linearize(
+                carry.linearize_at, carry.cstate, damp=damp, t=t
+            )
+
+            # Update
+            _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
+            u_upd, posterior = self.strategy.apply_updates(
+                prediction, updates=reverted.noise
+            )
+
+            diff = u_upd.marginals.mean - carry.linearize_at.mean
+            u = u_upd
+
+            diff_norm = linalg.vector_norm(diff) / np.sqrt(diff.size)
+            i = carry.i + 1
+            do_continue = np.logical_and(diff_norm > self.tol, i < self.maxiter)
+            return self.IState(
+                do_continue=do_continue,
+                i=i,
+                linearize_at=u.marginals,
+                cstate=cstate,
+                updated_u=u_upd,
+                updated_posterior=posterior,
+                fx=fx if carry.fx is not None else None,
+            )
+
+        return body_fun
+
+    def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
+        u_pred, prediction = self.strategy.init_posterior(u=u)
+
+        if self.constraint_init is not None:
+            cstate = self.constraint_init.init_linearization()
+            init = self.IState(
+                do_continue=True,
+                i=0,
+                linearize_at=u_pred.marginals,
+                cstate=cstate,
+                updated_u=u_pred,
+                updated_posterior=prediction,
+            )
+            body_fun = self.make_body_fun(
+                u_pred, prediction, constraint=self.constraint_init, damp=damp, t=t
+            )
+            final = self.while_loop(lambda s: s.do_continue, body_fun, init)
+            (u, posterior) = final.updated_u, final.updated_posterior
+        else:
+            u, posterior = u_pred, prediction
+
+        cstate = self.constraint.init_linearization()
+        fx, cstate = self.constraint.linearize(
+            rv=u_pred.marginals, state=cstate, damp=damp, t=t
+        )
+
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+
+        # TODO: the number of function evaluations should also be reflected
+        # in the solution object, so that we can communicate if an iterative
+        # solver took excessive attempts or so
+        return ProbabilisticSolution(
+            t=t,
+            u=u,
+            solution_full=posterior,
+            num_steps=0,
+            auxiliary=cstate,
+            output_scale=output_scale,
+            fun_evals=fx,
+        )
+
+    def step(self, state: ProbabilisticSolution, *, dt, damp):
+        # Discretize
+        output_scale = np.ones_like(state.output_scale)
+        transition = self.prior(dt, output_scale)
+
+        # Predict
+        u_pred, prediction = self.strategy.predict(
+            state.solution_full, transition=transition
+        )
+
+        # Iterated update
+        body_fun = self.make_body_fun(
+            u_pred, prediction, constraint=self.constraint, damp=damp, t=state.t + dt
+        )
+        init = self.IState(
+            do_continue=True,
+            i=0,
+            linearize_at=u_pred.marginals,
+            cstate=state.auxiliary,
+            updated_u=u_pred,
+            updated_posterior=prediction,
+            fx=state.fun_evals,
+        )
+        final = self.while_loop(lambda s: s.do_continue, body_fun, init)
+        return ProbabilisticSolution(
+            t=state.t + dt,
+            u=final.updated_u,
+            solution_full=final.updated_posterior,
+            output_scale=output_scale,
+            auxiliary=final.cstate,
+            num_steps=state.num_steps + 1,
+            fun_evals=final.fx,
         )
 
     def userfriendly_output(
@@ -2096,7 +2409,7 @@ class error_residual_std(ErrorEstimator):
         ssm: Any,
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default
-    ):
+    ) -> None:
         if error_norm is None:
             error_norm = error_norm_scale_then_rms()
 
@@ -2122,11 +2435,12 @@ class error_residual_std(ErrorEstimator):
     ) -> tuple[float, tuple]:
         # Discretize; The output scale is set to one
         # since the error is multiplied with a local scale estimate anyway
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale())
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
-        mean = self.ssm.stats.mean(previous.u.marginals)
+        # TODO: should conditional.apply take the Pytree mean?
+        mean = previous.u.marginals.evaluate_mean()
         rv = self.ssm.conditional.apply(mean, transition)
 
         # Optionally: re-linearize
@@ -2137,12 +2451,11 @@ class error_residual_std(ErrorEstimator):
         else:
             linearized = proposed.fun_evals
 
-        # Extract the local residual stdev from the linearization
+        # Extract the local residual std from the linearization
         observed = self.ssm.conditional.marginalise(rv, linearized)
-        output_scale = self.ssm.stats.mahalanobis_norm_relative(0.0, rv=observed)
-        stdev = self.ssm.stats.standard_deviation(observed)
-        error_estimate_unscaled = np.squeeze(stdev)
-        error = output_scale * error_estimate_unscaled
+        output_scale = observed.mahalanobis_norm_relative(0.0)
+        observed = observed.rescale_cholesky(output_scale)
+        error = observed.evaluate_std()
         error, _ = tree.ravel_pytree(error)
 
         # Compute a reference
@@ -2151,7 +2464,7 @@ class error_residual_std(ErrorEstimator):
         reference = np.maximum(np.abs(u0), np.abs(u1))
         reference, _ = tree.ravel_pytree(reference)
 
-        # Turn the unscaled absolute error into a relative one
+        # Turn the unscaled absolute error into a relative one.
         # This is a generalisation of the typical residual-based
         # error estimates for probabilistic solvers in the sense that
         # it respects higher-order information. For first-order problems,
@@ -2160,6 +2473,96 @@ class error_residual_std(ErrorEstimator):
         # (non-probabilistic) ODE solvers; for example, refer to
         # Tan et al. (2026; https://arxiv.org/pdf/2602.04086).
         n = self.constraint.root_order - 1
+        error_abs = error * dt**n / np.factorial(n)
+        error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
+
+        # Scale the error norm with the error contraction rate and return
+        error_contraction_rate = self.ssm.num_derivatives + 1
+        error_power = error_norm ** (-1.0 / error_contraction_rate)
+        return error_power, state
+
+
+class error_state_std(ErrorEstimator):
+    r"""Construct an error estimator based on a state's standard deviation.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This function is highly experimental and not safe to use.
+        There is no guarantee that it works correctly (or at all).
+        It might be deleted tomorrow and without any deprecation policy.
+
+    """
+
+    # TODO: make the experimental-warning into a decorator
+    def __init__(
+        self,
+        *,
+        constraint: Constraint,
+        prior: Any,
+        ssm: Any,
+        error_norm: Callable | None = None,
+        re_linearize_before_error: bool = False,  # cache by default
+        derivative_idx: int = 0,
+    ) -> None:
+        if error_norm is None:
+            error_norm = error_norm_scale_then_rms()
+
+        self.error_norm = error_norm
+        self.constraint = constraint
+        self.prior = prior
+        self.ssm = ssm
+        self.re_linearize_before_error = re_linearize_before_error
+        self.derivative_idx = derivative_idx
+
+    def init_error(self):
+        return self.constraint.init_linearization()
+
+    def estimate_error_norm(
+        self,
+        state,
+        previous: ProbabilisticSolution,
+        proposed: ProbabilisticSolution,
+        *,
+        dt: float,
+        atol: float,
+        rtol: float,
+        damp: float,
+    ) -> tuple[float, tuple]:
+        # Discretize; The output scale is set to one
+        # since the error is multiplied with a local scale estimate anyway
+        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+        transition = self.prior(dt, output_scale)
+
+        # Extrapolate from the zero-error state
+        mean = previous.u.marginals.evaluate_mean()
+        rv = self.ssm.conditional.apply(mean, transition)
+
+        # Optionally: re-linearize
+        if self.re_linearize_before_error:
+            linearized, state = self.constraint.linearize(
+                rv, state, damp=damp, t=proposed.t
+            )
+        else:
+            linearized = proposed.fun_evals
+
+        # Extract the local residual std from the linearization
+        observed, conditional = self.ssm.conditional.revert(rv, linearized)
+        output_scale = observed.mahalanobis_norm_relative(0.0)
+
+        # Measure error on the n-th state (usually, n=0 because why not)
+        n = self.derivative_idx
+
+        # *New:* Go back into solution space
+        std = conditional.noise.evaluate_std()[n]
+        error, _ = tree.ravel_pytree(std)
+        error = output_scale * error
+        error, _ = tree.ravel_pytree(error)
+
+        # Compute a reference
+        u0, _ = tree.ravel_pytree(previous.u.mean[n])
+        u1, _ = tree.ravel_pytree(proposed.u.mean[n])
+        reference = np.maximum(np.abs(u0), np.abs(u1))
+
+        # Turn the unscaled absolute error into a relative one.
         error_abs = error * dt**n / np.factorial(n)
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 

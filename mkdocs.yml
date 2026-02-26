@@ -62,9 +62,10 @@ plugins:
             show_bases: false
             show_source: false
             inherited_members: false
-            show_if_no_docstring: false
+            show_if_no_docstring: true
             merge_init_into_class: true
-            group_by_category: true
+            members_order: alphabetical
+            group_by_category: false
   - exclude:
       glob:
         - examples*/*.py
@@ -102,6 +103,7 @@ nav:
       - examples_benchmarks/work-precision-pleiades.ipynb
       - examples_benchmarks/work-precision-vanderpol.ipynb
       - examples_benchmarks/work-precision-hires.ipynb
+      - examples_benchmarks/work-precision-dae-robertson.ipynb
       - examples_benchmarks/taylor-init-fitzhughnagumo.ipynb
       - examples_benchmarks/taylor-init-node.ipynb
       - examples_benchmarks/taylor-init-pleiades.ipynb
@@ -110,7 +112,7 @@ nav:
       - probdiffeq: api_docs/probdiffeq.md
       - ivpsolve: api_docs/ivpsolve.md
       - taylor: api_docs/taylor.md
-      - impl: api_docs/impl.md
+      - ssm_impl: api_docs/ssm_impl.md
   - DOCUMENTATION | DEVELOPER:
       - dev_docs/creating_example_notebook.md
       - dev_docs/continuous_integration.md

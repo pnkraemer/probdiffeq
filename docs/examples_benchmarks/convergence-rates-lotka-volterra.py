@@ -37,7 +37,7 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 jax.config.update("jax_debug_nans", True)
 
 
-def main():
+def main() -> None:
     """Run the script."""
     # High order solvers need double precision
     jax.config.update("jax_enable_x64", True)
@@ -91,12 +91,17 @@ def main():
 
         # Smooth curves
         x, y = smooth(values["work_num_steps"], values["precision"])
-        x_lin, y_lin = linear_trend(values["work_num_steps"], values["precision"])
+        (x_lin, y_lin), (scale, _) = linear_trend(
+            values["work_num_steps"], values["precision"]
+        )
 
         # All curves start at (1, 1)
         ax["values"].loglog(x / x.min(), y / y.max(), color=color, label=keys)
         ax["trends"].loglog(
-            x_lin / x_lin.min(), y_lin / y_lin.max(), color=color, label=keys
+            x_lin / x_lin.min(),
+            y_lin / y_lin.max(),
+            color=color,
+            label=f"Rate: {scale:.1f}",
         )
 
     ax["values"].set_title("Values (slightly smoothed)")
@@ -245,7 +250,7 @@ def linear_trend(x, y):
     x = jnp.log10(x)
     y = jnp.log10(y)
     scale, bias = jnp.polyfit(x, y, 1)
-    return 10 ** (x), 10 ** (scale * x + bias)
+    return (10 ** (x), 10 ** (scale * x + bias)), (scale, bias)
 
 
 main()

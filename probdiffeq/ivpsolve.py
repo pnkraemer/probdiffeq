@@ -48,10 +48,10 @@ class Solver(Protocol, Generic[T_contra, S]):
     def step(self, state: S, *, dt: float, damp: float) -> S:
         """Perform a step."""
 
-    def interpolate(self, *, t, interp_from: S, interp_to: S):
+    def interpolate(self, *, t, interp_from: S, interp_to: S) -> Any:
         """Interpolate between two solver states."""
 
-    def interpolate_at_t1(self, *, t, interp_from: S, interp_to: S):
+    def interpolate_at_t1(self, *, t, interp_from: S, interp_to: S) -> Any:
         """Interpolate close to a checkpoint."""
 
     @property
@@ -86,7 +86,7 @@ class control_proportional_integral(Control[float]):
         factor_max=10.0,
         power_integral_unscaled=0.3,
         power_proportional_unscaled=0.4,
-    ):
+    ) -> None:
         self.safety = safety
         self.factor_min = factor_min
         self.factor_max = factor_max
@@ -116,7 +116,7 @@ class control_proportional_integral(Control[float]):
 class control_integral(Control[tuple]):
     """Construct an integral-controller."""
 
-    def __init__(self, *, safety=0.95, factor_min=0.2, factor_max=10.0):
+    def __init__(self, *, safety=0.95, factor_min=0.2, factor_max=10.0) -> None:
         self.safety = safety
         self.factor_min = factor_min
         self.factor_max = factor_max
@@ -204,7 +204,9 @@ def solve_adaptive_save_at(
         warnings.warn(msg, stacklevel=1)
 
     if control is None:
-        control = control_proportional_integral()
+        # In probabilistic solvers, integral controllers seem to work better
+        # than proportional-integral controllers.
+        control = control_integral()
 
     loop = RejectionLoop(
         solver=solver,
@@ -386,7 +388,7 @@ class RejectionLoop:
         error: Any,
         control: Control,
         while_loop: Callable,
-    ):
+    ) -> None:
         self.solver = solver
         self.clip_dt = clip_dt
         self.error = error

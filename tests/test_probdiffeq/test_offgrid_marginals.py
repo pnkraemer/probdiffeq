@@ -6,7 +6,7 @@ from probdiffeq.util import test_util
 
 
 @testing.parametrize("fact", ["dense", "blockdiag", "isotropic"])
-def test_save_at_result_matches_interpolated_adaptive_result(fact):
+def test_save_at_result_matches_interpolated_adaptive_result(fact) -> None:
     """Test that the save_at result matches the interpolation (using a filter)."""
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
@@ -23,11 +23,11 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     solve = test_util.solve_adaptive_save_every_step(error=error, solver=solver)
     save_every = solve(init, t0=t0, t1=t1, dt0=0.1, atol=1e-2, rtol=1e-2)
     offgrid = func.vmap(lambda s: solver.offgrid_marginals(s, solution=save_every))
-    u_interpolated = offgrid(ts[1:-1])
+    u_interpolated = func.jit(offgrid)(ts[1:-1])
 
     # Compute a save-at solution and remove the edge-points
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
-    save_at = solve(init, atol=1e-2, rtol=1e-2, save_at=ts, dt0=0.1)
+    save_at = func.jit(solve)(init, atol=1e-2, rtol=1e-2, save_at=ts, dt0=0.1)
     u_save_at = tree.tree_map(lambda s: s[1:-1], save_at.u)
 
     # Assert similarity
@@ -38,21 +38,20 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact):
     for ui, us in zip(u_interpolated.std, u_save_at.std):
         assert testing.allclose(ui, us)
 
-    marginals_allclose_func = func.partial(testing.marginals_allclose, ssm=ssm)
-    marginals_allclose_func = func.vmap(marginals_allclose_func)
-    assert np.all(
-        marginals_allclose_func(u_interpolated.marginals, u_save_at.marginals)
-    )
+    marginals_allclose_func = func.vmap(testing.marginals_allclose)
+    are_close = marginals_allclose_func(u_interpolated.marginals, u_save_at.marginals)
+
+    assert np.all(are_close)
 
     # Assert u and u_std have matching shapes (that was wrong before)
-    u_shape = tree.tree_map(np.shape, u_save_at.mean)
-    u_std_shape = tree.tree_map(np.shape, u_save_at.std)
+    _, u_shape = tree.tree_flatten(u_save_at.mean)
+    _, u_std_shape = tree.tree_flatten(u_save_at.std)
     match = tree.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
     assert tree.tree_all(match)
 
 
 @testing.parametrize("fact", ["isotropic", "dense", "blockdiag"])
-def test_filter_marginals_close_only_to_left_boundary(fact):
+def test_filter_marginals_close_only_to_left_boundary(fact) -> None:
     """Assert that the filter-marginals interpolate well close to the left boundary."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
@@ -81,7 +80,7 @@ def test_filter_marginals_close_only_to_left_boundary(fact):
 
 
 @testing.parametrize("fact", ["isotropic", "dense", "blockdiag"])
-def test_smoother_marginals_close_to_both_boundaries(fact):
+def test_smoother_marginals_close_to_both_boundaries(fact) -> None:
     """Assert that the smoother-marginals interpolate well close to the boundary."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 

@@ -52,7 +52,7 @@ jax.config.update("jax_debug_nans", True)
 
 
 # +
-f, u0, (t0, t1), f_args = ivps.affine_independent(initial_values=(1.0,), a=2.0)
+f, u0, (t0, t1), f_args = ivps.affine_independent(initial_values=1.0, a=2.0)
 
 
 @jax.jit
