@@ -2,7 +2,7 @@
 
 from probdiffeq.backend import abc, func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Sequence, TypeVar
-from probdiffeq.util import cholesky_util
+from probdiffeq.util import cholesky_util, gram_util
 
 T = TypeVar("T", bound=Array)
 """A type-variable for Array types.
@@ -620,6 +620,47 @@ class DenseConditional(AbstractConditional):
 
             noise = DenseNormal(q0, output_scale * Q, unravel=self.unravel)
             return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
+
+        return discretise
+
+    def transition_ornstein_uhlenbeck_integrated(self, M, base_scale):
+
+        (d,) = self.ode_shape
+        assert M.shape == (d, d)  # todo: flatten M from pytree?
+
+        base_scale, _ = tree.ravel_pytree(base_scale)
+        assert base_scale.shape == (d,), base_scale.shape
+
+        eye_d = np.eye(d)
+        a = linalg.diagonal_matrix(np.ones((self.num_derivatives,)), k=1)
+        A = np.kron(a, eye_d)
+        E = np.zeros((self.num_derivatives + 1, self.num_derivatives + 1))
+        E = E.at[-1, -1].set(1.0)
+        A += np.kron(E, M)
+
+        b = np.eye(self.num_derivatives + 1)[-1][:, None]
+        B = np.kron(b, linalg.diagonal_matrix(base_scale))
+
+        precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
+
+        pl = gram_util.pade_and_legendre_13()
+        exp_gram = gram_util.exp_gram_cholesky(pade_legendre=pl, solve=linalg.solve_lu)
+        q0 = np.zeros(self.flat_shape)
+
+        def discretise(dt, output_scale):
+            output_scale = np.asarray(output_scale)
+            assert output_scale.shape == ()
+
+            p, p_inv = precon_fun(dt)
+            p = np.repeat(p, d)
+            p_inv = np.repeat(p_inv, d)
+
+            A_p = dt * p_inv[:, None] * A * p[None, :]
+            B_p = np.sqrt(dt) * p_inv[:, None] * B
+
+            eA, L = exp_gram(A_p, B_p)
+            noise = DenseNormal(q0, output_scale * L, unravel=self.unravel)
+            return LatentCond(eA, noise, to_latent=p_inv, to_observed=p)
 
         return discretise
 
@@ -1437,6 +1478,10 @@ def system_matrices_1d_iwp(num_derivatives):
     Q_1d = cholesky_util.cholesky_hilbert(num_derivatives + 1)
     Q_1d_flipped = np.flip(Q_1d, axis=0)
     Q_1d = linalg.qr_r(Q_1d_flipped.T).T
+
+    scale = np.sign(linalg.diagonal(Q_1d))
+    scale = np.where(scale == 0.0, 1.0, scale)
+    Q_1d = Q_1d * scale[None, :]
     return A_1d, Q_1d
 
 

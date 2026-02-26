@@ -47,8 +47,16 @@ def vector_norm(arr, /, *, order=None):
     return jnp.linalg.norm(arr, ord=order)
 
 
+def matrix_norm(arr, /, *, order=None):
+    return jnp.linalg.norm(arr, ord=order)
+
+
 def solve_triangular(matrix, rhs, /, *, trans=0, lower=False):
     return jax.scipy.linalg.solve_triangular(matrix, rhs, trans=trans, lower=lower)
+
+
+def solve_lu(matrix, rhs, /):
+    return jnp.linalg.solve(matrix, rhs)
 
 
 def inv(matrix, /):
@@ -71,9 +79,13 @@ def trace(arr, /):
     return jnp.trace(arr)
 
 
-def diagonal_matrix(arr, /):
-    return jnp.diag(arr)
+def diagonal_matrix(arr, /, k=0):
+    return jnp.diag(arr, k=k)
 
 
 def triu(arr, /):
     return jnp.triu(arr)
+
+
+def expm(arr, /):
+    return jax.scipy.linalg.expm(arr)

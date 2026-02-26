@@ -1132,7 +1132,7 @@ def prior_wiener_integrated(
     diffuse_derivatives: int = 0,
     diffuse_eps: float = 1.0,  # a large value
 ):
-    """Construct an repeatedly-integrated Wiener process."""
+    """Construct a repeatedly-integrated Wiener process."""
     tcoeffs_std = _tcoeffs_std_from_differential_variables(
         tcoeffs,
         is_differential=is_differential,
@@ -1143,6 +1143,39 @@ def prior_wiener_integrated(
     return prior_wiener_integrated_diffuse(
         tcoeffs,
         tcoeffs_std,
+        ssm_fact=ssm_fact,
+        output_scale=output_scale,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+    )
+
+
+def prior_ornstein_uhlenbeck_integrated(
+    tcoeffs: C,
+    *,
+    M: Array,
+    # Which of the Taylor coefficients are differential variables
+    is_differential: C | None = None,
+    nondifferential_eps: float = 1e-6,  # a small value
+    # The state-space model factorisation
+    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
+    # Do we use a special output scale?
+    output_scale: ArrayLike | None = None,
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value
+):
+    tcoeffs_std = _tcoeffs_std_from_differential_variables(
+        tcoeffs,
+        is_differential=is_differential,
+        nondifferential_eps=nondifferential_eps,
+        ssm_fact=ssm_fact,
+    )
+
+    return prior_ornstein_uhlenbeck_integrated_diffuse(
+        tcoeffs,
+        tcoeffs_std,
+        M=M,
         ssm_fact=ssm_fact,
         output_scale=output_scale,
         diffuse_derivatives=diffuse_derivatives,
@@ -1266,6 +1299,72 @@ def prior_wiener_integrated_diffuse(
     tcoeffs_std = tree.tree_unflatten(structure, std_leaves_scaled)
 
     discretize = ssm.conditional.transition_wiener_integrated(base_scale=output_scale)
+
+    # Return the target
+    marginal = ssm.normal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
+    target = TaylorCoeffTarget(marginal)
+    return target, discretize, ssm
+
+
+def prior_ornstein_uhlenbeck_integrated_diffuse(
+    tcoeffs_mean: C,
+    tcoeffs_std: C,
+    *,
+    M,
+    # The state-space model factorisation
+    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
+    # Do we use a special output scale?
+    output_scale: ArrayLike | None = None,
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value
+):
+    # Add derivatives to the Taylor coefficients.
+    # Warning: This destroys pytree structure in the tcoeffs and the
+    # resulting pytree will always be a list (for now at least)
+    if diffuse_derivatives > 0:
+        tcoeffs_mean, tcoeffs_std = _add_diffuse_derivatives(
+            tcoeffs_mean,
+            tcoeffs_std,
+            diffuse_derivatives=diffuse_derivatives,
+            diffuse_eps=diffuse_eps,
+        )
+
+    # Choose a state-space model factorisation
+    match ssm_fact:
+        case "dense":
+            ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(tcoeffs_mean)
+        case "blockdiag":
+            ssm = ssm_impl.FactSsmImpl.from_tcoeffs_blockdiag(tcoeffs_mean)
+        case "isotropic":
+            ssm = ssm_impl.FactSsmImpl.from_tcoeffs_isotropic(tcoeffs_mean)
+        case _:
+            msg = f"Factorisation ssm_fact='{ssm_fact}' unknown. "
+            msg += "Choose one out of {'dense', 'isotropic', 'blockdiag'}."
+            raise ValueError(msg)
+
+    if output_scale is None:
+        output_scale = tree.tree_map(np.ones_like, tcoeffs_std[0])
+    else:
+        output_scale = tree.tree_map(np.asarray, output_scale)
+
+        def shape_equal(A, B):
+            return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
+
+        if not tree.tree_all(shape_equal(output_scale, tcoeffs_std[0])):
+            msg = "Output scale has the wrong shape."
+            msg += f" Expected: output_scale.shape={tcoeffs_std[0].shape}."
+            msg += f" Received: output_scale.shape={output_scale.shape}."
+            raise ValueError(msg)
+
+    [output_scale_leaf] = tree.tree_leaves(output_scale)
+    std_leaves, structure = tree.tree_flatten(tcoeffs_std)
+    std_leaves_scaled = [output_scale_leaf * s for s in std_leaves]
+    tcoeffs_std = tree.tree_unflatten(structure, std_leaves_scaled)
+
+    discretize = ssm.conditional.transition_ornstein_uhlenbeck_integrated(
+        M=M, base_scale=output_scale
+    )
 
     # Return the target
     marginal = ssm.normal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
@@ -1745,21 +1844,40 @@ class solver_mle(ProbabilisticSolver):
         prior: Callable,
         ssm: Any,
         strategy: MarkovStrategy,
+        constraint_init=None,
     ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
+        self.constraint_init = constraint_init
 
     def init(self, t, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
-        u, prediction = self.strategy.init_posterior(u=u)
+        u_pred, prediction = self.strategy.init_posterior(u=u)
         cstate = self.constraint.init_linearization()
 
         output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
 
         # Update
-        fx, cstate = self.constraint.linearize(u.marginals, cstate, damp=damp, t=t)
+        fx, cstate = self.constraint.linearize(u_pred.marginals, cstate, damp=damp, t=t)
         fx = tree.tree_map(np.zeros_like, fx)
-        posterior = prediction
-        output_scale_running = np.zeros_like(output_scale_prior)
-        auxiliary = (cstate, output_scale_running, 0)
+        if self.constraint_init is not None:
+            cstate2 = self.constraint_init.init_linearization()
+            fx, _cstate2 = self.constraint.linearize(
+                u_pred.marginals, cstate2, damp=damp, t=t
+            )
+            observed, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
+            updates = reverted.noise
+            u, posterior = self.strategy.apply_updates(
+                prediction=prediction, updates=updates
+            )
+            output_scale_running = observed.mahalanobis_norm_relative(0.0)
+
+            # Return the state
+            auxiliary = (cstate, output_scale_running, 1)
+
+        else:
+            u = u_pred
+            posterior = prediction
+            output_scale_running = np.zeros_like(output_scale_prior)
+            auxiliary = (cstate, output_scale_running, 0)
 
         return ProbabilisticSolution(
             t=t,
