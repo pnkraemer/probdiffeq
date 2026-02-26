@@ -1,8 +1,7 @@
+"""Utilities for matrix exponentials and (finite-horizon) Gramians."""
+
 from probdiffeq.backend import flow, linalg, np, structs
 from probdiffeq.backend.typing import Array, Callable
-
-# TODO: the PADE-arguments could be enums
-# TODO: build an "auto" method that selects an order
 
 
 def exp_gram_matrix_fraction(expm=linalg.expm) -> Callable:
@@ -115,7 +114,7 @@ def pade_and_legendre_3() -> PadeLegendre:
             Ls.append(l_o)
 
         sqr_norms = np.asarray(legendre_norms, dtype=A.dtype)
-        Ls = [l / np.sqrt(i) for i, l in zip(sqr_norms, Ls)]
+        Ls = [ell / np.sqrt(i) for i, ell in zip(sqr_norms, Ls)]
         rhs = np.concatenate(Ls, axis=-1)
 
         L = solve(V - U, rhs)
@@ -163,17 +162,18 @@ def pade_and_legendre_5():
         L_odd = [P @ B * C[1, 3] + B * C[1, 1], P @ B * C[3, 3], zeros]
 
         for k in [2]:  # todo: triple-check
-            L_even = [l + P @ B * C[2 * i, 2 * k] for i, l in enumerate(L_even)]
-            L_odd = [l + P @ B * C[2 * i + 1, 2 * k + 1] for i, l in enumerate(L_odd)]
+            L_even = [ell + P @ B * C[2 * i, 2 * k] for i, ell in enumerate(L_even)]
+            L_odd = [
+                ell + P @ B * C[2 * i + 1, 2 * k + 1] for i, ell in enumerate(L_odd)
+            ]
 
-        L_odd = [A @ l for l in L_odd]
+        L_odd = [A @ ell for ell in L_odd]
 
         Ls = []
         for l_i, l_o in zip(L_even, L_odd):
             Ls.append(l_i)
             Ls.append(l_o)
 
-        # Ls = [l / np.sqrt(i) for i, l in zip(sqr_norms, Ls)]
         rhs = np.concatenate(Ls, axis=-1)
 
         L = solve(V - U, rhs)
@@ -232,10 +232,12 @@ def pade_and_legendre_7():
 
         for k in [2, 3]:
             P = A2 @ P
-            L_even = [l + P @ B * C[2 * i, 2 * k] for i, l in enumerate(L_even)]
-            L_odd = [l + P @ B * C[2 * i + 1, 2 * k + 1] for i, l in enumerate(L_odd)]
+            L_even = [ell + P @ B * C[2 * i, 2 * k] for i, ell in enumerate(L_even)]
+            L_odd = [
+                ell + P @ B * C[2 * i + 1, 2 * k + 1] for i, ell in enumerate(L_odd)
+            ]
 
-        L_odd = [A @ l for l in L_odd]
+        L_odd = [A @ ell for ell in L_odd]
 
         Ls = []
         for l_i, l_o in zip(L_even, L_odd):
@@ -243,7 +245,7 @@ def pade_and_legendre_7():
             Ls.append(l_o)
 
         sqr_norms = np.asarray(legendre_norms, dtype=A.dtype)
-        Ls = [l / np.sqrt(i) for i, l in zip(sqr_norms, Ls)]
+        Ls = [ell / np.sqrt(i) for i, ell in zip(sqr_norms, Ls)]
         rhs = np.concatenate(Ls, axis=-1)
 
         L = solve(V - U, rhs)
@@ -309,10 +311,12 @@ def pade_and_legendre_9():
 
         for k in [2, 3, 4]:
             P = A2 @ P
-            L_even = [l + P @ B * C[2 * i, 2 * k] for i, l in enumerate(L_even)]
-            L_odd = [l + P @ B * C[2 * i + 1, 2 * k + 1] for i, l in enumerate(L_odd)]
+            L_even = [ell + P @ B * C[2 * i, 2 * k] for i, ell in enumerate(L_even)]
+            L_odd = [
+                ell + P @ B * C[2 * i + 1, 2 * k + 1] for i, ell in enumerate(L_odd)
+            ]
 
-        L_odd = [A @ l for l in L_odd]
+        L_odd = [A @ ell for ell in L_odd]
 
         Ls = []
         for l_i, l_o in zip(L_even, L_odd):
@@ -320,7 +324,7 @@ def pade_and_legendre_9():
             Ls.append(l_o)
 
         sqr_norms = np.asarray(legendre_norms, dtype=A.dtype)
-        Ls = [l / np.sqrt(i) for i, l in zip(sqr_norms, Ls)]
+        Ls = [ell / np.sqrt(i) for i, ell in zip(sqr_norms, Ls)]
         rhs = np.concatenate(Ls, axis=-1)
 
         L = solve(V - U, rhs)
@@ -365,7 +369,8 @@ def pade_and_legendre_13():
     def init(A, B, *, solve=linalg.solve_lu):
         b = np.asarray(pade_coeffs, dtype=A.dtype)
 
-        ident = np.eye(*A.shape, dtype=A.dtype)
+        n, m = A.shape
+        ident = np.eye(n, m, dtype=A.dtype)
         zeros = np.zeros_like(B)
         A2 = linalg.vector_dot(A, A)
         A4 = linalg.vector_dot(A2, A2)
@@ -414,10 +419,12 @@ def pade_and_legendre_13():
         P = A2
         for k in [2, 3, 4, 5, 6]:
             P = A2 @ P
-            L_even = [l + P @ B * C[2 * i, 2 * k] for i, l in enumerate(L_even)]
-            L_odd = [l + P @ B * C[2 * i + 1, 2 * k + 1] for i, l in enumerate(L_odd)]
+            L_even = [ell + P @ B * C[2 * i, 2 * k] for i, ell in enumerate(L_even)]
+            L_odd = [
+                ell + P @ B * C[2 * i + 1, 2 * k + 1] for i, ell in enumerate(L_odd)
+            ]
 
-        L_odd = [A @ l for l in L_odd]
+        L_odd = [A @ ell for ell in L_odd]
 
         Ls = []
         for l_i, l_o in zip(L_even, L_odd):
@@ -425,7 +432,7 @@ def pade_and_legendre_13():
             Ls.append(l_o)
 
         sqr_norms = np.asarray(legendre_norms, dtype=A.dtype)
-        Ls = [l / np.sqrt(i) for i, l in zip(sqr_norms, Ls)]
+        Ls = [ell / np.sqrt(i) for i, ell in zip(sqr_norms, Ls)]
         rhs = np.concatenate(Ls, axis=-1)
 
         L = solve(V - U, rhs)

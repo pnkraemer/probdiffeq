@@ -36,17 +36,20 @@ def test_exact(seed, nrows, ncols, pade_legendre, use_triu):
 
     if use_triu:
         A = np.triu(A)
-        solve = linalg.solve_triangular
+        algorithm = gram_util.exp_gram_cholesky(
+            pade_legendre=pade_legendre, solve=linalg.solve_triangular
+        )
     else:
-        solve = linalg.solve_lu
+        algorithm = gram_util.exp_gram_cholesky(
+            pade_legendre=pade_legendre, solve=linalg.solve_lu
+        )
+
+    # Run our algorithm
+    eA2, L2 = func.jit(algorithm)(A, B)
 
     # Evaluate a baseline
     algorithm = gram_util.exp_gram_matrix_fraction()
     eA1, G1 = func.jit(algorithm)(A, B)
-
-    # Run our algorithm
-    algorithm = gram_util.exp_gram_cholesky(pade_legendre=pade_legendre, solve=solve)
-    eA2, L2 = func.jit(algorithm)(A, B)
 
     # Choose a tolerance based on the dtype.
     tol = np.sqrt(np.finfo_eps(G1.dtype))
