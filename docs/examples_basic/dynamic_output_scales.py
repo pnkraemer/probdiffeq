@@ -69,9 +69,7 @@ def vf(y, /, *, t):
 num_derivatives = 1
 
 tcoeffs = (u0, vf(u0, t=t0))
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-    tcoeffs, output_scale=1.0, ssm_fact="dense"
-)
+init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, output_scale=1.0, ssm_fact="dense")
 ts1 = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
 dynamic = probdiffeq.solver_dynamic(

@@ -57,15 +57,13 @@ def vf(y, t, *, p):  # noqa: ARG001
 
 
 tcoeffs = (u0, vf(u0, t0, p=f_args))
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-    tcoeffs, output_scale=10.0, ssm_fact="isotropic"
-)
+init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, output_scale=10.0, ssm_fact="isotropic")
 
 
 def solve(p):
     """Evaluate the parameter-to-solution map."""
     tcoeffs = (u0, vf(u0, t0, p=p))
-    init, ibm, ssm = probdiffeq.prior_wiener_integrated(
+    init, ibm, ssm = probdiffeq.prior_iwp(
         tcoeffs, output_scale=10.0, ssm_fact="isotropic"
     )
 

@@ -6,7 +6,7 @@ from probdiffeq.backend import np, testing
 
 def test_default_yield_correct_transitions() -> None:
     tcoeffs = [2.0, 3.0, 4.0, 5.0]
-    init, iwp, _ssm = probdiffeq.prior_wiener_integrated(tcoeffs)
+    init, iwp, _ssm = probdiffeq.prior_iwp(tcoeffs)
 
     assert testing.allclose(init.std, [0.0, 0.0, 0.0, 0.0])
 
@@ -33,7 +33,7 @@ def test_default_yield_correct_transitions() -> None:
 
 def test_diffuse_derivatives() -> None:
     tcoeffs = [2.0, 3.0]
-    init, _iwp, _ssm = probdiffeq.prior_wiener_integrated(
+    init, _iwp, _ssm = probdiffeq.prior_iwp(
         tcoeffs, diffuse_derivatives=3, diffuse_eps=123.0
     )
     assert testing.allclose(init.mean, [2.0, 3.0, 0.0, 0.0, 0.0])
@@ -43,7 +43,7 @@ def test_diffuse_derivatives() -> None:
 def test_differential_variables_dense() -> None:
     tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray([True, False, True])]
-    init, _iwp, _ssm = probdiffeq.prior_wiener_integrated(
+    init, _iwp, _ssm = probdiffeq.prior_iwp(
         tcoeffs, is_differential=isdiff, nondifferential_eps=0.123, ssm_fact="dense"
     )
 
@@ -54,13 +54,13 @@ def test_differential_variables_dense() -> None:
     with testing.raises(ValueError, match="wrong PyTree structure"):
         tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
         isdiff = [np.asarray(False)]  # wrong shape
-        _ = probdiffeq.prior_wiener_integrated(tcoeffs, is_differential=isdiff)
+        _ = probdiffeq.prior_iwp(tcoeffs, is_differential=isdiff)
 
 
 def test_differential_variables_blockdiag() -> None:
     tcoeffs = [np.asarray([1.0, 2.0, 3.0]), np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray([True, False, True]), np.asarray([False, False, True])]
-    init, _iwp, _ssm = probdiffeq.prior_wiener_integrated(
+    init, _iwp, _ssm = probdiffeq.prior_iwp(
         tcoeffs, is_differential=isdiff, nondifferential_eps=0.123, ssm_fact="blockdiag"
     )
 
@@ -73,15 +73,13 @@ def test_differential_variables_blockdiag() -> None:
     with testing.raises(ValueError, match="wrong PyTree structure"):
         tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
         isdiff = [np.asarray(False)]  # wrong shape
-        _ = probdiffeq.prior_wiener_integrated(
-            tcoeffs, is_differential=isdiff, ssm_fact="blockdiag"
-        )
+        _ = probdiffeq.prior_iwp(tcoeffs, is_differential=isdiff, ssm_fact="blockdiag")
 
 
 def test_differential_variables_isotropic() -> None:
     tcoeffs = [np.asarray([1.0, 2.0, 3.0]), np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray(True), np.asarray(False)]
-    init, _iwp, _ssm = probdiffeq.prior_wiener_integrated(
+    init, _iwp, _ssm = probdiffeq.prior_iwp(
         tcoeffs, is_differential=isdiff, nondifferential_eps=0.123, ssm_fact="isotropic"
     )
 
@@ -94,9 +92,7 @@ def test_differential_variables_isotropic() -> None:
     with testing.raises(ValueError, match="wrong PyTree structure"):
         tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
         isdiff = [np.asarray([True, False, True])]  # wrong shape
-        _ = probdiffeq.prior_wiener_integrated(
-            tcoeffs, is_differential=isdiff, ssm_fact="isotropic"
-        )
+        _ = probdiffeq.prior_iwp(tcoeffs, is_differential=isdiff, ssm_fact="isotropic")
 
 
 @testing.parametrize("ssm_fact", ["dense", "blockdiag"])
@@ -107,7 +103,7 @@ def test_output_scale_dense_blockdiag(ssm_fact) -> None:
     scale = 123.45 * np.ones((1, 1, 1))
 
     # Test that the transition covariances are scaled correctly
-    init, iwp, _ssm = probdiffeq.prior_wiener_integrated(
+    init, iwp, _ssm = probdiffeq.prior_iwp(
         tcoeffs, output_scale=scale, ssm_fact=ssm_fact
     )
 
@@ -117,7 +113,7 @@ def test_output_scale_dense_blockdiag(ssm_fact) -> None:
     assert testing.allclose(cov, Q_expected)
 
     # Test that the "diffuse_derivatives" are scaled correctly
-    init, iwp, _ssm = probdiffeq.prior_wiener_integrated(
+    init, iwp, _ssm = probdiffeq.prior_iwp(
         tcoeffs,
         output_scale=scale,
         diffuse_derivatives=3,
@@ -136,9 +132,7 @@ def test_output_scale_dense_blockdiag(ssm_fact) -> None:
     for shapes in [(), (1,), (1, 1)]:
         scale = 123.45 * np.ones(shapes)
         with testing.raises(ValueError, match="wrong shape"):
-            _ = probdiffeq.prior_wiener_integrated(
-                tcoeffs, output_scale=scale, ssm_fact=ssm_fact
-            )
+            _ = probdiffeq.prior_iwp(tcoeffs, output_scale=scale, ssm_fact=ssm_fact)
 
 
 def test_output_scale_isotropic() -> None:
@@ -148,7 +142,7 @@ def test_output_scale_isotropic() -> None:
     scale = 123.45 * np.ones(())
 
     # Test that the transition covariances are scaled correctly
-    init, iwp, _ssm = probdiffeq.prior_wiener_integrated(
+    init, iwp, _ssm = probdiffeq.prior_iwp(
         tcoeffs, output_scale=scale, ssm_fact="isotropic"
     )
 
@@ -158,7 +152,7 @@ def test_output_scale_isotropic() -> None:
     assert testing.allclose(cov, Q_expected)
 
     # Test that the "diffuse_derivatives" are scaled correctly
-    init, iwp, _ssm = probdiffeq.prior_wiener_integrated(
+    init, iwp, _ssm = probdiffeq.prior_iwp(
         tcoeffs,
         output_scale=scale,
         diffuse_derivatives=3,
@@ -175,6 +169,4 @@ def test_output_scale_isotropic() -> None:
     for shapes in [(1,), (1, 1), (1, 1, 1)]:
         scale = 123.45 * np.ones(shapes)
         with testing.raises(ValueError, match="wrong shape"):
-            _ = probdiffeq.prior_wiener_integrated(
-                tcoeffs, output_scale=scale, ssm_fact="isotropic"
-            )
+            _ = probdiffeq.prior_iwp(tcoeffs, output_scale=scale, ssm_fact="isotropic")

@@ -91,7 +91,7 @@ H0 = hamiltonian_1st(u0_1st)
 # +
 
 tcoeffs = [u0_1st]
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, diffuse_derivatives=2)
+init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, diffuse_derivatives=2)
 ts1 = probdiffeq.constraint_ode_ts1(vf_1st, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 solver_1st = probdiffeq.solver_mle(
@@ -137,7 +137,7 @@ def root(u, du, ddu, /, *, t):
 
 u0, du0 = jnp.split(u0_1st, 2)
 tcoeffs = [u0, du0]
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, diffuse_derivatives=1)
+init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, diffuse_derivatives=1)
 
 # -
 

@@ -61,7 +61,7 @@ def vf(y, /, *, t):
 # +
 def solve(tc):
     """Solve the ODE."""
-    init, prior, ssm = probdiffeq.prior_wiener_integrated(tc, ssm_fact="dense")
+    init, prior, ssm = probdiffeq.prior_iwp(tc, ssm_fact="dense")
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_mle(
@@ -118,7 +118,7 @@ print(jax.tree.map(jnp.shape, solution.u))
 # +
 
 key = jax.random.PRNGKey(seed=15)
-_, _, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
+_, _, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact="dense")
 strategy = probdiffeq.strategy_filter(ssm)
 posterior = solution.solution_full
 sample_one = posterior.sample(key, ssm=ssm)

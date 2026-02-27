@@ -64,19 +64,17 @@ u0 = jnp.asarray(0.1)
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
 
 # "Bad" prior (no Taylor coefficients)
-mseq_prior, ssm = probdiffeq.prior_wiener_integrated_discrete(
+mseq_prior, ssm = probdiffeq.prior_iwp_discrete(
     (u0,), grid=ts, diffuse_derivatives=2, output_scale=10.0
 )
 
 # "Good" prior (Taylor coefficients)
 tcoeffs = taylor.odejet_padded_scan(lambda y: vector_field(y, t=t0), (u0,), num=2)
-mseq_tcoeffs, ssm = probdiffeq.prior_wiener_integrated_discrete(
-    tcoeffs, grid=ts, output_scale=10.0
-)
+mseq_tcoeffs, ssm = probdiffeq.prior_iwp_discrete(tcoeffs, grid=ts, output_scale=10.0)
 
 
 # Posterior
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, output_scale=10.0)
+init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, output_scale=10.0)
 ts1 = probdiffeq.constraint_ode_ts1(vector_field, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm)

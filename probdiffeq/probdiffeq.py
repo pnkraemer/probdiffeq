@@ -1118,7 +1118,7 @@ class ProbabilisticSolver:
         return sol, InterpResult(step_from=acc, interp_from=prev)
 
 
-def prior_wiener_integrated(
+def prior_iwp(
     tcoeffs: C,
     *,
     # Which of the Taylor coefficients are differential variables
@@ -1140,7 +1140,7 @@ def prior_wiener_integrated(
         ssm_fact=ssm_fact,
     )
 
-    return prior_wiener_integrated_diffuse(
+    return prior_iwp_diffuse(
         tcoeffs,
         tcoeffs_std,
         ssm_fact=ssm_fact,
@@ -1150,7 +1150,7 @@ def prior_wiener_integrated(
     )
 
 
-def prior_ornstein_uhlenbeck_integrated(
+def prior_ioup(
     tcoeffs: C,
     *,
     M: Array,
@@ -1172,7 +1172,7 @@ def prior_ornstein_uhlenbeck_integrated(
         ssm_fact=ssm_fact,
     )
 
-    return prior_ornstein_uhlenbeck_integrated_diffuse(
+    return prior_ioup_diffuse(
         tcoeffs,
         tcoeffs_std,
         M=M,
@@ -1232,7 +1232,7 @@ def _tcoeffs_std_from_differential_variables(
     return tree.tree_map(std_init, is_differential)
 
 
-def prior_wiener_integrated_diffuse(
+def prior_iwp_diffuse(
     tcoeffs_mean: C,
     tcoeffs_std: C,
     *,
@@ -1298,7 +1298,7 @@ def prior_wiener_integrated_diffuse(
     std_leaves_scaled = [output_scale_leaf * s for s in std_leaves]
     tcoeffs_std = tree.tree_unflatten(structure, std_leaves_scaled)
 
-    discretize = ssm.conditional.transition_wiener_integrated(base_scale=output_scale)
+    discretize = ssm.conditional.transition_iwp(base_scale=output_scale)
 
     # Return the target
     marginal = ssm.normal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
@@ -1306,7 +1306,7 @@ def prior_wiener_integrated_diffuse(
     return target, discretize, ssm
 
 
-def prior_ornstein_uhlenbeck_integrated_diffuse(
+def prior_ioup_diffuse(
     tcoeffs_mean: C,
     tcoeffs_std: C,
     *,
@@ -1362,9 +1362,7 @@ def prior_ornstein_uhlenbeck_integrated_diffuse(
     std_leaves_scaled = [output_scale_leaf * s for s in std_leaves]
     tcoeffs_std = tree.tree_unflatten(structure, std_leaves_scaled)
 
-    discretize = ssm.conditional.transition_ornstein_uhlenbeck_integrated(
-        M=M, base_scale=output_scale
-    )
+    discretize = ssm.conditional.transition_ioup(M=M, base_scale=output_scale)
 
     # Return the target
     marginal = ssm.normal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
@@ -1383,7 +1381,7 @@ def _add_diffuse_derivatives(
     return tcoeffs_mean, tcoeffs_std
 
 
-def prior_wiener_integrated_discrete(
+def prior_iwp_discrete(
     tcoeffs: C,
     grid: Array,
     *,
@@ -1396,7 +1394,7 @@ def prior_wiener_integrated_discrete(
     diffuse_eps: float = 1.0,  # a large value
 ):
     """Compute a time-discretization of an integrated Wiener process."""
-    init, discretize, ssm = prior_wiener_integrated(
+    init, discretize, ssm = prior_iwp(
         tcoeffs,
         is_differential=is_differential,
         nondifferential_eps=nondifferential_eps,

@@ -45,7 +45,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     M = jnp.asarray([[-0.04, 0.0, 0.0], [0.04, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
     # TODO: clean up the IOUP api. also, what about isotropic etc.?
-    init, ioup, ssm = probdiffeq.prior_ornstein_uhlenbeck_integrated(
+    init, ioup, ssm = probdiffeq.prior_ioup(
         y0,
         M=M,
         output_scale=base_scale,
@@ -132,7 +132,7 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
         #   and idea which ones arent to stabilise the solver initialisation
         y0 = [jnp.array([1.0, 0.0, 0.0])]
         is_differential = [jnp.array([True, True, False])]
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
+        init, ibm, ssm = probdiffeq.prior_iwp(
             y0,
             output_scale=base_scale,
             diffuse_derivatives=num_derivatives,

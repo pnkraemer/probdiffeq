@@ -15,7 +15,7 @@ def case_solve_fixed_grid(fact):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
-    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     grid = np.linspace(t0, t1, endpoint=True, num=5)
 
@@ -37,7 +37,7 @@ def case_simulate_terminal_values(fact):
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
-    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
 
     def solver_to_solution(solver_fun, strategy_fun):

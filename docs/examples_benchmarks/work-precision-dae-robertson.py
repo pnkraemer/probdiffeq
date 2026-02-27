@@ -192,9 +192,7 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (y0,), num=num_derivatives - 1)
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            tcoeffs, output_scale=base_scale
-        )
+        init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, output_scale=base_scale)
         ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
@@ -241,7 +239,7 @@ def solver_dae(*, num_derivatives: int, time_span) -> Callable:
         #   and idea which ones arent to stabilise the solver initialisation
         y0 = [jnp.array([1.0, 0.0, 0.0])]
         is_differential = [jnp.array([True, True, False])]
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
+        init, ibm, ssm = probdiffeq.prior_iwp(
             y0,
             output_scale=base_scale,
             diffuse_derivatives=num_derivatives,
@@ -306,7 +304,7 @@ def solver_dae_ioup(*, num_derivatives: int, time_span) -> Callable:
         y0 = [jnp.array([1.0, 0.0, 0.0])]
         is_differential = [jnp.array([True, True, False])]
         M = jnp.asarray([[-0.4, 0.0, 0.0], [0.4, 0.0, 0.0], [0.0, 0.0, 0.0]])
-        init, ibm, ssm = probdiffeq.prior_ornstein_uhlenbeck_integrated(
+        init, ibm, ssm = probdiffeq.prior_ioup(
             y0,
             M=M,
             output_scale=base_scale,

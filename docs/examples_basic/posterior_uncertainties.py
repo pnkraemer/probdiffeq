@@ -60,7 +60,7 @@ u0 = jnp.asarray([20.0, 20.0])
 
 
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
+init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact="blockdiag")
 ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 

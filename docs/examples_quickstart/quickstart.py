@@ -39,7 +39,7 @@ t0, t1 = 0.0, 5.0
 
 # Set up a state-space model
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
-init, iwp, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
+init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact="dense")
 
 
 # Build a solver

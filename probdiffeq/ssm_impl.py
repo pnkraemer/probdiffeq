@@ -222,7 +222,7 @@ class AbstractConditional(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def transition_wiener_integrated(self, num_derivatives, output_scale=None):
+    def transition_iwp(self, num_derivatives, output_scale=None):
         """Construct the transitions for an integrated Wiener process."""
         raise NotImplementedError
 
@@ -594,7 +594,7 @@ class DenseConditional(AbstractConditional):
         ones = np.ones((n,))
         return LatentCond(A, noise, to_latent=ones, to_observed=ones)
 
-    def transition_wiener_integrated(self, base_scale):
+    def transition_iwp(self, base_scale):
 
         a, q_sqrtm = system_matrices_1d_iwp(self.num_derivatives)
         (d,) = self.ode_shape
@@ -623,7 +623,7 @@ class DenseConditional(AbstractConditional):
 
         return discretise
 
-    def transition_ornstein_uhlenbeck_integrated(self, M, base_scale):
+    def transition_ioup(self, M, base_scale):
 
         (d,) = self.ode_shape
         assert M.shape == (d, d)  # todo: flatten M from pytree?
@@ -1254,7 +1254,7 @@ class IsotropicConditional(AbstractConditional):
         ones = np.ones((num,))
         return LatentCond(matrix, noise, to_latent=ones, to_observed=ones)
 
-    def transition_wiener_integrated(self, base_scale):
+    def transition_iwp(self, base_scale):
 
         A, q_sqrtm = system_matrices_1d_iwp(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1, *self.ode_shape))
@@ -1422,7 +1422,7 @@ class BlockDiagConditional(AbstractConditional):
         matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
         return LatentCond.from_linop_and_noise(matrix, noise)
 
-    def transition_wiener_integrated(self, base_scale):
+    def transition_iwp(self, base_scale):
 
         a, q_sqrtm = system_matrices_1d_iwp(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1,))

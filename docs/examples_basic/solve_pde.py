@@ -44,7 +44,7 @@ def main() -> None:
 
     # Set up a state-space model
     tcoeffs = [u0, vf(u0, t=t0)]
-    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
+    init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact="blockdiag")
 
     # Build a solver
     ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)

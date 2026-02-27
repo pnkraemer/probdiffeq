@@ -22,7 +22,7 @@ class Factory:
     and make each case only vary one of the parameters.
     """
 
-    prior: Callable = probdiffeq.prior_wiener_integrated
+    prior: Callable = probdiffeq.prior_iwp
     strategy: Callable = probdiffeq.strategy_filter
     solver: Callable = probdiffeq.solver
     constraint: Callable = probdiffeq.constraint_ode_ts0
@@ -35,17 +35,15 @@ def case_factory_strategy_filter():
 
 
 @testing.case
-def case_factory_prior_wiener_integrated():
-    return Factory(prior=probdiffeq.prior_wiener_integrated)
+def case_factory_prior_iwp():
+    return Factory(prior=probdiffeq.prior_iwp)
 
 
 @testing.case
-def case_factory_prior_ornstein_uhlenbeck_integrated():
+def case_factory_prior_ioup():
     M = np.eye(2)
     return Factory(
-        prior=lambda *args, **kwargs: probdiffeq.prior_ornstein_uhlenbeck_integrated(
-            *args, M=M, **kwargs
-        )
+        prior=lambda *args, **kwargs: probdiffeq.prior_ioup(*args, M=M, **kwargs)
     )
 
 
