@@ -32,6 +32,10 @@ def where(cond, /, if_true, if_false):
     return jnp.where(cond, if_true, if_false)
 
 
+def nonzero(cond, /):
+    return jnp.nonzero(cond)
+
+
 def abs(arr, /):  # noqa: A001
     return jnp.abs(arr)
 
@@ -72,12 +76,12 @@ def concatenate(list_of_arrays, /, axis=0):
     return jnp.concatenate(list_of_arrays, axis=axis)
 
 
-def ones(shape, /):
-    return jnp.ones(shape)
+def ones(shape, /, dtype=None):
+    return jnp.ones(shape, dtype=dtype)
 
 
-def zeros(shape, /):
-    return jnp.zeros(shape)
+def zeros(shape, /, dtype=None):
+    return jnp.zeros(shape, dtype=dtype)
 
 
 def empty(shape, /):

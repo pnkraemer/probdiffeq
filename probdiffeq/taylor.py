@@ -7,7 +7,7 @@ in probdiffeq.probdiffeq easier to access.
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import flow, func, np, tree
+from probdiffeq.backend import flow, func, linalg, np, tree
 from probdiffeq.backend.typing import Array, ArrayLike, Callable, Sequence
 
 
@@ -323,3 +323,81 @@ def odejet_affine(vf: Callable, inits: Sequence[Array], /, num: int):
     tmp = fx
     fx_evaluations = [tmp := jvp_fn(tmp) for _ in range(num - 1)]
     return [*inits, fx, *fx_evaluations]
+
+
+def root_of_jet_of_root(
+    root: Callable, inits: Sequence[Array], /, num: int, is_differential
+):
+
+    zeros = tree.tree_map(np.zeros_like, inits[0])
+    inits = [*inits, *[zeros for _ in range(num)]]
+
+    zeros = tree.tree_map(lambda s: np.zeros(s.shape, dtype=bool), inits[0])
+    is_differential = [*is_differential, *[zeros for _ in range(num)]]
+
+    inits_free, unfree = _infer_degrees_of_freedom(inits, is_differential)
+
+    def root_jet_flat(x_free):
+        tcoeffs = unfree(x_free)
+        fx = root_jet(*tcoeffs)
+        y = tree.ravel_pytree(fx)[0]
+        return y
+
+    def root_jet(*tcoeffs_all):
+        # TODO: if we apply the preconditioner before passing
+        #   things in here, we can set is_tcoeff to True and possibly
+        #   gain a bunch of numerical robustness? (And speed?)
+        ps, ss = jet_unpack_series(tcoeffs_all, 2)
+        primals, series = func.jet(root, ps, ss, is_tcoeff=False)
+        return [primals, *series]
+
+    optimized = levenberg_marquardt(root_jet_flat, inits_free, num=100)
+    return unfree(optimized)
+
+
+def _infer_degrees_of_freedom(params, mask):
+
+    flat_params, unravel = tree.ravel_pytree(params)
+    flat_mask, _ = tree.ravel_pytree(mask)
+
+    flat_mask = np.logical_not(flat_mask)
+
+    active_idx = np.nonzero(flat_mask)
+
+    x_active0 = flat_params[active_idx]
+
+    def reconstruct(x_active):
+        flat_full = flat_params.at[active_idx].set(x_active)
+        return unravel(flat_full)
+
+    return x_active0, reconstruct
+
+
+def gd(F, x0, num):
+
+    def body_fun(x, _):
+
+        dfx = func.grad(F)(x)
+        return x - 0.01 * dfx, None
+
+    x, _ = flow.scan(body_fun, x0, xs=None, length=num)
+
+    return x
+
+
+def levenberg_marquardt(residual, x0, *, num=100, dt=1.0):
+
+    # Damping equivalent to machine epsilon (small seems desirable here)
+    damping = np.finfo_eps(x0.dtype)
+
+    def body_fun(x, _):
+        Fx = residual(x)
+        J = func.jacfwd(residual)(x)
+        A = J.T @ J + damping * np.eye(x.shape[0])
+        b = -J.T @ Fx
+        dx = linalg.solve_lu(A, b)
+        return x + dt * dx, None
+
+    x, _ = flow.scan(body_fun, x0, xs=None, length=num)
+
+    return x

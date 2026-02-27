@@ -59,6 +59,10 @@ def solve_lu(matrix, rhs, /):
     return jnp.linalg.solve(matrix, rhs)
 
 
+def lstsq(matrix, rhs, /):
+    return jnp.linalg.lstsq(matrix, rhs)[0]
+
+
 def inv(matrix, /):
     return jnp.linalg.inv(matrix)
 
