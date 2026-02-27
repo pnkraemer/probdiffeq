@@ -470,11 +470,20 @@ def constraint_root_jet(root, /, *, ssm: ssm_impl.FactSsmImpl, jacobian=None):
         jacobian = jacobian_hutchinson_fwd()
 
     def root_jet(*tcoeffs_all, t):
+        flat = [tree.ravel_pytree(s)[0] for s in tcoeffs_all]
+        unravel = tree.ravel_pytree(tcoeffs_all[0])[1]
+
+        # Flatten the root because jax.jet is a bit high maintenance :)
+        def jet_call(*y):
+            y_tree = [unravel(s) for s in y]
+            fx = root(*y_tree, t=t)
+            return tree.ravel_pytree(fx)[0]
+
         # TODO: if we apply the preconditioner before passing
         #   things in here, we can set is_tcoeff to True and possibly
         #   gain a bunch of numerical robustness? (And speed?)
-        ps, ss = taylor.jet_unpack_series(tcoeffs_all, root_order)
-        primals, series = func.jet(lambda *y: root(*y, t=t), ps, ss, is_tcoeff=False)
+        ps, ss = taylor.jet_unpack_series(flat, root_order)
+        primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
         return [primals, *series]
 
     # TODO: once we have a second root constraint (eg slr1),
