@@ -7,7 +7,7 @@ in probdiffeq.probdiffeq easier to access.
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import flow, func, linalg, np, tree
+from probdiffeq.backend import flow, func, np, tree
 from probdiffeq.backend.typing import Array, ArrayLike, Callable, Sequence
 
 
@@ -325,36 +325,47 @@ def odejet_affine(vf: Callable, inits: Sequence[Array], /, num: int):
     return [*inits, fx, *fx_evaluations]
 
 
-def root_of_jet_of_root(root: Callable, inits: Sequence[Array], /, num: int, is_free):
+def rootjet_nonlinear_lstsq(
+    root: Callable,
+    inits: Sequence[Array],
+    /,
+    num: int,
+    is_free: bool,
+    nonlinear_lstsq: Callable,
+):
 
+    # Fun-fact: for really high orders, recursively call this function
+
+    # Pad the initial values to the desired size
     zeros = tree.tree_map(np.zeros_like, inits[0])
     inits = [*inits, *[zeros for _ in range(num)]]
 
+    # Pad the masks to the desired size
     ones = tree.tree_map(lambda s: np.ones(s.shape, dtype=bool), inits[0])
     is_free = [*is_free, *[ones for _ in range(num)]]
 
-    inits_free, unfree = _infer_degrees_of_freedom_old(inits, is_free)
-    # inits_free, unfree = tree.ravel_pytree(inits)
+    return root_of_constraint_jet(root, inits, is_free, nonlinear_lstsq=nonlinear_lstsq)
 
-    def root_jet_flat_residual(x_free):
+
+def root_of_constraint_jet(root, inits, is_free, nonlinear_lstsq):
+    # Infer which of the parameters should be optimised
+    inits_free, unfree = _infer_degrees_of_freedom(inits, is_free)
+
+    def residual(x_free):
         tcoeffs = unfree(x_free)
         fx = root_jet(*tcoeffs)
         return tree.ravel_pytree(fx)[0]
 
     def root_jet(*tcoeffs_all):
-        # TODO: if we apply the preconditioner before passing
-        #   things in here, we can set is_tcoeff to True and possibly
-        #   gain a bunch of numerical robustness? (And speed?)
         ps, ss = jet_unpack_series(tcoeffs_all, 2)
         primals, series = func.jet(root, ps, ss, is_tcoeff=False)
         return [primals, *series]
 
-    optimized = levenberg_marquardt(root_jet_flat_residual, inits_free, num=10000)
-
+    optimized = nonlinear_lstsq(residual, inits_free)
     return unfree(optimized)
 
 
-def _infer_degrees_of_freedom_old(params, mask):
+def _infer_degrees_of_freedom(params, mask):
 
     flat_params, unravel = tree.ravel_pytree(params)
     flat_mask, _ = tree.ravel_pytree(mask)
@@ -368,21 +379,3 @@ def _infer_degrees_of_freedom_old(params, mask):
         return unravel(flat_full)
 
     return x_active0, reconstruct
-
-
-def levenberg_marquardt(residual, x0, *, num=100):
-
-    # Damping equivalent to machine epsilon (small seems desirable here)
-    damping = 10 * np.finfo_eps(x0.dtype)
-
-    def body_fun(x, _):
-        Fx = residual(x)
-        J = func.jacfwd(residual)(x)
-        A = J.T @ J + damping * np.eye(x.shape[0])
-        b = -J.T @ Fx
-        dx = linalg.solve_lu(A, b)
-        return x + dx, None
-
-    x, _ = flow.scan(body_fun, x0, xs=None, length=num)
-
-    return x

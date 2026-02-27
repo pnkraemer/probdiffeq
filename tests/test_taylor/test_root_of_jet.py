@@ -1,8 +1,8 @@
 from probdiffeq import taylor
-from probdiffeq.backend import np, tree
+from probdiffeq.backend import flow, func, linalg, np, testing
 
 
-def test_root_of_jet(num=8):
+def test_root_of_jet(num=3):
 
     def vf(y):
         k1, k2, k3 = 0.04, 3e7, 1e4
@@ -22,17 +22,33 @@ def test_root_of_jet(num=8):
         F1 = du[0] - f0
         F2 = du[1] - f1
         F3 = u[0] + u[1] + u[2] - 1
+        # The below is technically not a part of the DAE definition
+        # but it is a conserved quantity and providing it really
+        # helps the consistent initialisation.
         F4 = du[0] + du[1] + du[2]
         return np.stack([F1, F2, F3, F4])
 
-    # Yooooooo this works hallelujah
-    for _ in range(num):
-        is_free = tree.tree_map(lambda s: np.zeros(s.shape, dtype=bool), y0)
-        y0 = taylor.root_of_jet_of_root(root, y0, num=1, is_free=is_free)
+    is_free = [np.asarray([False, False, False])]
+    received = taylor.rootjet_nonlinear_lstsq(
+        root, y0, num=num, is_free=is_free, nonlinear_lstsq=levenberg_marquardt
+    )
 
-    for a, b in zip(tree.tree_leaves(expected), tree.tree_leaves(y0)):
-        print("Expected", a)
-        print("Received", b)
+    assert testing.allclose(received, expected)
 
-        print()
-    assert False
+
+def levenberg_marquardt(residual, x0, *, num=100):
+
+    # Damping equivalent to machine epsilon (small seems desirable here)
+    damping = 10 * np.finfo_eps(x0.dtype)
+
+    def body_fun(x, _):
+        Fx = residual(x)
+        J = func.jacfwd(residual)(x)
+        A = J.T @ J + damping * np.eye(x.shape[0])
+        b = -J.T @ Fx
+        dx = linalg.solve_lu(A, b)
+        return x + dx, None
+
+    x, _ = flow.scan(body_fun, x0, xs=None, length=num)
+
+    return x
