@@ -325,23 +325,21 @@ def odejet_affine(vf: Callable, inits: Sequence[Array], /, num: int):
     return [*inits, fx, *fx_evaluations]
 
 
-def root_of_jet_of_root(
-    root: Callable, inits: Sequence[Array], /, num: int, is_differential
-):
+def root_of_jet_of_root(root: Callable, inits: Sequence[Array], /, num: int, is_free):
 
     zeros = tree.tree_map(np.zeros_like, inits[0])
     inits = [*inits, *[zeros for _ in range(num)]]
 
-    zeros = tree.tree_map(lambda s: np.zeros(s.shape, dtype=bool), inits[0])
-    is_differential = [*is_differential, *[zeros for _ in range(num)]]
+    ones = tree.tree_map(lambda s: np.ones(s.shape, dtype=bool), inits[0])
+    is_free = [*is_free, *[ones for _ in range(num)]]
 
-    inits_free, unfree = _infer_degrees_of_freedom(inits, is_differential)
+    inits_free, unfree = _infer_degrees_of_freedom_old(inits, is_free)
+    # inits_free, unfree = tree.ravel_pytree(inits)
 
-    def root_jet_flat(x_free):
+    def root_jet_flat_residual(x_free):
         tcoeffs = unfree(x_free)
         fx = root_jet(*tcoeffs)
-        y = tree.ravel_pytree(fx)[0]
-        return y
+        return tree.ravel_pytree(fx)[0]
 
     def root_jet(*tcoeffs_all):
         # TODO: if we apply the preconditioner before passing
@@ -351,16 +349,15 @@ def root_of_jet_of_root(
         primals, series = func.jet(root, ps, ss, is_tcoeff=False)
         return [primals, *series]
 
-    optimized = levenberg_marquardt(root_jet_flat, inits_free, num=100)
+    optimized = levenberg_marquardt(root_jet_flat_residual, inits_free, num=10000)
+
     return unfree(optimized)
 
 
-def _infer_degrees_of_freedom(params, mask):
+def _infer_degrees_of_freedom_old(params, mask):
 
     flat_params, unravel = tree.ravel_pytree(params)
     flat_mask, _ = tree.ravel_pytree(mask)
-
-    flat_mask = np.logical_not(flat_mask)
 
     active_idx = np.nonzero(flat_mask)
 
@@ -373,22 +370,10 @@ def _infer_degrees_of_freedom(params, mask):
     return x_active0, reconstruct
 
 
-def gd(F, x0, num):
-
-    def body_fun(x, _):
-
-        dfx = func.grad(F)(x)
-        return x - 0.01 * dfx, None
-
-    x, _ = flow.scan(body_fun, x0, xs=None, length=num)
-
-    return x
-
-
-def levenberg_marquardt(residual, x0, *, num=100, dt=1.0):
+def levenberg_marquardt(residual, x0, *, num=100):
 
     # Damping equivalent to machine epsilon (small seems desirable here)
-    damping = np.finfo_eps(x0.dtype)
+    damping = 10 * np.finfo_eps(x0.dtype)
 
     def body_fun(x, _):
         Fx = residual(x)
@@ -396,7 +381,7 @@ def levenberg_marquardt(residual, x0, *, num=100, dt=1.0):
         A = J.T @ J + damping * np.eye(x.shape[0])
         b = -J.T @ Fx
         dx = linalg.solve_lu(A, b)
-        return x + dt * dx, None
+        return x + dx, None
 
     x, _ = flow.scan(body_fun, x0, xs=None, length=num)
 

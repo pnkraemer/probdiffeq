@@ -2,7 +2,7 @@ from probdiffeq import taylor
 from probdiffeq.backend import np, tree
 
 
-def test_root_of_jet(num=3):
+def test_root_of_jet(num=8):
 
     def vf(y):
         k1, k2, k3 = 0.04, 3e7, 1e4
@@ -18,14 +18,19 @@ def test_root_of_jet(num=3):
         k1, k2, k3 = 0.04, 3e7, 1e4
         f0 = -k1 * u[0] + k3 * u[1] * u[2]
         f1 = k1 * u[0] - k2 * u[1] ** 2 - k3 * u[1] * u[2]
-        return [du[0] - f0, du[1] - f1, u[0] + u[1] + u[2] - 1]
 
-    is_differential = [np.asarray([True, True, False])]
-    received = taylor.root_of_jet_of_root(
-        root, y0, num=num, is_differential=is_differential
-    )
+        F1 = du[0] - f0
+        F2 = du[1] - f1
+        F3 = u[0] + u[1] + u[2] - 1
+        F4 = du[0] + du[1] + du[2]
+        return np.stack([F1, F2, F3, F4])
 
-    for a, b in zip(tree.tree_leaves(expected), tree.tree_leaves(received)):
+    # Yooooooo this works hallelujah
+    for _ in range(num):
+        is_free = tree.tree_map(lambda s: np.zeros(s.shape, dtype=bool), y0)
+        y0 = taylor.root_of_jet_of_root(root, y0, num=1, is_free=is_free)
+
+    for a, b in zip(tree.tree_leaves(expected), tree.tree_leaves(y0)):
         print("Expected", a)
         print("Received", b)
 
