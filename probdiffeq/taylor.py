@@ -325,31 +325,41 @@ def odejet_affine(vf: Callable, inits: Sequence[Array], /, num: int):
     return [*inits, fx, *fx_evaluations]
 
 
-def rootjet_nonlinear_lstsq(
-    root: Callable,
+def daejet_nonlinear_lstsq(
+    differential: Callable,
+    algebraic: Callable,
     inits: Sequence[Array],
     /,
     num: int,
-    is_free: bool,
     nonlinear_lstsq: Callable,
 ):
-
+    """Evaluate the Taylor series of a differential-algebraic equation system."""
     # Fun-fact: for really high orders, recursively call this function
+    # TODO: enable higher index? enable higher order?
+
+    # Determine degrees of freedom ("dof")
+    zeros = tree.tree_map(lambda s: np.zeros(s.shape, dtype=bool), inits[0])
+    ones = tree.tree_map(lambda s: np.ones(s.shape, dtype=bool), inits[0])
+    is_dof = [*[zeros for _ in inits], *[ones for _ in range(num)]]
 
     # Pad the initial values to the desired size
     zeros = tree.tree_map(np.zeros_like, inits[0])
     inits = [*inits, *[zeros for _ in range(num)]]
 
-    # Pad the masks to the desired size
-    ones = tree.tree_map(lambda s: np.ones(s.shape, dtype=bool), inits[0])
-    is_free = [*is_free, *[ones for _ in range(num)]]
+    return _find_root_of_dae_constraint(
+        differential=differential,
+        algebraic=algebraic,
+        inits=inits,
+        is_dof=is_dof,
+        nonlinear_lstsq=nonlinear_lstsq,
+    )
 
-    return root_of_constraint_jet(root, inits, is_free, nonlinear_lstsq=nonlinear_lstsq)
 
-
-def root_of_constraint_jet(root, inits, is_free, nonlinear_lstsq):
+def _find_root_of_dae_constraint(
+    *, differential, algebraic, inits, is_dof, nonlinear_lstsq
+):
     # Infer which of the parameters should be optimised
-    inits_free, unfree = _infer_degrees_of_freedom(inits, is_free)
+    inits_free, unfree = _infer_degrees_of_freedom(inits, is_dof)
 
     def residual(x_free):
         tcoeffs = unfree(x_free)
@@ -357,9 +367,16 @@ def root_of_constraint_jet(root, inits, is_free, nonlinear_lstsq):
         return tree.ravel_pytree(fx)[0]
 
     def root_jet(*tcoeffs_all):
+        # Differential part
         ps, ss = jet_unpack_series(tcoeffs_all, 2)
-        primals, series = func.jet(root, ps, ss, is_tcoeff=False)
-        return [primals, *series]
+        primals1, series1 = func.jet(differential, ps, ss, is_tcoeff=False)
+
+        # Algebraic part
+        ps, ss = jet_unpack_series(tcoeffs_all, 1)
+        primals2, series2 = func.jet(algebraic, ps, ss, is_tcoeff=False)
+
+        # Put together (order doesn't matter)
+        return [primals1, *series1, primals2, *series2]
 
     optimized = nonlinear_lstsq(residual, inits_free)
     return unfree(optimized)
@@ -370,12 +387,10 @@ def _infer_degrees_of_freedom(params, mask):
     flat_params, unravel = tree.ravel_pytree(params)
     flat_mask, _ = tree.ravel_pytree(mask)
 
-    active_idx = np.nonzero(flat_mask)
-
-    x_active0 = flat_params[active_idx]
+    x_active0 = np.where(flat_mask, flat_params, 0.0)
 
     def reconstruct(x_active):
-        flat_full = flat_params.at[active_idx].set(x_active)
+        flat_full = np.where(flat_mask, x_active, flat_params)
         return unravel(flat_full)
 
     return x_active0, reconstruct
