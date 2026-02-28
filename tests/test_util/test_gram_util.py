@@ -1,3 +1,5 @@
+"""Test the matrix-exponential and finite-horizon Gramian utilities."""
+
 from probdiffeq.backend import func, linalg, np, random, testing
 from probdiffeq.util import gram_util
 

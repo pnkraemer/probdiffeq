@@ -1,15 +1,18 @@
+"""Tests for the DAE initialization routines."""
+
 from probdiffeq import taylor
 from probdiffeq.backend import flow, func, linalg, np, testing
 
 
-def test_daejet_matches_expectation_on_sir_model(num=3):
+@testing.parametrize("num", [2, 4])
+def test_daejet_matches_expectation_on_sir_model(num):
 
     # Use SIR model because it is structurally similar to DAEs,
     # but really not that hard to solve so we can test in single precision
     # whereas robertson would require double
     def vf_ode(y):
         beta, gamma = 2.0, 0.5  # infection and recovery rates
-        S, I, R = y
+        S, I, _R = y  # noqa: E741 ("I" is a good variable name in an SIR model)
 
         f0 = -beta * S * I
         f1 = beta * S * I - gamma * I
@@ -23,7 +26,7 @@ def test_daejet_matches_expectation_on_sir_model(num=3):
 
     def differential(u, du, /):
         beta, gamma = 2.0, 0.5
-        S, I, _R = u
+        S, I, _R = u  # noqa: E741 ("I" is a good variable name in an SIR model)
 
         f0 = -beta * S * I
         f1 = beta * S * I - gamma * I
