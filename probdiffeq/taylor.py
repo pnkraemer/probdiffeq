@@ -7,7 +7,7 @@ in probdiffeq.probdiffeq easier to access.
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import flow, func, np, tree
+from probdiffeq.backend import flow, func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Array, ArrayLike, Callable, Sequence
 
 
@@ -394,3 +394,40 @@ def _infer_degrees_of_freedom(params, mask):
         return unravel(flat_full)
 
     return x_active0, reconstruct
+
+
+def nonlinear_lstsq_levenberg_marquardt(*, maxiter) -> Callable:
+    """Solve nonlinear least-squares problems with Levenberg-Marquard."""
+
+    def solve(residual, x0):
+        @tree.register_dataclass
+        @structs.dataclass
+        class State:
+            x: Array
+            fx: Array
+            i: int
+
+        # Damping equivalent to machine epsilon
+        # (small seems desirable here but what do I know...)
+        damping = 10 * np.finfo_eps(x0.dtype)
+
+        def cond_fun(state: State):
+            cond1 = linalg.vector_norm(state.fx) > damping
+            cond2 = state.i < maxiter
+            return np.logical_and(cond1, cond2)
+
+        def body_fun(state: State) -> State:
+            J = func.jacfwd(residual)(state.x)
+            A = J.T @ J + damping * np.eye(state.x.shape[0])
+            b = -J.T @ state.fx
+            dx = linalg.solve_lu(A, b)
+
+            xnew = state.x + dx
+            fxnew = residual(xnew)
+            return State(xnew, fxnew, i=state.i + 1)
+
+        init = State(x0, residual(x0), i=0)
+        final = flow.while_loop(cond_fun, body_fun, init=init)
+        return final.x, {"iters": final.i}
+
+    return solve
