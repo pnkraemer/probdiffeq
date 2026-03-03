@@ -337,7 +337,7 @@ def daejet_nonlinear_lstsq(
     # Fun-fact: for really high orders, recursively call this function
     # TODO: enable higher index? enable higher order?
 
-    # Determine degrees of freedom ("dof")
+    # Determine degrees of freedom ("dof"). The provided 'inits' are not DOFs.
     zeros = tree.tree_map(lambda s: np.zeros(s.shape, dtype=bool), inits[0])
     ones = tree.tree_map(lambda s: np.ones(s.shape, dtype=bool), inits[0])
     is_dof = [*[zeros for _ in inits], *[ones for _ in range(num)]]
@@ -378,8 +378,8 @@ def _find_root_of_dae_constraint(
         # Put together (order doesn't matter)
         return [primals1, *series1, primals2, *series2]
 
-    optimized = nonlinear_lstsq(residual, inits_free)
-    return unfree(optimized)
+    optimized, info = nonlinear_lstsq(residual, inits_free)
+    return unfree(optimized), info
 
 
 def _infer_degrees_of_freedom(params, mask):

@@ -1,10 +1,11 @@
 """Tests for the DAE initialization routines."""
 
 from probdiffeq import taylor
-from probdiffeq.backend import flow, func, linalg, np, testing
+from probdiffeq.backend import flow, func, linalg, np, structs, testing, tree
+from probdiffeq.backend.typing import Array
 
 
-@testing.parametrize("num", [2, 4])
+@testing.parametrize("num", [2, 4, 10])
 def test_daejet_matches_expectation_on_sir_model(num):
 
     # Use SIR model because it is structurally similar to DAEs,
@@ -39,25 +40,46 @@ def test_daejet_matches_expectation_on_sir_model(num):
     y0 = [np.asarray([0.99, 0.01, 0.0])]
     expected = taylor.odejet_unroll(vf_ode, y0, num=num)
 
-    received = taylor.daejet_nonlinear_lstsq(
-        differential, algebraic, y0, num=num, nonlinear_lstsq=levenberg_marquardt
+    lstsq = levenberg_marquardt(maxiter=5)
+    received, _info = taylor.daejet_nonlinear_lstsq(
+        differential, algebraic, y0, num=num, nonlinear_lstsq=lstsq
     )
     assert testing.allclose(received, expected)
 
 
-def levenberg_marquardt(residual, x0, *, num=1000):
+def levenberg_marquardt(*, maxiter):
+    def solve(residual, x0):
+        # TODO: include DAEJET in a Taylor series benchmark
+        # (I really wonder whether it is faster or slower than rewrite+odejet)
 
-    # Damping equivalent to machine epsilon (small seems desirable here)
-    damping = 10 * np.finfo_eps(x0.dtype)
+        @tree.register_dataclass
+        @structs.dataclass
+        class State:
+            x: Array
+            fx: Array
+            i: int
 
-    def body_fun(x, _):
-        Fx = residual(x)
-        J = func.jacfwd(residual)(x)
-        A = J.T @ J + damping * np.eye(x.shape[0])
-        b = -J.T @ Fx
-        dx = linalg.solve_lu(A, b)
-        return x + dx, None
+        # Damping equivalent to machine epsilon
+        # (small seems desirable here but what do I know...)
+        damping = 10 * np.finfo_eps(x0.dtype)
 
-    x, _ = flow.scan(body_fun, x0, xs=None, length=num)
+        def cond_fun(state: State):
+            cond1 = linalg.vector_norm(state.fx) > damping
+            cond2 = state.i < maxiter
+            return np.logical_and(cond1, cond2)
 
-    return x
+        def body_fun(state: State) -> State:
+            J = func.jacfwd(residual)(state.x)
+            A = J.T @ J + damping * np.eye(state.x.shape[0])
+            b = -J.T @ state.fx
+            dx = linalg.solve_lu(A, b)
+
+            xnew = state.x + dx
+            fxnew = residual(xnew)
+            return State(xnew, fxnew, i=state.i + 1)
+
+        init = State(x0, residual(x0), i=0)
+        final = flow.while_loop(cond_fun, body_fun, init=init)
+        return final.x, {"iters": final.i}
+
+    return solve
