@@ -452,6 +452,48 @@ def constraint_root_ts1(root, /, *, ssm: ssm_impl.FactSsmImpl, jacobian=None):
     return ssm.linearize.root_taylor_1st(root, root_order=root_order, jacobian=jacobian)
 
 
+def constraint_dae_jet(
+    differential, algebraic, *, iterate, ssm: ssm_impl.FactSsmImpl, jacobian=None
+):
+    root_order = _verify_vector_field_signature_and_parse_order(differential)
+    root_order2 = _verify_vector_field_signature_and_parse_order(algebraic)
+    assert root_order == 2 and root_order2 == 1
+
+    if jacobian is None:
+        jacobian = jacobian_hutchinson_fwd()
+
+    def root_jet(*tcoeffs_all, t):
+        flat = [tree.ravel_pytree(s)[0] for s in tcoeffs_all]
+        unravel = tree.ravel_pytree(tcoeffs_all[0])[1]
+
+        # Flatten the root because jax.jet is a bit high maintenance :)
+        def jet_call_differential(*y):
+            y_tree = [unravel(s) for s in y]
+            fx = differential(*y_tree, t=t)
+            return tree.ravel_pytree(fx)[0]
+
+        # TODO: if we apply the preconditioner before passing
+        #   things in here, we can set is_tcoeff to True and possibly
+        #   gain a bunch of numerical robustness? (And speed?)
+        ps, ss = taylor.jet_unpack_series(flat, 2)
+        primals1, series1 = func.jet(jet_call_differential, ps, ss, is_tcoeff=False)
+
+        def jet_call_algebraic(*y):
+            y_tree = [unravel(s) for s in y]
+            fx = algebraic(*y_tree, t=t)
+            return tree.ravel_pytree(fx)[0]
+
+        ps, ss = taylor.jet_unpack_series(flat, 1)
+        primals2, series2 = func.jet(jet_call_algebraic, ps, ss, is_tcoeff=False)
+        return [primals1, *series1, primals2, *series2]
+
+    # TODO: once we have a second root constraint (eg slr1),
+    #       offer the below as a function argument.
+    return ssm.linearize.root_taylor_1st(
+        root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian, iterate=iterate
+    )
+
+
 def constraint_root_jet(root, /, *, ssm: ssm_impl.FactSsmImpl, jacobian=None):
     """Construct a constraint based on a custom root.
 

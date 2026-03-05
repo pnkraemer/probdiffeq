@@ -7,20 +7,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.integrate
 
-from probdiffeq import ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq, taylor
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
 
 
-def main(t0=1e-6, t1=1e5) -> None:
+def main(t0=1e-6, t1=1e3) -> None:
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
 
-    def root(u, du, /, *, t):
+    def differential(u, du, /, *, t):
         del t
-        return [du[:2] - dynamics(u), vf_algebraic(u)]
+        return du[:2] - dynamics(u)
 
     def dynamics(y):
         k1, k2, k3 = 0.04, 3e7, 1e4
@@ -28,7 +28,8 @@ def main(t0=1e-6, t1=1e5) -> None:
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
         return jnp.stack([f0, f1])
 
-    def vf_algebraic(u):
+    def algebraic(u, *, t):
+        del t
         return u[0] + u[1] + u[2] - 1
 
     # This base scale is critical to Robertson, because
@@ -36,38 +37,41 @@ def main(t0=1e-6, t1=1e5) -> None:
     # (but don't vary much within these scales).
     # TODO: what is the best "base output scale" for the solver?
     #       this should be an expectation-maximisation thing right?
-    base_scale = jnp.asarray([1e0, 1e-5, 0.1])
+    base_scale = jnp.asarray([1e0, 1e-3, 0.1])
 
     # For DAEs, not all variables are differential, and we need to have
     #   and idea which ones arent to stabilise the solver initialisation
     y0 = [jnp.array([1.0, 0.0, 0.0])]
-    is_differential = [jnp.array([True, True, False])]
     M = jnp.asarray([[-0.04, 0.0, 0.0], [0.04, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
+    lstsq = taylor.nonlinear_lstsq_levenberg_marquardt(maxiter=100)
+    y0, _info = taylor.daejet_nonlinear_lstsq(
+        lambda *a: differential(*a, t=t0),
+        lambda *a: algebraic(*a, t=t0),
+        y0,
+        num=4,
+        nonlinear_lstsq=lstsq,
+    )
+
     # TODO: clean up the IOUP api. also, what about isotropic etc.?
+    # is_differential = [jnp.array([True, True, True])]
     init, ioup, ssm = probdiffeq.prior_ioup(
         y0,
         M=M,
         output_scale=base_scale,
-        diffuse_derivatives=4,
-        is_differential=is_differential,
+        # is_differential=is_differential,
     )
 
     # We build a Jet constraint
-    jet = probdiffeq.constraint_root_jet(root, ssm=ssm)
-    ts = probdiffeq.constraint_root_ts1(root, ssm=ssm)
+    jet = probdiffeq.constraint_dae_jet(differential, algebraic, ssm=ssm, iterate=True)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 
     # TODO: should the dynamic solver calibrate inside the iteration step?
     # For proper DAEs, non-iterated solver's simply don't cut it
-    solver = probdiffeq.solver_dynamic_iterated(
-        strategy=strategy,
-        prior=ioup,
-        constraint=jet,
-        ssm=ssm,
-        constraint_init=jet,
-        maxiter=100,
+    solver = probdiffeq.solver_dynamic(
+        strategy=strategy, prior=ioup, constraint=jet, ssm=ssm
     )
+    print(solver)
 
     # The state-error-estimate doesn't care about the dimension
     # of the DAE, which is exactly what we need here
@@ -76,7 +80,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     # Linear spacing on a log-scale
     save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=100)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    solution = solve(init, save_at=save_at, atol=1e-4, rtol=1e-4)
+    solution = solve(init, save_at=save_at, atol=1e-8, rtol=1e-8)
     print(solution.num_steps)
 
     _fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(5, 5), sharex=True)

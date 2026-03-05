@@ -63,8 +63,23 @@ def lstsq(matrix, rhs, /):
     return jnp.linalg.lstsq(matrix, rhs)[0]
 
 
+def lstsq_qr_wide(A, b, /):
+
+    # Compute reduced QR factorization: A = Q R
+    Q, R = jnp.linalg.qr(A.T)
+
+    # Solve R u = Q^T b for u
+    u = jax.scipy.linalg.solve_triangular(R.T, b)
+
+    return Q @ u
+
+
 def inv(matrix, /):
     return jnp.linalg.inv(matrix)
+
+
+def pinv(matrix, /):
+    return jnp.linalg.pinv(matrix)
 
 
 def vector_dot(a, b, /):

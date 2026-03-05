@@ -1,6 +1,6 @@
 """Implementations of (factorized) state-space models."""
 
-from probdiffeq.backend import abc, func, linalg, np, random, structs, tree
+from probdiffeq.backend import abc, flow, func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
 
@@ -464,9 +464,13 @@ class DenseLinearizationFactory(AbstractLinearizationFactory):
         self.ode_shape = ode_shape
         self.unravel = unravel
 
-    def root_taylor_1st(self, root, *, jacobian, root_order: int):
+    def root_taylor_1st(self, root, *, jacobian, root_order: int, iterate: bool):
         return DenseLinearizationRootTs1(
-            root, unravel=self.unravel, jacobian=jacobian, root_order=root_order
+            root,
+            unravel=self.unravel,
+            jacobian=jacobian,
+            root_order=root_order,
+            iterate=iterate,
         )
 
     def ode_taylor_0th(self, vf, *, ode_order):
@@ -771,15 +775,17 @@ class DenseLinearizationOdeTs1(AbstractLinearizationOde):
 class DenseLinearizationRootTs1(AbstractLinearizationRoot):
     """Construct a dense implementation of root-TS1 linearization."""
 
-    def __init__(self, root, *, root_order, unravel, jacobian) -> None:
+    def __init__(self, root, *, root_order, unravel, jacobian, iterate) -> None:
         super().__init__(root, root_order=root_order)
         self.unravel = unravel
         self.jacobian = jacobian
+        self.iterate = iterate
 
     def init_linearization(self):
         return self.jacobian.init_jacobian_handler()
 
     def linearize(self, rv, state, *, damp: float, t):
+
         def constraint_flat(m: Array) -> Array:
             """Evaluate a flattened version of the root constraint."""
             # Unravel the location and extract derivatives
@@ -793,7 +799,18 @@ class DenseLinearizationRootTs1(AbstractLinearizationRoot):
             return tree.ravel_pytree(root_eval)[0]
 
         # Linearize the constraint
-        mean = rv.mean
+        # TODO: something's still broken... naja
+        if self.iterate:
+            project = nonlinear_lstsq_projected_constraint(maxiter=150)
+            mean, _info = project(constraint_flat, rv.mean, rv.cholesky)
+
+            import jax
+
+            jax.debug.print("{} {}", t, _info["iters"], ordered=True)
+            jax.debug.print("{} {}", t, mean, ordered=True)
+        else:
+            mean = rv.mean
+
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
         fx = fx - linop @ mean
 
@@ -808,6 +825,42 @@ class DenseLinearizationRootTs1(AbstractLinearizationRoot):
         noise = DenseNormal.from_dirac(unravel(fx), damp=damp)
         cond = LatentCond.from_linop_and_noise(linop, noise)
         return cond, state
+
+
+def nonlinear_lstsq_projected_constraint(*, maxiter):
+    """Solve nonlinear least-squares problems with projected Gauss-Newton."""
+
+    def solve(constraint, x0, cholesky):
+        @tree.register_dataclass
+        @structs.dataclass
+        class State:
+            x: Array
+            fx: Array
+            i: int
+
+        # Damping equivalent to machine epsilon
+        # (small seems desirable here but what do I know...)
+        eps = np.sqrt(np.finfo_eps(x0.dtype))
+
+        def cond_fun(state: State):
+            cond1 = linalg.vector_norm(state.fx) > eps
+            cond2 = state.i < maxiter
+            return np.logical_and(cond1, cond2)
+
+        def body_fun(state: State) -> State:
+            Jx = func.jacfwd(constraint)(state.x) @ cholesky
+
+            dx = linalg.lstsq(Jx, -state.fx)
+
+            xnew = state.x + cholesky @ dx
+            fxnew = constraint(xnew)
+            return State(xnew, fxnew, i=state.i + 1)
+
+        init = State(x0, constraint(x0), i=0)
+        final = flow.while_loop(cond_fun, body_fun, init=init)
+        return final.x, {"iters": final.i}
+
+    return solve
 
 
 class DenseLinearizationOdeSlr0(AbstractLinearizationOde):

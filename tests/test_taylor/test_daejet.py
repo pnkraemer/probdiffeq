@@ -4,7 +4,7 @@ from probdiffeq import taylor
 from probdiffeq.backend import np, testing
 
 
-@testing.parametrize("num", [2, 4])
+@testing.parametrize("num", [2, 4, 6, 8, 10])
 def test_daejet_matches_expectation_on_sir_model(num):
 
     # Use SIR model because it is structurally similar to DAEs,
@@ -39,8 +39,10 @@ def test_daejet_matches_expectation_on_sir_model(num):
     y0 = [np.asarray([0.99, 0.01, 0.0])]
     expected = taylor.odejet_unroll(vf_ode, y0, num=num)
 
-    lstsq = taylor.nonlinear_lstsq_levenberg_marquardt(maxiter=5)
+    lstsq = taylor.nonlinear_lstsq_levenberg_marquardt(maxiter=100)
+    # lstsq = taylor.nonlinear_lstsq_projected_constraint(maxiter=100)
     received, _info = taylor.daejet_nonlinear_lstsq(
         differential, algebraic, y0, num=num, nonlinear_lstsq=lstsq
     )
+    print(_info)
     assert testing.allclose(received, expected)
