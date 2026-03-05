@@ -36,6 +36,10 @@ def abs(arr, /):  # noqa: A001
     return jnp.abs(arr)
 
 
+def argmin(arr, /):
+    return jnp.argmin(arr)
+
+
 def diff(arr, /):
     return jnp.diff(arr)
 

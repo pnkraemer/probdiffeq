@@ -799,15 +799,14 @@ class DenseLinearizationRootTs1(AbstractLinearizationRoot):
             return tree.ravel_pytree(root_eval)[0]
 
         # Linearize the constraint
-        # TODO: something's still broken... naja
         if self.iterate:
-            project = nonlinear_lstsq_projected_constraint(maxiter=150)
+            project = nonlinear_lstsq_projected_constraint(maxiter=100)
             mean, _info = project(constraint_flat, rv.mean, rv.cholesky)
 
-            import jax
+            # import jax
 
-            jax.debug.print("{} {}", t, _info["iters"], ordered=True)
-            jax.debug.print("{} {}", t, mean, ordered=True)
+            # jax.debug.print("{} {}", t, _info["iters"], ordered=True)
+            # jax.debug.print("{} {}", t, mean, ordered=True)
         else:
             mean = rv.mean
 
@@ -827,6 +826,74 @@ class DenseLinearizationRootTs1(AbstractLinearizationRoot):
         return cond, state
 
 
+# def nonlinear_lstsq_projected_constraint_lm(*, maxiter):
+#     """Solve nonlinear least-squares problems with projected Levenberg-Marquardt (matrix-free)."""
+
+#     def solve(constraint, x0, cholesky):
+#         @tree.register_dataclass
+#         @structs.dataclass
+#         class State:
+#             x: Array
+#             fx: Array
+#             damp: float
+#             i: int
+
+#         # Damping equivalent to machine epsilon
+#         # (small seems desirable here but what do I know...)
+#         eps = np.sqrt(np.finfo_eps(x0.dtype))
+
+#         def cond_fun(state: State):
+#             cond1 = linalg.vector_norm(state.fx) > eps
+#             cond2 = state.i < maxiter
+#             import jax
+
+#             jax.debug.print(
+#                 "res: {} ({}) damp: {}", linalg.vector_norm(state.fx), eps, state.damp, ordered=True
+#             )
+#             return np.logical_and(cond1, cond2)
+
+#         def body_fun(state: State) -> State:
+#             Jx = func.jacfwd(constraint)(state.x) @ cholesky
+
+#             n = len(state.x)
+#             A = np.concatenate([Jx, state.damp * np.eye(n)])
+#             b = np.concatenate([-state.fx, np.zeros(n)])
+
+#             dx = cholesky @ linalg.lstsq(Jx, -state.fx)
+
+#             import jax
+#             # Linesearch
+
+#             alphas = 0.5 ** np.arange(-10, 10., step=1.)
+#             xs = func.vmap(lambda a: state.x + a*dx)(alphas)
+#             cs = func.vmap(constraint)(xs)
+#             norms = func.vmap(linalg.vector_norm)(cs)
+#             i = np.argmin(norms)
+#             xnew = xs[i]
+#             fxnew = cs[i]
+
+#             jax.debug.print("{} {}", norms, i, ordered=True)
+#             # # fx_best = state.fx
+#             # # for _ in range(10):
+#             # #     x_try = state.x + alpha * dx
+#             # #     fx_try = constraint(x_try)
+
+#             # #     alpha = np.where(linalg.vector_norm(fx_try) < linalg.vector_norm(fx_best), alpha, alpha/2)
+#             # #     fx_best = np.where(linalg.vector_norm(fx_try) < linalg.vector_norm(fx_best), fx_try, fx_best)
+#             # #     jax.debug.print("{} {}", alpha, fx_best, ordered=True)
+
+#             # xnew = state.x + alpha * dx
+#             # fxnew = constraint(xnew)
+
+#             return State(xnew, fxnew, damp=state.damp, i=state.i + 1)
+
+#         init = State(x0, constraint(x0), damp=eps, i=0)
+#         final = flow.while_loop(cond_fun, body_fun, init=init)
+#         return final.x, {"iters": final.i}
+
+#     return solve
+
+
 def nonlinear_lstsq_projected_constraint(*, maxiter):
     """Solve nonlinear least-squares problems with projected Gauss-Newton."""
 
@@ -836,6 +903,7 @@ def nonlinear_lstsq_projected_constraint(*, maxiter):
         class State:
             x: Array
             fx: Array
+            dx: Array
             i: int
 
         # Damping equivalent to machine epsilon
@@ -845,18 +913,56 @@ def nonlinear_lstsq_projected_constraint(*, maxiter):
         def cond_fun(state: State):
             cond1 = linalg.vector_norm(state.fx) > eps
             cond2 = state.i < maxiter
-            return np.logical_and(cond1, cond2)
+            cond3 = linalg.vector_norm(state.dx) > eps
+            return np.logical_and(np.logical_and(cond1, cond2), cond3)
 
         def body_fun(state: State) -> State:
             Jx = func.jacfwd(constraint)(state.x) @ cholesky
 
-            dx = linalg.lstsq(Jx, -state.fx)
+            damps = 10.0 ** np.arange(-15, -5, step=1.0)
+            alphas = 10.0 ** np.arange(-5, 5.0, step=1.0)
 
-            xnew = state.x + cholesky @ dx
-            fxnew = constraint(xnew)
-            return State(xnew, fxnew, i=state.i + 1)
+            def update(d, a):
+                n = len(state.x)
+                A = np.concatenate([Jx, d * np.eye(n)])
+                b = np.concatenate([-state.fx, np.zeros(n)])
 
-        init = State(x0, constraint(x0), i=0)
+                dx_hidden = linalg.lstsq(A, b)
+                dx = cholesky @ dx_hidden
+                return state.x + a * dx
+
+            p1, p2 = np.meshgrid(damps, alphas)
+            damps = p1.ravel()
+            alphas = p2.ravel()
+            # print(p1.shape)
+            # print(p2.shape)
+            # assert False
+            xs = func.vmap(update)(damps, alphas)
+            cs = func.vmap(constraint)(xs)
+            norms = func.vmap(linalg.vector_norm)(cs)
+
+            # # Linesearch
+            # xs = func.vmap(lambda a: state.x + a*dx)(alphas)
+            # cs = func.vmap(constraint)(xs)
+            # norms = func.vmap(linalg.vector_norm)(cs)
+            i = np.argmin(norms)
+            xnew = xs[i]
+            fxnew = cs[i]
+            damp = damps[i]
+            alpha = alphas[i]
+            # jax.debug.print(
+            #     "damp: {}, dx: {}, alpha: {}",
+            #     damp,
+            #     linalg.vector_norm(xnew - state.x),
+            #     alpha,
+            #     ordered=True,
+            # )
+            # jax.debug.print("dx: {}\n", , ordered=True)
+
+            return State(xnew, fxnew, dx=xnew - state.x, i=state.i + 1)
+
+        # jax.debug.print("\n", ordered=True)
+        init = State(x0, constraint(x0), dx=np.ones_like(x0), i=0)
         final = flow.while_loop(cond_fun, body_fun, init=init)
         return final.x, {"iters": final.i}
 

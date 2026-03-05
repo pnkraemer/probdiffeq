@@ -13,7 +13,7 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 jax.config.update("jax_debug_nans", True)
 
 
-def main(t0=1e-6, t1=1e3) -> None:
+def main(t0=1e-6, t1=1e5) -> None:
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
@@ -37,7 +37,7 @@ def main(t0=1e-6, t1=1e3) -> None:
     # (but don't vary much within these scales).
     # TODO: what is the best "base output scale" for the solver?
     #       this should be an expectation-maximisation thing right?
-    base_scale = jnp.asarray([1e0, 1e-3, 0.1])
+    base_scale = jnp.asarray([1e0, 1e-5, 0.1])
 
     # For DAEs, not all variables are differential, and we need to have
     #   and idea which ones arent to stabilise the solver initialisation
@@ -55,9 +55,8 @@ def main(t0=1e-6, t1=1e3) -> None:
 
     # TODO: clean up the IOUP api. also, what about isotropic etc.?
     # is_differential = [jnp.array([True, True, True])]
-    init, ioup, ssm = probdiffeq.prior_ioup(
+    init, ioup, ssm = probdiffeq.prior_iwp(
         y0,
-        M=M,
         output_scale=base_scale,
         # is_differential=is_differential,
     )
