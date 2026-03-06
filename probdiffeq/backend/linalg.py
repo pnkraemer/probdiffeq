@@ -59,21 +59,22 @@ def solve_lu(matrix, rhs, /):
     return jnp.linalg.solve(matrix, rhs)
 
 
-def lstsq(matrix, rhs, /):
+def lstsq_svd(matrix, rhs, /):
     return jnp.linalg.lstsq(matrix, rhs)[0]
 
 
 def lstsq_qr(A, b, /):
     n, m = A.shape
 
-    if n <= m:  # wide
+    if n <= m:
+        # Wide lstsq
         Q, R = jnp.linalg.qr(A.T)
         u = jax.scipy.linalg.solve_triangular(R.T, b)
         return Q @ u
 
+    # Tall lstsq
     Q, R = jnp.linalg.qr(A)
-    u = jax.scipy.linalg.solve_triangular(R, Q.T @ b)
-    return u
+    return jax.scipy.linalg.solve_triangular(R, Q.T @ b)
 
 
 def inv(matrix, /):

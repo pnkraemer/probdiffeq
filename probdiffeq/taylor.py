@@ -7,7 +7,8 @@ in probdiffeq.probdiffeq easier to access.
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import flow, func, linalg, np, structs, tree
+from probdiffeq import ssm_impl
+from probdiffeq.backend import flow, func, np, tree
 from probdiffeq.backend.typing import Array, ArrayLike, Callable, Sequence
 
 
@@ -331,141 +332,43 @@ def daejet_nonlinear_lstsq(
     inits: Sequence[Array],
     /,
     num: int,
-    nonlinear_lstsq: Callable | None = None,
+    nlstsq: Callable,
 ):
     """Evaluate the Taylor series of a differential-algebraic equation system."""
     # Fun-fact: for really high orders, recursively call this function
     # TODO: enable higher index? enable higher order?
 
-    # Determine degrees of freedom ("dof"). The provided 'inits' are not DOFs.
-    zeros = tree.tree_map(lambda s: np.zeros(s.shape, dtype=bool), inits[0])
-    ones = tree.tree_map(lambda s: np.ones(s.shape, dtype=bool), inits[0])
-    is_dof = [*[zeros for _ in inits], *[ones for _ in range(num)]]
+    # Determine degrees of freedom ("dof").
+    # Concretely: The provided 'inits' are not DOFs, all added ones are.
+    zeros = tree.tree_map(np.zeros_like, inits[0])
+    ones = tree.tree_map(np.ones_like, inits[0])
+    inits_std = [*[zeros for _ in inits], *[ones for _ in range(num)]]
 
     # Pad the initial values to the desired size
     zeros = tree.tree_map(np.zeros_like, inits[0])
-    inits = [*inits, *[zeros for _ in range(num)]]
+    inits_mean = [*inits, *[zeros for _ in range(num)]]
 
-    if nonlinear_lstsq is None:
-        nonlinear_lstsq = nonlinear_lstsq_projected_constraint(maxiter=10)
-    return _find_root_of_dae_constraint(
-        differential=differential,
-        algebraic=algebraic,
-        inits=inits,
-        is_dof=is_dof,
-        nonlinear_lstsq=nonlinear_lstsq,
-    )
+    ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(inits_mean)
+    rv = ssm.normal.from_mean_and_std(inits_mean, inits_std)
 
+    x0, unravel = tree.ravel_pytree(inits_mean)
 
-def _find_root_of_dae_constraint(
-    *, differential, algebraic, inits, is_dof, nonlinear_lstsq
-):
-    # Infer which of the parameters should be optimised
-    inits_free, unfree = _infer_degrees_of_freedom(inits, is_dof)
+    def root_jet(tcoeffs_flat):
+        tcoeffs_all = unravel(tcoeffs_flat)
 
-    def residual(x_free):
-        tcoeffs = unfree(x_free)
-        fx = root_jet(*tcoeffs)
-        return tree.ravel_pytree(fx)[0]
-
-    def root_jet(*tcoeffs_all):
-        # Differential part
+        # Differential part.
+        # Assumes that the DAE is first order. (TODO: assert that!)
         ps, ss = jet_unpack_series(tcoeffs_all, 2)
         primals1, series1 = func.jet(differential, ps, ss, is_tcoeff=False)
 
         # Algebraic part
+        # Assumes that the DAE is first order. (TODO: assert that!)
         ps, ss = jet_unpack_series(tcoeffs_all, 1)
         primals2, series2 = func.jet(algebraic, ps, ss, is_tcoeff=False)
 
         # Put together (order doesn't matter)
-        return [primals1, *series1, primals2, *series2]
+        fx = [primals1, *series1, primals2, *series2]
+        return tree.ravel_pytree(fx)[0]
 
-    optimized, info = nonlinear_lstsq(residual, inits_free)
-    return unfree(optimized), info
-
-
-def _infer_degrees_of_freedom(params, mask):
-
-    flat_params, unravel = tree.ravel_pytree(params)
-    flat_mask, _ = tree.ravel_pytree(mask)
-
-    x_active0 = np.where(flat_mask, flat_params, 0.0)
-
-    def reconstruct(x_active):
-        flat_full = np.where(flat_mask, x_active, flat_params)
-        return unravel(flat_full)
-
-    return x_active0, reconstruct
-
-
-def nonlinear_lstsq_projected_constraint(*, maxiter):
-    """Solve nonlinear least-squares problems with projected Gauss-Newton."""
-
-    def solve(constraint, x0):
-        @tree.register_dataclass
-        @structs.dataclass
-        class State:
-            x: Array
-            fx: Array
-            i: int
-
-        # Damping equivalent to machine epsilon
-        # (small seems desirable here but what do I know...)
-        eps = 10 * np.finfo_eps(x0.dtype)
-
-        def cond_fun(state: State):
-            cond1 = linalg.vector_norm(state.fx) > eps
-            cond2 = state.i < maxiter
-            return np.logical_and(cond1, cond2)
-
-        def body_fun(state: State) -> State:
-            Jx = func.jacfwd(constraint)(state.x)
-            dx = linalg.lstsq(Jx, -state.fx)
-
-            xnew = state.x + dx
-            fxnew = constraint(xnew)
-            return State(xnew, fxnew, i=state.i + 1)
-
-        init = State(x0, constraint(x0), i=0)
-        final = flow.while_loop(cond_fun, body_fun, init=init)
-        return final.x, {"iters": final.i}
-
-    return solve
-
-
-def nonlinear_lstsq_levenberg_marquardt(*, maxiter) -> Callable:
-    """Solve nonlinear least-squares problems with Levenberg-Marquardt."""
-
-    def solve(residual, x0):
-        @tree.register_dataclass
-        @structs.dataclass
-        class State:
-            x: Array
-            fx: Array
-            i: int
-
-        # Damping equivalent to machine epsilon
-        # (small seems desirable here but what do I know...)
-        damping = 10 * np.finfo_eps(x0.dtype)
-        eps = 10 * np.finfo_eps(x0.dtype)
-
-        def cond_fun(state: State):
-            cond1 = linalg.vector_norm(state.fx) > eps
-            cond2 = state.i < maxiter
-            return np.logical_and(cond1, cond2)
-
-        def body_fun(state: State) -> State:
-            J = func.jacfwd(residual)(state.x)
-            A = J.T @ J + damping * np.eye(state.x.shape[0])
-            b = -J.T @ state.fx
-            dx = linalg.solve_lu(A, b)
-
-            xnew = state.x + dx
-            fxnew = residual(xnew)
-            return State(xnew, fxnew, i=state.i + 1)
-
-        init = State(x0, residual(x0), i=0)
-        final = flow.while_loop(cond_fun, body_fun, init=init)
-        return final.x, {"iters": final.i}
-
-    return solve
+    x1, info = nlstsq(root_jet, x0, rv.mean, rv.cholesky)
+    return unravel(x1), info

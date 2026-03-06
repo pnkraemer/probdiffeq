@@ -223,6 +223,7 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
         return jnp.stack([f0, f1])
 
     def algebraic(u, *, t):
+        del t
         return u[0] + u[1] + u[2] - 1
 
     @jax.jit
@@ -276,6 +277,7 @@ def solver_dae_ioup(*, num_derivatives: int, time_span) -> Callable:
         return jnp.stack([f0, f1])
 
     def algebraic(u, *, t):
+        del t
         return u[0] + u[1] + u[2] - 1
 
     @jax.jit

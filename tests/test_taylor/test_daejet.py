@@ -2,6 +2,7 @@
 
 from probdiffeq import taylor
 from probdiffeq.backend import np, testing
+from probdiffeq.util import nlstsq_util
 
 
 @testing.parametrize("num", [2, 4, 6, 8, 10])
@@ -39,8 +40,9 @@ def test_daejet_matches_expectation_on_sir_model(num):
     y0 = [np.asarray([0.99, 0.01, 0.0])]
     expected = taylor.odejet_unroll(vf_ode, y0, num=num)
 
-    lstsq = taylor.nonlinear_lstsq_projected_constraint(maxiter=100)
+    eps = np.finfo_eps(y0[0].dtype)
+    nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=100, tol=eps)
     received, _info = taylor.daejet_nonlinear_lstsq(
-        differential, algebraic, y0, num=num, nonlinear_lstsq=lstsq
+        differential, algebraic, y0, num=num, nlstsq=nlstsq
     )
     assert testing.allclose(received, expected)
