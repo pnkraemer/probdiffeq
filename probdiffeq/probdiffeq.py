@@ -475,6 +475,10 @@ def constraint_dae_jet(
         # TODO: if we apply the preconditioner before passing
         #   things in here, we can set is_tcoeff to True and possibly
         #   gain a bunch of numerical robustness? (And speed?)
+        # TODO: can we further precondition the output?
+        #   Eg use a suitable power of dt + factorial?
+        #   That might be a lot easier to optimise
+
         ps, ss = taylor.jet_unpack_series(flat, 2)
         primals1, series1 = func.jet(jet_call_differential, ps, ss, is_tcoeff=False)
 
@@ -485,6 +489,7 @@ def constraint_dae_jet(
 
         ps, ss = taylor.jet_unpack_series(flat, 1)
         primals2, series2 = func.jet(jet_call_algebraic, ps, ss, is_tcoeff=False)
+
         return [primals1, *series1, primals2, *series2]
 
     # TODO: once we have a second root constraint (eg slr1),
@@ -2035,12 +2040,10 @@ class solver_dynamic(ProbabilisticSolver):
 
         output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
 
-        fx, lin_state = self.constraint.linearize(
-            u_pred.marginals, lin_state, damp=damp, t=t
-        )
-        # TODO: avoid the linearization altogether if update is false.
-        #  use jax.eval_shape instead.
+        lin_fun = func.partial(self.constraint.linearize, damp=damp, t=t)
+        fx, lin_state = func.eval_shape(lin_fun, u_pred.marginals, lin_state)
         fx = tree.tree_map(np.zeros_like, fx)
+        lin_state = tree.tree_map(np.zeros_like, lin_state)
 
         if self.constraint_init is not None:
             cstate2 = self.constraint_init.init_linearization()

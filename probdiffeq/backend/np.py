@@ -28,6 +28,10 @@ def maximum(a, b, /):
     return jnp.maximum(a, b)
 
 
+def amax(a, /):
+    return jnp.amax(a)
+
+
 def where(cond, /, if_true, if_false):
     return jnp.where(cond, if_true, if_false)
 

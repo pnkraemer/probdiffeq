@@ -418,7 +418,6 @@ def nonlinear_lstsq_projected_constraint(*, maxiter):
 
         def body_fun(state: State) -> State:
             Jx = func.jacfwd(constraint)(state.x)
-
             dx = linalg.lstsq(Jx, -state.fx)
 
             xnew = state.x + dx

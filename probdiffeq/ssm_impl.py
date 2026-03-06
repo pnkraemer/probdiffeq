@@ -788,6 +788,12 @@ class DenseLinearizationRootTs1(AbstractLinearizationRoot):
 
         def constraint_flat(m: Array) -> Array:
             """Evaluate a flattened version of the root constraint."""
+            # # Stop gradients for all means with zero std
+            # s, _ = tree.ravel_pytree(rv.evaluate_std())
+            # m_known = np.where(s == 0., m, 0.)
+            # m_known = func.stop_gradient(m_known)
+            # m = np.where(s == 0., m_known, m)
+
             # Unravel the location and extract derivatives
             m_tree = self.unravel(m)
             relevant_tcoeffs = m_tree[: self.root_order]
@@ -799,16 +805,14 @@ class DenseLinearizationRootTs1(AbstractLinearizationRoot):
             return tree.ravel_pytree(root_eval)[0]
 
         # Linearize the constraint
+        mean = rv.mean
+        import jax
+
         if self.iterate:
-            project = nonlinear_lstsq_projected_constraint(maxiter=100)
-            mean, _info = project(constraint_flat, rv.mean, rv.cholesky)
+            project = nlstsq_constrained_levenberg_marquardt(maxiter=500)
+            mean, _info = project(constraint_flat, mean, rv.mean, rv.cholesky)
 
-            # import jax
-
-            # jax.debug.print("{} {}", t, _info["iters"], ordered=True)
-            # jax.debug.print("{} {}", t, mean, ordered=True)
-        else:
-            mean = rv.mean
+            jax.debug.print("{} {}\n", t, _info, ordered=True)
 
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
         fx = fx - linop @ mean
@@ -826,76 +830,73 @@ class DenseLinearizationRootTs1(AbstractLinearizationRoot):
         return cond, state
 
 
-# def nonlinear_lstsq_projected_constraint_lm(*, maxiter):
-#     """Solve nonlinear least-squares problems with projected Levenberg-Marquardt (matrix-free)."""
+def nlstsq_constrained_levenberg_marquardt(*, maxiter):
+    """Solve nonlinearly constrained least-squares problems."""
 
-#     def solve(constraint, x0, cholesky):
-#         @tree.register_dataclass
-#         @structs.dataclass
-#         class State:
-#             x: Array
-#             fx: Array
-#             damp: float
-#             i: int
+    def solve(constraint, x0, mean, cholesky):
+        @tree.register_dataclass
+        @structs.dataclass
+        class State:
+            x: Array
+            fx: Array
+            dx: Array
+            i: int
+            damp: float
 
-#         # Damping equivalent to machine epsilon
-#         # (small seems desirable here but what do I know...)
-#         eps = np.sqrt(np.finfo_eps(x0.dtype))
+        # Damping equivalent to machine epsilon
+        # (small seems desirable here but what do I know...)
+        eps = np.sqrt(np.finfo_eps(x0.dtype))
 
-#         def cond_fun(state: State):
-#             cond1 = linalg.vector_norm(state.fx) > eps
-#             cond2 = state.i < maxiter
-#             import jax
+        def cond_fun(state: State):
 
-#             jax.debug.print(
-#                 "res: {} ({}) damp: {}", linalg.vector_norm(state.fx), eps, state.damp, ordered=True
-#             )
-#             return np.logical_and(cond1, cond2)
+            # Three conditions that all need to be satisfied to continue:
 
-#         def body_fun(state: State) -> State:
-#             Jx = func.jacfwd(constraint)(state.x) @ cholesky
+            # Constraint not yet satisfied
+            cond1 = linalg.vector_norm(state.fx) > eps * state.fx.size
 
-#             n = len(state.x)
-#             A = np.concatenate([Jx, state.damp * np.eye(n)])
-#             b = np.concatenate([-state.fx, np.zeros(n)])
+            # Maxiter not yet reached
+            cond2 = state.i < maxiter
 
-#             dx = cholesky @ linalg.lstsq(Jx, -state.fx)
+            # Iterations not yet converged
+            cond3 = linalg.vector_norm(state.dx) > eps * state.dx.size
 
-#             import jax
-#             # Linesearch
+            import jax
 
-#             alphas = 0.5 ** np.arange(-10, 10., step=1.)
-#             xs = func.vmap(lambda a: state.x + a*dx)(alphas)
-#             cs = func.vmap(constraint)(xs)
-#             norms = func.vmap(linalg.vector_norm)(cs)
-#             i = np.argmin(norms)
-#             xnew = xs[i]
-#             fxnew = cs[i]
+            jax.debug.print("{}", np.amax(state.fx), ordered=True)
 
-#             jax.debug.print("{} {}", norms, i, ordered=True)
-#             # # fx_best = state.fx
-#             # # for _ in range(10):
-#             # #     x_try = state.x + alpha * dx
-#             # #     fx_try = constraint(x_try)
+            return np.logical_and(np.logical_and(cond1, cond2), cond3)
 
-#             # #     alpha = np.where(linalg.vector_norm(fx_try) < linalg.vector_norm(fx_best), alpha, alpha/2)
-#             # #     fx_best = np.where(linalg.vector_norm(fx_try) < linalg.vector_norm(fx_best), fx_try, fx_best)
-#             # #     jax.debug.print("{} {}", alpha, fx_best, ordered=True)
+        def body_fun(state: State) -> State:
+            Jx = func.jacfwd(constraint)(state.x)
+            print("Jacobian", Jx)
+            H = Jx @ cholesky
+            r = state.fx - Jx @ (state.x - mean)
 
-#             # xnew = state.x + alpha * dx
-#             # fxnew = constraint(xnew)
+            n = len(state.x)
+            A = np.concatenate([H, state.damp * np.eye(n)])
+            b = np.concatenate([-r, np.zeros(n)])
 
-#             return State(xnew, fxnew, damp=state.damp, i=state.i + 1)
+            dy = linalg.lstsq(A, b)
+            dx = cholesky @ dy + mean - state.x
+            xnew = state.x + dx
 
-#         init = State(x0, constraint(x0), damp=eps, i=0)
-#         final = flow.while_loop(cond_fun, body_fun, init=init)
-#         return final.x, {"iters": final.i}
+            fxnew = constraint(xnew)
+            damp = np.where(
+                linalg.vector_norm(fxnew) < linalg.vector_norm(state.fx),
+                state.damp / 2,
+                state.damp * 2,
+            )
+            return State(xnew, fxnew, dx=xnew - state.x, i=state.i + 1, damp=damp)
 
-#     return solve
+        init = State(x0, constraint(x0), dx=np.ones_like(x0), i=0, damp=1.0)
+        final = flow.while_loop(cond_fun, body_fun, init=init)
+        return final.x, {"iters": final.i}
+
+    return solve
 
 
-def nonlinear_lstsq_projected_constraint(*, maxiter):
-    """Solve nonlinear least-squares problems with projected Gauss-Newton."""
+def nlstsq_constrained_gauss_newton(*, maxiter, trials_damp, trials_ls):
+    """Solve nonlinearly constrained least-squares problems."""
 
     def solve(constraint, x0, cholesky):
         @tree.register_dataclass
@@ -919,9 +920,6 @@ def nonlinear_lstsq_projected_constraint(*, maxiter):
         def body_fun(state: State) -> State:
             Jx = func.jacfwd(constraint)(state.x) @ cholesky
 
-            damps = 10.0 ** np.arange(-15, -5, step=1.0)
-            alphas = 10.0 ** np.arange(-5, 5.0, step=1.0)
-
             def update(d, a):
                 n = len(state.x)
                 A = np.concatenate([Jx, d * np.eye(n)])
@@ -931,34 +929,24 @@ def nonlinear_lstsq_projected_constraint(*, maxiter):
                 dx = cholesky @ dx_hidden
                 return state.x + a * dx
 
+            # Construct trial-space
+            damps = 10.0 ** np.linspace(-15.0, -5.0, num=trials_damp, endpoint=True)
+            alphas = 10.0 ** np.linspace(-5.0, 5.0, num=trials_ls, endpoint=True)
             p1, p2 = np.meshgrid(damps, alphas)
             damps = p1.ravel()
             alphas = p2.ravel()
-            # print(p1.shape)
-            # print(p2.shape)
-            # assert False
+
+            # Evaluate all trials
             xs = func.vmap(update)(damps, alphas)
             cs = func.vmap(constraint)(xs)
             norms = func.vmap(linalg.vector_norm)(cs)
 
-            # # Linesearch
-            # xs = func.vmap(lambda a: state.x + a*dx)(alphas)
-            # cs = func.vmap(constraint)(xs)
-            # norms = func.vmap(linalg.vector_norm)(cs)
+            # Find the best config
             i = np.argmin(norms)
             xnew = xs[i]
             fxnew = cs[i]
             damp = damps[i]
             alpha = alphas[i]
-            # jax.debug.print(
-            #     "damp: {}, dx: {}, alpha: {}",
-            #     damp,
-            #     linalg.vector_norm(xnew - state.x),
-            #     alpha,
-            #     ordered=True,
-            # )
-            # jax.debug.print("dx: {}\n", , ordered=True)
-
             return State(xnew, fxnew, dx=xnew - state.x, i=state.i + 1)
 
         # jax.debug.print("\n", ordered=True)

@@ -44,7 +44,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     y0 = [jnp.array([1.0, 0.0, 0.0])]
     M = jnp.asarray([[-0.04, 0.0, 0.0], [0.04, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
-    lstsq = taylor.nonlinear_lstsq_levenberg_marquardt(maxiter=100)
+    lstsq = taylor.nonlinear_lstsq_projected_constraint(maxiter=1000)
     y0, _info = taylor.daejet_nonlinear_lstsq(
         lambda *a: differential(*a, t=t0),
         lambda *a: algebraic(*a, t=t0),
@@ -54,11 +54,14 @@ def main(t0=1e-6, t1=1e5) -> None:
     )
 
     # TODO: clean up the IOUP api. also, what about isotropic etc.?
+    # TODO: solve the is_differential stuff.
+    # Or, revert to always constructing the exact taylor series at initialisation and fix this later?
     # is_differential = [jnp.array([True, True, True])]
     init, ioup, ssm = probdiffeq.prior_iwp(
         y0,
         output_scale=base_scale,
         # is_differential=is_differential,
+        # nondifferential_eps=np.finfo(float).eps,
     )
 
     # We build a Jet constraint
@@ -77,9 +80,9 @@ def main(t0=1e-6, t1=1e5) -> None:
     error = probdiffeq.error_state_std(constraint=jet, prior=ioup, ssm=ssm)
 
     # Linear spacing on a log-scale
-    save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=100)
+    save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=200)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    solution = solve(init, save_at=save_at, atol=1e-8, rtol=1e-8)
+    solution = solve(init, save_at=save_at, atol=1e-14, rtol=1e-14)
     print(solution.num_steps)
 
     _fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(5, 5), sharex=True)
