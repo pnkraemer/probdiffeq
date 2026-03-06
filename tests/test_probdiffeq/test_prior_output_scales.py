@@ -21,7 +21,7 @@ class ScaleShapeRules:
 def case_scale_rules_iwp_dense() -> ScaleShapeRules:
     return ScaleShapeRules(
         ssm_fact="dense",
-        prior=probdiffeq.prior_iwp,
+        prior=probdiffeq.prior_wiener_integrated,
         ode=(1, 1),
         base=(1, 1),
         calibrated=(),
@@ -33,7 +33,7 @@ def case_scale_rules_iwp_dense() -> ScaleShapeRules:
 def case_scale_rules_ioup_dense() -> ScaleShapeRules:
     return ScaleShapeRules(
         ssm_fact="dense",
-        prior=func.partial(probdiffeq.prior_ioup, rate=np.zeros((1, 1))),
+        prior=func.partial(probdiffeq.prior_exponential, rate=np.zeros((1, 1))),
         ode=(1,),
         base=(1,),
         calibrated=(),
@@ -45,7 +45,7 @@ def case_scale_rules_ioup_dense() -> ScaleShapeRules:
 def case_scale_rules_iwp_blockdiag() -> ScaleShapeRules:
     return ScaleShapeRules(
         ssm_fact="blockdiag",
-        prior=probdiffeq.prior_iwp,
+        prior=probdiffeq.prior_wiener_integrated,
         ode=(1, 1),
         base=(1, 1),
         calibrated=(1,),
@@ -57,7 +57,7 @@ def case_scale_rules_iwp_blockdiag() -> ScaleShapeRules:
 def case_scale_rules_iwp_isotropic() -> ScaleShapeRules:
     return ScaleShapeRules(
         ssm_fact="isotropic",
-        prior=probdiffeq.prior_iwp,
+        prior=probdiffeq.prior_wiener_integrated,
         ode=(1, 1),
         base=(),
         calibrated=(),

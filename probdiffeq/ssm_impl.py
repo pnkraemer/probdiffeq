@@ -227,7 +227,9 @@ class AbstractConditional(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def transition_ioup(self, *, rate: Array, base_scale: Array | None):
+    def transition_ioup(
+        self, vf_linear: Callable, vf_order: int, base_scale: Array | None
+    ):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -654,26 +656,32 @@ class DenseConditional(AbstractConditional):
             raise ValueError(msg)
         return output_scale
 
-    def transition_ioup(self, *, rate: Array, base_scale: Array | None):
+    def transition_ioup(
+        self, vf_linear: Array, vf_order: int, base_scale: Array | None
+    ):
         Lambda = self._process_base_scale(base_scale)
 
-        [ode_like] = tree.tree_leaves(self.unravel(np.ones(self.flat_shape))[0])
-        if ode_like.ndim == 0:
-            rate = np.eye(1) * rate
-        elif ode_like.ndim > 1:
-            msg = "Tensor-valued IOUPs have not been implemented (yet.)."
-            raise NotImplementedError(msg)
+        # Turn the linear vector field into the bottom block of the IOUP
 
+        leaf_like, unravel = tree.ravel_pytree(
+            self.unravel(np.ones(self.flat_shape))[0]
+        )
+        leaves = [leaf_like for _ in range(self.num_derivatives + 1)]
+
+        def vf_flat(tcoeffs):
+            tcoeffs_tree = tree.tree_map(unravel, tcoeffs)
+            fx = vf_linear(*tcoeffs_tree[-vf_order:])
+            return tree.ravel_pytree(fx)[0]
+
+        rate = func.jacfwd(vf_flat)(leaves)
+        bottom_block = np.concatenate(rate, axis=-1)
+
+        # Construct the SDE matrices
         (d,) = self.ode_shape
-        rate = np.asarray(rate)
-        assert rate.shape == (d, d)  # todo: flatten M from pytree?
-
         eye_d = np.eye(d)
         a = linalg.diagonal_matrix(np.ones((self.num_derivatives,)), k=1)
         A = np.kron(a, eye_d)
-        E = np.zeros((self.num_derivatives + 1, self.num_derivatives + 1))
-        E = E.at[-1, -1].set(1.0)
-        A += np.kron(E, rate)
+        A = A.at[-d:, :].set(bottom_block)
 
         b = np.eye(self.num_derivatives + 1)[-1][:, None]
         B = np.kron(b, Lambda)
@@ -1332,8 +1340,8 @@ class IsotropicConditional(AbstractConditional):
 
         return discretise
 
-    def transition_ioup(self, rate, base_scale):
-        del rate
+    def transition_ioup(self, vf_linear, vf_order, base_scale):
+        del vf_linear
         del base_scale
         msg = "Isotropic IOUPs have not been implemented (yet.)."
         msg += " If you need them, reach out."
@@ -1538,8 +1546,8 @@ class BlockDiagConditional(AbstractConditional):
 
         return discretise
 
-    def transition_ioup(self, rate, base_scale):
-        del rate
+    def transition_ioup(self, vf_linear, vf_order, base_scale):
+        del vf_linear
         del base_scale
         msg = "Isotropic IOUPs have not been implemented (yet.)."
         msg += " If you need them, reach out."

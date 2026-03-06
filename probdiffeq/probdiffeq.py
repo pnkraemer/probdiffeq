@@ -1286,20 +1286,89 @@ def _add_diffuse_derivatives(
     return tcoeffs_mean, tcoeffs_std
 
 
-def prior_iwp(*, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None):
+def prior_wiener_integrated(
+    *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
+):
     """Construct a repeatedly-integrated Wiener process."""
     return ssm.conditional.transition_iwp(base_scale=output_scale)
 
 
-def prior_ioup(
-    rate: Array, *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
+def prior_exponential(
+    vf_linear: Callable,
+    /,
+    *,
+    ssm: ssm_impl.FactSsmImpl,
+    output_scale: Array | None = None,
 ):
     """Construct a repeatedly-integrated Ornstein-Uhlenbeck process.
 
     According to https://arxiv.org/abs/2305.14978, but following the numerical
     methods from https://arxiv.org/abs/2310.13462.
     """
-    return ssm.conditional.transition_ioup(rate=rate, base_scale=output_scale)
+    # TODO: offer a "jacobian" option to enable isotropic and blockdiag implementations?
+    ioup_order = _verify_ioup_signature_and_parse_order(vf_linear)
+    if ioup_order > ssm.num_derivatives + 1:
+        msg = "The exponential prior must not "
+        msg += "require more Taylor coefficients than available."
+        raise TypeError(msg)
+
+    return ssm.conditional.transition_ioup(
+        vf_linear=vf_linear, vf_order=ioup_order, base_scale=output_scale
+    )
+
+
+def _verify_ioup_signature_and_parse_order(vf) -> int:
+    """Parse the vector-field structure from its signature."""
+    sig = inspect.signature(vf)
+    params = list(sig.parameters.values())
+
+    msg = f"""The dynamics' signature is not compatible with the constraint.
+
+    More precisely, the dynamics are expected to look like
+
+      - f(u, /),
+      - f(u, du, /),
+      - f(u, du, ddu, /),
+
+    and so on, where the number of positional arguments
+    specifies the order of the problem.
+    Replace `u`, `du`, and so on with any variable name of your choosing
+    but mind the keyword-only argument 't' in the signatures above.
+
+    That said, the arguments
+
+    {[(p.name, p.kind) for p in params]}
+
+    have been detected in the dynamics function.
+
+    Try wrapping the vector field through a pure Python function
+    with the correct arguments before passing it to the ODE constraint.
+
+      - No *args or **kwargs
+      - No functools.partial
+
+    """
+
+    POSITIONAL = (
+        inspect.Parameter.POSITIONAL_ONLY,
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+    )
+    KEYWORD = (inspect.Parameter.KEYWORD_ONLY,)
+
+    def is_positional(p):
+        return p.kind in POSITIONAL
+
+    def is_keyword(p):
+        return p.kind in KEYWORD
+
+    state_args = [p for p in params if is_positional(p)]
+    contains_no_positional = len(state_args) == 0
+    contains_keyword = len([p for p in params if is_keyword(p)]) > 0
+
+    if contains_no_positional or contains_keyword:
+        raise TypeError(msg)
+
+    return len(state_args)
 
 
 class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):

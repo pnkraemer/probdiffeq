@@ -160,7 +160,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
         init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
 
-        iwp = probdiffeq.prior_iwp(ssm=ssm)
+        iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
         ts1 = probdiffeq.constraint_ode_ts1(vf_probdiffeq, ssm=ssm)
 
         strategy = probdiffeq.strategy_filter(ssm=ssm)

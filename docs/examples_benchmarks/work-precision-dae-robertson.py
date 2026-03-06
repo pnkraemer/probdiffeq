@@ -190,7 +190,7 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
         init, ssm = probdiffeq.ssm_taylor(tcoeffs)
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
-        iwp = probdiffeq.prior_iwp(ssm=ssm, output_scale=base_scale)
+        iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=base_scale)
         ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
@@ -244,7 +244,7 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
         init, ssm = probdiffeq.ssm_taylor(tcoeffs)
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
-        iwp = probdiffeq.prior_iwp(ssm=ssm, output_scale=base_scale)
+        iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=base_scale)
 
         # We build a Jet constraint
         jet = probdiffeq.constraint_dae_jet(

@@ -13,7 +13,7 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact) -> None:
     # Generate a solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
-    iwp = probdiffeq.prior_iwp(ssm=ssm)
+    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
@@ -58,7 +58,7 @@ def test_filter_marginals_close_only_to_left_boundary(fact) -> None:
 
     tcoeffs = (u0, vf(u0, t=t0))
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
-    iwp = probdiffeq.prior_iwp(ssm=ssm)
+    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
@@ -88,7 +88,7 @@ def test_smoother_marginals_close_to_both_boundaries(fact) -> None:
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
-    iwp = probdiffeq.prior_iwp(ssm=ssm)
+    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)

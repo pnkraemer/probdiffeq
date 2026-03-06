@@ -22,7 +22,7 @@ class Factory:
     and make each case only vary one of the parameters.
     """
 
-    prior: Callable = probdiffeq.prior_iwp
+    prior: Callable = probdiffeq.prior_wiener_integrated
     strategy: Callable = probdiffeq.strategy_filter
     solver: Callable = probdiffeq.solver
     constraint: Callable = probdiffeq.constraint_ode_ts0
@@ -30,16 +30,20 @@ class Factory:
 
 
 @testing.case
-def case_factory_prior_iwp():
-    return Factory(prior=probdiffeq.prior_iwp)
+def case_factory_prior_wiener_integrated():
+    return Factory(prior=probdiffeq.prior_wiener_integrated)
 
 
 @testing.case
-def case_factory_prior_ioup():
+def case_factory_prior_exponential():
 
     def prior(ssm):
         try:
-            return probdiffeq.prior_ioup(rate=np.eye(2), ssm=ssm)
+
+            def vf_linear(u, /):
+                return tree.tree_map(lambda s: 0.01 * np.flip(s), u)
+
+            return probdiffeq.prior_exponential(vf_linear, ssm=ssm)
         except NotImplementedError:
             reason = "This prior is not implemented"
             reason += ", likely due to the selected state-space factorisation."

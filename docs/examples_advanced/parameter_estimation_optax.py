@@ -59,7 +59,7 @@ def vf(y, t, *, p):  # noqa: ARG001
 
 tcoeffs = (u0, vf(u0, t0, p=f_args))
 init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
-iwp = probdiffeq.prior_iwp(ssm=ssm, output_scale=10.0)
+iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=10.0)
 
 
 def solve(p):

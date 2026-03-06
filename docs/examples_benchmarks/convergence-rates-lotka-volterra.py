@@ -185,7 +185,7 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
 
         # Build a solver
         init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
-        iwp = probdiffeq.prior_iwp(ssm=ssm)
+        iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
         ts = probdiffeq.constraint_ode_ts1(vf_probdiffeq, ssm=ssm)
         solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts, ssm=ssm)

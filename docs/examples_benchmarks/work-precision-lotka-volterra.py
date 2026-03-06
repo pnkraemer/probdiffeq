@@ -147,7 +147,7 @@ def solver_probdiffeq(num_derivatives: int, implementation, constraint) -> Calla
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
 
         init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=implementation)
-        iwp = probdiffeq.prior_iwp(ssm=ssm)
+        iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
         ts = constraint(vf_probdiffeq, ssm=ssm)
         solver = probdiffeq.solver_mle(

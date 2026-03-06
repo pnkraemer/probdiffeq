@@ -44,7 +44,7 @@ init, ssm = probdiffeq.ssm_taylor(tcoeffs)
 
 
 # Build a solver
-iwp = probdiffeq.prior_iwp(ssm=ssm)
+iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
 ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
 solver = probdiffeq.solver_mle(ssm=ssm, strategy=strategy, prior=iwp, constraint=ts)

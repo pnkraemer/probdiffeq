@@ -8,7 +8,7 @@ from probdiffeq.backend import np, testing
 def test_transitions_are_correct_in_1d(ssm_fact) -> None:
     tcoeffs = [2.0, 3.0, 4.0, 5.0]
     _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=ssm_fact)
-    iwp = probdiffeq.prior_iwp(ssm=ssm)
+    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
 
     cond = iwp(1.0, 1.0)
     A_expected = np.asarray(
@@ -35,7 +35,7 @@ def test_transitions_are_correct_in_1d(ssm_fact) -> None:
 def test_transitions_are_correct_in_1d_blockdiag() -> None:
     tcoeffs = [2.0, 3.0, 4.0, 5.0]
     _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="blockdiag")
-    iwp = probdiffeq.prior_iwp(ssm=ssm)
+    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
 
     cond = iwp(1.0, np.ones((1,)))
     A_expected = np.asarray(

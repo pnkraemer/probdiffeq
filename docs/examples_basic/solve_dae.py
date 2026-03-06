@@ -80,7 +80,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     # the solutions live on vastly different scales
     # (but don't vary much within these scales).
     base_scale = jnp.asarray([0.8, 2e-05, 0.2])
-    ioup = probdiffeq.prior_iwp(ssm=ssm, output_scale=base_scale)
+    ioup = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=base_scale)
 
     # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
     jet = probdiffeq.constraint_dae_jet(differential, algebraic, ssm=ssm, nlstsq=nlstsq)

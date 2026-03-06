@@ -54,7 +54,7 @@ def vector_field(y, /, *, t):
     return 10.0 * y * (2.0 - y)
 
 
-t0, t1 = 0.0, 0.5
+t0, t1 = 0.0, 2.5
 u0 = jnp.asarray(0.1)
 
 # -
@@ -64,9 +64,15 @@ u0 = jnp.asarray(0.1)
 # +
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
 
+
+def vf_prior(u):
+    """Match the linear part of the dynamics exactly."""
+    return -10.0 * u
+
+
 # "Bad" prior (no Taylor coefficients)
 init, ssm = probdiffeq.ssm_taylor([u0], diffuse_derivatives=2)
-iwp = probdiffeq.prior_ioup(rate=20.0, ssm=ssm, output_scale=10.0)
+iwp = probdiffeq.prior_exponential(vf_prior, ssm=ssm, output_scale=10.0)
 mseq_prior = probdiffeq.MarkovSequence.from_grid(init, iwp, grid=ts, reverse=False)
 
 # "Good" prior (Taylor coefficients)

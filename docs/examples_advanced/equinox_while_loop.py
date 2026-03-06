@@ -44,7 +44,7 @@ def solution_routine(while_loop):
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
-    iwp = probdiffeq.prior_iwp(ssm=ssm)
+    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
 
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
