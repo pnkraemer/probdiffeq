@@ -433,7 +433,9 @@ def constraint_ode_ts0(vf, /, *, ssm):
     return ssm.linearize.ode_taylor_0th(vf, ode_order=ode_order)
 
 
-def constraint_root_ts1(root, /, *, ssm: ssm_impl.FactSsmImpl, jacobian=None):
+def constraint_root_ts1(
+    root, /, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlstsq=None
+):
     """Construct a constraint based on a custom root.
 
     See the custom information operator tutorial for details.
@@ -449,7 +451,9 @@ def constraint_root_ts1(root, /, *, ssm: ssm_impl.FactSsmImpl, jacobian=None):
     if jacobian is None:
         # Use hutchinson Jacobian handling for backward compatibility.
         jacobian = jacobian_hutchinson_fwd()
-    return ssm.linearize.root_taylor_1st(root, root_order=root_order, jacobian=jacobian)
+    return ssm.linearize.root_taylor_1st(
+        root, root_order=root_order, jacobian=jacobian, nlstsq=nlstsq
+    )
 
 
 def constraint_dae_jet(
@@ -1135,7 +1139,7 @@ class ProbabilisticSolver:
         return sol, InterpResult(step_from=acc, interp_from=prev)
 
 
-def prior_iwp(
+def ssm_taylor(
     tcoeffs: C,
     *,
     # Which of the Taylor coefficients are differential variables
@@ -1143,13 +1147,11 @@ def prior_iwp(
     nondifferential_eps: float = 1e-6,  # a small value
     # The state-space model factorisation
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    # Do we use a special output scale?
-    output_scale: ArrayLike | None = None,
     # How many extra derivatives to model in the state-space
     diffuse_derivatives: int = 0,
     diffuse_eps: float = 1.0,  # a large value
 ):
-    """Construct a repeatedly-integrated Wiener process."""
+    """Initialize a state-space model over Taylor coefficients."""
     tcoeffs_std = _tcoeffs_std_from_differential_variables(
         tcoeffs,
         is_differential=is_differential,
@@ -1157,44 +1159,10 @@ def prior_iwp(
         ssm_fact=ssm_fact,
     )
 
-    return prior_iwp_diffuse(
+    return ssm_taylor_diffuse(
         tcoeffs,
         tcoeffs_std,
         ssm_fact=ssm_fact,
-        output_scale=output_scale,
-        diffuse_derivatives=diffuse_derivatives,
-        diffuse_eps=diffuse_eps,
-    )
-
-
-def prior_ioup(
-    tcoeffs: C,
-    *,
-    M: Array,
-    # Which of the Taylor coefficients are differential variables
-    is_differential: C | None = None,
-    nondifferential_eps: float = 1e-6,  # a small value
-    # The state-space model factorisation
-    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    # Do we use a special output scale?
-    output_scale: ArrayLike | None = None,
-    # How many extra derivatives to model in the state-space
-    diffuse_derivatives: int = 0,
-    diffuse_eps: float = 1.0,  # a large value
-):
-    tcoeffs_std = _tcoeffs_std_from_differential_variables(
-        tcoeffs,
-        is_differential=is_differential,
-        nondifferential_eps=nondifferential_eps,
-        ssm_fact=ssm_fact,
-    )
-
-    return prior_ioup_diffuse(
-        tcoeffs,
-        tcoeffs_std,
-        M=M,
-        ssm_fact=ssm_fact,
-        output_scale=output_scale,
         diffuse_derivatives=diffuse_derivatives,
         diffuse_eps=diffuse_eps,
     )
@@ -1249,28 +1217,23 @@ def _tcoeffs_std_from_differential_variables(
     return tree.tree_map(std_init, is_differential)
 
 
-def prior_iwp_diffuse(
+def ssm_taylor_diffuse(
     tcoeffs_mean: C,
     tcoeffs_std: C,
     *,
     # The state-space model factorisation
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    # Do we use a special output scale?
-    output_scale: ArrayLike | None = None,
     # How many extra derivatives to model in the state-space
     diffuse_derivatives: int = 0,
     diffuse_eps: float = 1.0,  # a large value
 ):
-    """Construct an diffuse repeatedly-integrated Wiener process.
+    """Initialize a diffuse state-space model for Taylor coefficients.
 
     The diffuse process has a nonzero initial standard deviation.
-    This is typically used to:
-    - Either get more visually-pleasing uncertainties and gain
-      numerical robustness for high-order solvers in low precision arithmetic.
-    - Communicate to the solvers that the prior has not seen any data
-      (and solvers can handle data at initialisation themselves.)
+    This is typically used to get more visually-pleasing uncertainties and gain
+    numerical robustness for high-order solvers in low precision arithmetic.
 
-    Outside of these cases, use the usual integrated Wiener process.
+    Outside of these cases, use the usual Taylor-state-space-model process.
     """
     # Add derivatives to the Taylor coefficients.
     # Warning: This destroys pytree structure in the tcoeffs and the
@@ -1296,95 +1259,10 @@ def prior_iwp_diffuse(
             msg += "Choose one out of {'dense', 'isotropic', 'blockdiag'}."
             raise ValueError(msg)
 
-    if output_scale is None:
-        output_scale = tree.tree_map(np.ones_like, tcoeffs_std[0])
-    else:
-        output_scale = tree.tree_map(np.asarray, output_scale)
-
-        def shape_equal(A, B):
-            return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
-
-        if not tree.tree_all(shape_equal(output_scale, tcoeffs_std[0])):
-            msg = "Output scale has the wrong shape."
-            msg += f" Expected: output_scale.shape={tcoeffs_std[0].shape}."
-            msg += f" Received: output_scale.shape={output_scale.shape}."
-            raise ValueError(msg)
-
-    [output_scale_leaf] = tree.tree_leaves(output_scale)
-    std_leaves, structure = tree.tree_flatten(tcoeffs_std)
-    std_leaves_scaled = [output_scale_leaf * s for s in std_leaves]
-    tcoeffs_std = tree.tree_unflatten(structure, std_leaves_scaled)
-
-    discretize = ssm.conditional.transition_iwp(base_scale=output_scale)
-
     # Return the target
     marginal = ssm.normal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
     target = TaylorCoeffTarget(marginal)
-    return target, discretize, ssm
-
-
-def prior_ioup_diffuse(
-    tcoeffs_mean: C,
-    tcoeffs_std: C,
-    *,
-    M,
-    # The state-space model factorisation
-    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    # Do we use a special output scale?
-    output_scale: ArrayLike | None = None,
-    # How many extra derivatives to model in the state-space
-    diffuse_derivatives: int = 0,
-    diffuse_eps: float = 1.0,  # a large value
-):
-    # Add derivatives to the Taylor coefficients.
-    # Warning: This destroys pytree structure in the tcoeffs and the
-    # resulting pytree will always be a list (for now at least)
-    if diffuse_derivatives > 0:
-        tcoeffs_mean, tcoeffs_std = _add_diffuse_derivatives(
-            tcoeffs_mean,
-            tcoeffs_std,
-            diffuse_derivatives=diffuse_derivatives,
-            diffuse_eps=diffuse_eps,
-        )
-
-    # Choose a state-space model factorisation
-    match ssm_fact:
-        case "dense":
-            ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(tcoeffs_mean)
-        case "blockdiag":
-            ssm = ssm_impl.FactSsmImpl.from_tcoeffs_blockdiag(tcoeffs_mean)
-        case "isotropic":
-            ssm = ssm_impl.FactSsmImpl.from_tcoeffs_isotropic(tcoeffs_mean)
-        case _:
-            msg = f"Factorisation ssm_fact='{ssm_fact}' unknown. "
-            msg += "Choose one out of {'dense', 'isotropic', 'blockdiag'}."
-            raise ValueError(msg)
-
-    if output_scale is None:
-        output_scale = tree.tree_map(np.ones_like, tcoeffs_std[0])
-    else:
-        output_scale = tree.tree_map(np.asarray, output_scale)
-
-        def shape_equal(A, B):
-            return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
-
-        if not tree.tree_all(shape_equal(output_scale, tcoeffs_std[0])):
-            msg = "Output scale has the wrong shape."
-            msg += f" Expected: output_scale.shape={tcoeffs_std[0].shape}."
-            msg += f" Received: output_scale.shape={output_scale.shape}."
-            raise ValueError(msg)
-
-    [output_scale_leaf] = tree.tree_leaves(output_scale)
-    std_leaves, structure = tree.tree_flatten(tcoeffs_std)
-    std_leaves_scaled = [output_scale_leaf * s for s in std_leaves]
-    tcoeffs_std = tree.tree_unflatten(structure, std_leaves_scaled)
-
-    discretize = ssm.conditional.transition_ioup(M=M, base_scale=output_scale)
-
-    # Return the target
-    marginal = ssm.normal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
-    target = TaylorCoeffTarget(marginal)
-    return target, discretize, ssm
+    return target, ssm
 
 
 def _add_diffuse_derivatives(
@@ -1398,33 +1276,62 @@ def _add_diffuse_derivatives(
     return tcoeffs_mean, tcoeffs_std
 
 
-def prior_iwp_discrete(
-    tcoeffs: C,
-    grid: Array,
-    *,
-    is_differential: C | None = None,
-    nondifferential_eps: float = 1e-6,  # a small value
-    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    output_scale: ArrayLike | None = None,
-    # How many extra derivatives to model in the state-space
-    diffuse_derivatives: int = 0,
-    diffuse_eps: float = 1.0,  # a large value
-):
-    """Compute a time-discretization of an integrated Wiener process."""
-    init, discretize, ssm = prior_iwp(
-        tcoeffs,
-        is_differential=is_differential,
-        nondifferential_eps=nondifferential_eps,
-        ssm_fact=ssm_fact,
-        output_scale=output_scale,
-        diffuse_derivatives=diffuse_derivatives,
-        diffuse_eps=diffuse_eps,
-    )
-    scales = np.ones_like(ssm.prototypes.output_scale_calibrated())
-    discretize_vmap = func.vmap(discretize, in_axes=(0, None))
-    conditionals = discretize_vmap(np.diff(grid), scales)
-    markov_seq = MarkovSequence(init.marginals, conditionals, reverse=False)
-    return markov_seq, ssm
+def prior_iwp(*, ssm, output_scale=None):
+    """Construct a repeatedly-integrated Wiener process."""
+    output_scale = _process_output_scale(ssm=ssm, output_scale=output_scale)
+    return ssm.conditional.transition_iwp(base_scale=output_scale)
+
+
+def prior_ioup(M, *, ssm, output_scale=None):
+    """Construct a repeatedly-integrated Ornstein-Uhlenbeck process."""
+    output_scale = _process_output_scale(ssm=ssm, output_scale=output_scale)
+    return ssm.conditional.transition_ioup(M=M, base_scale=output_scale)
+
+
+def _process_output_scale(*, ssm, output_scale):
+    if output_scale is None:
+        return np.ones_like(ssm.prototypes.std())
+
+    output_scale = tree.tree_map(np.asarray, output_scale)
+
+    def shape_equal(A, B):
+        return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
+
+    if not tree.tree_all(shape_equal(output_scale, ssm.prototypes.std())):
+        msg = "Output scale has the wrong shape."
+        msg += f" Expected: output_scale.shape={ssm.prototypes.std()}."
+        msg += f" Received: output_scale.shape={output_scale}."
+        raise ValueError(msg)
+    return output_scale
+
+
+# def prior_iwp_discrete(
+#     tcoeffs: C,
+#     grid: Array,
+#     *,
+#     is_differential: C | None = None,
+#     nondifferential_eps: float = 1e-6,  # a small value
+#     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",
+#     output_scale: ArrayLike | None = None,
+#     # How many extra derivatives to model in the state-space
+#     diffuse_derivatives: int = 0,
+#     diffuse_eps: float = 1.0,  # a large value
+# ):
+#     """Compute a time-discretization of an integrated Wiener process."""
+#     init, discretize, ssm = prior_iwp(
+#         tcoeffs,
+#         is_differential=is_differential,
+#         nondifferential_eps=nondifferential_eps,
+#         ssm_fact=ssm_fact,
+#         output_scale=output_scale,
+#         diffuse_derivatives=diffuse_derivatives,
+#         diffuse_eps=diffuse_eps,
+#     )
+#     scales = np.ones_like(ssm.prototypes.output_scale_calibrated())
+#     discretize_vmap = func.vmap(discretize, in_axes=(0, None))
+#     conditionals = discretize_vmap(np.diff(grid), scales)
+#     markov_seq = MarkovSequence(init.marginals, conditionals, reverse=False)
+#     return markov_seq, ssm
 
 
 class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):

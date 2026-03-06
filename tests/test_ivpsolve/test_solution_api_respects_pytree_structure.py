@@ -20,7 +20,8 @@ def fixture_pn_solution(fact):
 
     # Generate a solver
     tcoeffs = Taylor(*taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2))
-    init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
+    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
+    ibm = probdiffeq.prior_iwp(ssm=ssm)
 
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)

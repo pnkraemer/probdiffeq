@@ -130,7 +130,7 @@ class AbstractLinearizationFactory(abc.ABC):
 
     @abc.abstractmethod
     def root_taylor_1st(
-        self, root, *, jacobian, root_order: int
+        self, root, *, jacobian, root_order: int, nlstsq: Callable | None
     ) -> AbstractLinearizationRoot:
         """Construct an implementation of 1st-order Taylor-linearization for roots."""
         raise NotImplementedError
@@ -628,6 +628,7 @@ class DenseConditional(AbstractConditional):
         return discretise
 
     def transition_ioup(self, M, base_scale):
+        # TODO: assert that the ODE is vector-valued (not scalar or matrix-valued)
 
         (d,) = self.ode_shape
         assert M.shape == (d, d)  # todo: flatten M from pytree?
@@ -649,14 +650,20 @@ class DenseConditional(AbstractConditional):
 
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
 
-        pl = gram_util.pade_and_legendre_13()
-        exp_gram = gram_util.exp_gram_cholesky(pade_legendre=pl, solve=linalg.solve_lu)
+        # TODO: find a good default. Always using high orders seems wasteful.
+        pade_legendre = (
+            gram_util.pade_and_legendre_13()
+            if B.dtype == "float64"
+            else gram_util.pade_and_legendre_7()
+        )
+
+        # Pascal matrices are upper triangular so we use a dedicated solver
+        exp_gram = gram_util.exp_gram_cholesky(
+            pade_legendre=pade_legendre, solve=linalg.solve_triangular
+        )
         q0 = np.zeros(self.flat_shape)
 
-        # import jax
-
         def discretise(dt, output_scale):
-            # jax.debug.print("{}", dt)
             output_scale = np.asarray(output_scale)
             assert output_scale.shape == ()
 
@@ -664,13 +671,9 @@ class DenseConditional(AbstractConditional):
             p = np.repeat(p, d)
             p_inv = np.repeat(p_inv, d)
 
+            # Precondition. (I've not seen a big impact, but we do it anyway)
             A_p = dt * p_inv[:, None] * A * p[None, :]
             B_p = np.sqrt(dt) * p_inv[:, None] * B
-
-            A_p = dt * A
-            B_p = np.sqrt(dt) * B
-            p_inv = np.ones_like(p_inv)
-            p = np.ones_like(p)
 
             eA, L = exp_gram(A_p, B_p)
             noise = DenseNormal(q0, output_scale * L, unravel=self.unravel)
@@ -1129,7 +1132,9 @@ class IsotropicLinearizationFactory(AbstractLinearizationFactory):
     def __init__(self, unravel) -> None:
         self.unravel = unravel
 
-    def root_taylor_1st(self, root, *, jacobian, root_order: int):
+    def root_taylor_1st(
+        self, root, *, jacobian, root_order: int, nlstsq: Callable | None
+    ):
         raise NotImplementedError
 
     def ode_taylor_1st(self, vf, *, ode_order, jacobian):
@@ -1155,7 +1160,9 @@ class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
     def __init__(self, unravel) -> None:
         self.unravel = unravel
 
-    def root_taylor_1st(self, root, *, jacobian, root_order: int):
+    def root_taylor_1st(
+        self, root, *, jacobian, root_order: int, nlstsq: Callable | None
+    ):
         raise NotImplementedError
 
     def ode_taylor_0th(self, vf, *, ode_order):
@@ -1280,6 +1287,9 @@ class IsotropicConditional(AbstractConditional):
             return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
         return discretise
+
+    def transition_ioup(self, M, base_scale):
+        raise NotImplementedError
 
     def preconditioner_apply(self, cond, /):
         A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
@@ -1457,6 +1467,9 @@ class BlockDiagConditional(AbstractConditional):
             return LatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
 
         return discretise
+
+    def transition_ioup(self, M, base_scale):
+        raise NotImplementedError
 
     def preconditioner_apply(self, cond, /):
         A = cond.to_observed[:, :, None] * cond.A * cond.to_latent[:, None, :]

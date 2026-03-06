@@ -36,8 +36,16 @@ def case_factory_prior_iwp():
 
 @testing.case
 def case_factory_prior_ioup():
-    M = np.eye(2)
-    prior = func.partial(probdiffeq.prior_ioup, M=M)
+
+    def prior(*args, **kwargs):
+        try:
+            M = np.eye(2)
+            return probdiffeq.prior_ioup(*args, M=M, **kwargs)
+        except NotImplementedError:
+            reason = "This prior is not implemented"
+            reason += ", likely due to the selected state-space factorisation."
+            testing.skip(reason)
+
     return Factory(prior=prior)
 
 
@@ -129,56 +137,6 @@ def case_factory_constraint_root_ts1(ivp):
 
 
 @testing.case
-def case_factory_constraint_root_jet(ivp):
-    vf, _u0, (_t0, _t1) = ivp
-
-    # Always materialize to stabilise blockdiagonal/isotropic TS1
-    jacobian = probdiffeq.jacobian_materialize()
-
-    def root(u, du, /, *, t):
-        return tree.tree_map(lambda a, b: a - b, du, vf(u, t=t))
-
-    constraint_fn = func.partial(probdiffeq.constraint_root_jet, jacobian=jacobian)
-
-    def constraint(vf, **kwargs):
-        try:
-            del vf  # no vector fields, we use the root instead
-            return constraint_fn(root, **kwargs)
-        except NotImplementedError:
-            reason = "This linearisation is not implemented"
-            reason += ", likely due to the selected state-space factorisation."
-            testing.skip(reason)
-
-    return Factory(constraint=constraint)
-
-
-@testing.case
-def case_factory_constraint_root_jet_iterated(ivp):
-    vf, _u0, (_t0, _t1) = ivp
-
-    # Always materialize to stabilise blockdiagonal/isotropic TS1
-    jacobian = probdiffeq.jacobian_materialize()
-
-    def root(u, du, /, *, t):
-        return tree.tree_map(lambda a, b: a - b, du, vf(u, t=t))
-
-    constraint_fn = func.partial(
-        probdiffeq.constraint_root_jet, jacobian=jacobian, iterate=True
-    )
-
-    def constraint(vf, **kwargs):
-        try:
-            del vf  # no vector fields, we use the root instead
-            return constraint_fn(root, **kwargs)
-        except NotImplementedError:
-            reason = "This linearisation is not implemented"
-            reason += ", likely due to the selected state-space factorisation."
-            testing.skip(reason)
-
-    return Factory(constraint=constraint)
-
-
-@testing.case
 def case_factory_constraint_ode_slr0():
     def constraint(*args, **kwargs):
         try:
@@ -235,16 +193,17 @@ def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
 
     # Build a solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
-    init, iwp, ssm = factory.prior(tcoeffs, ssm_fact=ssm_fact)
+    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=ssm_fact)
+    prior = factory.prior(ssm=ssm)
     strategy = factory.strategy(ssm=ssm)
     constraint = factory.constraint(vf, ssm=ssm)
     solver = factory.solver(
-        strategy=strategy, prior=iwp, constraint=constraint, ssm=ssm
+        strategy=strategy, prior=prior, constraint=constraint, ssm=ssm
     )
     # not all constraints have shape (d,):
     error_norm = probdiffeq.error_norm_rms_then_scale()
     error = factory.error(
-        prior=iwp, ssm=ssm, constraint=constraint, error_norm=error_norm
+        prior=prior, ssm=ssm, constraint=constraint, error_norm=error_norm
     )
 
     # Compute the PN solution
