@@ -630,6 +630,7 @@ class DenseConditional(AbstractConditional):
         if base_scale is None:
             base_scale = base_scale_expected
         else:
+            base_scale = np.asarray(base_scale)
             if base_scale.shape != base_scale_expected.shape:
                 msg = "The base-scale has the wrong shape."
                 msg += f" Expected: {base_scale_expected.shape}."
@@ -652,6 +653,13 @@ class DenseConditional(AbstractConditional):
     def transition_ioup(self, M, base_scale=None):
         Lambda = self._process_base_scale(base_scale)
 
+        ode_like = self.unravel(np.ones(self.flat_shape))[0]
+        if ode_like.shape == ():
+            M = np.eye(1) * M
+        if ode_like.ndim > 1:
+            msg = "Tensor-valued IOUPs have not been implemented (yet.)."
+            raise NotImplementedError(msg)
+
         (d,) = self.ode_shape
         assert M.shape == (d, d)  # todo: flatten M from pytree?
 
@@ -662,7 +670,7 @@ class DenseConditional(AbstractConditional):
         E = E.at[-1, -1].set(1.0)
 
         # Something something Kronecker -> we seem to have to transpose M here
-        A += np.kron(E, M.T)
+        A += np.kron(E, M)
 
         b = np.eye(self.num_derivatives + 1)[-1][:, None]
         B = np.kron(b, Lambda)
@@ -678,7 +686,7 @@ class DenseConditional(AbstractConditional):
 
         # Pascal matrices are upper triangular so we use a dedicated solver
         exp_gram = gram_util.exp_gram_cholesky(
-            pade_legendre=pade_legendre, solve=linalg.solve_triangular
+            pade_legendre=pade_legendre, solve=linalg.solve_lu
         )
         q0 = np.zeros(self.flat_shape)
 
@@ -1322,7 +1330,9 @@ class IsotropicConditional(AbstractConditional):
         return discretise
 
     def transition_ioup(self, M, base_scale):
-        raise NotImplementedError
+        msg = "Isotropic IOUPs have not been implemented (yet.)."
+        msg += " If you need them, reach out."
+        raise NotImplementedError(msg)
 
     def preconditioner_apply(self, cond, /):
         A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
@@ -1521,7 +1531,9 @@ class BlockDiagConditional(AbstractConditional):
         return discretise
 
     def transition_ioup(self, M, base_scale):
-        raise NotImplementedError
+        msg = "Isotropic IOUPs have not been implemented (yet.)."
+        msg += " If you need them, reach out."
+        raise NotImplementedError(msg)
 
     def preconditioner_apply(self, cond, /):
         A = cond.to_observed[:, :, None] * cond.A * cond.to_latent[:, None, :]

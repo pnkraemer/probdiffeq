@@ -12,8 +12,8 @@ class ScaleShapeRules:
     ode: tuple
     base: tuple
     calibrated: tuple
-    base_baddies: tuple
-    calibrated_baddies: tuple
+    base_baddies: list[tuple]
+    calibrated_baddies: list[tuple]
 
 
 def case_scale_rules_iwp_dense() -> ScaleShapeRules:
