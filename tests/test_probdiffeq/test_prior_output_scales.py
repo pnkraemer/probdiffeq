@@ -2,12 +2,12 @@
 
 from probdiffeq import probdiffeq
 from probdiffeq.backend import func, np, structs, testing
-from probdiffeq.backend.typing import Callable
+from probdiffeq.backend.typing import Callable, Literal
 
 
 @structs.dataclass
 class ScaleShapeRules:
-    ssm_fact: str
+    ssm_fact: Literal["dense", "isotropic", "blockdiag"]
     prior: Callable
     ode: tuple
     base: tuple
