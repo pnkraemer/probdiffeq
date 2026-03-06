@@ -464,13 +464,13 @@ class DenseLinearizationFactory(AbstractLinearizationFactory):
         self.ode_shape = ode_shape
         self.unravel = unravel
 
-    def root_taylor_1st(self, root, *, jacobian, root_order: int, iterate: bool):
+    def root_taylor_1st(self, root, *, jacobian, root_order: int, nlstsq: bool):
         return DenseLinearizationRootTs1(
             root,
             unravel=self.unravel,
             jacobian=jacobian,
             root_order=root_order,
-            iterate=iterate,
+            nlstsq=nlstsq,
         )
 
     def ode_taylor_0th(self, vf, *, ode_order):
@@ -775,11 +775,11 @@ class DenseLinearizationOdeTs1(AbstractLinearizationOde):
 class DenseLinearizationRootTs1(AbstractLinearizationRoot):
     """Construct a dense implementation of root-TS1 linearization."""
 
-    def __init__(self, root, *, root_order, unravel, jacobian, iterate) -> None:
+    def __init__(self, root, *, root_order, unravel, jacobian, nlstsq) -> None:
         super().__init__(root, root_order=root_order)
         self.unravel = unravel
         self.jacobian = jacobian
-        self.iterate = iterate
+        self.nlstsq = nlstsq
 
     def init_linearization(self):
         return self.jacobian.init_jacobian_handler()
@@ -801,10 +801,8 @@ class DenseLinearizationRootTs1(AbstractLinearizationRoot):
         # Linearize the constraint
         mean = rv.mean
 
-        if self.iterate:
-            eps = np.finfo_eps(mean) ** 0.5
-            project = nlstsq_constrained_gauss_newton(maxiter=10, tol=eps)
-            mean, _info = project(constraint_flat, mean, rv.mean, rv.cholesky)
+        if self.nlstsq is not None:
+            mean, _info = self.nlstsq(constraint_flat, mean, rv.mean, rv.cholesky)
 
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
         fx = fx - linop @ mean

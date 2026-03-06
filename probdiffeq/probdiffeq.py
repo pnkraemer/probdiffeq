@@ -453,11 +453,13 @@ def constraint_root_ts1(root, /, *, ssm: ssm_impl.FactSsmImpl, jacobian=None):
 
 
 def constraint_dae_jet(
-    differential, algebraic, *, iterate, ssm: ssm_impl.FactSsmImpl, jacobian=None
+    differential, algebraic, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlstsq=None
 ):
     root_order = _verify_vector_field_signature_and_parse_order(differential)
+    assert root_order == 2
+
     root_order2 = _verify_vector_field_signature_and_parse_order(algebraic)
-    assert root_order == 2 and root_order2 == 1
+    assert root_order2 == 1
 
     if jacobian is None:
         jacobian = jacobian_hutchinson_fwd()
@@ -495,7 +497,7 @@ def constraint_dae_jet(
     # TODO: once we have a second root constraint (eg slr1),
     #       offer the below as a function argument.
     return ssm.linearize.root_taylor_1st(
-        root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian, iterate=iterate
+        root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian, nlstsq=nlstsq
     )
 
 

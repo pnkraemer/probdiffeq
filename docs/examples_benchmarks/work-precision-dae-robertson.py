@@ -40,6 +40,7 @@ import scipy.integrate
 import tqdm
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq.util import nlstsq_util
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -229,11 +230,17 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
     @jax.jit
     def param_to_solution(tol):
         t0, t1 = time_span
-        differential_auto = functools.partial(differential, t=t0)
-        algebraic_auto = functools.partial(algebraic, t=t0)
+
+        def differential_auto(u, du):
+            return differential(u, du, t=t0)
+
+        def algebraic_auto(u):
+            return algebraic(u, t=t0)
+
         y0 = [jnp.array([1.0, 0.0, 0.0])]
+        nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=10, tol=1e-8)
         tcoeffs, _info = taylor.daejet_nonlinear_lstsq(
-            differential_auto, algebraic_auto, y0, num=num_derivatives
+            differential_auto, algebraic_auto, y0, num=num_derivatives, nlstsq=nlstsq
         )
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
@@ -241,7 +248,7 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
 
         # We build a Jet constraint
         jet = probdiffeq.constraint_dae_jet(
-            differential, algebraic, ssm=ssm, iterate=True
+            differential, algebraic, ssm=ssm, nlstsq=nlstsq
         )
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
@@ -283,11 +290,17 @@ def solver_dae_ioup(*, num_derivatives: int, time_span) -> Callable:
     @jax.jit
     def param_to_solution(tol):
         t0, t1 = time_span
-        differential_auto = functools.partial(differential, t=t0)
-        algebraic_auto = functools.partial(algebraic, t=t0)
+
+        def differential_auto(u, du):
+            return differential(u, du, t=t0)
+
+        def algebraic_auto(u):
+            return algebraic(u, t=t0)
+
         y0 = [jnp.array([1.0, 0.0, 0.0])]
+        nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=10, tol=1e-8)
         tcoeffs, _info = taylor.daejet_nonlinear_lstsq(
-            differential_auto, algebraic_auto, y0, num=num_derivatives
+            differential_auto, algebraic_auto, y0, num=num_derivatives, nlstsq=nlstsq
         )
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
@@ -296,7 +309,7 @@ def solver_dae_ioup(*, num_derivatives: int, time_span) -> Callable:
 
         # We build a Jet constraint
         jet = probdiffeq.constraint_dae_jet(
-            differential, algebraic, iterate=True, ssm=ssm
+            differential, algebraic, nlstsq=nlstsq, ssm=ssm
         )
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
