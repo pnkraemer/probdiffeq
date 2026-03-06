@@ -51,9 +51,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     # (but don't vary much within these scales).
     base_scale = jnp.asarray([1e0, 1e-5, 0.1])
     M = jnp.asarray([[-0.04, 0.0, 0.0], [0.04, 0.0, 0.0], [0.0, 0.0, 0.0]])
-    ioup = probdiffeq.prior_ornstein_uhlenbeck_integrated(
-        ssm=ssm, output_scale=base_scale
-    )
+    ioup = probdiffeq.prior_ioup(M=M, ssm=ssm, output_scale=base_scale)
 
     # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
     jet = probdiffeq.constraint_dae_jet(differential, algebraic, ssm=ssm, nlstsq=nlstsq)
@@ -69,8 +67,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     # Linear spacing on a log-scale
     save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=200)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    solution = solve(init, save_at=save_at, atol=1e-4, rtol=1e-4)
-    print(solution.num_steps)
+    solution = jax.jit(solve)(init, save_at=save_at, atol=1e-9, rtol=1e-7)
 
     _fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(5, 5), sharex=True)
     ax[0][0].set_title("Robertson solution")

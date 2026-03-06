@@ -666,6 +666,12 @@ class MarkovSequence(Generic[N]):
     reverse: bool = structs.dataclass_field(metadata={"static": True})
     """The direction of factorisations."""
 
+    @classmethod
+    def from_grid(cls, init, discretize, *, grid, reverse: bool):
+        marginal = init.marginals
+        conditional = func.vmap(discretize)(np.diff(grid))
+        return cls(marginal, conditional, reverse=reverse)
+
     def rescale_cholesky(self, factor, /):
         marg = self.marginal.rescale_cholesky(factor)
         cond = self.conditional.rescale_noise(factor)
@@ -1278,31 +1284,12 @@ def _add_diffuse_derivatives(
 
 def prior_iwp(*, ssm, output_scale=None):
     """Construct a repeatedly-integrated Wiener process."""
-    output_scale = _process_output_scale(ssm=ssm, output_scale=output_scale)
     return ssm.conditional.transition_iwp(base_scale=output_scale)
 
 
 def prior_ioup(M, *, ssm, output_scale=None):
     """Construct a repeatedly-integrated Ornstein-Uhlenbeck process."""
-    output_scale = _process_output_scale(ssm=ssm, output_scale=output_scale)
     return ssm.conditional.transition_ioup(M=M, base_scale=output_scale)
-
-
-def _process_output_scale(*, ssm, output_scale):
-    if output_scale is None:
-        return np.ones_like(ssm.prototypes.std())
-
-    output_scale = tree.tree_map(np.asarray, output_scale)
-
-    def shape_equal(A, B):
-        return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
-
-    if not tree.tree_all(shape_equal(output_scale, ssm.prototypes.std())):
-        msg = "Output scale has the wrong shape."
-        msg += f" Expected: output_scale.shape={ssm.prototypes.std()}."
-        msg += f" Received: output_scale.shape={output_scale}."
-        raise ValueError(msg)
-    return output_scale
 
 
 # def prior_iwp_discrete(

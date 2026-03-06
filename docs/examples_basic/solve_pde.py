@@ -45,7 +45,8 @@ def main() -> None:
 
     # Set up a state-space model
     tcoeffs = [u0, vf(u0, t=t0)]
-    init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact="blockdiag")
+    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="blockdiag")
+    ibm = probdiffeq.prior_iwp(ssm=ssm)
 
     # Build a solver
     ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
@@ -64,7 +65,7 @@ def main() -> None:
         nrows=2, ncols=len(u), figsize=(2 * len(u), 3), tight_layout=True
     )
     for t_i, u_i, std_i, ax_i in zip(save_at, u, u_std, axes.T):
-        ax_i[0].set_title(f"t = {t_i:.1f}")
+        ax_i[0].set_title(f"t = {t_i:.1f}", fontsize="medium")
         img = ax_i[0].imshow(u_i[0], cmap="copper", vmin=-1, vmax=1)
         plt.colorbar(img)
 
@@ -77,8 +78,8 @@ def main() -> None:
         ax_i[0].set_yticks(())
         ax_i[1].set_yticks(())
 
-    axes[0][0].set_ylabel("PDE solution")
-    axes[1][0].set_ylabel("log(std)")
+    axes[0][0].set_ylabel("PDE solution", fontsize="medium")
+    axes[1][0].set_ylabel("log(std)", fontsize="medium")
     plt.show()
 
 

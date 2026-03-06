@@ -606,6 +606,9 @@ class DenseConditional(AbstractConditional):
         eye_d = np.eye(d)
         A = np.kron(a, eye_d)
 
+        if base_scale is None:
+            base_scale = np.ones(self.ode_shape)
+
         base_scale, _ = tree.ravel_pytree(base_scale)
         assert base_scale.shape == (d,), base_scale.shape
 
@@ -615,7 +618,7 @@ class DenseConditional(AbstractConditional):
         q0 = np.zeros(self.flat_shape)
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
 
-        def discretise(dt, output_scale):
+        def discretise(dt, output_scale=1.0):
             output_scale = np.asarray(output_scale)
             assert output_scale.shape == ()
             p, p_inv = precon_fun(dt)
@@ -1277,7 +1280,10 @@ class IsotropicConditional(AbstractConditional):
         q0 = np.zeros((self.num_derivatives + 1, *self.ode_shape))
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
 
-        [base_scale] = tree.tree_leaves(base_scale)
+        if base_scale is None:
+            base_scale = np.ones(())
+
+        base_scale = np.asarray(base_scale)
         assert base_scale.shape == ()
 
         def discretise(dt, output_scale):
@@ -1447,6 +1453,9 @@ class BlockDiagConditional(AbstractConditional):
         a, q_sqrtm = system_matrices_1d_iwp(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1,))
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
+
+        if base_scale is None:
+            base_scale = np.ones(self.ode_shape)
 
         (d,) = self.ode_shape
         base_scale, _ = tree.ravel_pytree(base_scale)

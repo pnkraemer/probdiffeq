@@ -65,21 +65,21 @@ u0 = jnp.asarray(0.1)
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
 
 # "Bad" prior (no Taylor coefficients)
-mseq_prior, ssm = probdiffeq.prior_iwp_discrete(
-    (u0,), grid=ts, diffuse_derivatives=2, output_scale=10.0
-)
+init, ssm = probdiffeq.ssm_taylor([u0], diffuse_derivatives=2)
+iwp = probdiffeq.prior_iwp(ssm=ssm, output_scale=10.0)
+mseq_prior = probdiffeq.MarkovSequence.from_grid(init, iwp, grid=ts, reverse=False)
 
 # "Good" prior (Taylor coefficients)
 tcoeffs = taylor.odejet_padded_scan(lambda y: vector_field(y, t=t0), (u0,), num=2)
-mseq_tcoeffs, ssm = probdiffeq.prior_iwp_discrete(tcoeffs, grid=ts, output_scale=10.0)
+init, ssm = probdiffeq.ssm_taylor(tcoeffs)
+mseq_tcoeffs = probdiffeq.MarkovSequence.from_grid(init, iwp, grid=ts, reverse=False)
 
 
 # Posterior
-init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, output_scale=10.0)
 ts1 = probdiffeq.constraint_ode_ts1(vector_field, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm)
-error = probdiffeq.error_residual_std(constraint=ts1, prior=ibm, ssm=ssm)
+solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm)
+error = probdiffeq.error_residual_std(constraint=ts1, prior=iwp, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
 sol = solve(init, save_at=ts, atol=1e-1, rtol=1e-1)
 mseq_posterior = sol.solution_full
