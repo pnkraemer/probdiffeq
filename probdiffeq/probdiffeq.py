@@ -459,6 +459,10 @@ def constraint_root_ts1(
 def constraint_dae_jet(
     differential, algebraic, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlstsq=None
 ):
+    """Construct a Jet-based linearization/constraint for DAEs.
+
+    To use posterior linearisation, pass a `nlstsq` implementation.
+    """
     root_order = _verify_vector_field_signature_and_parse_order(differential)
     assert root_order == 2
 

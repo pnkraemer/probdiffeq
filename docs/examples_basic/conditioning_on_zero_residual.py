@@ -66,7 +66,7 @@ ts = jnp.linspace(t0, t1, num=500, endpoint=True)
 
 # "Bad" prior (no Taylor coefficients)
 init, ssm = probdiffeq.ssm_taylor([u0], diffuse_derivatives=2)
-iwp = probdiffeq.prior_ioup(M=jnp.eye(1) * 20.0, ssm=ssm, output_scale=10.0)
+iwp = probdiffeq.prior_ioup(rate=20.0, ssm=ssm, output_scale=10.0)
 mseq_prior = probdiffeq.MarkovSequence.from_grid(init, iwp, grid=ts, reverse=False)
 
 # "Good" prior (Taylor coefficients)

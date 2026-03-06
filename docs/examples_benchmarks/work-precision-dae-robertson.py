@@ -75,15 +75,12 @@ def main(start=3.0, stop=10.0, step=0.5, repeats=2, time_span=(1e-6, 1e5)) -> No
 
     # Assemble algorithms
     algorithms = {
-        "DAE | IoupJet(3)": solver_dae_ioup(num_derivatives=3, time_span=time_span),
-        "DAE | IoupJet(4)": solver_dae_ioup(num_derivatives=4, time_span=time_span),
-        "DAE | IwpJet(3)": solver_dae_iwp(num_derivatives=3, time_span=time_span),
-        "DAE | IwpJet(4)": solver_dae_iwp(num_derivatives=4, time_span=time_span),
+        "DAE | Jet(3)": solver_dae_iwp(num_derivatives=3, time_span=time_span),
+        "DAE | Jet(4)": solver_dae_iwp(num_derivatives=4, time_span=time_span),
         "ODE | TS1(3)": solver_ode(num_derivatives=3, time_span=time_span),
         "ODE | TS1(4)": solver_ode(num_derivatives=4, time_span=time_span),
-        # "ODE | BDF (Scipy)": solver_scipy(method="BDF", time_span=time_span),
+        "ODE | TS1(7)": solver_ode(num_derivatives=7, time_span=time_span),
         "ODE | LSODA (Scipy)": solver_scipy(method="LSODA", time_span=time_span),
-        # "ODE | Radau (Scipy)": solver_scipy(method="Radau", time_span=time_span),
     }
 
     # Compute a reference solution
@@ -190,9 +187,10 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
         # Build a solver
         vf_auto = functools.partial(vf, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (y0,), num=num_derivatives - 1)
+        init, ssm = probdiffeq.ssm_taylor(tcoeffs)
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
-        init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, output_scale=base_scale)
+        iwp = probdiffeq.prior_iwp(ssm=ssm, output_scale=base_scale)
         ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
@@ -237,13 +235,16 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
             return algebraic(u, t=t0)
 
         y0 = [jnp.array([1.0, 0.0, 0.0])]
-        nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=10, tol=1e-8)
+        nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(
+            maxiter=10, tol=jnp.finfo(y0[0].dtype).eps ** 0.5
+        )
         tcoeffs, _info = taylor.daejet_nonlinear_lstsq(
             differential_auto, algebraic_auto, y0, num=num_derivatives, nlstsq=nlstsq
         )
+        init, ssm = probdiffeq.ssm_taylor(tcoeffs)
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
-        init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, output_scale=base_scale)
+        iwp = probdiffeq.prior_iwp(ssm=ssm, output_scale=base_scale)
 
         # We build a Jet constraint
         jet = probdiffeq.constraint_dae_jet(
@@ -260,68 +261,6 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
         # of the DAE, which is exactly what we need here
         error = probdiffeq.error_state_std(constraint=jet, prior=iwp, ssm=ssm)
 
-        # TODO: build PID controllers (is this "gustafsson"?) for iterated solvers?
-        solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
-        solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
-
-        return jax.block_until_ready(solution.u.mean[0])
-
-    return param_to_solution
-
-
-def solver_dae_ioup(*, num_derivatives: int, time_span) -> Callable:
-    """Construct a method that solves Robertson as a DAE."""
-
-    def differential(u, du, /, *, t):
-        del t
-        return du[:2] - dynamics(u)
-
-    def dynamics(y):
-        k1, k2, k3 = 0.04, 3e7, 1e4
-        f0 = -k1 * y[0] + k3 * y[1] * y[2]
-        f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
-        return jnp.stack([f0, f1])
-
-    def algebraic(u, *, t):
-        del t
-        return u[0] + u[1] + u[2] - 1
-
-    @jax.jit
-    def param_to_solution(tol):
-        t0, t1 = time_span
-
-        def differential_auto(u, du):
-            return differential(u, du, t=t0)
-
-        def algebraic_auto(u):
-            return algebraic(u, t=t0)
-
-        y0 = [jnp.array([1.0, 0.0, 0.0])]
-        nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=10, tol=1e-8)
-        tcoeffs, _info = taylor.daejet_nonlinear_lstsq(
-            differential_auto, algebraic_auto, y0, num=num_derivatives, nlstsq=nlstsq
-        )
-
-        base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
-        M = jnp.asarray([[-0.4, 0.0, 0.0], [0.4, 0.0, 0.0], [0.0, 0.0, 0.0]])
-        init, ioup, ssm = probdiffeq.prior_ioup(tcoeffs, M=M, output_scale=base_scale)
-
-        # We build a Jet constraint
-        jet = probdiffeq.constraint_dae_jet(
-            differential, algebraic, nlstsq=nlstsq, ssm=ssm
-        )
-        strategy = probdiffeq.strategy_filter(ssm=ssm)
-
-        # For proper DAEs, non-iterated solver's simply don't cut it
-        solver = probdiffeq.solver_dynamic(
-            strategy=strategy, prior=ioup, constraint=jet, ssm=ssm
-        )
-
-        # The state-error-estimate doesn't care about the dimension
-        # of the DAE, which is exactly what we need here
-        error = probdiffeq.error_state_std(constraint=jet, prior=ioup, ssm=ssm)
-
-        # Integral controllers just work better than proportional-integral ones
         # TODO: build PID controllers (is this "gustafsson"?) for iterated solvers?
         solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
         solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)

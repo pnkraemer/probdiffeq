@@ -222,8 +222,12 @@ class AbstractConditional(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def transition_iwp(self, num_derivatives, output_scale=None):
+    def transition_iwp(self, output_scale: Array | None):
         """Construct the transitions for an integrated Wiener process."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def transition_ioup(self, *, rate: Array, base_scale: Array | None):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -653,7 +657,7 @@ class DenseConditional(AbstractConditional):
     def transition_ioup(self, *, rate: Array, base_scale: Array | None):
         Lambda = self._process_base_scale(base_scale)
 
-        ode_like, _ = tree.ravel_pytree(self.unravel(np.ones(self.flat_shape))[0])
+        [ode_like] = tree.tree_leaves(self.unravel(np.ones(self.flat_shape))[0])
         if ode_like.ndim == 0:
             rate = np.eye(1) * rate
         elif ode_like.ndim > 1:
@@ -661,6 +665,7 @@ class DenseConditional(AbstractConditional):
             raise NotImplementedError(msg)
 
         (d,) = self.ode_shape
+        rate = np.asarray(rate)
         assert rate.shape == (d, d)  # todo: flatten M from pytree?
 
         eye_d = np.eye(d)
@@ -677,9 +682,9 @@ class DenseConditional(AbstractConditional):
 
         # TODO: find a good default. Always using high orders seems wasteful.
         pade_legendre = (
-            gram_util.pade_and_legendre_13()
+            gram_util.pade_and_legendre_9()
             if B.dtype == "float64"
-            else gram_util.pade_and_legendre_7()
+            else gram_util.pade_and_legendre_5()
         )
 
         # Pascal matrices are upper triangular so we use a dedicated solver
@@ -1497,6 +1502,8 @@ class BlockDiagConditional(AbstractConditional):
                 msg += f" Received: {base_scale.shape}."
                 raise ValueError(msg)
 
+        base_scale, _ = tree.ravel_pytree(base_scale)
+
         a, q_sqrtm = system_matrices_1d_iwp(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1,))
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
@@ -1513,9 +1520,10 @@ class BlockDiagConditional(AbstractConditional):
                     msg += f" Expected: {base_scale.shape}."
                     msg += f" Received: {output_scale.shape}."
                     raise ValueError(msg)
+                output_scale, _ = tree.ravel_pytree(output_scale)
 
+            scale = output_scale * base_scale
             # Flatten the scale into something compatible with the flattened SSM
-            scale, _ = tree.ravel_pytree(base_scale * output_scale)
             (d,) = scale.shape
 
             A_batch = np.ones((d, 1, 1)) * a[None, :, :]

@@ -4,7 +4,9 @@ from probdiffeq.backend import flow, func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Array
 
 
-def nlstsq_constrained_gauss_newton(*, maxiter, tol, lstsq=linalg.lstsq_svd):
+def nlstsq_constrained_gauss_newton(
+    *, maxiter, tol, lstsq=linalg.lstsq_svd, while_loop=flow.while_loop
+):
     """Solve nonlinearly constrained least-squares problems."""
 
     def solve(constraint, x0, mean, cholesky):
@@ -44,7 +46,7 @@ def nlstsq_constrained_gauss_newton(*, maxiter, tol, lstsq=linalg.lstsq_svd):
             return State(xnew, fxnew, dx=xnew - state.x, i=state.i + 1)
 
         init = State(x0, constraint(x0), dx=np.ones_like(x0), i=0)
-        final = flow.while_loop(cond_fun, body_fun, init=init)
+        final = while_loop(cond_fun, body_fun, init=init)
         return final.x, {"iters": final.i}
 
     return solve

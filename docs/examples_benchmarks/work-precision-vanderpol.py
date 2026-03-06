@@ -80,7 +80,7 @@ def main(start=4.0, stop=10.0, step=0.25, repeats=2) -> None:
     _fig, ax = plt.subplots(figsize=(8, 5))
 
     for label, wp in results.items():
-        wdw = 1  # window
+        wdw = 3  # window
         x, y = wp["precision"], wp["work_mean"]
         x = jnp.exp(jnp.convolve(jnp.log(x), jnp.ones((wdw,)) / wdw, mode="valid"))
         y = jnp.exp(jnp.convolve(jnp.log(y), jnp.ones((wdw,)) / wdw, mode="valid"))
@@ -141,7 +141,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         return ddu - vf_probdiffeq(u, du, t=t)
 
     t0, t1 = 0.0, 3.0
-    u0, du0 = (jnp.atleast_1d(2.0), jnp.atleast_1d(0.0))
+    u0, du0 = (jnp.asarray(2.0), jnp.asarray(0.0))
     t0, t1 = (0.0, 6.3)
 
     @jax.jit
@@ -150,18 +150,19 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
 
-        init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact="dense")
+        init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
+        iwp = probdiffeq.prior_iwp(ssm=ssm)
         ts = probdiffeq.constraint_root_ts1(root, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         solver = probdiffeq.solver_dynamic(
             strategy=strategy, prior=iwp, constraint=ts, ssm=ssm
         )
-        error = probdiffeq.error_residual_std(constraint=ts, prior=iwp, ssm=ssm)
+        error = probdiffeq.error_state_std(constraint=ts, prior=iwp, ssm=ssm)
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, error=error, control=control, clip_dt=True
+            solver=solver, error=error, control=control
         )
         solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
         return jax.block_until_ready(solution.u.mean[0])

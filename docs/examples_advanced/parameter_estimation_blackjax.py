@@ -176,7 +176,8 @@ def plot_solution(t, u, *, ax, marker=".", **plotting_kwargs):
 
 
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta_guess,), num=2)
-init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, output_scale=10.0, ssm_fact="isotropic")
+init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
+iwp = probdiffeq.prior_iwp(ssm=ssm, output_scale=10.0)
 ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
 solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
@@ -187,7 +188,7 @@ def solve_fixed(theta, *, ts):
     """Evaluate the parameter-to-solution map, solving on a fixed grid."""
     # Create a probabilistic solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
-    init, _iwp, _ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact="isotropic")
+    init, _ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
     solve = ivpsolve.solve_fixed_grid(solver=solver)
     return solve(init, grid=ts)
 
@@ -197,7 +198,7 @@ def solve_adaptive(theta, *, save_at):
     """Evaluate the parameter-to-solution map, solving on an adaptive grid."""
     # Create a probabilistic solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
-    init, _iwp, _ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact="isotropic")
+    init, __ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
     error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
     return solve(init, save_at=save_at, dt0=0.1, atol=1e-4, rtol=1e-2)

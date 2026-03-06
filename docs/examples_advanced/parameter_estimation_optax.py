@@ -58,15 +58,14 @@ def vf(y, t, *, p):  # noqa: ARG001
 
 
 tcoeffs = (u0, vf(u0, t0, p=f_args))
-init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, output_scale=10.0, ssm_fact="isotropic")
+init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
+iwp = probdiffeq.prior_iwp(ssm=ssm, output_scale=10.0)
 
 
 def solve(p):
     """Evaluate the parameter-to-solution map."""
     tcoeffs = (u0, vf(u0, t0, p=p))
-    init, iwp, ssm = probdiffeq.prior_iwp(
-        tcoeffs, output_scale=10.0, ssm_fact="isotropic"
-    )
+    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
 
     def vf_p(y, /, *, t):
         return vf(y, t=t, p=p)

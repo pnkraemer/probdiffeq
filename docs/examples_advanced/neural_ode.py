@@ -162,9 +162,8 @@ def loss_log_marginal_likelihood(vf, *, t0):
         """Loss function: log-marginal likelihood of the data."""
         # Build a solver
         tcoeffs = (*u0, vf(*u0, t=t0, p=p))
-        init, iwp, ssm = probdiffeq.prior_iwp(
-            tcoeffs, output_scale=output_scale, ssm_fact="dense"
-        )
+        init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
+        iwp = probdiffeq.prior_iwp(ssm=ssm, output_scale=output_scale)
 
         def vf_p(y, /, *, t):
             return vf(y, t=t, p=p)
