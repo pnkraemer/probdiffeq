@@ -13,22 +13,7 @@
 #     name: python3
 # ---
 
-# # Solver types
-#
-# You can choose between a `adaptive.solver_calibrationfree()`
-# (which does not calibrate the output-scale),
-# a `adaptive.solver_mle()`
-# (which calibrates a global output scale via quasi-maximum-likelihood-estimation),
-# and a `adaptive.solver_dynamic()`,
-# which calibrates a time-varying,
-# piecewise constant output-scale via
-# "local' quasi-maximum-likelihood estimation,
-# similar to how ODE solver estimate local errors.
-#
-# But are these good for?
-# In short: choose a `solver_dynamic`
-# if your ODE output-scale varies quite strongly,
-# and choose an `solver_mle` otherwise.
+# # Exploit dynamic solvers for variable output scales
 #
 # For example, consider the numerical solution of a linear ODE with fixed steps:
 

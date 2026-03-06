@@ -4,20 +4,6 @@ from probdiffeq.backend import flow, linalg, np, structs
 from probdiffeq.backend.typing import Array, Callable
 
 
-def exp_gram_matrix_fraction(expm=linalg.expm) -> Callable:
-    """Compute matrix exponential and finite-horizon Gramian via matrix fractions."""
-
-    def compute(A, B):
-        n = A.shape[0]
-        M = np.block([[A, B @ B.T], [np.zeros_like(A), -A.T]])
-        E = expm(M)
-        eA = E[:n, :n]
-        Sigma = E[:n, n:] @ eA.T
-        return eA, Sigma
-
-    return compute
-
-
 @structs.dataclass
 class PadeLegendre:
     """Pade-Legendre combinations for matrix exponentials and Gramians."""

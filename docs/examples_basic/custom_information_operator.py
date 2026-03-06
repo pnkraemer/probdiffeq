@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Custom information operators
+# # Utilize custom constraints
 #
 # This tutorial extends the demonstration of solving second-order problems directly.
 #

@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Taylor coefficients
+# # Leverage state-space models over custom Taylor coefficients
 #
 # To build a probabilistic solver, we need to build a specific state-space model.
 # To build this specific state-space model, we interact with Taylor coefficients.

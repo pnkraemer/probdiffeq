@@ -81,10 +81,23 @@ extra:
   generator: false
 nav:
   - index.md
-  - An easy example: examples_quickstart/quickstart.ipynb
-  - Migration guide: migration_guide.md
-  - Choosing a solver: choosing_a_solver.md
-  - Troubleshooting: troubleshooting.md
+  - examples_quickstart/quickstart.ipynb
+  - migration_guide.md
+  - choosing_a_solver.md
+  - troubleshooting.md
+  - DOCUMENTATION | API:
+      - probdiffeq: api_docs/probdiffeq.md
+      - ivpsolve: api_docs/ivpsolve.md
+      - taylor: api_docs/taylor.md
+      - ssm_impl: api_docs/ssm_impl.md
+      - util:
+          - cholesky_util: api_docs/util/cholesky_util.md
+          - nlstsq_util: api_docs/util/nlstsq_util.md
+          - gram_util: api_docs/util/gram_util.md
+          - test_util: api_docs/util/test_util.md
+  - DOCUMENTATION | DEVELOPER:
+      - dev_docs/creating_example_notebook.md
+      - dev_docs/continuous_integration.md
   - EXAMPLES | BASIC:
       - examples_basic/conditioning_on_zero_residual.ipynb
       - examples_basic/posterior_uncertainties.ipynb
@@ -94,12 +107,13 @@ nav:
       - examples_basic/custom_information_operator.ipynb
       - examples_basic/solve_pde.ipynb
       - examples_basic/solve_dae.ipynb
+      - examples_basic/priors.ipynb
   - EXAMPLES | ADVANCED:
       - examples_advanced/parameter_estimation_optax.ipynb
       - examples_advanced/parameter_estimation_blackjax.ipynb
       - examples_advanced/neural_ode.ipynb
       - examples_advanced/equinox_while_loop.ipynb
-  - EXAMPLES | BENCHMARKS:
+  - BENCHMARKS:
       - examples_benchmarks/work-precision-lotka-volterra.ipynb
       - examples_benchmarks/work-precision-pleiades.ipynb
       - examples_benchmarks/work-precision-vanderpol.ipynb
@@ -109,11 +123,3 @@ nav:
       - examples_benchmarks/taylor-init-node.ipynb
       - examples_benchmarks/taylor-init-pleiades.ipynb
       - examples_benchmarks/convergence-rates-lotka-volterra.ipynb
-  - DOCUMENTATION | API:
-      - probdiffeq: api_docs/probdiffeq.md
-      - ivpsolve: api_docs/ivpsolve.md
-      - taylor: api_docs/taylor.md
-      - ssm_impl: api_docs/ssm_impl.md
-  - DOCUMENTATION | DEVELOPER:
-      - dev_docs/creating_example_notebook.md
-      - dev_docs/continuous_integration.md

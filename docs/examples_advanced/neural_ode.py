@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Diffusion tempering & NODEs
+# # Learn neural ODEs with diffusion tempering
 #
 
 # +

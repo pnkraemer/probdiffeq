@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Equinox's while-loops
+# # Make Probdiffeq's solvers reverse-mode differentiable
 #
 # Use [Equinox's](https://docs.kidger.site/equinox/)
 # bounded while loop to enable reverse-mode differentiation of adaptive IVP solvers.

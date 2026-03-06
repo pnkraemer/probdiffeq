@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # How probabilistic solvers work
+# # Understand the basics of probabilistic solvers
 #
 # Probabilistic solvers condition a prior distribution
 # on satisfying a zero-ODE-residual on a specified grid.
@@ -65,14 +65,9 @@ u0 = jnp.asarray(0.1)
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
 
 
-def vf_prior(u):
-    """Match the linear part of the dynamics exactly."""
-    return -10.0 * u
-
-
 # "Bad" prior (no Taylor coefficients)
 init, ssm = probdiffeq.ssm_taylor([u0], diffuse_derivatives=2)
-iwp = probdiffeq.prior_exponential(vf_prior, ssm=ssm, output_scale=10.0)
+iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=10.0)
 mseq_prior = probdiffeq.MarkovSequence.from_grid(init, iwp, grid=ts, reverse=False)
 
 # "Good" prior (Taylor coefficients)

@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Parameter estimation (BlackJAX)
+# # Estimate parameters (via BlackJAX)
 #
 #
 # This tutorial explains how to estimate unknown parameters of

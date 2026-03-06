@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Solve a DAE
+# # Solve differential-algebraic equations
 #
 # Solve a differential-algebraic equation, namely, the Robertson problem.
 # The Robertson problem is interesting for many reasons:

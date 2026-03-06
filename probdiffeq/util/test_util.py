@@ -1,8 +1,8 @@
 """Test utilities."""
 
 import probdiffeq.ivpsolve
-from probdiffeq.backend import flow, func, np, tree, warnings
-from probdiffeq.backend.typing import TypeVar
+from probdiffeq.backend import flow, func, linalg, np, tree, warnings
+from probdiffeq.backend.typing import Callable, TypeVar
 
 T = TypeVar("T")
 
@@ -62,3 +62,17 @@ def solve_adaptive_save_every_step(solver, error, control=None, clip_dt=False):
         )
 
     return solve
+
+
+def exp_gram_matrix_fraction(expm=linalg.expm) -> Callable:
+    """Compute matrix exponential and finite-horizon Gramian via matrix fractions."""
+
+    def compute(A, B):
+        n = A.shape[0]
+        M = np.block([[A, B @ B.T], [np.zeros_like(A), -A.T]])
+        E = expm(M)
+        eA = E[:n, :n]
+        Sigma = E[:n, n:] @ eA.T
+        return eA, Sigma
+
+    return compute

@@ -1,4 +1,4 @@
-# Troubleshooting
+# Troubleshoot common issues
 
 ## General troubleshooting
 

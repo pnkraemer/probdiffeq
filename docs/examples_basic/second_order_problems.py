@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Second-order systems
+# # Specialise in second-order systems
 
 # In this tutorial, we see how second-order ODEs can (and should!) be solved
 # without transforming them into first-order problems first.

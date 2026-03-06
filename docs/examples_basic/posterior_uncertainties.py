@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Posterior uncertainties
+# # Visualise posterior standard deviations
 
 # In this tutorial, we will investigate the structure of the uncertainties
 # returned by the probabilistic solvers. There is also the chance to compare

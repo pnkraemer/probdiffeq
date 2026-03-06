@@ -1,7 +1,7 @@
 """Test the matrix-exponential and finite-horizon Gramian utilities."""
 
 from probdiffeq.backend import func, linalg, np, random, testing
-from probdiffeq.util import gram_util
+from probdiffeq.util import gram_util, test_util
 
 
 def case_method_pade_legendre_13():
@@ -50,7 +50,7 @@ def test_exact(seed, nrows, ncols, pade_legendre, use_triu):
     eA2, L2 = func.jit(algorithm)(A, B)
 
     # Evaluate a baseline
-    algorithm = gram_util.exp_gram_matrix_fraction()
+    algorithm = test_util.exp_gram_matrix_fraction()
     eA1, G1 = func.jit(algorithm)(A, B)
 
     # Choose a tolerance based on the dtype.

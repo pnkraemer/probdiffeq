@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Solve a PDE
+# # Solve partial differential equations
 #
 # This tutorial replicates Figure 1 from https://arxiv.org/abs/2110.11812,
 # but uses some advanced features in Probdiffeq, namely, solving matrix-valued problems

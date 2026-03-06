@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Parameter estimation (Optax)
+# # Estimate parameters (via Optax)
 #
 # We create some data,
 # compute the marginal likelihood of this data _under the ODE posterior_

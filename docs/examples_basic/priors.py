@@ -13,7 +13,7 @@
 #     name: python3
 # ---
 
-# # Prior distributions
+# # Distinguish prior distributions
 #
 # Let's look at how different prior distributions behave.
 
