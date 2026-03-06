@@ -33,7 +33,7 @@ def case_scale_rules_iwp_dense() -> ScaleShapeRules:
 def case_scale_rules_ioup_dense() -> ScaleShapeRules:
     return ScaleShapeRules(
         ssm_fact="dense",
-        prior=func.partial(probdiffeq.prior_ioup, M=np.zeros((1, 1))),
+        prior=func.partial(probdiffeq.prior_ioup, rate=np.zeros((1, 1))),
         ode=(1,),
         base=(1,),
         calibrated=(),
@@ -48,9 +48,9 @@ def case_scale_rules_iwp_blockdiag() -> ScaleShapeRules:
         prior=probdiffeq.prior_iwp,
         ode=(1, 1),
         base=(1, 1),
-        calibrated=(1, 1),
+        calibrated=(1,),
         base_baddies=[(), (1,)],
-        calibrated_baddies=[(), (1,)],
+        calibrated_baddies=[(), (1, 1)],
     )
 
 

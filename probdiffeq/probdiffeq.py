@@ -1788,7 +1788,7 @@ class solver_mle(ProbabilisticSolver):
 
         # Calibrate the output scale
         new_term = observed.mahalanobis_norm_relative(0.0)
-        output_scale_running = self.ssm.normal.update_moving_avg(
+        output_scale_running = self.ssm.normal.update_moving_avg(  # type: ignore
             output_scale_running, new_term, num=num_data
         )
 

@@ -10,7 +10,7 @@ def test_ioup_reduces_to_iwp():
     tcoeffs = [u, u, u, u, u]
 
     _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
-    ioup = probdiffeq.prior_ioup(ssm=ssm, M=M)
+    ioup = probdiffeq.prior_ioup(ssm=ssm, rate=M)
     iwp = probdiffeq.prior_iwp(ssm=ssm)
 
     scale = 12.3456
@@ -30,7 +30,7 @@ def test_ioup_transition_as_expected(shape, n):
     tcoeffs = [u] * n
 
     _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
-    ioup = probdiffeq.prior_ioup(ssm=ssm, M=M)
+    ioup = probdiffeq.prior_ioup(ssm=ssm, rate=M)
 
     dt = 0.123456
     cond = func.jit(ioup)(dt)
@@ -57,7 +57,7 @@ def test_ioup_not_implemented_for_isotropic_or_blockdiag(ssm_fact):
     _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=ssm_fact)
 
     with testing.raises(NotImplementedError, match="reach out"):
-        _ = probdiffeq.prior_ioup(ssm=ssm, M=M)
+        _ = probdiffeq.prior_ioup(ssm=ssm, rate=M)
 
 
 @testing.parametrize("shape", [(2, 2)])
@@ -69,4 +69,4 @@ def test_ioup_not_implemented_for_matrix_valued_dense(shape):
 
     with testing.raises(NotImplementedError, match="implemented"):
         M = np.zeros((2, 2))  # irrelevant
-        _ = probdiffeq.prior_ioup(ssm=ssm, M=M)
+        _ = probdiffeq.prior_ioup(ssm=ssm, rate=M)

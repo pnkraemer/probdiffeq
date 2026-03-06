@@ -39,7 +39,8 @@ def fixture_solution(constraint_ode_factory, fact):
 
     try:
         tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
-        init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
+        init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
+        iwp = probdiffeq.prior_iwp(ssm=ssm)
         constraint = constraint_ode_factory(vf, ssm=ssm)
 
     except NotImplementedError:

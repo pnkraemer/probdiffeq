@@ -37,7 +37,7 @@ def test_transitions_are_correct_in_1d_blockdiag() -> None:
     _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="blockdiag")
     iwp = probdiffeq.prior_iwp(ssm=ssm)
 
-    cond = iwp(1.0, 1.0)
+    cond = iwp(1.0, np.ones((1,)))
     A_expected = np.asarray(
         [
             [1.0, 3.0, 3.0, 1.0],
