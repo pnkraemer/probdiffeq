@@ -1,3 +1,33 @@
+# ---
+# jupyter:
+#   jupytext:
+#     formats: ipynb,py:light
+#     text_representation:
+#       extension: .py
+#       format_name: light
+#       format_version: '1.5'
+#       jupytext_version: 1.17.3
+#   kernelspec:
+#     display_name: Python 3 (ipykernel)
+#     language: python
+#     name: python3
+# ---
+
+# # Solve a DAE
+#
+# Solve a differential-algebraic equation, namely, the Robertson problem.
+# The Robertson problem is interesting for many reasons:
+#   - It comes in DAE, and ODE form
+#     so we can compare different information operators
+#   - It has an exponential timescale so (good) adaptive
+#     steps are needed; fixed steps are hopeless.
+#   - Its y-states have wildly different scales,
+#     so a good prior model is important.
+
+
+# +
+"""Solve a differential-algebraic equation."""
+
 import statistics
 from collections.abc import Callable
 
@@ -49,7 +79,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     # This base scale is critical to Robertson, because
     # the solutions live on vastly different scales
     # (but don't vary much within these scales).
-    base_scale = jnp.asarray([1e0, 1e-5, 0.1])
+    base_scale = jnp.asarray([0.8, 2e-05, 0.2])
     M = jnp.asarray([[-0.04, 0.0, 0.0], [0.04, 0.0, 0.0], [0.0, 0.0, 0.0]])
     ioup = probdiffeq.prior_ioup(M=M, ssm=ssm, output_scale=base_scale)
 

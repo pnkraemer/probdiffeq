@@ -66,7 +66,7 @@ ts = jnp.linspace(t0, t1, num=500, endpoint=True)
 
 # "Bad" prior (no Taylor coefficients)
 init, ssm = probdiffeq.ssm_taylor([u0], diffuse_derivatives=2)
-iwp = probdiffeq.prior_iwp(ssm=ssm, output_scale=10.0)
+iwp = probdiffeq.prior_ioup(M=jnp.eye(1) * 20.0, ssm=ssm, output_scale=10.0)
 mseq_prior = probdiffeq.MarkovSequence.from_grid(init, iwp, grid=ts, reverse=False)
 
 # "Good" prior (Taylor coefficients)
@@ -105,9 +105,9 @@ samples_posterior = mseq_posterior.sample(key, ssm=ssm, shape=(num_samples,))
 fig, (axes_state, axes_residual, axes_log_abs) = plt.subplots(
     nrows=3, ncols=3, sharex=True, sharey="row", constrained_layout=True, figsize=(8, 5)
 )
-axes_state[0].set_title("w/ Initial condition")
-axes_state[1].set_title("w/ Taylor coefficients")
-axes_state[2].set_title("Posterior")
+axes_state[0].set_title("IOUP w/ Initial condition", fontsize="medium")
+axes_state[1].set_title("IOUP w/ Taylor coefficients", fontsize="medium")
+axes_state[2].set_title("Posterior", fontsize="medium")
 
 sample_style = {"marker": "None", "alpha": 0.99, "linewidth": 0.75}
 
@@ -160,12 +160,12 @@ axes_log_abs[0].set_ylim((-6, 4))
 axes_log_abs[0].set_yticks((-6, -1, 4))
 
 # Label the x- and y-axes
-axes_state[0].set_ylabel("Solution")
-axes_residual[0].set_ylabel("Residual")
-axes_log_abs[0].set_ylabel(r"Log-residual")
-axes_log_abs[0].set_xlabel("Time $t$")
-axes_log_abs[1].set_xlabel("Time $t$")
-axes_log_abs[2].set_xlabel("Time $t$")
+axes_state[0].set_ylabel("Solution", fontsize="medium")
+axes_residual[0].set_ylabel("Residual", fontsize="medium")
+axes_log_abs[0].set_ylabel("Log-residual", fontsize="medium")
+axes_log_abs[0].set_xlabel("Time $t$", fontsize="medium")
+axes_log_abs[1].set_xlabel("Time $t$", fontsize="medium")
+axes_log_abs[2].set_xlabel("Time $t$", fontsize="medium")
 
 # Show the result
 fig.align_ylabels()

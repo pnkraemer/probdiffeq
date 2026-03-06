@@ -19,12 +19,11 @@
 """Work-precision diagram on the Robertson problem.
 
 The Robertson problem is interesting for many reasons:
-- It comes in DAE, and ODE form
-  so we can compare different information operators
 - It has an exponential timescale so (good) adaptive
   steps are needed; fixed steps are hopeless.
 - Its y-states have wildly different scales,
   so a good prior model is important.
+
 """
 
 import functools

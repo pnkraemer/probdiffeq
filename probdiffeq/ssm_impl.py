@@ -630,8 +630,11 @@ class DenseConditional(AbstractConditional):
 
         return discretise
 
-    def transition_ioup(self, M, base_scale):
+    def transition_ioup(self, M, base_scale=None):
         # TODO: assert that the ODE is vector-valued (not scalar or matrix-valued)
+
+        if base_scale is None:
+            base_scale = np.ones(self.ode_shape)
 
         (d,) = self.ode_shape
         assert M.shape == (d, d)  # todo: flatten M from pytree?
@@ -666,7 +669,7 @@ class DenseConditional(AbstractConditional):
         )
         q0 = np.zeros(self.flat_shape)
 
-        def discretise(dt, output_scale):
+        def discretise(dt, output_scale=1.0):
             output_scale = np.asarray(output_scale)
             assert output_scale.shape == ()
 
