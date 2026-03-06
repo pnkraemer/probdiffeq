@@ -58,13 +58,13 @@ def vf(y, t, *, p):  # noqa: ARG001
 
 
 tcoeffs = (u0, vf(u0, t0, p=f_args))
-init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, output_scale=10.0, ssm_fact="isotropic")
+init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, output_scale=10.0, ssm_fact="isotropic")
 
 
 def solve(p):
     """Evaluate the parameter-to-solution map."""
     tcoeffs = (u0, vf(u0, t0, p=p))
-    init, ibm, ssm = probdiffeq.prior_iwp(
+    init, iwp, ssm = probdiffeq.prior_iwp(
         tcoeffs, output_scale=10.0, ssm_fact="isotropic"
     )
 
@@ -73,7 +73,7 @@ def solve(p):
 
     ts0 = probdiffeq.constraint_ode_ts0(vf_p, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
+    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
     return solve(init, grid=ts)
 

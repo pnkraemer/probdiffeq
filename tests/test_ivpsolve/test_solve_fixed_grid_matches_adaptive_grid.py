@@ -18,13 +18,13 @@ def test_fixed_grid_result_matches_adaptive_grid_result_when_reusing_grid(fact) 
     tcoeffs = Taylor(*taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2))
 
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
-    ibm = probdiffeq.prior_iwp(ssm=ssm)
+    iwp = probdiffeq.prior_iwp(ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver_mle(
-        strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
+        strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm
     )
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
 
     solve = test_util.solve_adaptive_save_every_step(
         error=error, solver=solver, clip_dt=True

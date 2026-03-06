@@ -883,7 +883,7 @@ class MarkovStrategy(Generic[T]):
 
     def __init__(
         self,
-        ssm: Any,
+        ssm: ssm_impl.FactSsmImpl,
         is_suitable_for_save_at: int,
         is_suitable_for_save_every_step: int,
         is_suitable_for_offgrid_marginals: int,
@@ -938,7 +938,7 @@ class ProbabilisticSolver:
         strategy: MarkovStrategy,
         prior: Callable,
         constraint: Constraint,
-        ssm: Any,
+        ssm: ssm_impl.FactSsmImpl,
     ) -> None:
         self.ssm = ssm
         self.strategy = strategy
@@ -1282,43 +1282,20 @@ def _add_diffuse_derivatives(
     return tcoeffs_mean, tcoeffs_std
 
 
-def prior_iwp(*, ssm, output_scale=None):
+def prior_iwp(*, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None):
     """Construct a repeatedly-integrated Wiener process."""
     return ssm.conditional.transition_iwp(base_scale=output_scale)
 
 
-def prior_ioup(M, *, ssm, output_scale=None):
-    """Construct a repeatedly-integrated Ornstein-Uhlenbeck process."""
-    return ssm.conditional.transition_ioup(M=M, base_scale=output_scale)
+def prior_ioup(
+    rate: Array, *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
+):
+    """Construct a repeatedly-integrated Ornstein-Uhlenbeck process.
 
-
-# def prior_iwp_discrete(
-#     tcoeffs: C,
-#     grid: Array,
-#     *,
-#     is_differential: C | None = None,
-#     nondifferential_eps: float = 1e-6,  # a small value
-#     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",
-#     output_scale: ArrayLike | None = None,
-#     # How many extra derivatives to model in the state-space
-#     diffuse_derivatives: int = 0,
-#     diffuse_eps: float = 1.0,  # a large value
-# ):
-#     """Compute a time-discretization of an integrated Wiener process."""
-#     init, discretize, ssm = prior_iwp(
-#         tcoeffs,
-#         is_differential=is_differential,
-#         nondifferential_eps=nondifferential_eps,
-#         ssm_fact=ssm_fact,
-#         output_scale=output_scale,
-#         diffuse_derivatives=diffuse_derivatives,
-#         diffuse_eps=diffuse_eps,
-#     )
-#     scales = np.ones_like(ssm.prototypes.output_scale_calibrated())
-#     discretize_vmap = func.vmap(discretize, in_axes=(0, None))
-#     conditionals = discretize_vmap(np.diff(grid), scales)
-#     markov_seq = MarkovSequence(init.marginals, conditionals, reverse=False)
-#     return markov_seq, ssm
+    According to https://arxiv.org/abs/2305.14978, but following the numerical
+    methods from https://arxiv.org/abs/2310.13462.
+    """
+    return ssm.conditional.transition_ioup(rate=rate, base_scale=output_scale)
 
 
 class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
@@ -1751,7 +1728,7 @@ class solver_mle(ProbabilisticSolver):
         *,
         constraint: Constraint,
         prior: Callable,
-        ssm: Any,
+        ssm: ssm_impl.FactSsmImpl,
         strategy: MarkovStrategy,
     ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
@@ -1865,7 +1842,7 @@ class solver_dynamic(ProbabilisticSolver):
         strategy: MarkovStrategy,
         prior: Callable,
         constraint: Constraint,
-        ssm: Any,
+        ssm: ssm_impl.FactSsmImpl,
         re_linearize_after_calibration=False,
     ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
@@ -1991,7 +1968,7 @@ class solver(ProbabilisticSolver):
         *,
         constraint: Constraint,
         prior: Callable,
-        ssm: Any,
+        ssm: ssm_impl.FactSsmImpl,
         strategy: MarkovStrategy,
     ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
@@ -2220,7 +2197,7 @@ class error_residual_std(ErrorEstimator):
         *,
         constraint: Constraint,
         prior: Any,
-        ssm: Any,
+        ssm: ssm_impl.FactSsmImpl,
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default
     ) -> None:
@@ -2312,7 +2289,7 @@ class error_state_std(ErrorEstimator):
         *,
         constraint: Constraint,
         prior: Any,
-        ssm: Any,
+        ssm: ssm_impl.FactSsmImpl,
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default
         derivative_idx: int = 0,

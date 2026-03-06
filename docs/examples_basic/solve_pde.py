@@ -46,15 +46,15 @@ def main() -> None:
     # Set up a state-space model
     tcoeffs = [u0, vf(u0, t=t0)]
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="blockdiag")
-    ibm = probdiffeq.prior_iwp(ssm=ssm)
+    iwp = probdiffeq.prior_iwp(ssm=ssm)
 
     # Build a solver
     ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_dynamic(
-        ssm=ssm, strategy=strategy, prior=ibm, constraint=ts
+        ssm=ssm, strategy=strategy, prior=iwp, constraint=ts
     )
-    error = probdiffeq.error_residual_std(constraint=ts, prior=ibm, ssm=ssm)
+    error = probdiffeq.error_residual_std(constraint=ts, prior=iwp, ssm=ssm)
 
     # Solve the ODE
     save_at = jnp.linspace(t0, t1, num=5, endpoint=True)

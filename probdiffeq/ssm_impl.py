@@ -650,27 +650,25 @@ class DenseConditional(AbstractConditional):
             raise ValueError(msg)
         return output_scale
 
-    def transition_ioup(self, M, base_scale=None):
+    def transition_ioup(self, *, rate: Array, base_scale: Array | None):
         Lambda = self._process_base_scale(base_scale)
 
-        ode_like = self.unravel(np.ones(self.flat_shape))[0]
-        if ode_like.shape == ():
-            M = np.eye(1) * M
-        if ode_like.ndim > 1:
+        ode_like, _ = tree.ravel_pytree(self.unravel(np.ones(self.flat_shape))[0])
+        if ode_like.ndim == 0:
+            rate = np.eye(1) * rate
+        elif ode_like.ndim > 1:
             msg = "Tensor-valued IOUPs have not been implemented (yet.)."
             raise NotImplementedError(msg)
 
         (d,) = self.ode_shape
-        assert M.shape == (d, d)  # todo: flatten M from pytree?
+        assert rate.shape == (d, d)  # todo: flatten M from pytree?
 
         eye_d = np.eye(d)
         a = linalg.diagonal_matrix(np.ones((self.num_derivatives,)), k=1)
         A = np.kron(a, eye_d)
         E = np.zeros((self.num_derivatives + 1, self.num_derivatives + 1))
         E = E.at[-1, -1].set(1.0)
-
-        # Something something Kronecker -> we seem to have to transpose M here
-        A += np.kron(E, M)
+        A += np.kron(E, rate)
 
         b = np.eye(self.num_derivatives + 1)[-1][:, None]
         B = np.kron(b, Lambda)
@@ -1329,7 +1327,9 @@ class IsotropicConditional(AbstractConditional):
 
         return discretise
 
-    def transition_ioup(self, M, base_scale):
+    def transition_ioup(self, rate, base_scale):
+        del rate
+        del base_scale
         msg = "Isotropic IOUPs have not been implemented (yet.)."
         msg += " If you need them, reach out."
         raise NotImplementedError(msg)
@@ -1530,7 +1530,9 @@ class BlockDiagConditional(AbstractConditional):
 
         return discretise
 
-    def transition_ioup(self, M, base_scale):
+    def transition_ioup(self, rate, base_scale):
+        del rate
+        del base_scale
         msg = "Isotropic IOUPs have not been implemented (yet.)."
         msg += " If you need them, reach out."
         raise NotImplementedError(msg)

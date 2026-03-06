@@ -39,7 +39,7 @@ def fixture_solution(constraint_ode_factory, fact):
 
     try:
         tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
-        init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
+        init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
         constraint = constraint_ode_factory(vf, ssm=ssm)
 
     except NotImplementedError:
@@ -50,9 +50,9 @@ def fixture_solution(constraint_ode_factory, fact):
 
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver_mle(
-        strategy=strategy, prior=ibm, constraint=constraint, ssm=ssm
+        strategy=strategy, prior=iwp, constraint=constraint, ssm=ssm
     )
-    error = probdiffeq.error_residual_std(constraint=constraint, prior=ibm, ssm=ssm)
+    error = probdiffeq.error_residual_std(constraint=constraint, prior=iwp, ssm=ssm)
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
     return func.jit(solve)(init, t0=t0, t1=t1, atol=1e-4, rtol=1e-4, damp=1e-9)
 

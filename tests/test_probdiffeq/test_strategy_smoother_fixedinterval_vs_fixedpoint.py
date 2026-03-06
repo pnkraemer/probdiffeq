@@ -20,11 +20,11 @@ def fixture_solver_setup(fact):
 @testing.fixture(name="solution_smoother")
 def fixture_solution_smoother(solver_setup):
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
+    init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
+    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
     solve = test_util.solve_adaptive_save_every_step(error=error, solver=solver)
     t0, t1 = solver_setup["t0"], solver_setup["t1"]
     return solve(init, t0=t0, t1=t1, dt0=0.1, atol=1e-3, rtol=1e-3)
@@ -35,11 +35,11 @@ def test_fixedpoint_smoother_equivalent_same_grid(
 ) -> None:
     """Test that with save_at=smoother_solution.t, the results should be identical."""
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
+    init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
+    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
 
     save_at = solution_smoother.t
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
@@ -76,11 +76,11 @@ def test_fixedpoint_smoother_equivalent_different_grid(
 
     # Re-generate the smoothing solver
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    _init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
+    _init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
     strategy_sm = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
     solver_smoother = probdiffeq.solver(
-        strategy=strategy_sm, prior=ibm, constraint=ts0, ssm=ssm
+        strategy=strategy_sm, prior=iwp, constraint=ts0, ssm=ssm
     )
 
     # Compute the offgrid-marginals
@@ -92,11 +92,11 @@ def test_fixedpoint_smoother_equivalent_different_grid(
 
     # Generate a fixedpoint solver and solve (saving at the interpolation points)
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
+    init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
     strategy_fp = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy_fp, prior=ibm, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
+    solver = probdiffeq.solver(strategy=strategy_fp, prior=iwp, constraint=ts0, ssm=ssm)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
     solution_fixedpoint = func.jit(solve)(
         init, save_at=ts, dt0=0.1, atol=1e-3, rtol=1e-3

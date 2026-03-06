@@ -14,11 +14,11 @@ def test_exponential_approximated_well(fact) -> None:
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = (*u0, vf(*u0, t=t0))
-    init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
+    init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver_dynamic(
-        strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
+        strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm
     )
 
     grid = np.linspace(t0, t1, num=20)

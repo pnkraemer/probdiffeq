@@ -39,8 +39,7 @@ def case_factory_prior_ioup():
 
     def prior(ssm):
         try:
-            M = np.eye(2)
-            return probdiffeq.prior_ioup(M=M, ssm=ssm)
+            return probdiffeq.prior_ioup(rate=np.eye(2), ssm=ssm)
         except NotImplementedError:
             reason = "This prior is not implemented"
             reason += ", likely due to the selected state-space factorisation."

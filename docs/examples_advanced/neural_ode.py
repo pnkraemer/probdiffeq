@@ -162,7 +162,7 @@ def loss_log_marginal_likelihood(vf, *, t0):
         """Loss function: log-marginal likelihood of the data."""
         # Build a solver
         tcoeffs = (*u0, vf(*u0, t=t0, p=p))
-        init, ibm, ssm = probdiffeq.prior_iwp(
+        init, iwp, ssm = probdiffeq.prior_iwp(
             tcoeffs, output_scale=output_scale, ssm_fact="dense"
         )
 
@@ -172,7 +172,7 @@ def loss_log_marginal_likelihood(vf, *, t0):
         ts0 = probdiffeq.constraint_ode_ts0(vf_p, ssm=ssm)
         strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
         solver_ts0 = probdiffeq.solver(
-            strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
+            strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm
         )
 
         # Solve

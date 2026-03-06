@@ -164,13 +164,13 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         # Build a solver
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
-        init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact="dense")
+        init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact="dense")
         ts1 = probdiffeq.constraint_ode_ts1(vf_probdiffeq, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
         solver = probdiffeq.solver_dynamic(
-            strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
+            strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm
         )
-        error = probdiffeq.error_residual_std(constraint=ts1, prior=ibm, ssm=ssm)
+        error = probdiffeq.error_residual_std(constraint=ts1, prior=iwp, ssm=ssm)
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(

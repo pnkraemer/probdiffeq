@@ -62,12 +62,12 @@ u0 = jnp.asarray([20.0, 20.0])
 
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
 init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="blockdiag")
-ibm = probdiffeq.prior_iwp(ssm=ssm)
+iwp = probdiffeq.prior_iwp(ssm=ssm)
 ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 
-solver = probdiffeq.solver_mle(strategy=strategy, prior=ibm, constraint=ts, ssm=ssm)
-error = probdiffeq.error_residual_std(constraint=ts, prior=ibm, ssm=ssm)
+solver = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts, ssm=ssm)
+error = probdiffeq.error_residual_std(constraint=ts, prior=iwp, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
 
 

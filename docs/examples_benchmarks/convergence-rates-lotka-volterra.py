@@ -184,11 +184,11 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
 
         # Build a solver
-        init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact="dense")
+        init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact="dense")
         strategy = probdiffeq.strategy_filter(ssm=ssm)
         ts = probdiffeq.constraint_ode_ts1(vf_probdiffeq, ssm=ssm)
-        solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts, ssm=ssm)
-        error = probdiffeq.error_residual_std(constraint=ts, prior=ibm, ssm=ssm)
+        solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts, ssm=ssm)
+        error = probdiffeq.error_residual_std(constraint=ts, prior=iwp, ssm=ssm)
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(

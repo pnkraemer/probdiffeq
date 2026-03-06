@@ -192,14 +192,14 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (y0,), num=num_derivatives - 1)
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
-        init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, output_scale=base_scale)
+        init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, output_scale=base_scale)
         ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         solver = probdiffeq.solver_dynamic(
-            strategy=strategy, prior=ibm, constraint=ts, ssm=ssm
+            strategy=strategy, prior=iwp, constraint=ts, ssm=ssm
         )
-        error = probdiffeq.error_state_std(constraint=ts, prior=ibm, ssm=ssm)
+        error = probdiffeq.error_state_std(constraint=ts, prior=iwp, ssm=ssm)
 
         solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
         solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
@@ -243,7 +243,7 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
         )
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
-        init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, output_scale=base_scale)
+        init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, output_scale=base_scale)
 
         # We build a Jet constraint
         jet = probdiffeq.constraint_dae_jet(
@@ -253,12 +253,12 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
 
         # For proper DAEs, non-iterated solver's simply don't cut it
         solver = probdiffeq.solver_dynamic(
-            strategy=strategy, prior=ibm, constraint=jet, ssm=ssm
+            strategy=strategy, prior=iwp, constraint=jet, ssm=ssm
         )
 
         # The state-error-estimate doesn't care about the dimension
         # of the DAE, which is exactly what we need here
-        error = probdiffeq.error_state_std(constraint=jet, prior=ibm, ssm=ssm)
+        error = probdiffeq.error_state_std(constraint=jet, prior=iwp, ssm=ssm)
 
         # TODO: build PID controllers (is this "gustafsson"?) for iterated solvers?
         solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)

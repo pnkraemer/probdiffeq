@@ -93,13 +93,13 @@ H0 = hamiltonian_1st(u0_1st)
 
 tcoeffs = [u0_1st]
 init, ssm = probdiffeq.ssm_taylor(tcoeffs, diffuse_derivatives=2)
-ibm = probdiffeq.prior_iwp(ssm=ssm)
+iwp = probdiffeq.prior_iwp(ssm=ssm)
 ts1 = probdiffeq.constraint_ode_ts1(vf_1st, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 solver_1st = probdiffeq.solver_mle(
-    strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
+    strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm
 )
-error = probdiffeq.error_state_std(constraint=ts1, prior=ibm, ssm=ssm)
+error = probdiffeq.error_state_std(constraint=ts1, prior=iwp, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, error=error)
 
 # -
@@ -140,7 +140,7 @@ def root(u, du, ddu, /, *, t):
 u0, du0 = jnp.split(u0_1st, 2)
 tcoeffs = [u0, du0]
 init, ssm = probdiffeq.ssm_taylor(tcoeffs, diffuse_derivatives=1)
-ibm = probdiffeq.prior_iwp(ssm=ssm)
+iwp = probdiffeq.prior_iwp(ssm=ssm)
 
 # -
 
@@ -151,7 +151,7 @@ ibm = probdiffeq.prior_iwp(ssm=ssm)
 ts1 = probdiffeq.constraint_root_ts1(root, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 solver_2nd = probdiffeq.solver_mle(
-    strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
+    strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm
 )
 
 # -
@@ -164,7 +164,7 @@ solver_2nd = probdiffeq.solver_mle(
 
 # +
 
-error = probdiffeq.error_state_std(constraint=ts1, prior=ibm, ssm=ssm)
+error = probdiffeq.error_state_std(constraint=ts1, prior=iwp, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, error=error)
 
 sol_2 = jax.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)

@@ -26,11 +26,11 @@ def fixture_solution_and_loss_and_data(strategy_func, fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
-    init, ibm, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
+    init, iwp, ssm = probdiffeq.prior_iwp(tcoeffs, ssm_fact=fact)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = strategy_func(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
+    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
     sol = func.jit(solve)(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2)
 
