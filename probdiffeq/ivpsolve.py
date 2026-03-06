@@ -138,7 +138,7 @@ def solve_adaptive_terminal_values(
     solver: Solver,
     error,
     control: Control | None = None,
-    clip_dt: bool = False,
+    clip_dt: bool = True,
     while_loop: Callable = flow.while_loop,
 ) -> Callable[..., Solution]:
     """Simulate the terminal values of an initial value problem."""

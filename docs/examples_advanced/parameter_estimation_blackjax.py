@@ -1,11 +1,12 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -162,8 +163,6 @@ theta_true = u0 + 0.5 * jnp.flip(u0)
 theta_guess = u0  # initial guess
 
 
-# -
-
 # +
 
 
@@ -267,8 +266,6 @@ data = solve_fixed(theta_true, ts=ts).u.mean[0][-1]
 log_M = functools.partial(logposterior_fn, data=data, ts=ts)
 
 
-# -
-
 # +
 
 
@@ -355,7 +352,6 @@ states = inference_loop(
 
 solution_samples = jax.vmap(solve_save_at)(states.position)
 
-# -
 
 # +
 
@@ -423,8 +419,6 @@ log_M_vmapped_x = jax.vmap(log_M, in_axes=-1, out_axes=-1)
 log_M_vmapped = jax.vmap(log_M_vmapped_x, in_axes=-1, out_axes=-1)
 Zs = log_M_vmapped(Thetas)
 
-
-# -
 
 # +
 

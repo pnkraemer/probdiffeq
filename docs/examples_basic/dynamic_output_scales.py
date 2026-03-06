@@ -1,11 +1,12 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -48,9 +49,6 @@ if not backend.has_been_selected:
 jax.config.update("jax_debug_nans", True)
 
 
-# -
-
-
 # +
 f, u0, (t0, t1), f_args = ivps.affine_independent(initial_values=1.0, a=2.0)
 
@@ -61,8 +59,6 @@ def vf(y, /, *, t):
     del t
     return f(y, *f_args)
 
-
-# -
 
 # +
 
@@ -77,7 +73,6 @@ dynamic = probdiffeq.solver_dynamic(
 )
 mle = probdiffeq.solver_mle(strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm)
 
-# -
 
 # +
 

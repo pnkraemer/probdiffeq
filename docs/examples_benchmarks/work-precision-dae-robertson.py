@@ -197,17 +197,11 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         solver = probdiffeq.solver_dynamic(
-            strategy=strategy,
-            prior=ibm,
-            constraint=ts,
-            ssm=ssm,
-            re_linearize_after_calibration=True,
+            strategy=strategy, prior=ibm, constraint=ts, ssm=ssm
         )
         error = probdiffeq.error_state_std(constraint=ts, prior=ibm, ssm=ssm)
 
-        solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, error=error, clip_dt=True
-        )
+        solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
         solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
 
         return jax.block_until_ready(solution.u.mean[0])
@@ -252,22 +246,15 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
 
         # For proper DAEs, non-iterated solver's simply don't cut it
         solver = probdiffeq.solver_dynamic(
-            strategy=strategy,
-            prior=ibm,
-            constraint=jet,
-            ssm=ssm,
-            re_linearize_after_calibration=True,
+            strategy=strategy, prior=ibm, constraint=jet, ssm=ssm
         )
 
         # The state-error-estimate doesn't care about the dimension
         # of the DAE, which is exactly what we need here
         error = probdiffeq.error_state_std(constraint=jet, prior=ibm, ssm=ssm)
 
-        # Integral controllers just work better than proportional-integral ones
         # TODO: build PID controllers (is this "gustafsson"?) for iterated solvers?
-        solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, error=error, clip_dt=True
-        )
+        solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
         solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
 
         return jax.block_until_ready(solution.u.mean[0])
@@ -313,11 +300,7 @@ def solver_dae_ioup(*, num_derivatives: int, time_span) -> Callable:
 
         # For proper DAEs, non-iterated solver's simply don't cut it
         solver = probdiffeq.solver_dynamic(
-            strategy=strategy,
-            prior=ioup,
-            constraint=jet,
-            ssm=ssm,
-            re_linearize_after_calibration=True,
+            strategy=strategy, prior=ioup, constraint=jet, ssm=ssm
         )
 
         # The state-error-estimate doesn't care about the dimension
@@ -326,9 +309,7 @@ def solver_dae_ioup(*, num_derivatives: int, time_span) -> Callable:
 
         # Integral controllers just work better than proportional-integral ones
         # TODO: build PID controllers (is this "gustafsson"?) for iterated solvers?
-        solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, error=error, clip_dt=True
-        )
+        solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
         solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
 
         return jax.block_until_ready(solution.u.mean[0])

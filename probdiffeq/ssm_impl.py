@@ -854,9 +854,6 @@ def nlstsq_constrained_gauss_newton(*, maxiter, tol, lstsq=linalg.lstsq):
 
             H = Jx @ cholesky
             r = state.fx + Jx @ (mean - state.x)
-
-            n = len(state.x)
-
             dy = lstsq(H, r)
             dx = mean - state.x - cholesky @ dy
             xnew = state.x + dx

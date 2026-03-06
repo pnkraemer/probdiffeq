@@ -1,11 +1,12 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -81,8 +82,6 @@ def main() -> None:
     plt.show()
 
 
-# -
-
 # +
 
 
@@ -97,8 +96,6 @@ def simulator(save_at, error, solver):
 
     return solve
 
-
-# -
 
 # +
 
@@ -138,12 +135,8 @@ def _laplace_2d(grid, dx):
     return grid[1:-1, 1:-1]
 
 
-# -
-
 # +
 
 
 if __name__ == "__main__":
     main()
-
-# -

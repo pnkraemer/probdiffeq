@@ -1,11 +1,12 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -125,10 +126,8 @@ sensitivities = jax.jit(jax.grad(parameter_to_data_fit))
 # We can differentiate the function forward- and reverse-mode
 # (the latter is possible because we use fixed steps)
 
-# +
 parameter_to_data_fit(parameter_guess)
 sensitivities(parameter_guess)
-# -
 
 # Now, enter optax: build an optimizer,
 # and optimise the parameter-to-model-fit function.
@@ -154,7 +153,6 @@ def build_update_fn(*, optimizer, loss_fn):
 optim = optax.adam(learning_rate=1e-2)
 update_fn = build_update_fn(optimizer=optim, loss_fn=parameter_to_data_fit)
 
-# -
 
 # +
 
@@ -178,5 +176,3 @@ solution_better = solve(p)
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
 plt.plot(ts, solution_better.u.mean[0])
 plt.show()
-
-# -

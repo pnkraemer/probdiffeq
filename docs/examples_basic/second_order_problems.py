@@ -1,11 +1,12 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -63,8 +64,6 @@ solver_1st = probdiffeq.solver_mle(
 error_1st = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
 
 
-# -
-
 # +
 
 
@@ -101,8 +100,6 @@ solver_2nd = probdiffeq.solver_mle(
     strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
 )
 error_2nd = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
-
-# -
 
 
 # +

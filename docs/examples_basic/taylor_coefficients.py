@@ -1,11 +1,12 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -58,7 +59,6 @@ def vf(y, /, *, t):
 # Here is a wrapper arounds Probdiffeq's solution routine.
 
 
-# +
 def solve(tc):
     """Solve the ODE."""
     init, prior, ssm = probdiffeq.prior_iwp(tc, ssm_fact="dense")
@@ -73,16 +73,12 @@ def solve(tc):
     return solve(init, save_at=ts, atol=1e-2, rtol=1e-2)
 
 
-# -
-
 # It's time to solve some ODEs:
 
-# +
 tcoeffs = taylor.odejet_padded_scan(lambda *y: vf(*y, t=t0), [u0], num=2)
 solution = solve(tcoeffs)
 print(jax.tree.map(jnp.shape, solution))
 
-# -
 
 # The type of solution.u matches that of the initial condition.
 
@@ -128,5 +124,3 @@ print(jax.tree.map(jnp.shape, solution.u.mean))
 print(jax.tree.map(jnp.shape, solution.u.std))
 print(jax.tree.map(jnp.shape, sample_one))
 print(jax.tree.map(jnp.shape, sample_many))
-
-# -
