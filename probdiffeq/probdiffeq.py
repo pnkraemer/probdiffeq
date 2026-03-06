@@ -1293,6 +1293,18 @@ def prior_wiener_integrated(
     return ssm.conditional.transition_wiener_integrated(base_scale=output_scale)
 
 
+def prior_oscillator(
+    linop: Callable, /, *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
+):
+    def vf_linear(*tcoeffs):
+        assert len(tcoeffs) > 1
+        return linop(tcoeffs[-2])
+
+    return ssm.conditional.transition_exponential(
+        vf_linear=vf_linear, base_scale=output_scale
+    )
+
+
 def prior_ornstein_uhlenbeck_integrated(
     linop: Callable, /, *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
 ):

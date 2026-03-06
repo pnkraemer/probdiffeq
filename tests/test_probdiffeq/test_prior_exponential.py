@@ -71,6 +71,29 @@ def test_ioup_matches_the_equivalent_exponential():
     assert testing.allclose(cond1, cond2)
 
 
+def test_oscillator_matches_the_equivalent_exponential():
+    u = np.ones((4,))
+    M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
+    tcoeffs = [u, u, u, u]
+
+    def vf_exponential(u, du, ddu, dddu):
+        return linop_ioup(ddu)
+
+    def linop_ioup(x):
+        return M @ x
+
+    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
+    exponential = probdiffeq.prior_exponential(vf_exponential, ssm=ssm)
+
+    ioup = probdiffeq.prior_oscillator(linop_ioup, ssm=ssm)
+
+    scale = 12.3456
+    dt = 0.123456
+    cond1 = func.jit(exponential)(dt, scale)
+    cond2 = func.jit(ioup)(dt, scale)
+    assert testing.allclose(cond1, cond2)
+
+
 def test_exponential_reduces_to_iwp():
     u = np.ones((2,))
     M = np.zeros((2, 2))
