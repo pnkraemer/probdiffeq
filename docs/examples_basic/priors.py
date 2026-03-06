@@ -13,114 +13,68 @@
 #     name: python3
 # ---
 
-# # Taylor coefficients
+# # Prior distributions
 #
-# To build a probabilistic solver, we need to build a specific state-space model.
-# To build this specific state-space model, we interact with Taylor coefficients.
-# Here are some examples how Taylor coefficients
-# play a role in Probdiffeq's solution routines.
+# Let's look at how different prior distributions behave.
 
 
 # +
-"""Demonstrate how central Taylor coefficient estimation is to Probdiffeq."""
-
-import collections
+"""Demonstrate prior distributions."""
 
 import jax
 import jax.numpy as jnp
-from diffeqzoo import backend, ivps
+import matplotlib.pyplot as plt
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import probdiffeq
 
-# Fail this notebook on NaN detection (to catch those in the CI)
-jax.config.update("jax_debug_nans", True)
-
-
-if not backend.has_been_selected:
-    backend.select("jax")  # ivp examples in jax
-
-# -
-
-# We start by defining an ODE.
-
-# +
-f, u0, (t0, t1), f_args = ivps.logistic()
+ts = jnp.linspace(0.0, 25.0, num=100, endpoint=True)
 
 
-def vf(y, /, *, t):
-    """Evaluate the vector field."""
-    del t
-    return f(y, *f_args)
+def vf_matern(u, du, ddu):
+    """Matern 5/2"""
+    ell = 0.5
+    return -(ell**3) * u - 3 * ell**2 * du - 3 * ell * ddu
 
 
-# -
+def vf_oscillator(u, du, ddu):
+    """Oscillating prior"""
+    return -du  # always the second highest coefficient
 
 
-# Here is a wrapper arounds Probdiffeq's solution routine.
+def vf_ioup(u, du, ddu):
+    """Integrated Ornstein-Uhlenbeck"""
+    return -ddu  # always the highest coefficient
 
 
-def solve(tc):
-    """Solve the ODE."""
-    init, ssm = probdiffeq.ssm_taylor(tc, ssm_fact="dense")
-    prior = probdiffeq.prior_wiener_integrated(ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver = probdiffeq.solver_mle(
-        strategy=strategy, prior=prior, constraint=ts0, ssm=ssm
-    )
-    ts = jnp.linspace(t0, t1, endpoint=True, num=10)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=prior, ssm=ssm)
-    solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    return solve(init, save_at=ts, atol=1e-2, rtol=1e-2)
+def vf_iwp(u, du, ddu):
+    """Integrated Wiener"""
+    return 0.0 * u  # always zeros
 
 
-# It's time to solve some ODEs:
-
-tcoeffs = taylor.odejet_padded_scan(lambda *y: vf(*y, t=t0), [u0], num=2)
-solution = solve(tcoeffs)
-print(jax.tree.map(jnp.shape, solution))
-
-
-# The type of solution.u matches that of the initial condition.
-
-# +
-
-print(jax.tree.map(jnp.shape, tcoeffs))
-print(jax.tree.map(jnp.shape, solution.u))
-
-
-# -
-
-# Anything that behaves like a list work.
-# For example, we can use lists or tuples, but also named tuples.
-
-# +
-
-CustomTCoeffs = collections.namedtuple(
-    "CustomTCoeffs", ["state", "velocity", "acceleration"]
+fig, axes = plt.subplots(
+    nrows=3, ncols=4, sharex=True, sharey=False, figsize=(8, 5), constrained_layout=True
 )
-tcoeffs = CustomTCoeffs(*tcoeffs)
-solution = solve(tcoeffs)
+for i, (vf_prior, ax_col) in enumerate(
+    zip([vf_oscillator, vf_matern, vf_ioup, vf_iwp], axes.T)
+):
+    init, ssm = probdiffeq.ssm_taylor_diffuse([0.0, 0.0, 2.0], [2.0, 2.0, 2.0])
 
-print(jax.tree.map(jnp.shape, tcoeffs))
-print(jax.tree.map(jnp.shape, solution))
-print(jax.tree.map(jnp.shape, solution.u))
+    prior = probdiffeq.prior_exponential(vf_prior, ssm=ssm, output_scale=1.0)
+    mseq = probdiffeq.MarkovSequence.from_grid(init, prior, grid=ts, reverse=False)
+
+    num_samples = 3
+    key = jax.random.PRNGKey(i)
+    sample_fun = jax.jit(mseq.sample, static_argnames=["shape", "ssm"])
+    samples_prior = sample_fun(key, ssm=ssm, shape=(num_samples,))
+
+    ax_col[0].set_title(vf_prior.__doc__, fontsize="medium")
+
+    for s, ax in zip(samples_prior, ax_col):
+        ax.plot(ts, s.T, color=f"C{i}", linewidth=1.0)
+
+axes[0][0].set_ylabel("State", fontsize="medium")
+axes[1][0].set_ylabel("Velocity", fontsize="medium")
+axes[2][0].set_ylabel("Acceleration", fontsize="medium")
 
 
-# -
-
-# The same applies to statistical quantities that we can extract from the solution.
-# For example, the standard deviation or samples from the solution object:
-
-# +
-
-key = jax.random.PRNGKey(seed=15)
-_, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
-posterior = solution.solution_full
-sample_one = posterior.sample(key, ssm=ssm)
-sample_many = posterior.sample(key, ssm=ssm, shape=(1, 2, 3))
-
-print(jax.tree.map(jnp.shape, solution.u.mean))
-print(jax.tree.map(jnp.shape, solution.u.std))
-print(jax.tree.map(jnp.shape, sample_one))
-print(jax.tree.map(jnp.shape, sample_many))
+plt.show()

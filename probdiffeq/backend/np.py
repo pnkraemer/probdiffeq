@@ -242,3 +242,11 @@ def triu(arr, /):
 
 def dtype(arr_or_dtype, /):
     return jnp.dtype(arr_or_dtype)
+
+
+def binomial_coeff(n, k):
+    return jnp.exp(
+        jax.scipy.special.gammaln(n + 1)
+        - jax.scipy.special.gammaln(k + 1)
+        - jax.scipy.special.gammaln(n - k + 1)
+    )

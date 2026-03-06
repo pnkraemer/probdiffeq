@@ -1,25 +1,92 @@
-"""Tests for IOUP."""
+"""Tests for exponential priors."""
 
 from probdiffeq import probdiffeq
 from probdiffeq.backend import func, linalg, np, random, testing, tree
 
 
-def test_ioup_reduces_to_iwp():
+def test_matern32_matches_the_equivalent_exponential():
+    u = np.ones((4,))
+    M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
+    tcoeffs = [u, u]
+
+    ell = 0.3456
+
+    def vf_exponential(u, du):
+        return -(ell**2) * u - 2 * ell * du
+
+    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
+    exponential = probdiffeq.prior_exponential(vf_exponential, ssm=ssm)
+
+    matern = probdiffeq.prior_matern(ell, ssm=ssm)
+
+    scale = 12.3456
+    dt = 0.123456
+    cond1 = func.jit(exponential)(dt, scale)
+    cond2 = func.jit(matern)(dt, scale)
+    assert testing.allclose(cond1, cond2)
+
+
+def test_matern52_matches_the_equivalent_exponential():
+    u = np.ones((4,))
+    M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
+    tcoeffs = [u, u, u]
+
+    ell = 0.3456
+
+    def vf_exponential(u, du, ddu):
+        return -(ell**3) * u - 3 * ell**2 * du - 3 * ell * ddu
+
+    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
+    exponential = probdiffeq.prior_exponential(vf_exponential, ssm=ssm)
+
+    matern = probdiffeq.prior_matern(ell, ssm=ssm)
+
+    scale = 12.3456
+    dt = 0.123456
+    cond1 = func.jit(exponential)(dt, scale)
+    cond2 = func.jit(matern)(dt, scale)
+    assert testing.allclose(cond1, cond2)
+
+
+def test_ioup_matches_the_equivalent_exponential():
+    u = np.ones((4,))
+    M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
+    tcoeffs = [u, u, u, u]
+
+    def vf_exponential(u, du, ddu, dddu):
+        return linop_ioup(dddu)
+
+    def linop_ioup(x):
+        return M @ x
+
+    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
+    exponential = probdiffeq.prior_exponential(vf_exponential, ssm=ssm)
+
+    ioup = probdiffeq.prior_ornstein_uhlenbeck_integrated(linop_ioup, ssm=ssm)
+
+    scale = 12.3456
+    dt = 0.123456
+    cond1 = func.jit(exponential)(dt, scale)
+    cond2 = func.jit(ioup)(dt, scale)
+    assert testing.allclose(cond1, cond2)
+
+
+def test_exponential_reduces_to_iwp():
     u = np.ones((2,))
     M = np.zeros((2, 2))
-    tcoeffs = [u, u, u, u, u]
+    tcoeffs = [u, u, u, u]
 
-    def vf_linear(u):
+    def vf_linear(u, du, ddu, dddu):
         return np.zeros_like(u)
 
     _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
-    ioup = probdiffeq.prior_exponential(vf_linear, ssm=ssm)
+    exponential = probdiffeq.prior_exponential(vf_linear, ssm=ssm)
     iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
 
     scale = 12.3456
     dt = 0.123456
 
-    cond1 = func.jit(ioup)(dt, scale)
+    cond1 = func.jit(exponential)(dt, scale)
     cond2 = func.jit(iwp)(dt, scale)
     assert testing.allclose(cond1, cond2)
 
@@ -29,12 +96,12 @@ def test_exponential_raises_error_if_vf_linear_is_bad():
     M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
     tcoeffs = [u] * 2
 
-    def vf_linear(ddu, du, u):
-        return M @ u.ravel()
+    def vf_linear(u, du, ddu):
+        return M @ ddu.ravel()
 
     _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
     with testing.raises(TypeError, match="Taylor coefficients"):
-        ioup = probdiffeq.prior_exponential(vf_linear, ssm=ssm)
+        exponential = probdiffeq.prior_exponential(vf_linear, ssm=ssm)
 
     # Sanity check: equal order is fine
     tcoeffs = [u] * 3
@@ -42,22 +109,21 @@ def test_exponential_raises_error_if_vf_linear_is_bad():
     _ = probdiffeq.prior_exponential(vf_linear, ssm=ssm)
 
 
-@testing.parametrize("shape", [(), (3,), (3, 3)])
-@testing.parametrize("n", [2, 4])
-def test_ioup_transition_as_expected(shape, n):
+@testing.parametrize("ode_shape", [(), (3,), (3, 3)])
+def test_exponential_transition_as_expected(ode_shape):
     """Follow Proposition 1 in https://arxiv.org/abs/2305.14978."""
-    u = np.ones(shape)
+    u = np.ones(ode_shape)
     M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
-    tcoeffs = [u] * n
+    tcoeffs = [u] * 3
 
-    def vf_linear(u):
-        return M @ u.ravel()
+    def vf_linear(u, du, ddu):
+        return M @ ddu.ravel()
 
     _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
-    ioup = probdiffeq.prior_exponential(vf_linear, ssm=ssm)
+    exponential = probdiffeq.prior_exponential(vf_linear, ssm=ssm)
 
     dt = 0.123456
-    cond = func.jit(ioup)(dt)
+    cond = func.jit(exponential)(dt)
     cond = ssm.conditional.preconditioner_apply(cond)
     A_received = cond.A
 
@@ -73,14 +139,14 @@ def test_ioup_transition_as_expected(shape, n):
 
 
 @testing.parametrize("ssm_fact", ["isotropic", "blockdiag"])
-def test_ioup_not_implemented_for_isotropic_or_blockdiag(ssm_fact):
+def test_exponential_not_implemented_for_isotropic_or_blockdiag(ssm_fact):
     u = np.ones((2,))
     M = np.zeros((2, 2))
-    tcoeffs = [u, u, u, u, u]
+    tcoeffs = [u, u, u]
 
     _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=ssm_fact)
 
-    def vf_linear(u):
+    def vf_linear(u, du, ddu):
         return np.zeros_like(u)
 
     with testing.raises(NotImplementedError, match="reach out"):

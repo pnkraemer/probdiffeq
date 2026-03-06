@@ -1290,7 +1290,38 @@ def prior_wiener_integrated(
     *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
 ):
     """Construct a repeatedly-integrated Wiener process."""
-    return ssm.conditional.transition_iwp(base_scale=output_scale)
+    return ssm.conditional.transition_wiener_integrated(base_scale=output_scale)
+
+
+def prior_ornstein_uhlenbeck_integrated(
+    linop: Callable, /, *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
+):
+    def vf_linear(*tcoeffs):
+        return linop(tcoeffs[-1])
+
+    return ssm.conditional.transition_exponential(
+        vf_linear=vf_linear, base_scale=output_scale
+    )
+
+
+def prior_matern(
+    lengthscale: Array,
+    /,
+    *,
+    ssm: ssm_impl.FactSsmImpl,
+    output_scale: Array | None = None,
+):
+    def vf_linear(*tcoeffs):
+        D = len(tcoeffs)
+        coeffs = [np.binomial_coeff(D, i) for i in range(D)]
+        output = 0.0
+        for c, n, u in zip(coeffs, range(D, -1, -1), tcoeffs):
+            output -= c * lengthscale**n * u
+        return output
+
+    return ssm.conditional.transition_exponential(
+        vf_linear=vf_linear, base_scale=output_scale
+    )
 
 
 def prior_exponential(
@@ -1306,14 +1337,24 @@ def prior_exponential(
     methods from https://arxiv.org/abs/2310.13462.
     """
     # TODO: offer a "jacobian" option to enable isotropic and blockdiag implementations?
-    ioup_order = _verify_ioup_signature_and_parse_order(vf_linear)
-    if ioup_order > ssm.num_derivatives + 1:
-        msg = "The exponential prior must not "
-        msg += "require more Taylor coefficients than available."
+    prior_order = _verify_ioup_signature_and_parse_order(vf_linear)
+    if prior_order != ssm.num_derivatives + 1:
+        msg = f"""The exponential prior does not match the Taylor coefficients in the SSM.
+
+        Concretely: 
+
+        - For two Taylor coefficients, we expect `f(u, du, /)`.
+        - For three Taylor coefficients, we expect `f(u, du, ddu /)`.
+        - For two Taylor coefficients, we expect `f(u, du, ddu, dddu/)`.
+        
+        and so on. The passed dynamics correspond to **{prior_order}** Taylor
+        coefficients, whereas the state-space model includes **{ssm.num_derivatives + 1}**
+        Taylor coeffients.
+        """
         raise TypeError(msg)
 
-    return ssm.conditional.transition_ioup(
-        vf_linear=vf_linear, vf_order=ioup_order, base_scale=output_scale
+    return ssm.conditional.transition_exponential(
+        vf_linear=vf_linear, base_scale=output_scale
     )
 
 

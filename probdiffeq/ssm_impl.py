@@ -222,14 +222,12 @@ class AbstractConditional(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def transition_iwp(self, output_scale: Array | None):
+    def transition_wiener_integrated(self, output_scale: Array | None):
         """Construct the transitions for an integrated Wiener process."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def transition_ioup(
-        self, vf_linear: Callable, vf_order: int, base_scale: Array | None
-    ):
+    def transition_exponential(self, vf_linear: Callable, base_scale: Array | None):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -604,7 +602,7 @@ class DenseConditional(AbstractConditional):
         ones = np.ones((n,))
         return LatentCond(A, noise, to_latent=ones, to_observed=ones)
 
-    def transition_iwp(self, base_scale: Array | None):
+    def transition_wiener_integrated(self, base_scale: Array | None):
         Lambda = self._process_base_scale(base_scale)
 
         # Construct the transitions
@@ -656,9 +654,7 @@ class DenseConditional(AbstractConditional):
             raise ValueError(msg)
         return output_scale
 
-    def transition_ioup(
-        self, vf_linear: Array, vf_order: int, base_scale: Array | None
-    ):
+    def transition_exponential(self, vf_linear: Array, base_scale: Array | None):
         Lambda = self._process_base_scale(base_scale)
 
         # Turn the linear vector field into the bottom block of the IOUP
@@ -670,7 +666,7 @@ class DenseConditional(AbstractConditional):
 
         def vf_flat(tcoeffs):
             tcoeffs_tree = tree.tree_map(unravel, tcoeffs)
-            fx = vf_linear(*tcoeffs_tree[-vf_order:])
+            fx = vf_linear(*tcoeffs_tree)
             return tree.ravel_pytree(fx)[0]
 
         rate = func.jacfwd(vf_flat)(leaves)
@@ -1308,7 +1304,7 @@ class IsotropicConditional(AbstractConditional):
         ones = np.ones((num,))
         return LatentCond(matrix, noise, to_latent=ones, to_observed=ones)
 
-    def transition_iwp(self, base_scale: Array | None):
+    def transition_wiener_integrated(self, base_scale: Array | None):
 
         if base_scale is None:
             base_scale = np.ones(())
@@ -1340,7 +1336,7 @@ class IsotropicConditional(AbstractConditional):
 
         return discretise
 
-    def transition_ioup(self, vf_linear, vf_order, base_scale):
+    def transition_exponential(self, vf_linear, base_scale):
         del vf_linear
         del base_scale
         msg = "Isotropic IOUPs have not been implemented (yet.)."
@@ -1498,7 +1494,7 @@ class BlockDiagConditional(AbstractConditional):
         matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
         return LatentCond.from_linop_and_noise(matrix, noise)
 
-    def transition_iwp(self, base_scale: Array | None):
+    def transition_wiener_integrated(self, base_scale: Array | None):
 
         base_scale_expected = self.unravel_leaf(np.ones(self.ode_shape))
         if base_scale is None:
@@ -1546,7 +1542,7 @@ class BlockDiagConditional(AbstractConditional):
 
         return discretise
 
-    def transition_ioup(self, vf_linear, vf_order, base_scale):
+    def transition_exponential(self, vf_linear, base_scale):
         del vf_linear
         del base_scale
         msg = "Isotropic IOUPs have not been implemented (yet.)."
