@@ -31,23 +31,23 @@ ts = jnp.linspace(0.0, 25.0, num=100, endpoint=True)
 
 
 def vf_matern(u, du, ddu):
-    """Matern 5/2"""
+    """Matern 5/2."""
     ell = 0.5
     return -(ell**3) * u - 3 * ell**2 * du - 3 * ell * ddu
 
 
-def vf_oscillator(u, du, ddu):
-    """Oscillating prior"""
+def vf_oscillator(_u, du, _ddu):
+    """Oscillating prior."""
     return -du  # always the second highest coefficient
 
 
-def vf_ioup(u, du, ddu):
-    """Integrated Ornstein-Uhlenbeck"""
+def vf_ioup(_u, _du, ddu):
+    """Integrated Ornstein-Uhlenbeck."""
     return -ddu  # always the highest coefficient
 
 
-def vf_iwp(u, du, ddu):
-    """Integrated Wiener"""
+def vf_iwp(u, _du, _ddu):
+    """Integrated Wiener."""
     return 0.0 * u  # always zeros
 
 

@@ -1289,13 +1289,15 @@ def _add_diffuse_derivatives(
 def prior_wiener_integrated(
     *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
 ):
-    """Construct a repeatedly-integrated Wiener process."""
+    """Construct an integrated Wiener process prior."""
     return ssm.conditional.transition_wiener_integrated(base_scale=output_scale)
 
 
 def prior_oscillator(
     linop: Callable, /, *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
 ):
+    """Construct an oscillating prior."""
+
     def vf_linear(*tcoeffs):
         assert len(tcoeffs) > 1
         return linop(tcoeffs[-2])
@@ -1308,6 +1310,8 @@ def prior_oscillator(
 def prior_ornstein_uhlenbeck_integrated(
     linop: Callable, /, *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
 ):
+    """Construct an integrated Ornstein-Uhlenbeck prior."""
+
     def vf_linear(*tcoeffs):
         return linop(tcoeffs[-1])
 
@@ -1323,6 +1327,8 @@ def prior_matern(
     ssm: ssm_impl.FactSsmImpl,
     output_scale: Array | None = None,
 ):
+    """Construct a Matern prior."""
+
     def vf_linear(*tcoeffs):
         D = len(tcoeffs)
         coeffs = [np.binomial_coeff(D, i) for i in range(D)]
@@ -1343,7 +1349,7 @@ def prior_exponential(
     ssm: ssm_impl.FactSsmImpl,
     output_scale: Array | None = None,
 ):
-    """Construct a repeatedly-integrated Ornstein-Uhlenbeck process.
+    """Construct an exponential integrator prior.
 
     According to https://arxiv.org/abs/2305.14978, but following the numerical
     methods from https://arxiv.org/abs/2310.13462.
@@ -1353,12 +1359,12 @@ def prior_exponential(
     if prior_order != ssm.num_derivatives + 1:
         msg = f"""The exponential prior does not match the Taylor coefficients in the SSM.
 
-        Concretely: 
+        Concretely:
 
         - For two Taylor coefficients, we expect `f(u, du, /)`.
         - For three Taylor coefficients, we expect `f(u, du, ddu /)`.
         - For two Taylor coefficients, we expect `f(u, du, ddu, dddu/)`.
-        
+
         and so on. The passed dynamics correspond to **{prior_order}** Taylor
         coefficients, whereas the state-space model includes **{ssm.num_derivatives + 1}**
         Taylor coeffients.

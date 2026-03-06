@@ -4,9 +4,8 @@ from probdiffeq import probdiffeq
 from probdiffeq.backend import func, linalg, np, random, testing, tree
 
 
-def test_matern32_matches_the_equivalent_exponential():
+def test_exponential_prior_matches_matern32():
     u = np.ones((4,))
-    M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
     tcoeffs = [u, u]
 
     ell = 0.3456
@@ -26,9 +25,8 @@ def test_matern32_matches_the_equivalent_exponential():
     assert testing.allclose(cond1, cond2)
 
 
-def test_matern52_matches_the_equivalent_exponential():
+def test_exponential_prior_matches_matern52():
     u = np.ones((4,))
-    M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
     tcoeffs = [u, u, u]
 
     ell = 0.3456
@@ -48,12 +46,15 @@ def test_matern52_matches_the_equivalent_exponential():
     assert testing.allclose(cond1, cond2)
 
 
-def test_ioup_matches_the_equivalent_exponential():
+def test_exponential_prior_matches_ioup():
     u = np.ones((4,))
     M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
     tcoeffs = [u, u, u, u]
 
     def vf_exponential(u, du, ddu, dddu):
+        del u
+        del du
+        del ddu
         return linop_ioup(dddu)
 
     def linop_ioup(x):
@@ -71,12 +72,15 @@ def test_ioup_matches_the_equivalent_exponential():
     assert testing.allclose(cond1, cond2)
 
 
-def test_oscillator_matches_the_equivalent_exponential():
+def test_exponential_prior_matches_oscillator():
     u = np.ones((4,))
     M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
     tcoeffs = [u, u, u, u]
 
     def vf_exponential(u, du, ddu, dddu):
+        del u
+        del du
+        del dddu
         return linop_ioup(ddu)
 
     def linop_ioup(x):
@@ -94,12 +98,14 @@ def test_oscillator_matches_the_equivalent_exponential():
     assert testing.allclose(cond1, cond2)
 
 
-def test_exponential_reduces_to_iwp():
+def test_exponential_prior_matches_iwp():
     u = np.ones((2,))
-    M = np.zeros((2, 2))
     tcoeffs = [u, u, u, u]
 
     def vf_linear(u, du, ddu, dddu):
+        del du
+        del ddu
+        del dddu
         return np.zeros_like(u)
 
     _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
@@ -120,11 +126,13 @@ def test_exponential_raises_error_if_vf_linear_is_bad():
     tcoeffs = [u] * 2
 
     def vf_linear(u, du, ddu):
+        del u
+        del du
         return M @ ddu.ravel()
 
     _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
     with testing.raises(TypeError, match="Taylor coefficients"):
-        exponential = probdiffeq.prior_exponential(vf_linear, ssm=ssm)
+        _ = probdiffeq.prior_exponential(vf_linear, ssm=ssm)
 
     # Sanity check: equal order is fine
     tcoeffs = [u] * 3
@@ -140,6 +148,8 @@ def test_exponential_transition_as_expected(ode_shape):
     tcoeffs = [u] * 3
 
     def vf_linear(u, du, ddu):
+        del u
+        del du
         return M @ ddu.ravel()
 
     _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
@@ -164,12 +174,13 @@ def test_exponential_transition_as_expected(ode_shape):
 @testing.parametrize("ssm_fact", ["isotropic", "blockdiag"])
 def test_exponential_not_implemented_for_isotropic_or_blockdiag(ssm_fact):
     u = np.ones((2,))
-    M = np.zeros((2, 2))
     tcoeffs = [u, u, u]
 
     _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=ssm_fact)
 
     def vf_linear(u, du, ddu):
+        del du
+        del ddu
         return np.zeros_like(u)
 
     with testing.raises(NotImplementedError, match="reach out"):

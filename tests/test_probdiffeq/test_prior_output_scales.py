@@ -31,9 +31,11 @@ def case_scale_rules_iwp_dense() -> ScaleShapeRules:
 
 
 def case_scale_rules_ioup_dense() -> ScaleShapeRules:
+    linop = np.zeros_like
+    prior = func.partial(probdiffeq.prior_ornstein_uhlenbeck_integrated, linop)
     return ScaleShapeRules(
         ssm_fact="dense",
-        prior=func.partial(probdiffeq.prior_exponential, rate=np.zeros((1, 1))),
+        prior=prior,
         ode=(1,),
         base=(1,),
         calibrated=(),
