@@ -39,21 +39,21 @@ def create_random_variable(fact):
     if fact == "dense":
         ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(tcoeffs)
         output_scale = np.ones((3,))
-        discretize = ssm.conditional.transition_iwp(output_scale)
+        discretize = ssm.conditional.transition_wiener_integrated(output_scale)
 
         output_scale = np.ones(())
         rv = discretize(0.1, output_scale)
     elif fact == "blockdiag":
         ssm = ssm_impl.FactSsmImpl.from_tcoeffs_blockdiag(tcoeffs)
         output_scale = np.ones((3,))
-        discretize = ssm.conditional.transition_iwp(output_scale)
+        discretize = ssm.conditional.transition_wiener_integrated(output_scale)
 
         output_scale = np.ones((3,))
         rv = discretize(0.1, output_scale)
     elif fact == "isotropic":
         ssm = ssm_impl.FactSsmImpl.from_tcoeffs_isotropic(tcoeffs)
         output_scale = np.ones(())
-        discretize = ssm.conditional.transition_iwp(output_scale)
+        discretize = ssm.conditional.transition_wiener_integrated(output_scale)
 
         output_scale = np.ones(())
         rv = discretize(0.1, output_scale)

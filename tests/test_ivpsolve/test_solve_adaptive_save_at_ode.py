@@ -35,15 +35,15 @@ def case_factory_prior_wiener_integrated():
 
 
 @testing.case
-def case_factory_prior_exponential():
+def case_factory_prior_ioup():
 
     def prior(ssm):
         try:
 
-            def vf_linear(u, /):
+            def linop(u, /):
                 return tree.tree_map(lambda s: 0.01 * np.flip(s), u)
 
-            return probdiffeq.prior_exponential(vf_linear, ssm=ssm)
+            return probdiffeq.prior_ornstein_uhlenbeck_integrated(linop, ssm=ssm)
         except NotImplementedError:
             reason = "This prior is not implemented"
             reason += ", likely due to the selected state-space factorisation."
