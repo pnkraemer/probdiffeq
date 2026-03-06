@@ -4,11 +4,11 @@ from probdiffeq import probdiffeq
 from probdiffeq.backend import np, testing
 
 
-def test_default_yield_correct_transitions() -> None:
+@testing.parametrize("ssm_fact", ["isotropic", "dense"])
+def test_transitions_are_correct_in_1d(ssm_fact) -> None:
     tcoeffs = [2.0, 3.0, 4.0, 5.0]
-    init, iwp, _ssm = probdiffeq.prior_iwp(tcoeffs)
-
-    assert testing.allclose(init.std, [0.0, 0.0, 0.0, 0.0])
+    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=ssm_fact)
+    iwp = probdiffeq.prior_iwp(ssm=ssm)
 
     cond = iwp(1.0, 1.0)
     A_expected = np.asarray(
@@ -31,78 +31,29 @@ def test_default_yield_correct_transitions() -> None:
     assert testing.allclose(cond.noise.cholesky @ cond.noise.cholesky.T, Q_expected)
 
 
-@testing.parametrize("ssm_fact", ["dense", "blockdiag"])
-def test_output_scale_dense_blockdiag(ssm_fact) -> None:
-
-    # 1d problem, but "unusual" shapes. Values don't matter.
-    tcoeffs = [np.ones((1, 1, 1)), np.ones((1, 1, 1))]
-    scale = 123.45 * np.ones((1, 1, 1))
-
-    # Test that the transition covariances are scaled correctly
-    init, iwp, _ssm = probdiffeq.prior_iwp(
-        tcoeffs, output_scale=scale, ssm_fact=ssm_fact
-    )
+# Separate test because conditional shapes differ
+def test_transitions_are_correct_in_1d_blockdiag() -> None:
+    tcoeffs = [2.0, 3.0, 4.0, 5.0]
+    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="blockdiag")
+    iwp = probdiffeq.prior_iwp(ssm=ssm)
 
     cond = iwp(1.0, 1.0)
-    Q_expected = 123.45**2.0 * 1.0 / np.asarray([[3.0, 2.0], [2.0, 1.0]])
-    _, cov = cond.noise.to_multivariate_normal()
-    assert testing.allclose(cov, Q_expected)
-
-    # Test that the "diffuse_derivatives" are scaled correctly
-    init, iwp, _ssm = probdiffeq.prior_iwp(
-        tcoeffs,
-        output_scale=scale,
-        diffuse_derivatives=3,
-        diffuse_eps=1,
-        ssm_fact=ssm_fact,
+    A_expected = np.asarray(
+        [
+            [1.0, 3.0, 3.0, 1.0],
+            [0.0, 1.0, 2.0, 1.0],
+            [0.0, 0.0, 1.0, 1.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
     )
-
-    zero = np.zeros((1, 1, 1))
-    nonzero = 123.45 * np.ones((1, 1, 1))
-    assert testing.allclose(
-        init.std, [zero, zero, nonzero, nonzero, nonzero], strict_shapes=True
+    Q_expected = np.asarray(
+        [
+            [1.0 / 7.0, 1.0 / 6.0, 1.0 / 5.0, 1.0 / 4.0],
+            [1.0 / 6.0, 1.0 / 5.0, 1.0 / 4.0, 1.0 / 3.0],
+            [1.0 / 5.0, 1.0 / 4.0, 1.0 / 3.0, 1.0 / 2.0],
+            [1.0 / 4.0, 1.0 / 3.0, 1.0 / 2.0, 1.0 / 1.0],
+        ]
     )
-
-    # Test that for the wrong shape or type, an error is raised
-    tcoeffs = [np.ones((1, 1, 1)), np.ones((1, 1, 1))]
-    for shapes in [(), (1,), (1, 1)]:
-        scale = 123.45 * np.ones(shapes)
-        with testing.raises(ValueError, match="wrong shape"):
-            _ = probdiffeq.prior_iwp(tcoeffs, output_scale=scale, ssm_fact=ssm_fact)
-
-
-def test_output_scale_isotropic() -> None:
-
-    # 1d problem, but "unusual" shapes. Values don't matter.
-    tcoeffs = [np.ones((1, 1, 1)), np.ones((1, 1, 1))]
-    scale = 123.45 * np.ones(())
-
-    # Test that the transition covariances are scaled correctly
-    init, iwp, _ssm = probdiffeq.prior_iwp(
-        tcoeffs, output_scale=scale, ssm_fact="isotropic"
-    )
-
-    cond = iwp(1.0, 1.0)
-    Q_expected = 123.45**2.0 * 1.0 / np.asarray([[3.0, 2.0], [2.0, 1.0]])
-    _, cov = cond.noise.to_multivariate_normal()
-    assert testing.allclose(cov, Q_expected)
-
-    # Test that the "diffuse_derivatives" are scaled correctly
-    init, iwp, _ssm = probdiffeq.prior_iwp(
-        tcoeffs,
-        output_scale=scale,
-        diffuse_derivatives=3,
-        diffuse_eps=1,
-        ssm_fact="isotropic",
-    )
-
-    zero = np.zeros(())
-    nonzero = 123.45 * np.ones(())
-    assert testing.allclose(init.std, [zero, zero, nonzero, nonzero, nonzero])
-
-    # Test that for the wrong shape or type, an error is raised
-    tcoeffs = [np.ones((1, 1, 1)), np.ones((1, 1, 1))]
-    for shapes in [(1,), (1, 1), (1, 1, 1)]:
-        scale = 123.45 * np.ones(shapes)
-        with testing.raises(ValueError, match="wrong shape"):
-            _ = probdiffeq.prior_iwp(tcoeffs, output_scale=scale, ssm_fact="isotropic")
+    assert testing.allclose(cond.A, A_expected[None, ...])
+    cov = np.einsum("ijk,ilk->ijl", cond.noise.cholesky, cond.noise.cholesky)
+    assert testing.allclose(cov, Q_expected[None, ...])

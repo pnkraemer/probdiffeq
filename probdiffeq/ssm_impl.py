@@ -598,29 +598,23 @@ class DenseConditional(AbstractConditional):
         ones = np.ones((n,))
         return LatentCond(A, noise, to_latent=ones, to_observed=ones)
 
-    def transition_iwp(self, base_scale):
+    def transition_iwp(self, base_scale: Array | None):
+        Lambda = self._process_base_scale(base_scale)
 
+        # Construct the transitions
         a, q_sqrtm = system_matrices_1d_iwp(self.num_derivatives)
         (d,) = self.ode_shape
 
         eye_d = np.eye(d)
         A = np.kron(a, eye_d)
-
-        if base_scale is None:
-            base_scale = np.ones(self.ode_shape)
-
-        base_scale, _ = tree.ravel_pytree(base_scale)
-        assert base_scale.shape == (d,), base_scale.shape
-
-        Lambda = linalg.diagonal_matrix(base_scale)
         Q = np.kron(q_sqrtm, Lambda)
 
         q0 = np.zeros(self.flat_shape)
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
 
         def discretise(dt, output_scale=1.0):
-            output_scale = np.asarray(output_scale)
-            assert output_scale.shape == ()
+            output_scale = self._process_calibrated_scale(output_scale)
+
             p, p_inv = precon_fun(dt)
             p = np.repeat(p, d)
             p_inv = np.repeat(p_inv, d)
@@ -630,17 +624,36 @@ class DenseConditional(AbstractConditional):
 
         return discretise
 
-    def transition_ioup(self, M, base_scale=None):
-        # TODO: assert that the ODE is vector-valued (not scalar or matrix-valued)
-
+    def _process_base_scale(self, base_scale):
+        # Process the expected shape of the base-scale
+        base_scale_expected = self.unravel(np.ones(self.flat_shape))[0]
         if base_scale is None:
-            base_scale = np.ones(self.ode_shape)
+            base_scale = base_scale_expected
+        else:
+            if base_scale.shape != base_scale_expected.shape:
+                msg = "The base-scale has the wrong shape."
+                msg += f" Expected: {base_scale_expected.shape}."
+                msg += f" Received: {base_scale.shape}."
+                raise ValueError(msg)
+
+        # Flatten the scale into something compatible with the flattened SSM
+        base_scale, _ = tree.ravel_pytree(base_scale)
+        return linalg.diagonal_matrix(base_scale)
+
+    def _process_calibrated_scale(self, output_scale):
+        output_scale = np.asarray(output_scale)
+        if output_scale.shape != ():
+            msg = "The output-scale has the wrong shape."
+            msg += f" Expected: {()}."
+            msg += f" Received: {output_scale.shape}."
+            raise ValueError(msg)
+        return output_scale
+
+    def transition_ioup(self, M, base_scale=None):
+        Lambda = self._process_base_scale(base_scale)
 
         (d,) = self.ode_shape
         assert M.shape == (d, d)  # todo: flatten M from pytree?
-
-        base_scale, _ = tree.ravel_pytree(base_scale)
-        assert base_scale.shape == (d,), base_scale.shape
 
         eye_d = np.eye(d)
         a = linalg.diagonal_matrix(np.ones((self.num_derivatives,)), k=1)
@@ -652,7 +665,7 @@ class DenseConditional(AbstractConditional):
         A += np.kron(E, M.T)
 
         b = np.eye(self.num_derivatives + 1)[-1][:, None]
-        B = np.kron(b, linalg.diagonal_matrix(base_scale))
+        B = np.kron(b, Lambda)
 
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
 
@@ -670,8 +683,7 @@ class DenseConditional(AbstractConditional):
         q0 = np.zeros(self.flat_shape)
 
         def discretise(dt, output_scale=1.0):
-            output_scale = np.asarray(output_scale)
-            assert output_scale.shape == ()
+            output_scale = self._process_calibrated_scale(output_scale)
 
             p, p_inv = precon_fun(dt)
             p = np.repeat(p, d)
@@ -1277,20 +1289,32 @@ class IsotropicConditional(AbstractConditional):
         ones = np.ones((num,))
         return LatentCond(matrix, noise, to_latent=ones, to_observed=ones)
 
-    def transition_iwp(self, base_scale):
+    def transition_iwp(self, base_scale: Array | None):
+
+        if base_scale is None:
+            base_scale = np.ones(())
+        else:
+            base_scale = np.asarray(base_scale)
+            if base_scale.shape != ():
+                msg = "The base-scale has the wrong shape."
+                msg += f" Expected: {()}."
+                msg += f" Received: {base_scale.shape}."
+                raise ValueError(msg)
 
         A, q_sqrtm = system_matrices_1d_iwp(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1, *self.ode_shape))
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
 
-        if base_scale is None:
-            base_scale = np.ones(())
+        def discretise(dt, output_scale: Array = 1.0):
+            output_scale = np.asarray(output_scale)
+            if output_scale.shape != ():
+                msg = "The base-scale has the wrong shape."
+                msg += f" Expected: {()}."
+                msg += f" Received: {output_scale.shape}."
+                raise ValueError(msg)
 
-        base_scale = np.asarray(base_scale)
-        assert base_scale.shape == ()
-
-        def discretise(dt, output_scale):
             scale = base_scale * output_scale
+
             p, p_inv = precon_fun(dt)
             noise = IsotropicNormal(q0, scale * q_sqrtm, treedef=self.tree_structure)
             return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
@@ -1451,22 +1475,38 @@ class BlockDiagConditional(AbstractConditional):
         matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
         return LatentCond.from_linop_and_noise(matrix, noise)
 
-    def transition_iwp(self, base_scale):
+    def transition_iwp(self, base_scale: Array | None):
+
+        base_scale_expected = self.unravel_leaf(np.ones(self.ode_shape))
+        if base_scale is None:
+            base_scale = base_scale_expected
+        else:
+            if base_scale.shape != base_scale_expected.shape:
+                msg = "The base-scale has the wrong shape."
+                msg += f" Expected: {base_scale_expected.shape}."
+                msg += f" Received: {base_scale.shape}."
+                raise ValueError(msg)
 
         a, q_sqrtm = system_matrices_1d_iwp(self.num_derivatives)
         q0 = np.zeros((self.num_derivatives + 1,))
         precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
 
-        if base_scale is None:
-            base_scale = np.ones(self.ode_shape)
-
-        (d,) = self.ode_shape
-        base_scale, _ = tree.ravel_pytree(base_scale)
-        assert base_scale.shape == (d,)
-
-        def discretise(dt, output_scale):
+        def discretise(dt, output_scale: Array | None = None):
             p, p_inv = precon_fun(dt)
-            scale = base_scale * output_scale
+            if output_scale is None:
+                output_scale = np.ones_like(base_scale)
+            else:
+                output_scale = np.asarray(output_scale)
+
+                if output_scale.shape != base_scale.shape:
+                    msg = "The output-scale has the wrong shape."
+                    msg += f" Expected: {base_scale.shape}."
+                    msg += f" Received: {output_scale.shape}."
+                    raise ValueError(msg)
+
+            # Flatten the scale into something compatible with the flattened SSM
+            scale, _ = tree.ravel_pytree(base_scale * output_scale)
+            (d,) = scale.shape
 
             A_batch = np.ones((d, 1, 1)) * a[None, :, :]
             mean = np.ones((d, 1)) * q0[None, :]
