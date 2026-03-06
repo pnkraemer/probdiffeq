@@ -331,7 +331,7 @@ def daejet_nonlinear_lstsq(
     inits: Sequence[Array],
     /,
     num: int,
-    nonlinear_lstsq: Callable,
+    nonlinear_lstsq: Callable | None = None,
 ):
     """Evaluate the Taylor series of a differential-algebraic equation system."""
     # Fun-fact: for really high orders, recursively call this function
@@ -346,6 +346,8 @@ def daejet_nonlinear_lstsq(
     zeros = tree.tree_map(np.zeros_like, inits[0])
     inits = [*inits, *[zeros for _ in range(num)]]
 
+    if nonlinear_lstsq is None:
+        nonlinear_lstsq = nonlinear_lstsq_projected_constraint(maxiter=10)
     return _find_root_of_dae_constraint(
         differential=differential,
         algebraic=algebraic,

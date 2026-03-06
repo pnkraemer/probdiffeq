@@ -499,47 +499,6 @@ def constraint_dae_jet(
     )
 
 
-def constraint_root_jet(root, /, *, ssm: ssm_impl.FactSsmImpl, jacobian=None):
-    """Construct a constraint based on a custom root.
-
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This function is highly experimental and not safe to use.
-        There is no guarantee that it works correctly (or at all).
-        It might be deleted tomorrow and without any deprecation policy.
-
-    """
-    root_order = _verify_vector_field_signature_and_parse_order(root)
-    if root_order == 1:
-        msg = "Did you accidentally pass a vector field instead of a root-constraint?"
-        raise ValueError(msg)
-
-    if jacobian is None:
-        jacobian = jacobian_hutchinson_fwd()
-
-    def root_jet(*tcoeffs_all, t):
-        flat = [tree.ravel_pytree(s)[0] for s in tcoeffs_all]
-        unravel = tree.ravel_pytree(tcoeffs_all[0])[1]
-
-        # Flatten the root because jax.jet is a bit high maintenance :)
-        def jet_call(*y):
-            y_tree = [unravel(s) for s in y]
-            fx = root(*y_tree, t=t)
-            return tree.ravel_pytree(fx)[0]
-
-        # TODO: if we apply the preconditioner before passing
-        #   things in here, we can set is_tcoeff to True and possibly
-        #   gain a bunch of numerical robustness? (And speed?)
-        ps, ss = taylor.jet_unpack_series(flat, root_order)
-        primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
-        return [primals, *series]
-
-    # TODO: once we have a second root constraint (eg slr1),
-    #       offer the below as a function argument.
-    return ssm.linearize.root_taylor_1st(
-        root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian
-    )
-
-
 def constraint_ode_ts1(
     vf, /, *, ssm: ssm_impl.FactSsmImpl, jacobian: JacobianHandler | None = None
 ):
@@ -1898,10 +1857,8 @@ class solver_mle(ProbabilisticSolver):
         prior: Callable,
         ssm: Any,
         strategy: MarkovStrategy,
-        constraint_init=None,
     ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
-        self.constraint_init = constraint_init
 
     def init(self, t, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         u_pred, prediction = self.strategy.init_posterior(u=u)
@@ -1910,28 +1867,14 @@ class solver_mle(ProbabilisticSolver):
         output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
 
         # Update
-        fx, cstate = self.constraint.linearize(u_pred.marginals, cstate, damp=damp, t=t)
+        lin_fun = func.partial(self.constraint.linearize, damp=damp, t=t)
+        fx, _cstate = func.eval_shape(lin_fun, u_pred.marginals, cstate)
         fx = tree.tree_map(np.zeros_like, fx)
-        if self.constraint_init is not None:
-            cstate2 = self.constraint_init.init_linearization()
-            fx, _cstate2 = self.constraint.linearize(
-                u_pred.marginals, cstate2, damp=damp, t=t
-            )
-            observed, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
-            updates = reverted.noise
-            u, posterior = self.strategy.apply_updates(
-                prediction=prediction, updates=updates
-            )
-            output_scale_running = observed.mahalanobis_norm_relative(0.0)
 
-            # Return the state
-            auxiliary = (cstate, output_scale_running, 1)
-
-        else:
-            u = u_pred
-            posterior = prediction
-            output_scale_running = np.zeros_like(output_scale_prior)
-            auxiliary = (cstate, output_scale_running, 0)
+        u = u_pred
+        posterior = prediction
+        output_scale_running = np.zeros_like(output_scale_prior)
+        auxiliary = (cstate, output_scale_running, 0)
 
         return ProbabilisticSolution(
             t=t,
@@ -2028,11 +1971,9 @@ class solver_dynamic(ProbabilisticSolver):
         constraint: Constraint,
         ssm: Any,
         re_linearize_after_calibration=False,
-        constraint_init=None,
     ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
         self.re_linearize_after_calibration = re_linearize_after_calibration
-        self.constraint_init = constraint_init
 
     def init(self, t, u, *, damp) -> ProbabilisticSolution:
         u_pred, prediction = self.strategy.init_posterior(u=u)
@@ -2041,24 +1982,11 @@ class solver_dynamic(ProbabilisticSolver):
         output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
 
         lin_fun = func.partial(self.constraint.linearize, damp=damp, t=t)
-        fx, lin_state = func.eval_shape(lin_fun, u_pred.marginals, lin_state)
+        fx, _lin_state = func.eval_shape(lin_fun, u_pred.marginals, lin_state)
         fx = tree.tree_map(np.zeros_like, fx)
-        lin_state = tree.tree_map(np.zeros_like, lin_state)
 
-        if self.constraint_init is not None:
-            cstate2 = self.constraint_init.init_linearization()
-            fx, _cstate2 = self.constraint.linearize(
-                u_pred.marginals, cstate2, damp=damp, t=t
-            )
-            observed, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
-            updates = reverted.noise
-            u, posterior = self.strategy.apply_updates(
-                prediction=prediction, updates=updates
-            )
-
-        else:
-            u = u_pred
-            posterior = prediction
+        u = u_pred
+        posterior = prediction
 
         posterior = prediction
         return ProbabilisticSolution(
@@ -2169,33 +2097,20 @@ class solver(ProbabilisticSolver):
         prior: Callable,
         ssm: Any,
         strategy: MarkovStrategy,
-        constraint_init: Constraint | None = None,
     ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
-        self.constraint_init = constraint_init
 
     def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         u_pred, prediction = self.strategy.init_posterior(u=u)
 
-        if self.constraint_init is not None:
-            co = self.constraint.init_linearization()
-            fx, _co = self.constraint_init.linearize(
-                rv=u_pred.marginals, state=co, damp=damp, t=t
-            )
-            _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
-            u, posterior = self.strategy.apply_updates(
-                prediction, updates=reverted.noise
-            )
-        else:
-            u, posterior = u_pred, prediction
+        u, posterior = u_pred, prediction
 
         cstate = self.constraint.init_linearization()
-        # TODO: replace the below with jax.eval_shape
-        # because we don't really want to evaluate anything here
-        fx, cstate = self.constraint.linearize(
-            rv=u_pred.marginals, state=cstate, damp=damp, t=t
-        )
+
+        lin_fun = func.partial(self.constraint.linearize, damp=damp, t=t)
+        fx, _cstate = func.eval_shape(lin_fun, u_pred.marginals, cstate)
         fx = tree.tree_map(np.zeros_like, fx)
+
         output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
         return ProbabilisticSolution(
             t=t,
@@ -2255,592 +2170,6 @@ class solver(ProbabilisticSolver):
         )
 
         output_scale = ones * output_scale[None, ...]
-
-        ts = np.concatenate([solution0.t[None], solution.t])
-        return ProbabilisticSolution(
-            t=ts,
-            u=u,
-            solution_full=posterior,
-            output_scale=output_scale,
-            num_steps=solution.num_steps,
-            auxiliary=solution.auxiliary,
-            fun_evals=solution.fun_evals,
-        )
-
-
-class solver_iterated(ProbabilisticSolver):
-    """Create a solver that does not calibrate the output scale automatically.
-
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This function is highly experimental and not safe to use.
-        There is no guarantee that it works correctly (or at all).
-        It might be deleted tomorrow and without any deprecation policy.
-
-    Related:
-    [`ProbabilisticSolver`](#probdiffeq.probdiffeq.ProbabilisticSolver).
-
-    """
-
-    def __init__(
-        self,
-        *,
-        constraint: Constraint,
-        prior: Callable,
-        ssm: Any,
-        strategy: MarkovStrategy,
-        constraint_init: Constraint | None = None,
-        tol: float | None = None,
-        maxiter: int = 10,
-        while_loop=flow.while_loop,
-    ) -> None:
-        super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
-        self.constraint_init = constraint_init
-
-        float_eps = np.finfo_eps(np.asarray(1.0).dtype)
-        self.tol = tol if tol is not None else float_eps**0.5
-        self.maxiter = maxiter
-        self.while_loop = while_loop
-
-    # TODO: move this outside the init and reuse in the step
-    @tree.register_dataclass
-    @structs.dataclass
-    class IState:
-        """A data structure for carrying state in iterated solvers."""
-
-        do_continue: float
-        i: int
-        linearize_at: Any
-        cstate: Any  # constraint-state
-        updated_u: Any
-        updated_posterior: Any
-        fx: Any = None
-
-    def make_body_fun(self, u_pred, prediction, *, constraint, damp, t):
-        """Create the body-function for the while-loop in an iterated solver."""
-
-        def body_fun(carry: solver_iterated.IState) -> solver_iterated.IState:
-            # _do_continue, i, lin_at, corrstate, _updated = carry
-            # Linearize
-            fx, cstate = constraint.linearize(
-                carry.linearize_at, carry.cstate, damp=damp, t=t
-            )
-
-            # Update
-            _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
-            u_upd, posterior = self.strategy.apply_updates(
-                prediction, updates=reverted.noise
-            )
-
-            diff = u_upd.marginals.mean - carry.linearize_at.mean
-            u = u_upd
-
-            diff_norm = linalg.vector_norm(diff) / np.sqrt(diff.size)
-            i = carry.i + 1
-            do_continue = np.logical_and(diff_norm > self.tol, i < self.maxiter)
-            return self.IState(
-                do_continue=do_continue,
-                i=i,
-                linearize_at=u.marginals,
-                cstate=cstate,
-                updated_u=u_upd,
-                updated_posterior=posterior,
-                fx=fx if carry.fx is not None else None,
-            )
-
-        return body_fun
-
-    def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
-        u_pred, prediction = self.strategy.init_posterior(u=u)
-
-        if self.constraint_init is not None:
-            cstate = self.constraint_init.init_linearization()
-            init = self.IState(
-                do_continue=True,
-                i=0,
-                linearize_at=u_pred.marginals,
-                cstate=cstate,
-                updated_u=u_pred,
-                updated_posterior=prediction,
-            )
-            body_fun = self.make_body_fun(
-                u_pred, prediction, constraint=self.constraint_init, damp=damp, t=t
-            )
-            final = self.while_loop(lambda s: s.do_continue, body_fun, init)
-            (u, posterior) = final.updated_u, final.updated_posterior
-        else:
-            u, posterior = u_pred, prediction
-
-        cstate = self.constraint.init_linearization()
-        fx, cstate = self.constraint.linearize(
-            rv=u_pred.marginals, state=cstate, damp=damp, t=t
-        )
-
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
-
-        # TODO: the number of function evaluations should also be reflected
-        # in the solution object, so that we can communicate if an iterative
-        # solver took excessive attempts or so
-        return ProbabilisticSolution(
-            t=t,
-            u=u,
-            solution_full=posterior,
-            num_steps=0,
-            auxiliary=cstate,
-            output_scale=output_scale,
-            fun_evals=fx,
-        )
-
-    def step(self, state: ProbabilisticSolution, *, dt, damp):
-        # Discretize
-        output_scale = np.ones_like(state.output_scale)
-        transition = self.prior(dt, output_scale)
-
-        # Predict
-        u_pred, prediction = self.strategy.predict(
-            state.solution_full, transition=transition
-        )
-
-        # Iterated update
-        body_fun = self.make_body_fun(
-            u_pred, prediction, constraint=self.constraint, damp=damp, t=state.t + dt
-        )
-        init = self.IState(
-            do_continue=True,
-            i=0,
-            linearize_at=u_pred.marginals,
-            cstate=state.auxiliary,
-            updated_u=u_pred,
-            updated_posterior=prediction,
-            fx=state.fun_evals,
-        )
-        final = self.while_loop(lambda s: s.do_continue, body_fun, init)
-        return ProbabilisticSolution(
-            t=state.t + dt,
-            u=final.updated_u,
-            solution_full=final.updated_posterior,
-            output_scale=output_scale,
-            auxiliary=final.cstate,
-            num_steps=state.num_steps + 1,
-            fun_evals=final.fx,
-        )
-
-    def userfriendly_output(
-        self, *, solution0: ProbabilisticSolution, solution: ProbabilisticSolution
-    ) -> ProbabilisticSolution:
-        assert solution.t.ndim > 0
-
-        # This is the uncalibrated solver, so scale=1
-        ones = np.ones_like(solution.output_scale)
-        output_scale = np.ones_like(solution.output_scale[-1])
-
-        init = solution0.solution_full
-        posterior = solution.solution_full
-        u, posterior = self.strategy.finalize(
-            posterior0=init, posterior=posterior, output_scale=output_scale
-        )
-
-        output_scale = ones * output_scale[None, ...]
-
-        ts = np.concatenate([solution0.t[None], solution.t])
-        return ProbabilisticSolution(
-            t=ts,
-            u=u,
-            solution_full=posterior,
-            output_scale=output_scale,
-            num_steps=solution.num_steps,
-            auxiliary=solution.auxiliary,
-            fun_evals=solution.fun_evals,
-        )
-
-
-class solver_mle_iterated(ProbabilisticSolver):
-    """Create a solver that does not calibrate the output scale automatically.
-
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This function is highly experimental and not safe to use.
-        There is no guarantee that it works correctly (or at all).
-        It might be deleted tomorrow and without any deprecation policy.
-
-    Related:
-    [`ProbabilisticSolver`](#probdiffeq.probdiffeq.ProbabilisticSolver).
-
-    """
-
-    def __init__(
-        self,
-        *,
-        constraint: Constraint,
-        prior: Callable,
-        ssm: Any,
-        strategy: MarkovStrategy,
-        constraint_init: Constraint | None = None,
-        tol: float | None = None,
-        maxiter: int = 10,
-        while_loop=flow.while_loop,
-    ) -> None:
-        super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
-        self.constraint_init = constraint_init
-
-        float_eps = np.finfo_eps(np.asarray(1.0).dtype)
-        self.tol = tol if tol is not None else float_eps**0.5
-        self.maxiter = maxiter
-        self.while_loop = while_loop
-
-    # TODO: move this outside the init and reuse in the step
-    @tree.register_dataclass
-    @structs.dataclass
-    class IState:
-        """A data structure for carrying state in iterated solvers."""
-
-        do_continue: float
-        i: int
-        linearize_at: Any
-        cstate: Any  # constraint-state
-        updated_u: Any
-        updated_posterior: Any
-        mahalanobis: float
-        fx: Any = None
-
-    def make_body_fun(self, u_pred, prediction, *, constraint, damp, t):
-        """Create the body-function for the while-loop in an iterated solver."""
-
-        def body_fun(carry: solver_iterated.IState) -> solver_iterated.IState:
-            # _do_continue, i, lin_at, corrstate, _updated = carry
-            # Linearize
-            fx, cstate = constraint.linearize(
-                carry.linearize_at, carry.cstate, damp=damp, t=t
-            )
-
-            # Update
-            observed, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
-            u_upd, posterior = self.strategy.apply_updates(
-                prediction, updates=reverted.noise
-            )
-            mahalanobis = observed.mahalanobis_norm_relative(0.0)
-
-            diff = u_upd.marginals.mean - carry.linearize_at.mean
-            u = u_upd
-
-            diff_norm = linalg.vector_norm(diff) / np.sqrt(diff.size)
-            i = carry.i + 1
-            do_continue = np.logical_and(diff_norm > self.tol, i < self.maxiter)
-            return self.IState(
-                do_continue=do_continue,
-                i=i,
-                linearize_at=u.marginals,
-                cstate=cstate,
-                updated_u=u_upd,
-                updated_posterior=posterior,
-                fx=fx if carry.fx is not None else None,
-                mahalanobis=mahalanobis,
-            )
-
-        return body_fun
-
-    def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
-        u_pred, prediction = self.strategy.init_posterior(u=u)
-
-        if self.constraint_init is not None:
-            cstate = self.constraint_init.init_linearization()
-            init = self.IState(
-                do_continue=True,
-                i=0,
-                linearize_at=u_pred.marginals,
-                cstate=cstate,
-                updated_u=u_pred,
-                updated_posterior=prediction,
-                mahalanobis=0.0,
-            )
-            body_fun = self.make_body_fun(
-                u_pred, prediction, constraint=self.constraint_init, damp=damp, t=t
-            )
-            final = self.while_loop(lambda s: s.do_continue, body_fun, init)
-            (u, posterior) = final.updated_u, final.updated_posterior
-            mahalanobis = final.mahalanobis
-            num_data = 1
-        else:
-            u, posterior = u_pred, prediction
-            mahalanobis = 0.0
-            num_data = 0
-        cstate = self.constraint.init_linearization()
-        fx, cstate = self.constraint.linearize(
-            rv=u_pred.marginals, state=cstate, damp=damp, t=t
-        )
-
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
-
-        # TODO: the number of function evaluations should also be reflected
-        # in the solution object, so that we can communicate if an iterative
-        # solver took excessive attempts or so
-        return ProbabilisticSolution(
-            t=t,
-            u=u,
-            solution_full=posterior,
-            num_steps=0,
-            auxiliary=(cstate, mahalanobis, num_data),
-            output_scale=output_scale,
-            fun_evals=fx,
-        )
-
-    def step(self, state: ProbabilisticSolution, *, dt, damp):
-        # Discretize
-        output_scale = np.ones_like(state.output_scale)
-        transition = self.prior(dt, output_scale)
-
-        # Predict
-        u_pred, prediction = self.strategy.predict(
-            state.solution_full, transition=transition
-        )
-
-        # Iterated update
-        body_fun = self.make_body_fun(
-            u_pred, prediction, constraint=self.constraint, damp=damp, t=state.t + dt
-        )
-        cstate, output_scale_running, num_data = state.auxiliary
-        init = self.IState(
-            do_continue=True,
-            i=0,
-            linearize_at=u_pred.marginals,
-            cstate=cstate,
-            updated_u=u_pred,
-            updated_posterior=prediction,
-            fx=state.fun_evals,
-            mahalanobis=0.0,
-        )
-        final = self.while_loop(lambda s: s.do_continue, body_fun, init)
-
-        import jax
-
-        jax.debug.print("{}", final.mahalanobis)
-        output_scale_running = self.ssm.normal.update_moving_avg(
-            output_scale_running, final.mahalanobis, num=num_data
-        )
-
-        # Return the state
-        auxiliary = (final.cstate, output_scale_running, num_data + 1)
-        return ProbabilisticSolution(
-            t=state.t + dt,
-            u=final.updated_u,
-            solution_full=final.updated_posterior,
-            output_scale=output_scale,
-            auxiliary=auxiliary,
-            num_steps=state.num_steps + 1,
-            fun_evals=final.fx,
-        )
-
-    def userfriendly_output(
-        self, *, solution0: ProbabilisticSolution, solution: ProbabilisticSolution
-    ) -> ProbabilisticSolution:
-        assert solution.t.ndim > 0
-
-        _cstate, output_scale_calibrated, _ = solution.auxiliary
-        ones = np.ones_like(output_scale_calibrated)  # for later
-        output_scale = output_scale_calibrated[-1]
-
-        init = solution0.solution_full
-        posterior = solution.solution_full
-        u, posterior = self.strategy.finalize(
-            posterior0=init, posterior=posterior, output_scale=output_scale
-        )
-
-        output_scale = ones
-        ts = np.concatenate([solution0.t[None], solution.t])
-        return ProbabilisticSolution(
-            t=ts,
-            u=u,
-            solution_full=posterior,
-            output_scale=output_scale,
-            num_steps=solution.num_steps,
-            auxiliary=solution.auxiliary,
-            fun_evals=solution.fun_evals,
-        )
-
-
-class solver_dynamic_iterated(ProbabilisticSolver):
-    """Create a solver that does not calibrate the output scale automatically.
-
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This function is highly experimental and not safe to use.
-        There is no guarantee that it works correctly (or at all).
-        It might be deleted tomorrow and without any deprecation policy.
-
-    Related:
-    [`ProbabilisticSolver`](#probdiffeq.probdiffeq.ProbabilisticSolver).
-
-    """
-
-    def __init__(
-        self,
-        *,
-        constraint: Constraint,
-        prior: Callable,
-        ssm: Any,
-        strategy: MarkovStrategy,
-        constraint_init: Constraint | None = None,
-        tol: float | None = None,
-        maxiter: int = 10,
-        while_loop=flow.while_loop,
-    ) -> None:
-        super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
-        self.constraint_init = constraint_init
-
-        float_eps = np.finfo_eps(np.asarray(1.0).dtype)
-        self.tol = tol if tol is not None else float_eps**0.5
-        self.maxiter = maxiter
-        self.while_loop = while_loop
-
-    # TODO: move this outside the init and reuse in the step
-    @tree.register_dataclass
-    @structs.dataclass
-    class IState:
-        """A data structure for carrying state in iterated solvers."""
-
-        do_continue: float
-        i: int
-        linearize_at: Any
-        cstate: Any  # constraint-state
-        updated_u: Any
-        updated_posterior: Any
-        fx: Any = None
-
-    def make_body_fun(self, u_pred, prediction, *, constraint, damp, t):
-        """Create the body-function for the while-loop in an iterated solver."""
-
-        def body_fun(carry: solver_iterated.IState) -> solver_iterated.IState:
-            # _do_continue, i, lin_at, corrstate, _updated = carry
-            # Linearize
-            fx, cstate = constraint.linearize(
-                carry.linearize_at, carry.cstate, damp=damp, t=t
-            )
-
-            # Update
-            _observed, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
-            u_upd, posterior = self.strategy.apply_updates(
-                prediction, updates=reverted.noise
-            )
-
-            diff = u_upd.marginals.mean - carry.linearize_at.mean
-            u = u_upd
-
-            diff_norm = linalg.vector_norm(diff) / np.sqrt(diff.size)
-            i = carry.i + 1
-            do_continue = np.logical_and(diff_norm > self.tol, i < self.maxiter)
-            return self.IState(
-                do_continue=do_continue,
-                i=i,
-                linearize_at=u.marginals,
-                cstate=cstate,
-                updated_u=u_upd,
-                updated_posterior=posterior,
-                fx=fx if carry.fx is not None else None,
-            )
-
-        return body_fun
-
-    def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
-        u_pred, prediction = self.strategy.init_posterior(u=u)
-
-        if self.constraint_init is not None:
-            cstate = self.constraint_init.init_linearization()
-            init = self.IState(
-                do_continue=True,
-                i=0,
-                linearize_at=u_pred.marginals,
-                cstate=cstate,
-                updated_u=u_pred,
-                updated_posterior=prediction,
-            )
-            body_fun = self.make_body_fun(
-                u_pred, prediction, constraint=self.constraint_init, damp=damp, t=t
-            )
-            final = self.while_loop(lambda s: s.do_continue, body_fun, init)
-            (u, posterior) = final.updated_u, final.updated_posterior
-        else:
-            u, posterior = u_pred, prediction
-        cstate = self.constraint.init_linearization()
-        fx, cstate = self.constraint.linearize(
-            rv=u_pred.marginals, state=cstate, damp=damp, t=t
-        )
-
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
-
-        # TODO: the number of function evaluations should also be reflected
-        # in the solution object, so that we can communicate if an iterative
-        # solver took excessive attempts or so
-        return ProbabilisticSolution(
-            t=t,
-            u=u,
-            solution_full=posterior,
-            num_steps=0,
-            auxiliary=cstate,
-            output_scale=output_scale,
-            fun_evals=fx,
-        )
-
-    def step(self, state: ProbabilisticSolution, *, dt, damp):
-
-        # Calibrate the output scale
-        # TODO: should this happen inside the iteration?
-        ones = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
-        transition = self.prior(dt, ones)
-        mean = state.u.marginals.evaluate_mean()
-        u = self.ssm.conditional.apply(mean, transition)
-
-        # Linearize
-        fx, cstate = self.constraint.linearize(
-            u, state=state.auxiliary, damp=damp, t=state.t + dt
-        )
-        observed = self.ssm.conditional.marginalise(u, fx)
-        output_scale = observed.mahalanobis_norm_relative(0.0)
-
-        # Full step with calibrated scale
-        transition = self.prior(dt, output_scale)
-
-        # Predict
-        u_pred, prediction = self.strategy.predict(
-            state.solution_full, transition=transition
-        )
-
-        # Iterated update
-        body_fun = self.make_body_fun(
-            u_pred, prediction, constraint=self.constraint, damp=damp, t=state.t + dt
-        )
-        init = self.IState(
-            do_continue=True,
-            i=0,
-            linearize_at=u_pred.marginals,
-            cstate=cstate,
-            updated_u=u_pred,
-            updated_posterior=prediction,
-            fx=state.fun_evals,
-        )
-        final = self.while_loop(lambda s: s.do_continue, body_fun, init)
-
-        # Return the state
-        auxiliary = final.cstate
-        return ProbabilisticSolution(
-            t=state.t + dt,
-            u=final.updated_u,
-            solution_full=final.updated_posterior,
-            output_scale=output_scale,
-            auxiliary=auxiliary,
-            num_steps=state.num_steps + 1,
-            fun_evals=final.fx,
-        )
-
-    def userfriendly_output(
-        self, *, solution0: ProbabilisticSolution, solution: ProbabilisticSolution
-    ) -> ProbabilisticSolution:
-        assert solution.t.ndim > 0
-
-        ones = np.ones_like(solution.output_scale)  # for later
-        output_scale = ones[-1]
-
-        init = solution0.solution_full
-        posterior = solution.solution_full
-        u, posterior = self.strategy.finalize(
-            posterior0=init, posterior=posterior, output_scale=output_scale
-        )
 
         ts = np.concatenate([solution0.t[None], solution.t])
         return ProbabilisticSolution(

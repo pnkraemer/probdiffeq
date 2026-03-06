@@ -788,12 +788,6 @@ class DenseLinearizationRootTs1(AbstractLinearizationRoot):
 
         def constraint_flat(m: Array) -> Array:
             """Evaluate a flattened version of the root constraint."""
-            # # Stop gradients for all means with zero std
-            # s, _ = tree.ravel_pytree(rv.evaluate_std())
-            # m_known = np.where(s == 0., m, 0.)
-            # m_known = func.stop_gradient(m_known)
-            # m = np.where(s == 0., m_known, m)
-
             # Unravel the location and extract derivatives
             m_tree = self.unravel(m)
             relevant_tcoeffs = m_tree[: self.root_order]
@@ -806,13 +800,11 @@ class DenseLinearizationRootTs1(AbstractLinearizationRoot):
 
         # Linearize the constraint
         mean = rv.mean
-        import jax
 
         if self.iterate:
-            project = nlstsq_constrained_levenberg_marquardt(maxiter=500)
+            eps = np.finfo_eps(mean) ** 0.5
+            project = nlstsq_constrained_gauss_newton(maxiter=10, tol=eps)
             mean, _info = project(constraint_flat, mean, rv.mean, rv.cholesky)
-
-            jax.debug.print("{} {}\n", t, _info, ordered=True)
 
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
         fx = fx - linop @ mean
@@ -830,7 +822,7 @@ class DenseLinearizationRootTs1(AbstractLinearizationRoot):
         return cond, state
 
 
-def nlstsq_constrained_levenberg_marquardt(*, maxiter):
+def nlstsq_constrained_gauss_newton(*, maxiter, tol, lstsq=linalg.lstsq):
     """Solve nonlinearly constrained least-squares problems."""
 
     def solve(constraint, x0, mean, cholesky):
@@ -841,115 +833,37 @@ def nlstsq_constrained_levenberg_marquardt(*, maxiter):
             fx: Array
             dx: Array
             i: int
-            damp: float
-
-        # Damping equivalent to machine epsilon
-        # (small seems desirable here but what do I know...)
-        eps = np.sqrt(np.finfo_eps(x0.dtype))
 
         def cond_fun(state: State):
-
             # Three conditions that all need to be satisfied to continue:
 
-            # Constraint not yet satisfied
-            cond1 = linalg.vector_norm(state.fx) > eps * state.fx.size
+            # 1. Constraint not yet satisfied
+            cond1 = linalg.vector_norm(state.fx) > tol * np.sqrt(state.fx.size)
 
-            # Maxiter not yet reached
+            # 2. Maxiter not yet reached
             cond2 = state.i < maxiter
 
-            # Iterations not yet converged
-            cond3 = linalg.vector_norm(state.dx) > eps * state.dx.size
+            # 3. Iterations not yet converged
+            cond3 = linalg.vector_norm(state.dx) > tol * np.sqrt(state.dx.size)
 
-            import jax
-
-            jax.debug.print("{}", np.amax(state.fx), ordered=True)
-
+            # If any of the conditions is violated, the iteration is over.
             return np.logical_and(np.logical_and(cond1, cond2), cond3)
 
         def body_fun(state: State) -> State:
             Jx = func.jacfwd(constraint)(state.x)
-            print("Jacobian", Jx)
+
             H = Jx @ cholesky
-            r = state.fx - Jx @ (state.x - mean)
+            r = state.fx + Jx @ (mean - state.x)
 
             n = len(state.x)
-            A = np.concatenate([H, state.damp * np.eye(n)])
-            b = np.concatenate([-r, np.zeros(n)])
 
-            dy = linalg.lstsq(A, b)
-            dx = cholesky @ dy + mean - state.x
+            dy = lstsq(H, r)
+            dx = mean - state.x - cholesky @ dy
             xnew = state.x + dx
 
             fxnew = constraint(xnew)
-            damp = np.where(
-                linalg.vector_norm(fxnew) < linalg.vector_norm(state.fx),
-                state.damp / 2,
-                state.damp * 2,
-            )
-            return State(xnew, fxnew, dx=xnew - state.x, i=state.i + 1, damp=damp)
-
-        init = State(x0, constraint(x0), dx=np.ones_like(x0), i=0, damp=1.0)
-        final = flow.while_loop(cond_fun, body_fun, init=init)
-        return final.x, {"iters": final.i}
-
-    return solve
-
-
-def nlstsq_constrained_gauss_newton(*, maxiter, trials_damp, trials_ls):
-    """Solve nonlinearly constrained least-squares problems."""
-
-    def solve(constraint, x0, cholesky):
-        @tree.register_dataclass
-        @structs.dataclass
-        class State:
-            x: Array
-            fx: Array
-            dx: Array
-            i: int
-
-        # Damping equivalent to machine epsilon
-        # (small seems desirable here but what do I know...)
-        eps = np.sqrt(np.finfo_eps(x0.dtype))
-
-        def cond_fun(state: State):
-            cond1 = linalg.vector_norm(state.fx) > eps
-            cond2 = state.i < maxiter
-            cond3 = linalg.vector_norm(state.dx) > eps
-            return np.logical_and(np.logical_and(cond1, cond2), cond3)
-
-        def body_fun(state: State) -> State:
-            Jx = func.jacfwd(constraint)(state.x) @ cholesky
-
-            def update(d, a):
-                n = len(state.x)
-                A = np.concatenate([Jx, d * np.eye(n)])
-                b = np.concatenate([-state.fx, np.zeros(n)])
-
-                dx_hidden = linalg.lstsq(A, b)
-                dx = cholesky @ dx_hidden
-                return state.x + a * dx
-
-            # Construct trial-space
-            damps = 10.0 ** np.linspace(-15.0, -5.0, num=trials_damp, endpoint=True)
-            alphas = 10.0 ** np.linspace(-5.0, 5.0, num=trials_ls, endpoint=True)
-            p1, p2 = np.meshgrid(damps, alphas)
-            damps = p1.ravel()
-            alphas = p2.ravel()
-
-            # Evaluate all trials
-            xs = func.vmap(update)(damps, alphas)
-            cs = func.vmap(constraint)(xs)
-            norms = func.vmap(linalg.vector_norm)(cs)
-
-            # Find the best config
-            i = np.argmin(norms)
-            xnew = xs[i]
-            fxnew = cs[i]
-            damp = damps[i]
-            alpha = alphas[i]
             return State(xnew, fxnew, dx=xnew - state.x, i=state.i + 1)
 
-        # jax.debug.print("\n", ordered=True)
         init = State(x0, constraint(x0), dx=np.ones_like(x0), i=0)
         final = flow.while_loop(cond_fun, body_fun, init=init)
         return final.x, {"iters": final.i}
