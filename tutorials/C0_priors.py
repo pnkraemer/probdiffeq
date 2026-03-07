@@ -31,7 +31,7 @@ def main():
         """Integrated Wiener."""
         return 0.0 * u  # always zeros
 
-    fig, axes = plt.subplots(
+    _fig, axes = plt.subplots(
         nrows=3, ncols=4, sharex=True, figsize=(8, 5), constrained_layout=True
     )
     for i, (vf_prior, ax_col) in enumerate(
@@ -53,7 +53,7 @@ def main():
         stds = margs.evaluate_std()
 
         # Use the docstring as a title (but remove the period at the final character)
-        ax_col[0].set_title(vf_prior.__doc__[:-1], fontsize="medium")
+        ax_col[0].set_title(vf_prior.__doc__[:-1], fontsize="medium")  # type: ignore
 
         for smp, m, std, ax in zip(samples_prior, means, stds, ax_col):
             ax.plot(ts, smp.T, color=f"C{i}", linewidth=1.0)

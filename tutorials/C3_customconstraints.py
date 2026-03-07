@@ -111,7 +111,7 @@ def main():
     # Plot both solutions.
     # See how much better the custom root solver preserves the Hamiltonian?
 
-    fig, ax = plt.subplots(ncols=2, figsize=(8, 3), constrained_layout=True)
+    _fig, ax = plt.subplots(ncols=2, figsize=(8, 3), constrained_layout=True)
 
     ax[0].set_title("Differential equation solution", fontsize="medium")
     ax[0].plot(

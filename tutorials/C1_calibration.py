@@ -21,7 +21,6 @@ def main():
 
     t0, t1 = 0.0, 1.0
     u0 = jnp.asarray(1.0)
-    num_derivatives = 1
 
     tcoeffs = (u0, vf(u0, t=t0))
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
