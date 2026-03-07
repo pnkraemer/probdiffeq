@@ -51,8 +51,11 @@ doc = [
     "blackjax>=1.0.0",
     "diffrax",
     "numba",
-    "mkdocs",
-    "mkdocs-material",
+    # mkdocs 2.0 is a backwards-incompatible rewrite
+    # and mkdocs-material stops supporting it.
+    # Pin both to ensure functional docs (for now at least)
+    "mkdocs<2.0.0",
+    "mkdocs-material<9.7.0",
     "mkdocs-exclude",
     "mkdocstrings-python",
     "mkdocstrings",
