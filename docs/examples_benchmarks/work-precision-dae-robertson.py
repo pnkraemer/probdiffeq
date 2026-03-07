@@ -19,12 +19,11 @@
 """Work-precision diagram on the Robertson problem.
 
 The Robertson problem is interesting for many reasons:
-- It comes in DAE, and ODE form
-  so we can compare different information operators
 - It has an exponential timescale so (good) adaptive
   steps are needed; fixed steps are hopeless.
 - Its y-states have wildly different scales,
   so a good prior model is important.
+
 """
 
 import functools
@@ -40,12 +39,13 @@ import scipy.integrate
 import tqdm
 
 from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq.util import nlstsq_util
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
 
 
-def main(start=2.0, stop=10.0, step=0.25, repeats=3, time_span=(1e-6, 1e5)) -> None:
+def main(start=3.0, stop=10.0, step=0.5, repeats=2, time_span=(1e-6, 1e5)) -> None:
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
@@ -75,13 +75,12 @@ def main(start=2.0, stop=10.0, step=0.25, repeats=3, time_span=(1e-6, 1e5)) -> N
 
     # Assemble algorithms
     algorithms = {
-        "DAE | Jet(3)": solver_dae(num_derivatives=3, time_span=time_span),
-        "DAE | Jet(4)": solver_dae(num_derivatives=4, time_span=time_span),
+        "DAE | Jet(3)": solver_dae_iwp(num_derivatives=3, time_span=time_span),
+        "DAE | Jet(4)": solver_dae_iwp(num_derivatives=4, time_span=time_span),
         "ODE | TS1(3)": solver_ode(num_derivatives=3, time_span=time_span),
+        "ODE | TS1(4)": solver_ode(num_derivatives=4, time_span=time_span),
         "ODE | TS1(7)": solver_ode(num_derivatives=7, time_span=time_span),
-        # "ODE | BDF (Scipy)": solver_scipy(method="BDF", time_span=time_span),
         "ODE | LSODA (Scipy)": solver_scipy(method="LSODA", time_span=time_span),
-        "ODE | Radau (Scipy)": solver_scipy(method="Radau", time_span=time_span),
     }
 
     # Compute a reference solution
@@ -98,7 +97,7 @@ def main(start=2.0, stop=10.0, step=0.25, repeats=3, time_span=(1e-6, 1e5)) -> N
     _fig, ax = plt.subplots(ncols=2, figsize=(13, 5))
 
     for label, wp in results.items():
-        wdw = 1  # window
+        wdw = 3  # window
 
         precision, y = wp["precision"], wp["work_mean"]
         x, _ = precision.T
@@ -188,20 +187,19 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
         # Build a solver
         vf_auto = functools.partial(vf, t=t0)
         tcoeffs = taylor.odejet_padded_scan(vf_auto, (y0,), num=num_derivatives - 1)
+        init, ssm = probdiffeq.ssm_taylor(tcoeffs)
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            tcoeffs, output_scale=base_scale
-        )
+        iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=base_scale)
         ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
-        solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts, ssm=ssm)
-        error = probdiffeq.error_state_std(constraint=ts, prior=ibm, ssm=ssm)
-
-        solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, error=error, clip_dt=True
+        solver = probdiffeq.solver_dynamic(
+            strategy=strategy, prior=iwp, constraint=ts, ssm=ssm
         )
+        error = probdiffeq.error_state_std(constraint=ts, prior=iwp, ssm=ssm)
+
+        solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
         solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
 
         return jax.block_until_ready(solution.u.mean[0])
@@ -209,63 +207,62 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
     return param_to_solution
 
 
-def solver_dae(*, num_derivatives: int, time_span) -> Callable:
+def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
     """Construct a method that solves Robertson as a DAE."""
 
-    def root(u, du, /, *, t):
+    def differential(u, du, /, *, t):
         del t
-        return [vf_differential(u, du), vf_algebraic(u)]
+        return du[:2] - dynamics(u)
 
-    def vf_differential(y, du):
+    def dynamics(y):
         k1, k2, k3 = 0.04, 3e7, 1e4
         f0 = -k1 * y[0] + k3 * y[1] * y[2]
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
-        return jnp.stack([du[0] - f0, du[1] - f1])
+        return jnp.stack([f0, f1])
 
-    def vf_algebraic(u):
+    def algebraic(u, *, t):
+        del t
         return u[0] + u[1] + u[2] - 1
 
     @jax.jit
     def param_to_solution(tol):
+        t0, t1 = time_span
 
-        # This base scale is critical to Robertson, because
-        # the solutions live on vastly different scales
-        # (but don't vary much within these scales).
-        # TODO: what is the best "base output scale" for the solver?
-        #       this should be an expectation-maximisation thing right?
-        base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
+        def differential_auto(u, du):
+            return differential(u, du, t=t0)
 
-        # For DAEs, not all variables are differential, and we need to have
-        #   and idea which ones arent to stabilise the solver initialisation
+        def algebraic_auto(u):
+            return algebraic(u, t=t0)
+
         y0 = [jnp.array([1.0, 0.0, 0.0])]
-        is_differential = [jnp.array([True, True, False])]
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            y0,
-            output_scale=base_scale,
-            diffuse_derivatives=num_derivatives,
-            is_differential=is_differential,
+        nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(
+            maxiter=10, tol=jnp.finfo(y0[0].dtype).eps ** 0.5
         )
+        tcoeffs, _info = taylor.daejet_nonlinear_lstsq(
+            differential_auto, algebraic_auto, y0, num=num_derivatives, nlstsq=nlstsq
+        )
+        init, ssm = probdiffeq.ssm_taylor(tcoeffs)
+
+        base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
+        iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=base_scale)
 
         # We build a Jet constraint
-        jet = probdiffeq.constraint_root_jet(root, ssm=ssm)
-        ts = probdiffeq.constraint_root_ts1(root, ssm=ssm)
+        jet = probdiffeq.constraint_dae_jet(
+            differential, algebraic, ssm=ssm, nlstsq=nlstsq
+        )
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         # For proper DAEs, non-iterated solver's simply don't cut it
-        solver = probdiffeq.solver_iterated(
-            strategy=strategy, prior=ibm, constraint=jet, ssm=ssm, constraint_init=jet
+        solver = probdiffeq.solver_dynamic(
+            strategy=strategy, prior=iwp, constraint=jet, ssm=ssm
         )
 
         # The state-error-estimate doesn't care about the dimension
         # of the DAE, which is exactly what we need here
-        error = probdiffeq.error_state_std(constraint=ts, prior=ibm, ssm=ssm)
+        error = probdiffeq.error_state_std(constraint=jet, prior=iwp, ssm=ssm)
 
-        # Integral controllers just work better than proportional-integral ones
         # TODO: build PID controllers (is this "gustafsson"?) for iterated solvers?
-        solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, error=error, clip_dt=True
-        )
-        t0, t1 = time_span
+        solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
         solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
 
         return jax.block_until_ready(solution.u.mean[0])

@@ -193,15 +193,14 @@ def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = taylor.odejet_unroll(vf_auto, (u0, du0), num=num_derivatives - 1)
 
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            tcoeffs, ssm_fact="isotropic"
-        )
+        init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
+        iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
         ts = constraint_ode_fun(vf_probdiffeq, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
         solver = probdiffeq.solver_dynamic(
-            strategy=strategy, prior=ibm, constraint=ts, ssm=ssm
+            strategy=strategy, prior=iwp, constraint=ts, ssm=ssm
         )
-        error = probdiffeq.error_residual_std(constraint=ts, prior=ibm, ssm=ssm)
+        error = probdiffeq.error_residual_std(constraint=ts, prior=iwp, ssm=ssm)
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(

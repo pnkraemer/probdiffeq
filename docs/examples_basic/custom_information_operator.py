@@ -1,18 +1,19 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# # Custom information operators
+# # Utilize custom constraints
 #
 # This tutorial extends the demonstration of solving second-order problems directly.
 #
@@ -91,13 +92,14 @@ H0 = hamiltonian_1st(u0_1st)
 # +
 
 tcoeffs = [u0_1st]
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, diffuse_derivatives=2)
+init, ssm = probdiffeq.ssm_taylor(tcoeffs, diffuse_derivatives=2)
+iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
 ts1 = probdiffeq.constraint_ode_ts1(vf_1st, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 solver_1st = probdiffeq.solver_mle(
-    strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
+    strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm
 )
-error = probdiffeq.error_state_std(constraint=ts1, prior=ibm, ssm=ssm)
+error = probdiffeq.error_state_std(constraint=ts1, prior=iwp, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, error=error)
 
 # -
@@ -137,7 +139,8 @@ def root(u, du, ddu, /, *, t):
 
 u0, du0 = jnp.split(u0_1st, 2)
 tcoeffs = [u0, du0]
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, diffuse_derivatives=1)
+init, ssm = probdiffeq.ssm_taylor(tcoeffs, diffuse_derivatives=1)
+iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
 
 # -
 
@@ -148,7 +151,7 @@ init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, diffuse_derivatives
 ts1 = probdiffeq.constraint_root_ts1(root, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 solver_2nd = probdiffeq.solver_mle(
-    strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
+    strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm
 )
 
 # -
@@ -161,7 +164,7 @@ solver_2nd = probdiffeq.solver_mle(
 
 # +
 
-error = probdiffeq.error_state_std(constraint=ts1, prior=ibm, ssm=ssm)
+error = probdiffeq.error_state_std(constraint=ts1, prior=iwp, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, error=error)
 
 sol_2 = jax.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
@@ -192,5 +195,3 @@ ax[1].set_ylabel("Error")
 ax[1].legend()
 # ax[1].set_ylim((eps, 10))
 plt.show()
-
-# -

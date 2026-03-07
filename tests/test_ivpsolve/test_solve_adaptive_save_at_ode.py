@@ -22,10 +22,34 @@ class Factory:
     and make each case only vary one of the parameters.
     """
 
+    prior: Callable = probdiffeq.prior_wiener_integrated
     strategy: Callable = probdiffeq.strategy_filter
     solver: Callable = probdiffeq.solver
     constraint: Callable = probdiffeq.constraint_ode_ts0
     error: Callable = probdiffeq.error_residual_std
+
+
+@testing.case
+def case_factory_prior_wiener_integrated():
+    return Factory(prior=probdiffeq.prior_wiener_integrated)
+
+
+@testing.case
+def case_factory_prior_ioup():
+
+    def prior(ssm):
+        try:
+
+            def linop(u, /):
+                return tree.tree_map(lambda s: 0.01 * np.flip(s), u)
+
+            return probdiffeq.prior_ornstein_uhlenbeck_integrated(linop, ssm=ssm)
+        except NotImplementedError:
+            reason = "This prior is not implemented"
+            reason += ", likely due to the selected state-space factorisation."
+            testing.skip(reason)
+
+    return Factory(prior=prior)
 
 
 @testing.case
@@ -95,6 +119,7 @@ def case_factory_constraint_ode_ts1_hutchinson_rev():
 def case_factory_constraint_root_ts1(ivp):
     vf, _u0, (_t0, _t1) = ivp
 
+    # Always materialize to stabilise blockdiagonal/isotropic TS1
     jacobian = probdiffeq.jacobian_materialize()
 
     def root(u, du, /, *, t):
@@ -171,13 +196,18 @@ def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
 
     # Build a solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
-    init, iwp, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=ssm_fact)
+    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=ssm_fact)
+    prior = factory.prior(ssm=ssm)
     strategy = factory.strategy(ssm=ssm)
     constraint = factory.constraint(vf, ssm=ssm)
     solver = factory.solver(
-        strategy=strategy, prior=iwp, constraint=constraint, ssm=ssm
+        strategy=strategy, prior=prior, constraint=constraint, ssm=ssm
     )
-    error = factory.error(prior=iwp, ssm=ssm, constraint=constraint)
+    # not all constraints have shape (d,):
+    error_norm = probdiffeq.error_norm_rms_then_scale()
+    error = factory.error(
+        prior=prior, ssm=ssm, constraint=constraint, error_norm=error_norm
+    )
 
     # Compute the PN solution
     save_at = np.linspace(t0, t1, endpoint=True, num=7)

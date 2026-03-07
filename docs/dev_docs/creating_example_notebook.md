@@ -1,4 +1,4 @@
-# Creating a new example/benchmark
+# Create a new example or benchmark
 
 Probdiffeq hosts numerous tutorials and benchmarks that demonstrate the library. The differences between examples and benchmarks are minimal: they are all Jupyter notebooks (paired to `py:light` files via jupytext for version control) and each demonstrates one functionality. Examples show *what* probdiffeq offers, while benchmarks show *how well* it performs, often compared to other solver libraries. Each tutorial or benchmark should run in under a minute. New contributions are welcome!
 

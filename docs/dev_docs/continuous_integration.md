@@ -1,4 +1,4 @@
-# Continuous Integration
+# Use Probdiffeq's continuous integration
 
 This guide explains how to install dependencies, run linting and formatting checks, execute tests, and build documentation as part of the continuous integration (CI) process.
 

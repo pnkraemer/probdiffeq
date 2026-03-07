@@ -1,18 +1,19 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# # Taylor coefficients
+# # Leverage state-space models over custom Taylor coefficients
 #
 # To build a probabilistic solver, we need to build a specific state-space model.
 # To build this specific state-space model, we interact with Taylor coefficients.
@@ -58,10 +59,10 @@ def vf(y, /, *, t):
 # Here is a wrapper arounds Probdiffeq's solution routine.
 
 
-# +
 def solve(tc):
     """Solve the ODE."""
-    init, prior, ssm = probdiffeq.prior_wiener_integrated(tc, ssm_fact="dense")
+    init, ssm = probdiffeq.ssm_taylor(tc, ssm_fact="dense")
+    prior = probdiffeq.prior_wiener_integrated(ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_mle(
@@ -73,16 +74,12 @@ def solve(tc):
     return solve(init, save_at=ts, atol=1e-2, rtol=1e-2)
 
 
-# -
-
 # It's time to solve some ODEs:
 
-# +
 tcoeffs = taylor.odejet_padded_scan(lambda *y: vf(*y, t=t0), [u0], num=2)
 solution = solve(tcoeffs)
 print(jax.tree.map(jnp.shape, solution))
 
-# -
 
 # The type of solution.u matches that of the initial condition.
 
@@ -118,8 +115,7 @@ print(jax.tree.map(jnp.shape, solution.u))
 # +
 
 key = jax.random.PRNGKey(seed=15)
-_, _, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="dense")
-strategy = probdiffeq.strategy_filter(ssm)
+_, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
 posterior = solution.solution_full
 sample_one = posterior.sample(key, ssm=ssm)
 sample_many = posterior.sample(key, ssm=ssm, shape=(1, 2, 3))
@@ -128,5 +124,3 @@ print(jax.tree.map(jnp.shape, solution.u.mean))
 print(jax.tree.map(jnp.shape, solution.u.std))
 print(jax.tree.map(jnp.shape, sample_one))
 print(jax.tree.map(jnp.shape, sample_many))
-
-# -

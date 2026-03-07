@@ -28,12 +28,20 @@ def maximum(a, b, /):
     return jnp.maximum(a, b)
 
 
+def amax(a, /):
+    return jnp.amax(a)
+
+
 def where(cond, /, if_true, if_false):
     return jnp.where(cond, if_true, if_false)
 
 
 def abs(arr, /):  # noqa: A001
     return jnp.abs(arr)
+
+
+def argmin(arr, /):
+    return jnp.argmin(arr)
 
 
 def diff(arr, /):
@@ -56,6 +64,10 @@ def squeeze(arr, /):
     return jnp.squeeze(arr)
 
 
+def sign(arr, /):
+    return jnp.sign(arr)
+
+
 def atleast_1d(arr, /):
     return jnp.atleast_1d(arr)
 
@@ -64,16 +76,16 @@ def finfo_eps(arr_or_dtype, /):
     return jnp.finfo(arr_or_dtype).eps
 
 
-def concatenate(list_of_arrays, /):
-    return jnp.concatenate(list_of_arrays)
+def concatenate(list_of_arrays, /, axis=0):
+    return jnp.concatenate(list_of_arrays, axis=axis)
 
 
-def ones(shape, /):
-    return jnp.ones(shape)
+def ones(shape, /, dtype=None):
+    return jnp.ones(shape, dtype=dtype)
 
 
-def zeros(shape, /):
-    return jnp.zeros(shape)
+def zeros(shape, /, dtype=None):
+    return jnp.zeros(shape, dtype=dtype)
 
 
 def empty(shape, /):
@@ -120,6 +132,14 @@ def log(arr, /):
     return jnp.log(arr)
 
 
+def log2(arr, /):
+    return jnp.log2(arr)
+
+
+def ceil(arr, /):
+    return jnp.ceil(arr)
+
+
 def power(arr, powers):
     return jnp.power(arr, powers)
 
@@ -128,8 +148,8 @@ def exp(arr, /):
     return jnp.exp(arr)
 
 
-def eye(n, m=None, /):
-    return jnp.eye(n, M=m)
+def eye(n, m=None, /, dtype=None):
+    return jnp.eye(n, M=m, dtype=dtype)
 
 
 def save(path, arr, /):
@@ -216,5 +236,17 @@ def tril(arr, /):
     return jnp.tril(arr)
 
 
+def triu(arr, /):
+    return jnp.triu(arr)
+
+
 def dtype(arr_or_dtype, /):
     return jnp.dtype(arr_or_dtype)
+
+
+def binomial_coeff(n, k):
+    return jnp.exp(
+        jax.scipy.special.gammaln(n + 1)
+        - jax.scipy.special.gammaln(k + 1)
+        - jax.scipy.special.gammaln(n - k + 1)
+    )

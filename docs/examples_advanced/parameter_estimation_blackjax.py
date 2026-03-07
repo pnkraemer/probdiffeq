@@ -1,18 +1,19 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# # Parameter estimation (BlackJAX)
+# # Estimate parameters (via BlackJAX)
 #
 #
 # This tutorial explains how to estimate unknown parameters of
@@ -162,8 +163,6 @@ theta_true = u0 + 0.5 * jnp.flip(u0)
 theta_guess = u0  # initial guess
 
 
-# -
-
 # +
 
 
@@ -177,12 +176,11 @@ def plot_solution(t, u, *, ax, marker=".", **plotting_kwargs):
 
 
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta_guess,), num=2)
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-    tcoeffs, output_scale=10.0, ssm_fact="isotropic"
-)
+init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
+iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=10.0)
 ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
-solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
+solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
 
 
 @jax.jit
@@ -190,7 +188,7 @@ def solve_fixed(theta, *, ts):
     """Evaluate the parameter-to-solution map, solving on a fixed grid."""
     # Create a probabilistic solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
-    init, _ibm, _ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="isotropic")
+    init, _ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
     solve = ivpsolve.solve_fixed_grid(solver=solver)
     return solve(init, grid=ts)
 
@@ -200,8 +198,8 @@ def solve_adaptive(theta, *, save_at):
     """Evaluate the parameter-to-solution map, solving on an adaptive grid."""
     # Create a probabilistic solver
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta,), num=2)
-    init, _ibm, _ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="isotropic")
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
+    init, __ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
     return solve(init, save_at=save_at, dt0=0.1, atol=1e-4, rtol=1e-2)
 
@@ -268,8 +266,6 @@ data = solve_fixed(theta_true, ts=ts).u.mean[0][-1]
 
 log_M = functools.partial(logposterior_fn, data=data, ts=ts)
 
-
-# -
 
 # +
 
@@ -357,7 +353,6 @@ states = inference_loop(
 
 solution_samples = jax.vmap(solve_save_at)(states.position)
 
-# -
 
 # +
 
@@ -425,8 +420,6 @@ log_M_vmapped_x = jax.vmap(log_M, in_axes=-1, out_axes=-1)
 log_M_vmapped = jax.vmap(log_M_vmapped_x, in_axes=-1, out_axes=-1)
 Zs = log_M_vmapped(Thetas)
 
-
-# -
 
 # +
 

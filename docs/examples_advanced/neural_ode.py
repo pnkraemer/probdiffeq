@@ -1,18 +1,19 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# # Diffusion tempering & NODEs
+# # Learn neural ODEs with diffusion tempering
 #
 
 # +
@@ -88,8 +89,6 @@ def main(num_data=100, epochs=1000, print_every=100, hidden=(20,), lr=0.2) -> No
     plt.show()
 
 
-# -
-
 # +
 
 
@@ -106,8 +105,6 @@ def vf_neural_ode(*, hidden: tuple, t0: float, t1: float):
 
     return vf, (u0,), (t0, t1), f_args
 
-
-# -
 
 # +
 
@@ -146,8 +143,6 @@ def model_mlp(
     return unravel(p_init), fwd
 
 
-# -
-
 # +
 
 
@@ -167,9 +162,8 @@ def loss_log_marginal_likelihood(vf, *, t0):
         """Loss function: log-marginal likelihood of the data."""
         # Build a solver
         tcoeffs = (*u0, vf(*u0, t=t0, p=p))
-        init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-            tcoeffs, output_scale=output_scale, ssm_fact="dense"
-        )
+        init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
+        iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=output_scale)
 
         def vf_p(y, /, *, t):
             return vf(y, t=t, p=p)
@@ -177,7 +171,7 @@ def loss_log_marginal_likelihood(vf, *, t0):
         ts0 = probdiffeq.constraint_ode_ts0(vf_p, ssm=ssm)
         strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
         solver_ts0 = probdiffeq.solver(
-            strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
+            strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm
         )
 
         # Solve
@@ -193,8 +187,6 @@ def loss_log_marginal_likelihood(vf, *, t0):
 
     return loss
 
-
-# -
 
 # +
 
@@ -214,8 +206,6 @@ def train_step_optax(optimizer, loss):
 
     return update
 
-
-# -
 
 # +
 

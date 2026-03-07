@@ -1,18 +1,19 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# # Second-order systems
+# # Specialise in second-order systems
 
 # In this tutorial, we see how second-order ODEs can (and should!) be solved
 # without transforming them into first-order problems first.
@@ -54,18 +55,15 @@ def vf_1(y, /, *, t):
 
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
 
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-    tcoeffs, output_scale=1.0, ssm_fact="isotropic"
-)
+init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
+iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=1.0)
 ts0 = probdiffeq.constraint_ode_ts0(vf_1, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
 solver_1st = probdiffeq.solver_mle(
-    strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
+    strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm
 )
-error_1st = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
+error_1st = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
 
-
-# -
 
 # +
 
@@ -96,17 +94,14 @@ def vf_2(y, dy, /, *, t):
 # Different derivative count because we don't transform to first order
 # The goal is to match the number of tracked taylor coefficients.
 tcoeffs = taylor.odejet_padded_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-    tcoeffs, output_scale=1.0, ssm_fact="isotropic"
-)
+init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
+iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=1.0)
 ts0 = probdiffeq.constraint_ode_ts0(vf_2, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
 solver_2nd = probdiffeq.solver_mle(
-    strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm
+    strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm
 )
-error_2nd = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
-
-# -
+error_2nd = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
 
 
 # +

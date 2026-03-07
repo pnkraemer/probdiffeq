@@ -1,33 +1,19 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# # Solver types
-#
-# You can choose between a `adaptive.solver_calibrationfree()`
-# (which does not calibrate the output-scale),
-# a `adaptive.solver_mle()`
-# (which calibrates a global output scale via quasi-maximum-likelihood-estimation),
-# and a `adaptive.solver_dynamic()`,
-# which calibrates a time-varying,
-# piecewise constant output-scale via
-# "local' quasi-maximum-likelihood estimation,
-# similar to how ODE solver estimate local errors.
-#
-# But are these good for?
-# In short: choose a `solver_dynamic`
-# if your ODE output-scale varies quite strongly,
-# and choose an `solver_mle` otherwise.
+# # Exploit dynamic solvers for variable output scales
 #
 # For example, consider the numerical solution of a linear ODE with fixed steps:
 
@@ -48,9 +34,6 @@ if not backend.has_been_selected:
 jax.config.update("jax_debug_nans", True)
 
 
-# -
-
-
 # +
 f, u0, (t0, t1), f_args = ivps.affine_independent(initial_values=1.0, a=2.0)
 
@@ -62,24 +45,20 @@ def vf(y, /, *, t):
     return f(y, *f_args)
 
 
-# -
-
 # +
 
 num_derivatives = 1
 
 tcoeffs = (u0, vf(u0, t=t0))
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-    tcoeffs, output_scale=1.0, ssm_fact="dense"
-)
+init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
+iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=1.0)
 ts1 = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
 strategy = probdiffeq.strategy_filter(ssm=ssm)
 dynamic = probdiffeq.solver_dynamic(
-    strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm
+    strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm
 )
-mle = probdiffeq.solver_mle(strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm)
+mle = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm)
 
-# -
 
 # +
 

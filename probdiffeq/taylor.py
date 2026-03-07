@@ -7,7 +7,8 @@ in probdiffeq.probdiffeq easier to access.
 See the tutorials for example use cases.
 """
 
-from probdiffeq.backend import flow, func, np, tree
+from probdiffeq import ssm_impl
+from probdiffeq.backend import flow, func, inspect, np, tree
 from probdiffeq.backend.typing import Array, ArrayLike, Callable, Sequence
 
 
@@ -323,3 +324,107 @@ def odejet_affine(vf: Callable, inits: Sequence[Array], /, num: int):
     tmp = fx
     fx_evaluations = [tmp := jvp_fn(tmp) for _ in range(num - 1)]
     return [*inits, fx, *fx_evaluations]
+
+
+def daejet_nonlinear_lstsq(
+    differential: Callable,
+    algebraic: Callable,
+    inits: Sequence[Array],
+    /,
+    num: int,
+    nlstsq: Callable,
+):
+    """Evaluate the Taylor series of a differential-algebraic equation system."""
+    # For really high orders, recursively call this function
+
+    root_order_differential = _verify_dae_signature_and_parse_order(differential)
+    root_order_algebraic = _verify_dae_signature_and_parse_order(algebraic)
+
+    # Determine degrees of freedom ("dof") and initialse all others diffusely
+    # Concretely: The provided 'inits' are not DOFs, all added ones are.
+    zeros = tree.tree_map(np.zeros_like, inits[0])
+    ones = tree.tree_map(np.ones_like, inits[0])
+    inits_std = [*[zeros for _ in inits], *[ones for _ in range(num)]]
+
+    # Pad the initial values to the desired size
+    zeros = tree.tree_map(np.zeros_like, inits[0])
+    inits_mean = [*inits, *[zeros for _ in range(num)]]
+
+    ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(inits_mean)
+    rv = ssm.normal.from_mean_and_std(inits_mean, inits_std)
+
+    x0, unravel = tree.ravel_pytree(inits_mean)
+
+    def root_jet(tcoeffs_flat):
+        tcoeffs_all = unravel(tcoeffs_flat)
+
+        # Differential part.
+        # Assumes that the DAE is first order.
+        ps, ss = jet_unpack_series(tcoeffs_all, root_order_differential)
+        primals1, series1 = func.jet(differential, ps, ss, is_tcoeff=False)
+
+        # Algebraic part
+        # Assumes that the DAE is first order.
+        ps, ss = jet_unpack_series(tcoeffs_all, root_order_algebraic)
+        primals2, series2 = func.jet(algebraic, ps, ss, is_tcoeff=False)
+
+        # Put together (order doesn't matter)
+        fx = [primals1, *series1, primals2, *series2]
+        return tree.ravel_pytree(fx)[0]
+
+    x1, info = nlstsq(root_jet, x0, rv.mean, rv.cholesky)
+    return unravel(x1), info
+
+
+def _verify_dae_signature_and_parse_order(vf) -> int:
+    """Parse the vector-field structure from its signature."""
+    sig = inspect.signature(vf)
+    params = list(sig.parameters.values())
+
+    msg = f"""The dynamics' signature is not compatible with the constraint.
+
+    More precisely, the dynamics are expected to look like
+
+      - f(u, /),
+      - f(u, du, /),
+      - f(u, du, ddu, /),
+
+    and so on, where the number of positional arguments
+    specifies the order of the problem.
+    Replace `u`, `du`, and so on with any variable name of your choosing
+    but mind the keyword-only argument 't' in the signatures above.
+
+    That said, the arguments
+
+    {[(p.name, p.kind) for p in params]}
+
+    have been detected in the dynamics function.
+
+    Try wrapping the vector field through a pure Python function
+    with the correct arguments before passing it to the ODE constraint.
+
+      - No *args or **kwargs
+      - No functools.partial
+
+    """
+
+    POSITIONAL = (
+        inspect.Parameter.POSITIONAL_ONLY,
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+    )
+    KEYWORD = (inspect.Parameter.KEYWORD_ONLY,)
+
+    def is_positional(p):
+        return p.kind in POSITIONAL
+
+    def is_keyword(p):
+        return p.kind in KEYWORD
+
+    state_args = [p for p in params if is_positional(p)]
+    contains_no_positional = len(state_args) == 0
+    contains_keyword = len([p for p in params if is_keyword(p)]) > 0
+
+    if contains_no_positional or contains_keyword:
+        raise TypeError(msg)
+
+    return len(state_args)

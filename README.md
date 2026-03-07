@@ -15,6 +15,7 @@
 - ⚡ Stable implementations of filtering, smoothing, and other estimation strategies  
 - ⚡ Custom information operators, dense output, and posterior sampling  
 - ⚡ State-space model factorisations  
+- ⚡ Custom prior processes, ODE-, mass-matrix-ODE-, and DAE-solvers
 - ⚡ Parameter estimation
 - ⚡ Taylor-series estimation with and without Jets  
 - ⚡ Seamless interoperability with [Optax](https://optax.readthedocs.io/en/latest/index.html), [BlackJAX](https://blackjax-devs.github.io/blackjax/), and other JAX-based libraries  

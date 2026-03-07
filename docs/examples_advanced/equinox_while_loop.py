@@ -1,18 +1,19 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# # Equinox's while-loops
+# # Make Probdiffeq's solvers reverse-mode differentiable
 #
 # Use [Equinox's](https://docs.kidger.site/equinox/)
 # bounded while loop to enable reverse-mode differentiation of adaptive IVP solvers.
@@ -42,12 +43,13 @@ def solution_routine(while_loop):
     u0 = jnp.asarray([0.1])
 
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
-    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="isotropic")
+    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
+    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
 
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
+    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
     solve_adaptive = ivpsolve.solve_adaptive_terminal_values(
         solver=solver, error=error, while_loop=while_loop
     )
@@ -101,5 +103,3 @@ solution, gradient = jax.jit(jax.value_and_grad(solve))(x)
 
 print(solution)
 print(gradient)
-
-# -

@@ -1,18 +1,19 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# # Solve a PDE
+# # Solve partial differential equations
 #
 # This tutorial replicates Figure 1 from https://arxiv.org/abs/2110.11812,
 # but uses some advanced features in Probdiffeq, namely, solving matrix-valued problems
@@ -44,15 +45,16 @@ def main() -> None:
 
     # Set up a state-space model
     tcoeffs = [u0, vf(u0, t=t0)]
-    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
+    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="blockdiag")
+    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
 
     # Build a solver
     ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_dynamic(
-        ssm=ssm, strategy=strategy, prior=ibm, constraint=ts
+        ssm=ssm, strategy=strategy, prior=iwp, constraint=ts
     )
-    error = probdiffeq.error_residual_std(constraint=ts, prior=ibm, ssm=ssm)
+    error = probdiffeq.error_residual_std(constraint=ts, prior=iwp, ssm=ssm)
 
     # Solve the ODE
     save_at = jnp.linspace(t0, t1, num=5, endpoint=True)
@@ -63,7 +65,7 @@ def main() -> None:
         nrows=2, ncols=len(u), figsize=(2 * len(u), 3), tight_layout=True
     )
     for t_i, u_i, std_i, ax_i in zip(save_at, u, u_std, axes.T):
-        ax_i[0].set_title(f"t = {t_i:.1f}")
+        ax_i[0].set_title(f"t = {t_i:.1f}", fontsize="medium")
         img = ax_i[0].imshow(u_i[0], cmap="copper", vmin=-1, vmax=1)
         plt.colorbar(img)
 
@@ -76,12 +78,10 @@ def main() -> None:
         ax_i[0].set_yticks(())
         ax_i[1].set_yticks(())
 
-    axes[0][0].set_ylabel("PDE solution")
-    axes[1][0].set_ylabel("log(std)")
+    axes[0][0].set_ylabel("PDE solution", fontsize="medium")
+    axes[1][0].set_ylabel("log(std)", fontsize="medium")
     plt.show()
 
-
-# -
 
 # +
 
@@ -97,8 +97,6 @@ def simulator(save_at, error, solver):
 
     return solve
 
-
-# -
 
 # +
 
@@ -138,12 +136,8 @@ def _laplace_2d(grid, dx):
     return grid[1:-1, 1:-1]
 
 
-# -
-
 # +
 
 
 if __name__ == "__main__":
     main()
-
-# -

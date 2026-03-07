@@ -1,18 +1,19 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# # How probabilistic solvers work
+# # Understand the basics of probabilistic solvers
 #
 # Probabilistic solvers condition a prior distribution
 # on satisfying a zero-ODE-residual on a specified grid.
@@ -53,7 +54,7 @@ def vector_field(y, /, *, t):
     return 10.0 * y * (2.0 - y)
 
 
-t0, t1 = 0.0, 0.5
+t0, t1 = 0.0, 2.5
 u0 = jnp.asarray(0.1)
 
 # -
@@ -63,24 +64,23 @@ u0 = jnp.asarray(0.1)
 # +
 ts = jnp.linspace(t0, t1, num=500, endpoint=True)
 
+
 # "Bad" prior (no Taylor coefficients)
-mseq_prior, ssm = probdiffeq.prior_wiener_integrated_discrete(
-    (u0,), grid=ts, diffuse_derivatives=2, output_scale=10.0
-)
+init, ssm = probdiffeq.ssm_taylor([u0], diffuse_derivatives=2)
+iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=10.0)
+mseq_prior = probdiffeq.MarkovSequence.from_grid(init, iwp, grid=ts, reverse=False)
 
 # "Good" prior (Taylor coefficients)
 tcoeffs = taylor.odejet_padded_scan(lambda y: vector_field(y, t=t0), (u0,), num=2)
-mseq_tcoeffs, ssm = probdiffeq.prior_wiener_integrated_discrete(
-    tcoeffs, grid=ts, output_scale=10.0
-)
+init, ssm = probdiffeq.ssm_taylor(tcoeffs)
+mseq_tcoeffs = probdiffeq.MarkovSequence.from_grid(init, iwp, grid=ts, reverse=False)
 
 
 # Posterior
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, output_scale=10.0)
 ts1 = probdiffeq.constraint_ode_ts1(vector_field, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts1, ssm=ssm)
-error = probdiffeq.error_residual_std(constraint=ts1, prior=ibm, ssm=ssm)
+solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm)
+error = probdiffeq.error_residual_std(constraint=ts1, prior=iwp, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
 sol = solve(init, save_at=ts, atol=1e-1, rtol=1e-1)
 mseq_posterior = sol.solution_full
@@ -106,9 +106,9 @@ samples_posterior = mseq_posterior.sample(key, ssm=ssm, shape=(num_samples,))
 fig, (axes_state, axes_residual, axes_log_abs) = plt.subplots(
     nrows=3, ncols=3, sharex=True, sharey="row", constrained_layout=True, figsize=(8, 5)
 )
-axes_state[0].set_title("w/ Initial condition")
-axes_state[1].set_title("w/ Taylor coefficients")
-axes_state[2].set_title("Posterior")
+axes_state[0].set_title("IOUP w/ Initial condition", fontsize="medium")
+axes_state[1].set_title("IOUP w/ Taylor coefficients", fontsize="medium")
+axes_state[2].set_title("Posterior", fontsize="medium")
 
 sample_style = {"marker": "None", "alpha": 0.99, "linewidth": 0.75}
 
@@ -161,15 +161,13 @@ axes_log_abs[0].set_ylim((-6, 4))
 axes_log_abs[0].set_yticks((-6, -1, 4))
 
 # Label the x- and y-axes
-axes_state[0].set_ylabel("Solution")
-axes_residual[0].set_ylabel("Residual")
-axes_log_abs[0].set_ylabel(r"Log-residual")
-axes_log_abs[0].set_xlabel("Time $t$")
-axes_log_abs[1].set_xlabel("Time $t$")
-axes_log_abs[2].set_xlabel("Time $t$")
+axes_state[0].set_ylabel("Solution", fontsize="medium")
+axes_residual[0].set_ylabel("Residual", fontsize="medium")
+axes_log_abs[0].set_ylabel("Log-residual", fontsize="medium")
+axes_log_abs[0].set_xlabel("Time $t$", fontsize="medium")
+axes_log_abs[1].set_xlabel("Time $t$", fontsize="medium")
+axes_log_abs[2].set_xlabel("Time $t$", fontsize="medium")
 
 # Show the result
 fig.align_ylabels()
 plt.show()
-
-# -

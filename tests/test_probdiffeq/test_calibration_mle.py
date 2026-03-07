@@ -15,13 +15,14 @@ def case_solve_fixed_grid(fact):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
-    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
+    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     grid = np.linspace(t0, t1, endpoint=True, num=5)
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
-        solver = solver_fun(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
+        solver = solver_fun(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
         solve = ivpsolve.solve_fixed_grid(solver=solver)
         return func.jit(solve)(init, grid=grid)
 
@@ -37,13 +38,14 @@ def case_simulate_terminal_values(fact):
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
-    init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact=fact)
+    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
+    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun(ssm=ssm)
-        solver = solver_fun(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
-        error = probdiffeq.error_residual_std(constraint=ts0, prior=ibm, ssm=ssm)
+        solver = solver_fun(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
+        error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
         solve = ivpsolve.solve_adaptive_terminal_values(error=error, solver=solver)
         return func.jit(solve)(init, t0=t0, t1=t1, dt0=dt0, atol=1e-2, rtol=1e-2)
 

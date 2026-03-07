@@ -1,18 +1,19 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# # Parameter estimation (Optax)
+# # Estimate parameters (via Optax)
 #
 # We create some data,
 # compute the marginal likelihood of this data _under the ODE posterior_
@@ -57,24 +58,21 @@ def vf(y, t, *, p):  # noqa: ARG001
 
 
 tcoeffs = (u0, vf(u0, t0, p=f_args))
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-    tcoeffs, output_scale=10.0, ssm_fact="isotropic"
-)
+init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
+iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=10.0)
 
 
 def solve(p):
     """Evaluate the parameter-to-solution map."""
     tcoeffs = (u0, vf(u0, t0, p=p))
-    init, ibm, ssm = probdiffeq.prior_wiener_integrated(
-        tcoeffs, output_scale=10.0, ssm_fact="isotropic"
-    )
+    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
 
     def vf_p(y, /, *, t):
         return vf(y, t=t, p=p)
 
     ts0 = probdiffeq.constraint_ode_ts0(vf_p, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy, prior=ibm, constraint=ts0, ssm=ssm)
+    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
     return solve(init, grid=ts)
 
@@ -127,10 +125,8 @@ sensitivities = jax.jit(jax.grad(parameter_to_data_fit))
 # We can differentiate the function forward- and reverse-mode
 # (the latter is possible because we use fixed steps)
 
-# +
 parameter_to_data_fit(parameter_guess)
 sensitivities(parameter_guess)
-# -
 
 # Now, enter optax: build an optimizer,
 # and optimise the parameter-to-model-fit function.
@@ -156,7 +152,6 @@ def build_update_fn(*, optimizer, loss_fn):
 optim = optax.adam(learning_rate=1e-2)
 update_fn = build_update_fn(optimizer=optim, loss_fn=parameter_to_data_fit)
 
-# -
 
 # +
 
@@ -180,5 +175,3 @@ solution_better = solve(p)
 plt.plot(ts, data, color="k", linestyle="solid", linewidth=6, alpha=0.125)
 plt.plot(ts, solution_better.u.mean[0])
 plt.show()
-
-# -

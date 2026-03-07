@@ -1,4 +1,4 @@
-# Choosing a solver
+# Choose the right probabilistic solver
 
 Good solvers are problem-dependent. However, some guidelines exist:
 
@@ -28,7 +28,6 @@ If that does not work: good luck; probabilistic solvers for problems that are st
 *and* high-dimensional are a bit of an open problem as of writing this.
 
 ## Filters vs smoothers
-
 As a rule of thumb, use a `ivpsolvers.strategy_filter` strategy for `simulate_terminal_values`, 
 a `ivpsolvers.strategy_smoother_fixedpoint` strategy for `solve_adaptive_save_at`,
 and a `ivpsolvers.strategy_smoother_fixedinterval` strategy for `solve_fixed_step`.
@@ -40,11 +39,34 @@ Use a `solvers.solver_dynamic` solver if you expect that the output scale of you
 solution varies greatly (eg for first-order, linear ODEs; see the tutorials).
 Otherwise, use an `solvers.solver_mle` solver for plain simulation problems, 
 and a `solvers.solver` for parameter-estimation.
+See also the output scale recommendations under "Prior distributions".
+
+
+## Prior distributions
+If you're uncertain which prior to choose, prefer an integrated Wiener process over more advanced priors.
+The reason is that integrated Wiener processes have closed form transition parameters, which makes
+simulations much faster. For other cases, use exponential priors according to the recommendations
+in https://arxiv.org/abs/2305.14978.
+
+Regarding output scales: 
+if the ODE states carry different magnitudes (eg in the Robertson problem, where two states 
+are O(1) and the third one is O($10^{-5}$)), a dedicated output scale when constructing the 
+prior makes sense. Consult the DAE tutorials for specific information.
+
+Regarding the number of Taylor coefficients: assuming the ODE solution is smooth, then
+more Taylor coefficients increase the convergence *rate* but also increase the complexity
+per step and the requirements on numerical robustness. When in doubt, use 4-5 Taylor coefficients,
+or 7-8 Taylor coefficients if the goal is to achieve accuracy close to machine precision.
+In single precision (eg on a GPU), track only 2-3 Taylor coefficients.
+
 
 ## Miscellaneous
 If you use a `ts0`, choose an `isotropic` factorisation instead of a `dense` factorisation.
 They are mathematically equivalent, but the `isotropic` factorisation is faster.
 
+For parameter estimation problems with adaptive solvers, replace Probdiffeq's while-loops
+with Equinox's while-loops; see the tutorials for how.
 
 ## Future guidelines
 These guidelines are a work in progress and may change at any point. If you have any input, reach out.
+Something missing? Reach out!

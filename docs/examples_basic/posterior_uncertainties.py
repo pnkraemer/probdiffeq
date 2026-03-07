@@ -1,18 +1,19 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.17.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# # Posterior uncertainties
+# # Visualise posterior standard deviations
 
 # In this tutorial, we will investigate the structure of the uncertainties
 # returned by the probabilistic solvers. There is also the chance to compare
@@ -60,12 +61,13 @@ u0 = jnp.asarray([20.0, 20.0])
 
 
 tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
-init, ibm, ssm = probdiffeq.prior_wiener_integrated(tcoeffs, ssm_fact="blockdiag")
+init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="blockdiag")
+iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
 ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
 strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
 
-solver = probdiffeq.solver_mle(strategy=strategy, prior=ibm, constraint=ts, ssm=ssm)
-error = probdiffeq.error_residual_std(constraint=ts, prior=ibm, ssm=ssm)
+solver = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts, ssm=ssm)
+error = probdiffeq.error_residual_std(constraint=ts, prior=iwp, ssm=ssm)
 solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
 
 
@@ -128,6 +130,3 @@ for i, (u_i, std_i, ax_i) in enumerate(zip(sol.u.mean, sol.u.std, axes.T)):
 
 fig.align_ylabels()
 plt.show()
-
-
-# -
