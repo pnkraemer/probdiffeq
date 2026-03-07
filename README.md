@@ -79,7 +79,7 @@ Notably, Probdiffeq's API is not guaranteed to be stable, but we do our best to 
 
 
 
-## Citing
+## Citation
 
 If you use **Probdiffeq** in your research, please cite:
 
@@ -165,7 +165,7 @@ A (subjective, probdiffeq-centric) list of relevant work includes:
 Anything missing? Reach out! 
 
 
-## Choose the right probabilistic solver
+## Choose the right solver
 
 Good solvers are problem-dependent. However, some guidelines exist:
 
@@ -247,7 +247,7 @@ Probdiffeq is a JAX library that focuses on state-space-model-based formulations
 
 
 
-### Transition from ProbNumDiffEq.jl (Julia)
+### Migrate from ProbNumDiffEq.jl (Julia)
 
 [ProbNumDiffEq.jl](https://nathanaelbosch.github.io/ProbNumDiffEq.jl/stable/) is a library for probabilistic IVP solvers in Julia, similar to Probdiffeq. However, while the feature offerings are similar, the libraries are unrelated.
 To translate ProbNumDiffEq.jl code to Probdiffeq code:
@@ -265,7 +265,7 @@ Consult each libraries' latest API documentation when in doubt.
 
 
 
-### Transition from ProbNum (Python, Numpy)
+### Migrate from ProbNum (Python, Numpy)
 
 [ProbNum](https://probnum.readthedocs.io/en/latest/) is a general probabilistic numerics library based on Numpy. Probdiffeq specializes in IVP solvers using pure JAX, offering:
 
@@ -275,7 +275,7 @@ Consult each libraries' latest API documentation when in doubt.
 
 
 
-### Transition from Diffrax
+### Migrate from Diffrax
 
 [Diffrax](https://docs.kidger.site/diffrax/) is a JAX-based library for differential equations. The key difference is that Diffrax's solvers are non-probabilistic; Probdiffeq solvers are probabilistic. Approximate solver mapping:
 
@@ -290,7 +290,7 @@ Consult each libraries' latest API documentation when in doubt.
 
 
 
-### General differences from other common ODE solvers (e.g., SciPy, jax.odeint)
+### Migrate from other common ODE solvers (e.g., SciPy, jax.odeint)
 
 * Probdiffeq's solutions are posterior distributions instead of point estimates, enabling uncertainty quantification and more sophisticated models (eg easy switch to second-order problems).
 * Probdiffeq's solver modes are explicit: `simulate_terminal_values()`, and `solve_adaptive_save_at()` instead of a one-size-fits-all `solve()` method.
@@ -333,11 +333,11 @@ You can also check out [Probdiffeq's Pleiades benchmark](https://github.com/pnkr
 Your problem is not discussed here? Feel free to reach out. Opening an issue is a great way to get help!
 
 
-## Use Probdiffeq's continuous integration
+## Use the CI
 
 This guide explains how to install dependencies, run linting and formatting checks, execute tests, and build documentation as part of the continuous integration (CI) process.
 
-### Full Installation
+### Install Probdiffeq with all dev-related dependencies
 
 After cloning the repository, in the root of the project, and assuming JAX is already installed, do the following:
 To install all development dependencies, use one or more of the following commands:
@@ -354,12 +354,12 @@ To install everything required for development, you can install all extras at on
 pip install .[test,format-and-lint,doc]
 ```
 
-### Running Checks
+### Run all the checks
 
 The project uses a `Makefile` to streamline common CI tasks. 
 You can run the following commands to check code quality and correctness:
 
-#### 1. Formatting and Linting
+#### 1. Check/apply formatting and Linting
 
 To check code formatting and linting rules, run:
 
@@ -373,7 +373,7 @@ This will:
 - Check for style violations and linting issues.
 - Enforce documentation conventions.
 
-#### 2. Running Tests
+#### 2. Run tests
 
 To execute all tests, use:
 
@@ -385,7 +385,7 @@ This will:
 - Run all tests.
 - Execute tests in parallel for efficiency.
 
-#### 3. Running Benchmarks
+#### 3. Execute benchmarks
 
 
 We maintain benchmarks comparing **Probdiffeq** against other solvers and libraries, including [SciPy](https://scipy.org/), [JAX](https://jax.readthedocs.io/en/latest/), and [Diffrax](https://docs.kidger.site/diffrax/).
@@ -411,7 +411,7 @@ make benchmarks-run-dry-run
 This is helpful to verify that API changes are reflected in the benchmark code.
 
 
-#### 4. Building Documentation
+#### 4. Build the documentation
 
 To generate the documentation, use:
 
@@ -424,7 +424,13 @@ This will:
 - Process Jupyter notebooks and Markdown files.
 - Build the documentation site.
 
-#### 5. Cleaning Up
+To preview the docs, use:
+
+```commandline 
+make doc-serve
+```
+
+#### 5. Clean Up
 
 To remove auxiliary files generated during testing or documentation builds, run:
 
@@ -434,11 +440,11 @@ make clean
 
 This removes unnecessary files (eg pytest or mypy caches) to keep the repository clean.
 
-### Pre-commit Hooks
+### Use pre-commit hooks
 
 To ensure code quality before committing, the project uses `pre-commit` hooks. These automatically format, lint, and check files before they are committed to the repository.
 
-#### Setting Up Pre-commit
+#### Set up Pre-commit
 
 Install `pre-commit` and set up the hooks by running:
 
@@ -447,7 +453,7 @@ pip install pre-commit  # Included in `pip install -e .[format-and-lint]`
 pre-commit install
 ```
 
-#### Running Pre-commit Manually
+#### Rune pre-commit hooks manually
 
 To check all files, not just the staged ones, run:
 
@@ -464,46 +470,28 @@ pre-commit run
 This ensures that only properly formatted and linted code is committed.
 
 
-## Create a new example or benchmark
+## Create new tutorials or benchmarks
 
-Probdiffeq hosts numerous tutorials and benchmarks that demonstrate the library. The differences between examples and benchmarks are minimal: they are all Jupyter notebooks (paired to `py:light` files via jupytext for version control) and each demonstrates one functionality. Examples show *what* probdiffeq offers, while benchmarks show *how well* it performs, often compared to other solver libraries. Each tutorial or benchmark should run in under a minute. New contributions are welcome!
+Probdiffeq hosts numerous tutorials and benchmarks that demonstrate the library. The differences between examples and benchmarks are minimal: they are all Python scripts (which become `Jupyter notebook` files in the final docs) and each demonstrates one functionality. 
+
+- Tutorials show *what* probdiffeq offers
+
+- Benchmarks show *how well* it performs, often compared to other solver libraries. 
+
+Each tutorial or benchmark should run in under a minute, most run in a few seconds. New contributions are welcome!
 
 ### Steps
 
 1. **Create the script:**  
-   Create a new Jupyter notebook in the appropriate subdirectory of `docs/`. Example paths include:
-   - `docs/examples_benchmarks/benchmark-name.ipynb`
-   - `docs/examples_advanced/example-name.ipynb`  
-   Choose a meaningful name (e.g., `work-precision-hires`, `demonstrate-calibration`). The notebook should run the full example/benchmark and produce its plots. Ensure execution time stays well below one minute to keep CI manageable.
-
-   If your example requires external dependencies (e.g., sampling or optimization libraries), place it in `examples_advanced`. If it is a benchmark, place it in `examples_benchmarks`. Otherwise, place it in
-   `examples_basic`.
-
-2. **Sync to py:light:**  
-   Install documentation dependencies and pre-commit hooks if you haven't already:
-   ```
-   pip install .[doc,format-and-lint]
-   pre-commit install
-   ```
-   Link the notebook to a py:light script using jupytext (preferred for version control and formatting):
-   ```
-   jupytext --set-formats ipynb,py:light <new-notebook.ipynb>
-   ```
-   Or link all notebooks at once:
-   ```
-   jupytext --set-formats ipynb,py:light docs/examples_*/*.ipynb
-   ```
-   Notebooks placed correctly according to the directory structure will be included by the previous command.
-   
-3. **Docs:**  
-   Add the new `.ipynb` file to the documentation navigation in `mkdocs.yml` under `nav:`.  
-   Ensure the corresponding script is excluded under `mkdocs.yml -> exclude:`; if needed, add it there.
-
-4. **Makefile:**  
-   Check whether the new example or benchmark needs to be added to the appropriate Makefile target (e.g., `examples-and-benchmarks`). Generally, new files are detected automatically, but check nevertheless.
-
-5. **Pyproject.toml:**  
-   If your example requires external dependencies, list them under the `doc` optional dependencies in `pyproject.toml`.
-
-6. **Pull request:**  
-   Commit the new notebook (the pre-commit hook will handle formatting and linting). Open a pull request and you're done.
+  Create a new  notebook in the appropriate subdirectory of `tutorials/` or `benchmarks/`.
+  Choose a meaningful name (e.g., `benchmarks/work-precision-hires.py`, `tutorials/demonstrate-calibration.py`). 
+  The tutorials show up in the documentation according to the alphabetic order in the `tutorials/` and `benchmarks` directories.
+    
+2. **Fill the script:** 
+  Write the benchmark/tutorial code. Ensure the execution time stays well below one minute to keep CI manageable.
+ 
+3. **Write documentation:**
+  The module docstring will become the title and description of the notebook, so choose a good one. 
+    
+4. **Pull request:**  
+  Commit the new file (the pre-commit hook will handle formatting and linting). Open a pull request and you're done.

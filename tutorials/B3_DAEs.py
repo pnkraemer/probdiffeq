@@ -1,17 +1,16 @@
-## Solve a differential-algebraic equation
-#
-#
-# Solve a differential-algebraic equation, namely, the Robertson problem.
-# The Robertson problem is interesting for many reasons:
-#   - It comes in DAE, and ODE form
-#     so we can compare different information operators
-#   - It has an exponential timescale so (good) adaptive
-#     steps are needed; fixed steps are hopeless.
-#   - Its y-states have wildly different scales,
-#     so a good prior model is important.
-#
-#
+"""Simulate DAEs.
 
+Solve a differential-algebraic equation, namely, the Robertson problem.
+The Robertson problem is interesting for many reasons:
+  - It comes in DAE, and ODE form
+    so we can compare different information operators
+  - It has an exponential timescale so (good) adaptive
+    steps are needed; fixed steps are hopeless.
+  - Its y-states have wildly different scales,
+    so a good prior model is important.
+
+
+"""
 
 import jax
 import jax.numpy as jnp
@@ -79,8 +78,9 @@ def main(t0=1e-6, t1=1e5) -> None:
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
     solution = jax.jit(solve)(init, save_at=save_at, atol=1e-9, rtol=1e-7)
 
-    _fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(5, 5), sharex=True)
-    ax[0][0].set_title("Robertson solution")
+    fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(5, 5), sharex=True)
+    ax[0][0].set_title("Robertson solution", fontsize="medium")
+    ax[0][1].set_title("Standard deviations", fontsize="medium")
 
     # Plot a special index
     i = 0
@@ -92,13 +92,15 @@ def main(t0=1e-6, t1=1e5) -> None:
     ax[1][1].loglog(save_at, solution.u.std[i][:, 1] / scipy.special.factorial(i))
     ax[2][1].loglog(save_at, solution.u.std[i][:, 2] / scipy.special.factorial(i))
 
-    ax[0][0].set_ylabel("State $y_1$")
-    ax[1][0].set_ylabel("State $y_2$")
-    ax[2][0].set_ylabel("State $y_3$")
-    ax[2][0].set_xlabel("Time $t$")
+    ax[0][0].set_ylabel("State $y_1$", fontsize="medium")
+    ax[1][0].set_ylabel("State $y_2$", fontsize="medium")
+    ax[2][0].set_ylabel("State $y_3$", fontsize="medium")
+    ax[2][0].set_xlabel("Time $t$", fontsize="medium")
+    ax[2][1].set_xlabel("Time $t$", fontsize="medium")
     ax[0][0].set_xlim((t0, t1))
 
     plt.tight_layout()
+    fig.align_ylabels()
     plt.show()
 
 

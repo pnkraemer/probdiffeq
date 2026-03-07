@@ -1,10 +1,9 @@
-## Solve a PDE
-#
-# This tutorial replicates Figure 1 from https://arxiv.org/abs/2110.11812,
-# but uses some advanced features in Probdiffeq, namely, solving matrix-valued problems
-# and adaptive simulation with fixedpoint smoothing.
-#
+"""Simulate PDEs.
 
+This tutorial replicates Figure 1 from https://arxiv.org/abs/2110.11812,
+but uses some advanced features in Probdiffeq, namely, solving matrix-valued problems
+and adaptive simulation with fixedpoint smoothing.
+"""
 
 import jax
 import jax.numpy as jnp

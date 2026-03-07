@@ -1,13 +1,14 @@
 # Version number
 probdiffeq/_version.py
 
-# Jupyter notebooks
-docs/**/*.ipynb
-docs/examples_*/*.md
+# Don't version jupyter notebooks. Track synced markdown files.
+*.ipynb
 
-# The landing page is automatically generated
+# Most of the docs are automatically generated
 docs/index.md
-
+docs/API*/
+docs/Developer*/
+docs/Tutorial*/
 
 
 # IDE stuff

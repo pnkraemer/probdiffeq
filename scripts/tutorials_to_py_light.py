@@ -1,8 +1,14 @@
-"""Transform py:light scripts into Jupyter notebooks."""
+"""Transform a plain Python script into py:light."""
 
 import contextlib
 import os
 from re import sub
+
+
+def main():
+    """Transform all Tutorials into py:light formats in the doc/ directory."""
+    mkdir_unless_exists("docs/Tutorials/")
+    py_to_py_light(source="tutorials/", target="docs/Tutorials/")
 
 
 def py_to_py_light(*, source, target):
@@ -17,9 +23,11 @@ def py_to_py_light(*, source, target):
         # Create directory if necessary
         mkdir_unless_exists(dir_trg)
 
-        # Transform each python file in directory
-        for i, filename_with_py in enumerate(sorted(files_src)):
+        # Transform each python file in directory (step alphabetically)
+        for filename_with_py in sorted(files_src):
             if filename_with_py[0] != "_" and filename_with_py[-3:] == ".py":
+                prefix, _, _ = str(filename_with_py).partition("_")
+
                 # Split docstring (to be manipulated) from rest of source
                 header, rest = split_docstring_from_content(
                     f"{dir_src}/{filename_with_py}"
@@ -32,15 +40,32 @@ def py_to_py_light(*, source, target):
                 header[0] = header[0].replace(".", "")
 
                 # Turn header into markdown
-                markdown_title = [f"## {header[0]}"]
+                markdown_title = [f"## {prefix}. {header[0]}"]
                 markdown_rest = [f"# {h}" for h in header[1:]]
                 markdown = [*markdown_title, *markdown_rest]
 
                 # Save results
                 title = filename(header[0], remove=["(", ")", "[", "]"])
                 save_lines_as_file(
-                    [*markdown, "\n", *rest], target=f"{dir_trg}/{i + 1}_{title}.py"
+                    [*markdown, "\n", *rest], target=f"{dir_trg}/{prefix}_{title}.py"
                 )
+
+
+def replace_prefix(f: str, *, source: str, target: str) -> str:
+    """Replace the source-prefix with a target prefix."""
+    f_without_source = string_without_prefix(f, prefix=source)
+    return f"{target}{f_without_source}"
+
+
+def string_without_prefix(f: str, /, *, prefix: str) -> str:
+    """Remove a prefix from a string."""
+    return f[len(prefix) :]
+
+
+def mkdir_unless_exists(f: str, /) -> None:
+    """Create a directory."""
+    with contextlib.suppress(FileExistsError):
+        os.mkdir(f)
 
 
 def split_docstring_from_content(file):
@@ -61,32 +86,6 @@ def split_docstring_from_content(file):
         # Case 2: Multi-line docstring
         idx = lines_other.index('"""\n')
         return [line_first, *lines_other[:idx]], lines_other[idx + 1 :]
-
-
-def save_lines_as_file(data, /, *, target):
-    """Save a list of strings as a file."""
-    with open(target, "w") as modified:
-        x = data[0]
-        for remaining in data[1:]:
-            x += f"{remaining}"
-        modified.write(x)
-
-
-def replace_prefix(f: str, *, source: str, target: str) -> str:
-    """Replace the source-prefix with a target prefix."""
-    f_without_source = string_without_prefix(f, prefix=source)
-    return f"{target}{f_without_source}"
-
-
-def string_without_prefix(f: str, /, *, prefix: str) -> str:
-    """Remove a prefix from a string."""
-    return f[len(prefix) :]
-
-
-def mkdir_unless_exists(f: str, /) -> None:
-    """Create a directory."""
-    with contextlib.suppress(FileExistsError):
-        os.mkdir(f)
 
 
 def filename(s, remove):
@@ -116,6 +115,14 @@ def snake_case(s):
     ).lower()
 
 
+def save_lines_as_file(data, /, *, target):
+    """Save a list of strings as a file."""
+    with open(target, "w") as modified:
+        x = data[0]
+        for remaining in data[1:]:
+            x += f"{remaining}"
+        modified.write(x)
+
+
 if __name__ == "__main__":
-    mkdir_unless_exists("docs/Tutorials/")
-    py_to_py_light(source="tutorials/", target="docs/Tutorials/")
+    main()

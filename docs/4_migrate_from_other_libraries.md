@@ -6,7 +6,7 @@ Probdiffeq is a JAX library that focuses on state-space-model-based formulations
 
 
 
-### Transition from ProbNumDiffEq.jl (Julia)
+### Migrate from ProbNumDiffEq.jl (Julia)
 
 [ProbNumDiffEq.jl](https://nathanaelbosch.github.io/ProbNumDiffEq.jl/stable/) is a library for probabilistic IVP solvers in Julia, similar to Probdiffeq. However, while the feature offerings are similar, the libraries are unrelated.
 To translate ProbNumDiffEq.jl code to Probdiffeq code:
@@ -24,7 +24,7 @@ Consult each libraries' latest API documentation when in doubt.
 
 
 
-### Transition from ProbNum (Python, Numpy)
+### Migrate from ProbNum (Python, Numpy)
 
 [ProbNum](https://probnum.readthedocs.io/en/latest/) is a general probabilistic numerics library based on Numpy. Probdiffeq specializes in IVP solvers using pure JAX, offering:
 
@@ -34,7 +34,7 @@ Consult each libraries' latest API documentation when in doubt.
 
 
 
-### Transition from Diffrax
+### Migrate from Diffrax
 
 [Diffrax](https://docs.kidger.site/diffrax/) is a JAX-based library for differential equations. The key difference is that Diffrax's solvers are non-probabilistic; Probdiffeq solvers are probabilistic. Approximate solver mapping:
 
@@ -49,7 +49,7 @@ Consult each libraries' latest API documentation when in doubt.
 
 
 
-### General differences from other common ODE solvers (e.g., SciPy, jax.odeint)
+### Migrate from other common ODE solvers (e.g., SciPy, jax.odeint)
 
 * Probdiffeq's solutions are posterior distributions instead of point estimates, enabling uncertainty quantification and more sophisticated models (eg easy switch to second-order problems).
 * Probdiffeq's solver modes are explicit: `simulate_terminal_values()`, and `solve_adaptive_save_at()` instead of a one-size-fits-all `solve()` method.

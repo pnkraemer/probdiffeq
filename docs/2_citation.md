@@ -1,4 +1,4 @@
-# Citing
+# Citation
 
 If you use **Probdiffeq** in your research, please cite:
 

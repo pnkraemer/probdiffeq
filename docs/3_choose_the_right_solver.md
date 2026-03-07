@@ -1,4 +1,4 @@
-# Choose the right probabilistic solver
+# Choose the right solver
 
 Good solvers are problem-dependent. However, some guidelines exist:
 

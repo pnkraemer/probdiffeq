@@ -82,6 +82,7 @@ norecursedirs = ["dist", "build", "dev", "typings"]
 
 [tool.ruff]
 include = ["**.py", "**/pyproject.toml", "**.ipynb"]
+exclude = ["old_docs/*"]
 # Same as Black.
 line-length = 88
 indent-width = 4

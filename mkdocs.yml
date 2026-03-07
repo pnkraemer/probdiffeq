@@ -66,13 +66,10 @@ plugins:
             merge_init_into_class: true
             members_order: alphabetical
             group_by_category: false
-  - exclude:
-      glob:
-        - examples*/*.py
-        - examples*/*.ipynb_*
-        - benchmarks*/**/*.md
-        - benchmarks*/**/*.py
-  - mkdocs-jupyter
+  - mkdocs-jupyter:
+      include: ['*.py']
+      execute: true
+      allow_errors: false
 extra:
   social:
     - icon: fontawesome/brands/twitter
