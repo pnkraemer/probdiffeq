@@ -7,8 +7,8 @@ from re import sub
 
 def main():
     """Transform all Tutorials into py:light formats in the doc/ directory."""
-    mkdir_unless_exists("docs/Tutorials/")
-    py_to_py_light(source="tutorials/", target="docs/Tutorials/")
+    mkdir_unless_exists("docs/Examples/")
+    py_to_py_light(source="tutorials/", target="docs/Examples/")
 
 
 def py_to_py_light(*, source, target):

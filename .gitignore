@@ -5,10 +5,10 @@ probdiffeq/_version.py
 *.ipynb
 
 # Most of the docs are automatically generated
-docs/index.md
+docs/*.md
 docs/API*/
-docs/Developer*/
-docs/Tutorial*/
+docs/Examples*/
+docs/Probdiffeq_Benchmark*/
 
 
 # IDE stuff

@@ -1,3 +1,0 @@
-# probdiffeq.taylor 
-
-:::probdiffeq.taylor
