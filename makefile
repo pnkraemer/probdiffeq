@@ -9,8 +9,9 @@ quickstart:
 	# Otherwise, it's unclear whether the listed main dependencies
 	# are specified correctly. This avoids issues like
 	# https://github.com/pnkraemer/probdiffeq/issues/810
-	python scripts/tutorials_to_py_light.py 
-	python docs/Tutorials/A*.py
+	python scripts/examples_and_benchmarks_to_py_light.py 
+	python docs/Examples/A0*.py
+	python docs/Examples/A1*.py
 
 
 clean:
