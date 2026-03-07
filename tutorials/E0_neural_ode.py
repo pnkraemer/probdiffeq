@@ -22,7 +22,7 @@ def main(num_data=100, epochs=1000, print_every=100, hidden=(20,), lr=0.2) -> No
 
     # Create a loss (this is where probabilistic numerics enters!)
     loss = loss_log_marginal_likelihood(vf=vf, t0=t0)
-    loss0, info0 = loss(
+    _loss0, info0 = loss(
         f_args, u0=u0, grid=grid, data=data, std=std, output_scale=output_scale
     )
 
@@ -31,8 +31,9 @@ def main(num_data=100, epochs=1000, print_every=100, hidden=(20,), lr=0.2) -> No
     train_step = train_step_optax(optim, loss=loss)
 
     # Train the model
-    state = optim.init(f_args)
+    print()
     print("Loss after...")
+    state = optim.init(f_args)
     for i in range(epochs):
         (f_args, state), info = train_step(
             f_args,

@@ -38,7 +38,7 @@ def main():
 
     # Construct solvers
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta_guess,), num=2)
-    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
+    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
     iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=10.0)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
@@ -47,21 +47,6 @@ def main():
 
     save_at = jnp.linspace(t0, t1, num=250, endpoint=True)
     solve_save_at = solve_adaptive(vf, solver=solver, error=error, save_at=save_at)
-
-    # Visualise the initial guess and the data
-
-    fig, ax = plt.subplots(figsize=(5, 3))
-
-    data_kwargs = {"alpha": 0.5, "color": "gray"}
-    ax.annotate("Data", (13.0, 30.0), **data_kwargs)
-    sol = solve_save_at(theta_true)
-    ax = plot_solution(sol.t, sol.u.mean[0], ax=ax, **data_kwargs)
-
-    guess_kwargs = {"color": "C3"}
-    ax.annotate("Initial guess", (7.5, 20.0), **guess_kwargs)
-    sol = solve_save_at(theta_guess)
-    ax = plot_solution(sol.t, sol.u.mean[0], ax=ax, **guess_kwargs)
-    plt.show()
 
     # Set up a log-posterior density function that we can plug into BlackJAX.
     # Choose a Gaussian prior centered at the initial guess with a large variance.
@@ -96,7 +81,7 @@ def main():
 
     # Visualise the initial guess and the data
 
-    fig, ax = plt.subplots()
+    _fig, ax = plt.subplots()
 
     sample_kwargs = {"color": "C0"}
     ax.annotate("Samples", (2.75, 31.0), **sample_kwargs)
@@ -131,7 +116,7 @@ def main():
     log_M_vmapped = jax.vmap(log_M_vmapped_x, in_axes=-1, out_axes=-1)
     Zs = log_M_vmapped(Thetas)
 
-    fig, ax = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(8, 3))
+    _fig, ax = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(8, 3))
 
     ax_samples, ax_heatmap = ax
 

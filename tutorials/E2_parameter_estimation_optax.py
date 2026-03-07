@@ -88,6 +88,7 @@ def main():
 
 
 def solver(vf, u0, *, grid):
+    """Create a solver."""
     _init, ssm = probdiffeq.ssm_taylor([u0, u0], ssm_fact="isotropic")
 
     def solve(p):
