@@ -1,4 +1,4 @@
-"""ODE-Jet - Neural ODE."""
+"""Taylor recursions - Neural ODE."""
 
 import functools
 import statistics

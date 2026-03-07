@@ -1,4 +1,4 @@
-"""Work vs precision - Lotka-Volterra."""
+"""Walltime - Lotka-Volterra."""
 
 import functools
 import statistics

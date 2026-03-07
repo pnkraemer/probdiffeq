@@ -1,4 +1,4 @@
-"""Work vs precision - stiff van-der-Pol."""
+"""Walltime - stiff van-der-Pol."""
 
 import functools
 import statistics

@@ -1,4 +1,4 @@
-"""Work vs precision - Robertson DAE."""
+"""Walltime - Robertson DAE."""
 
 import functools
 import statistics

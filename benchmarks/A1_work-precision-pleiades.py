@@ -1,4 +1,4 @@
-"""Work vs precision - Pleiades."""
+"""Walltime - Pleiades."""
 
 import functools
 import statistics

@@ -1,4 +1,4 @@
-"""ODE-Jet - Pleiades problem."""
+"""Taylor recursions - Pleiades problem."""
 
 import functools
 import statistics

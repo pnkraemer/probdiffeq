@@ -1,4 +1,4 @@
-"""ODE-Jet - FitzHugh-Nagumo problem."""
+"""Taylor recursions - FitzHugh-Nagumo problem."""
 
 import functools
 import statistics
