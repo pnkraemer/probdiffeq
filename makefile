@@ -21,7 +21,6 @@ doc:
 	python scripts/generate_api_docs.py 
 	python scripts/readme_to_dev_docs.py 
 	python scripts/tutorials_to_py_light.py 
-	python scripts/benchmarks_to_py_light.py 
 	# Execute the examples and benchmarks manually and not 
 	# via mkdocs-jupyter to gain clear error messages.
 	JUPYTER_PLATFORM_DIRS=1 mkdocs build
@@ -30,7 +29,6 @@ doc-serve:
 	python scripts/generate_api_docs.py 
 	python scripts/readme_to_dev_docs.py 
 	python scripts/tutorials_to_py_light.py 
-	python scripts/benchmarks_to_py_light.py 
 	# Execute the examples and benchmarks manually and not 
 	# via mkdocs-jupyter to gain clear error messages.
 	JUPYTER_PLATFORM_DIRS=1 mkdocs serve

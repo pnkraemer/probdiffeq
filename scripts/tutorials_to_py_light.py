@@ -10,6 +10,9 @@ def main():
     mkdir_unless_exists("docs/Examples/")
     py_to_py_light(source="tutorials/", target="docs/Examples/")
 
+    mkdir_unless_exists("docs/Probdiffeq_Benchmarks/")
+    py_to_py_light(source="benchmarks/", target="docs/Probdiffeq_Benchmarks/")
+
 
 def py_to_py_light(*, source, target):
     """Transform a Python script into py:light (as expected by JupyText).
