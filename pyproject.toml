@@ -51,8 +51,11 @@ doc = [
     "blackjax>=1.0.0",
     "diffrax",
     "numba",
-    "mkdocs",
-    "mkdocs-material",
+    # mkdocs 2.0 is a backwards-incompatible rewrite
+    # and mkdocs-material stops supporting it.
+    # Pin both to ensure functional docs (for now at least)
+    "mkdocs<2.0.0",
+    "mkdocs-material<9.7.0",
     "mkdocs-exclude",
     "mkdocstrings-python",
     "mkdocstrings",
@@ -154,7 +157,8 @@ split-on-trailing-comma = false
 "probdiffeq/backend/*" = ["D103", "ANN"]
 "tests/*" = ["D103", "ANN"]
 # Examples shouldn't fail with print statements:
-"docs/*" = ["T20"]
+"examples/*" = ["T20"]
+"benchmarks/*" = ["T20"]
 # Subclasses inherit docstrings, but D102 doesn't understand this.
 "probdiffeq/ssm_impl.py" = ["D102"]
 "probdiffeq/probdiffeq.py" = ["D102"]

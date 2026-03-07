@@ -76,7 +76,7 @@ jobs:
     name: Build docs with ${{ matrix.python-version }} on ${{ matrix.os }} (runs examples
       and benchmarks)
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:

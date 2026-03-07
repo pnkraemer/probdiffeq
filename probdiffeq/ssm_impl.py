@@ -393,7 +393,7 @@ class DenseNormal(AbstractTreeNormal):
     def __repr__(self) -> str:
         msg = f"DenseNormal(mean={self.mean}"
         msg += f", cholesky={self.cholesky}"
-        msg += f", unravel={self.unravel})"
+        msg += ", unravel=<...>)"
         return msg
 
     def evaluate_mean(self):
@@ -1769,7 +1769,7 @@ class BlockDiagNormal(AbstractTreeNormal):
         msg = f"BlockDiagNormal(mean={self.mean}"
         msg += f", cholesky={self.cholesky}"
         msg += f", treedef={self.treedef}"
-        msg += f", unravel_leaf={self.unravel_leaf}>)"
+        msg += ", unravel_leaf=<...>)"
         return msg
 
     @classmethod
