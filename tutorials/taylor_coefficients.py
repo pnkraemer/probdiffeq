@@ -1,0 +1,89 @@
+"""Demonstrate how central Taylor coefficient estimation is to Probdiffeq."""
+
+import collections
+
+import jax
+import jax.numpy as jnp
+from diffeqzoo import backend, ivps
+
+from probdiffeq import ivpsolve, probdiffeq, taylor
+
+# Fail this notebook on NaN detection (to catch those in the CI)
+jax.config.update("jax_debug_nans", True)
+
+
+if not backend.has_been_selected:
+    backend.select("jax")  # ivp examples in jax
+
+
+# We start by defining an ODE.
+
+f, u0, (t0, t1), f_args = ivps.logistic()
+
+
+def vf(y, /, *, t):
+    """Evaluate the vector field."""
+    del t
+    return f(y, *f_args)
+
+
+# Here is a wrapper arounds Probdiffeq's solution routine.
+
+
+def solve(tc):
+    """Solve the ODE."""
+    init, ssm = probdiffeq.ssm_taylor(tc, ssm_fact="dense")
+    prior = probdiffeq.prior_wiener_integrated(ssm=ssm)
+    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
+    solver = probdiffeq.solver_mle(
+        strategy=strategy, prior=prior, constraint=ts0, ssm=ssm
+    )
+    ts = jnp.linspace(t0, t1, endpoint=True, num=10)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=prior, ssm=ssm)
+    solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
+    return solve(init, save_at=ts, atol=1e-2, rtol=1e-2)
+
+
+# It's time to solve some ODEs:
+
+tcoeffs = taylor.odejet_padded_scan(lambda *y: vf(*y, t=t0), [u0], num=2)
+solution = solve(tcoeffs)
+print(jax.tree.map(jnp.shape, solution))
+
+
+# The type of solution.u matches that of the initial condition.
+
+
+print(jax.tree.map(jnp.shape, tcoeffs))
+print(jax.tree.map(jnp.shape, solution.u))
+
+
+# Anything that behaves like a list work.
+# For example, we can use lists or tuples, but also named tuples.
+
+
+CustomTCoeffs = collections.namedtuple(
+    "CustomTCoeffs", ["state", "velocity", "acceleration"]
+)
+tcoeffs = CustomTCoeffs(*tcoeffs)
+solution = solve(tcoeffs)
+
+print(jax.tree.map(jnp.shape, tcoeffs))
+print(jax.tree.map(jnp.shape, solution))
+print(jax.tree.map(jnp.shape, solution.u))
+
+
+# The same applies to statistical quantities that we can extract from the solution.
+# For example, the standard deviation or samples from the solution object:
+
+key = jax.random.PRNGKey(seed=15)
+_, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
+posterior = solution.solution_full
+sample_one = posterior.sample(key, ssm=ssm)
+sample_many = posterior.sample(key, ssm=ssm, shape=(1, 2, 3))
+
+print(jax.tree.map(jnp.shape, solution.u.mean))
+print(jax.tree.map(jnp.shape, solution.u.std))
+print(jax.tree.map(jnp.shape, sample_one))
+print(jax.tree.map(jnp.shape, sample_many))
