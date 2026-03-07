@@ -68,7 +68,7 @@ plugins:
             group_by_category: false
   - mkdocs-jupyter:
       include: ['*.py']
-      execute: false
+      execute: true
       allow_errors: false
 extra:
   social:
