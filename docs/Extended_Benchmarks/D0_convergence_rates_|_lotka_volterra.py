@@ -1,4 +1,4 @@
-"""Convergence rates | Lotka-Volterra."""
+## D0. Convergence rates | Lotka-Volterra
 
 import functools
 import statistics

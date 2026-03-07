@@ -1,4 +1,4 @@
-"""Taylor recursions | FitzHugh-Nagumo."""
+## C2. Taylor recursions | Pleiades
 
 import functools
 import statistics
@@ -16,7 +16,7 @@ from probdiffeq import taylor
 jax.config.update("jax_debug_nans", True)
 
 
-def main(max_time=0.25, repeats=2) -> None:
+def main(max_time=0.5, repeats=2) -> None:
     """Run the script."""
     # Set JAX config
     jax.config.update("jax_enable_x64", True)
@@ -25,7 +25,6 @@ def main(max_time=0.25, repeats=2) -> None:
         r"Forward-mode": odejet_via_jvp(),
         r"Taylor-mode (scan)": taylor_mode_scan(),
         r"Taylor-mode (unroll)": taylor_mode_unroll(),
-        r"Taylor-mode (doubling)": taylor_mode_doubling(),
     }
 
     # Compute a reference solution
@@ -92,11 +91,11 @@ def timeit_fun_from_args(*, repeats: int) -> Callable:
 
 def taylor_mode_scan() -> Callable:
     """Taylor-mode estimation."""
-    vf_auto, (u0,) = _fitzhugh_nagumo()
+    vf_auto, (u0, du0) = _pleiades()
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num)
+        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num)
         return jnp.asarray(tcoeffs)
 
     return estimate
@@ -104,23 +103,11 @@ def taylor_mode_scan() -> Callable:
 
 def taylor_mode_unroll() -> Callable:
     """Taylor-mode estimation."""
-    vf_auto, (u0,) = _fitzhugh_nagumo()
+    vf_auto, (u0, du0) = _pleiades()
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = taylor.odejet_unroll(vf_auto, (u0,), num=num)
-        return jnp.asarray(tcoeffs)
-
-    return estimate
-
-
-def taylor_mode_doubling() -> Callable:
-    """Taylor-mode estimation."""
-    vf_auto, (u0,) = _fitzhugh_nagumo()
-
-    @functools.partial(jax.jit, static_argnames=["num"])
-    def estimate(num):
-        tcoeffs = taylor.odejet_doubling_unroll(vf_auto, (u0,), num_doublings=num)
+        tcoeffs = taylor.odejet_unroll(vf_auto, (u0, du0), num=num)
         return jnp.asarray(tcoeffs)
 
     return estimate
@@ -128,27 +115,47 @@ def taylor_mode_doubling() -> Callable:
 
 def odejet_via_jvp() -> Callable:
     """Forward-mode estimation."""
-    vf_auto, (u0,) = _fitzhugh_nagumo()
+    vf_auto, (u0, du0) = _pleiades()
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = taylor.odejet_via_jvp(vf_auto, (u0,), num=num)
+        tcoeffs = taylor.odejet_via_jvp(vf_auto, (u0, du0), num=num)
         return jnp.asarray(tcoeffs)
 
     return estimate
 
 
-def _fitzhugh_nagumo():
-    u0 = jnp.asarray([-1.0, 1.0])
+def _pleiades():
+    # fmt: off
+    u0 = jnp.asarray(
+        [
+            3.0,  3.0, -1.0, -3.00, 2.0, -2.00,  2.0,
+            3.0, -3.0,  2.0,  0.00, 0.0, -4.00,  4.0,
+        ]
+    )
+    du0 = jnp.asarray(
+        [
+            0.0,  0.0,  0.0,  0.00, 0.0,  1.75, -1.5,
+            0.0,  0.0,  0.0, -1.25, 1.0,  0.00,  0.0,
+        ]
+    )
+    # fmt: on
+    t0 = 0.0
 
     @jax.jit
-    def vf_probdiffeq(u, a=0.2, b=0.2, c=3.0):
-        """FitzHugh--Nagumo model."""
-        du1 = c * (u[0] - u[0] ** 3 / 3 + u[1])
-        du2 = -(1.0 / c) * (u[0] - a - b * u[1])
-        return jnp.asarray([du1, du2])
+    def vf_probdiffeq(u, du, *, t=t0):  # noqa: ARG001
+        """Pleiades problem."""
+        x = u[0:7]  # x
+        y = u[7:14]  # y
+        xi, xj = x[:, None], x[None, :]
+        yi, yj = y[:, None], y[None, :]
+        rij = ((xi - xj) ** 2 + (yi - yj) ** 2) ** (3 / 2)
+        mj = jnp.arange(1, 8)[None, :]
+        ddx = jnp.sum(jnp.nan_to_num(mj * (xj - xi) / rij), axis=1)
+        ddy = jnp.sum(jnp.nan_to_num(mj * (yj - yi) / rij), axis=1)
+        return jnp.concatenate((ddx, ddy))
 
-    return vf_probdiffeq, (u0,)
+    return vf_probdiffeq, (u0, du0)
 
 
 def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:

@@ -1,4 +1,4 @@
-"""Taylor recursions | FitzHugh-Nagumo."""
+## C1. Taylor recursions | Neural ODE
 
 import functools
 import statistics
@@ -16,7 +16,7 @@ from probdiffeq import taylor
 jax.config.update("jax_debug_nans", True)
 
 
-def main(max_time=0.25, repeats=2) -> None:
+def main(max_time=0.55, repeats=2) -> None:
     """Run the script."""
     # Set JAX config
     jax.config.update("jax_enable_x64", True)
@@ -92,7 +92,7 @@ def timeit_fun_from_args(*, repeats: int) -> Callable:
 
 def taylor_mode_scan() -> Callable:
     """Taylor-mode estimation."""
-    vf_auto, (u0,) = _fitzhugh_nagumo()
+    vf_auto, (u0,) = _node()
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
@@ -104,7 +104,7 @@ def taylor_mode_scan() -> Callable:
 
 def taylor_mode_unroll() -> Callable:
     """Taylor-mode estimation."""
-    vf_auto, (u0,) = _fitzhugh_nagumo()
+    vf_auto, (u0,) = _node()
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
@@ -116,7 +116,7 @@ def taylor_mode_unroll() -> Callable:
 
 def taylor_mode_doubling() -> Callable:
     """Taylor-mode estimation."""
-    vf_auto, (u0,) = _fitzhugh_nagumo()
+    vf_auto, (u0,) = _node()
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
@@ -128,7 +128,7 @@ def taylor_mode_doubling() -> Callable:
 
 def odejet_via_jvp() -> Callable:
     """Forward-mode estimation."""
-    vf_auto, (u0,) = _fitzhugh_nagumo()
+    vf_auto, (u0,) = _node()
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
@@ -138,17 +138,29 @@ def odejet_via_jvp() -> Callable:
     return estimate
 
 
-def _fitzhugh_nagumo():
-    u0 = jnp.asarray([-1.0, 1.0])
+def _node():
+    N = 100
+    M = 100
+    num_layers = 2
+
+    key = jax.random.PRNGKey(seed=1)
+    key1, key2, key3, key4 = jax.random.split(key, num=4)
+
+    u0 = jax.random.uniform(key1, shape=(N,))
+
+    weights = jax.random.normal(key2, shape=(num_layers, 2, M, N))
+    biases1 = jax.random.normal(key3, shape=(num_layers, M))
+    biases2 = jax.random.normal(key4, shape=(num_layers, N))
+
+    fun = jnp.tanh
 
     @jax.jit
-    def vf_probdiffeq(u, a=0.2, b=0.2, c=3.0):
-        """FitzHugh--Nagumo model."""
-        du1 = c * (u[0] - u[0] ** 3 / 3 + u[1])
-        du2 = -(1.0 / c) * (u[0] - a - b * u[1])
-        return jnp.asarray([du1, du2])
+    def vf(x):
+        for (w1, w2), b1, b2 in zip(weights, biases1, biases2):
+            x = fun(w2.T @ fun(w1 @ x + b1) + b2)
+        return x
 
-    return vf_probdiffeq, (u0,)
+    return vf, (u0,)
 
 
 def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:

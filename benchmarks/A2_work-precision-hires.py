@@ -1,4 +1,4 @@
-"""Walltime - Hires."""
+"""Walltime | Hires."""
 
 import functools
 import statistics

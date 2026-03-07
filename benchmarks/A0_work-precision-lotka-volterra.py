@@ -1,4 +1,4 @@
-"""Walltime - Lotka-Volterra."""
+"""Walltime | Lotka-Volterra."""
 
 import functools
 import statistics

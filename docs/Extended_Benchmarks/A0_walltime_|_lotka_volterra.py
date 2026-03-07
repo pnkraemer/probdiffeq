@@ -1,14 +1,14 @@
-"""Walltime | stiff van-der-Pol."""
+## A0. Walltime | Lotka-Volterra
 
 import functools
 import statistics
 import timeit
 from collections.abc import Callable
 
+import diffrax
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-import numba
 import numpy as np
 import scipy.integrate
 import tqdm
@@ -19,7 +19,7 @@ from probdiffeq import ivpsolve, probdiffeq, taylor
 jax.config.update("jax_debug_nans", True)
 
 
-def main(start=4.0, stop=10.0, step=0.25, repeats=2) -> None:
+def main(start=3.0, stop=12.0, step=1.0, repeats=2) -> None:
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
@@ -29,8 +29,7 @@ def main(start=4.0, stop=10.0, step=0.25, repeats=2) -> None:
 
     _fig, ax = plt.subplots(figsize=(5, 3))
     ax.plot(ts, ys)
-    ax.set_ylim((-6, 6))
-    ax.set_title("Van-der-Pol problem")
+    ax.set_title("Lotka-Volterra problem")
     ax.set_xlabel("Time")
     ax.set_ylabel("State")
     plt.tight_layout()
@@ -41,38 +40,39 @@ def main(start=4.0, stop=10.0, step=0.25, repeats=2) -> None:
     timeit_fun = setup_timeit(repeats=repeats)
 
     # Assemble algorithms
+    ts0, ts1 = probdiffeq.constraint_ode_ts0, probdiffeq.constraint_ode_ts1
+    ts0_iso = solver_probdiffeq(5, constraint=ts0, implementation="isotropic")
+    ts0_bd = solver_probdiffeq(5, constraint=ts0, implementation="blockdiag")
+    ts1_dense = solver_probdiffeq(8, constraint=ts1, implementation="dense")
     algorithms = {
-        "TS1(4)": solver_probdiffeq(num_derivatives=4),
-        "TS1(8)": solver_probdiffeq(num_derivatives=8),
-        "SciPy('LSODA')": solver_scipy(method="LSODA"),
+        r"ProbDiffEq: TS0($5$, isotropic)": ts0_iso,
+        r"ProbDiffEq: TS0($5$, blockdiag)": ts0_bd,
+        r"ProbDiffEq: TS1($8$, dense)": ts1_dense,
+        "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
+        "Diffrax: Dopri8()": solver_diffrax(solver=diffrax.Dopri8()),
+        "SciPy: 'RK45'": solver_scipy(method="RK45"),
+        "SciPy: 'DOP853'": solver_scipy(method="DOP853"),
     }
 
     # Compute a reference solution
-    reference = solver_scipy(method="LSODA")(0.1 * tolerances[-1])
-    precision_fun = rmse_absolute(reference)
+    reference = solver_scipy(method="BDF")(1e-13)
+    precision_fun = rmse_relative(reference)
 
     # Compute all work-precision diagrams
     results = {}
-    pbar = tqdm.tqdm(algorithms.items())
-    for label, algo in pbar:
-        pbar.set_description(label)
+    for label, algo in tqdm.tqdm(algorithms.items()):
         param_to_wp = workprec(algo, precision_fun=precision_fun, timeit_fun=timeit_fun)
         results[label] = param_to_wp(tolerances)
 
-    _fig, ax = plt.subplots(figsize=(8, 5))
-
+    _fig, ax = plt.subplots(figsize=(7, 3))
     for label, wp in results.items():
-        wdw = 3  # window
-        x, y = wp["precision"], wp["work_mean"]
-        x = jnp.exp(jnp.convolve(jnp.log(x), jnp.ones((wdw,)) / wdw, mode="valid"))
-        y = jnp.exp(jnp.convolve(jnp.log(y), jnp.ones((wdw,)) / wdw, mode="valid"))
-        ax.loglog(x, y, label=label)
+        ax.loglog(wp["precision"], wp["work_mean"], label=label)
 
     ax.set_title("Work-precision diagram")
     ax.set_xlabel("Precision (relative RMSE)")
     ax.set_ylabel("Work (avg. wall time)")
     ax.grid(linestyle="dotted", which="both")
-    ax.legend(fontsize="small")
+    ax.legend(fontsize="small", loc="center left", bbox_to_anchor=(1, 0.5))
 
     plt.tight_layout()
     plt.show()
@@ -81,14 +81,14 @@ def main(start=4.0, stop=10.0, step=0.25, repeats=2) -> None:
 def solve_ivp_once():
     """Compute plotting-values for the IVP."""
 
-    @numba.jit(nopython=True)
-    def vf_scipy(_t, u):
-        """Van-der-Pol dynamics as a first-order differential equation."""
-        return np.asarray([u[1], 1e5 * ((1.0 - u[0] ** 2) * u[1] - u[0])])
+    def vf_scipy(_t, y):
+        """Lotka--Volterra dynamics."""
+        dy1 = 0.5 * y[0] - 0.05 * y[0] * y[1]
+        dy2 = -0.5 * y[1] + 0.05 * y[0] * y[1]
+        return np.asarray([dy1, dy2])
 
-    u0 = np.concatenate((np.atleast_1d(2.0), np.atleast_1d(0.0)))
-    time_span = np.asarray((0.0, 6.3))
-
+    u0 = jnp.asarray((20.0, 20.0))
+    time_span = np.asarray([0.0, 50.0])
     tol = 1e-12
     solution = scipy.integrate.solve_ivp(
         vf_scipy, y0=u0, t_span=time_span, atol=1e-3 * tol, rtol=tol, method="LSODA"
@@ -110,58 +110,93 @@ def setup_timeit(*, repeats: int) -> Callable:
     return timer
 
 
-def solver_probdiffeq(*, num_derivatives: int) -> Callable:
+def solver_probdiffeq(num_derivatives: int, implementation, constraint) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @jax.jit
-    def vf_probdiffeq(u, du, *, t):  # noqa: ARG001
-        """Van-der-Pol dynamics as a second-order differential equation."""
-        return 1e5 * ((1.0 - u**2) * du - u)
+    def vf_probdiffeq(y, /, *, t):  # noqa: ARG001
+        """Lotka--Volterra dynamics."""
+        dy1 = 0.5 * y[0] - 0.05 * y[0] * y[1]
+        dy2 = -0.5 * y[1] + 0.05 * y[0] * y[1]
+        return jnp.asarray([dy1, dy2])
 
-    def root(u, du, ddu, /, *, t):
-        """Evaluate a root to solve the 2nd-order problem directly."""
-        return ddu - vf_probdiffeq(u, du, t=t)
-
-    t0, t1 = 0.0, 3.0
-    u0, du0 = (jnp.asarray(2.0), jnp.asarray(0.0))
-    t0, t1 = (0.0, 6.3)
+    u0 = jnp.asarray((20.0, 20.0))
+    t0, t1 = (0.0, 50.0)
 
     @jax.jit
     def param_to_solution(tol):
-        # Build a solver
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0, du0), num=num_derivatives - 1)
+        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
 
-        init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
+        init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=implementation)
         iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
-        ts = probdiffeq.constraint_root_ts1(root, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
-
-        solver = probdiffeq.solver_dynamic(
+        ts = constraint(vf_probdiffeq, ssm=ssm)
+        solver = probdiffeq.solver_mle(
             strategy=strategy, prior=iwp, constraint=ts, ssm=ssm
         )
-        error = probdiffeq.error_state_std(constraint=ts, prior=iwp, ssm=ssm)
+        error = probdiffeq.error_residual_std(constraint=ts, prior=iwp, ssm=ssm)
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
-            solver=solver, error=error, control=control
+            error=error, solver=solver, control=control
         )
-        solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
+        dt0 = ivpsolve.dt0(vf_auto, (u0,))
+
+        # Build a solver
+        solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-2 * tol, rtol=tol)
+
+        # Return the terminal value
         return jax.block_until_ready(solution.u.mean[0])
 
     return param_to_solution
 
 
-def solver_scipy(method: str) -> Callable:
+def solver_diffrax(*, solver) -> Callable:
+    """Construct a solver that wraps Diffrax' solution routines."""
+
+    @diffrax.ODETerm
+    @jax.jit
+    def vf_diffrax(_t, y, _args):
+        """Lotka--Volterra dynamics."""
+        dy1 = 0.5 * y[0] - 0.05 * y[0] * y[1]
+        dy2 = -0.5 * y[1] + 0.05 * y[0] * y[1]
+        return jnp.asarray([dy1, dy2])
+
+    u0 = jnp.asarray((20.0, 20.0))
+    t0, t1 = (0.0, 50.0)
+
+    @jax.jit
+    def param_to_solution(tol):
+        controller = diffrax.PIDController(atol=1e-3 * tol, rtol=tol)
+        saveat = diffrax.SaveAt(t0=False, t1=True, ts=None)
+        solution = diffrax.diffeqsolve(
+            vf_diffrax,
+            y0=u0,
+            t0=t0,
+            t1=t1,
+            saveat=saveat,
+            stepsize_controller=controller,
+            dt0=None,
+            max_steps=10_000,
+            solver=solver,
+        )
+        return jax.block_until_ready(solution.ys[0, :])
+
+    return param_to_solution
+
+
+def solver_scipy(*, method: str) -> Callable:
     """Construct a solver that wraps SciPy's solution routines."""
 
-    @numba.jit(nopython=True)
-    def vf_scipy(_t, u):
-        """Van-der-Pol dynamics as a first-order differential equation."""
-        return np.asarray([u[1], 1e5 * ((1.0 - u[0] ** 2) * u[1] - u[0])])
+    def vf_scipy(_t, y):
+        """Lotka--Volterra dynamics."""
+        dy1 = 0.5 * y[0] - 0.05 * y[0] * y[1]
+        dy2 = -0.5 * y[1] + 0.05 * y[0] * y[1]
+        return np.asarray([dy1, dy2])
 
-    u0 = np.concatenate((np.atleast_1d(2.0), np.atleast_1d(0.0)))
-    time_span = np.asarray((0.0, 6.3))
+    u0 = jnp.asarray((20.0, 20.0))
+    time_span = np.asarray([0.0, 50.0])
 
     def param_to_solution(tol):
         solution = scipy.integrate.solve_ivp(
@@ -173,19 +208,20 @@ def solver_scipy(method: str) -> Callable:
             rtol=tol,
             method=method,
         )
-        return jnp.asarray(solution.y[0, -1])
+        return jnp.asarray(solution.y[:, -1])
 
     return param_to_solution
 
 
-def rmse_absolute(expected: jax.Array) -> Callable:
-    """Compute the absolute RMSE."""
+def rmse_relative(expected: jax.Array, *, nugget=1e-5) -> Callable:
+    """Compute the relative RMSE."""
     expected = jnp.asarray(expected)
 
     def rmse(received):
         received = jnp.asarray(received)
         error_absolute = jnp.abs(expected - received)
-        return jnp.linalg.norm(error_absolute) / jnp.sqrt(error_absolute.size)
+        error_relative = error_absolute / jnp.abs(nugget + expected)
+        return jnp.linalg.norm(error_relative) / jnp.sqrt(error_relative.size)
 
     return rmse
 

@@ -6,25 +6,30 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/probdiffeq.svg)](https://pypi.python.org/pypi/probdiffeq)
 
 
-**Probdiffeq** implements adaptive probabilistic numerical solvers for ordinary differential equations (ODEs). It builds on [JAX](https://jax.readthedocs.io/en/latest/), thus inheriting **automatic differentiation**, **vectorisation**, and **GPU acceleration**.
+
+
+**Probdiffeq** implements adaptive probabilistic numerical solvers for differential equations (ODEs). It builds on [JAX](https://jax.readthedocs.io/en/latest/), thus inheriting **automatic differentiation**, **vectorisation**, and **GPU acceleration**.
+
+
+
+> ⚠️ Probdiffeq is an active research project. Expect rough edges and sudden API changes.
+
 
 **Features:**
 
 - ⚡ Calibration and step-size adaptation  
 - ⚡ Stable implementations of filtering, smoothing, and other estimation strategies  
-- ⚡ Custom information operators, dense output, and posterior sampling  
+- ⚡ Custom information operators, dense output, posterior sampling, and prior distributions.
 - ⚡ State-space model factorisations  
-- ⚡ Custom prior processes, ODE-, mass-matrix-ODE-, and DAE-solvers
 - ⚡ Parameter estimation
-- ⚡ Taylor-series estimation with and without Jets  
+- ⚡ Taylor-series estimation with and without jets  
 - ⚡ Seamless interoperability with [Optax](https://optax.readthedocs.io/en/latest/index.html), [BlackJAX](https://blackjax-devs.github.io/blackjax/), and other JAX-based libraries  
 - ⚡ Numerous examples (basic and advanced) -- see the [documentation](https://pnkraemer.github.io/probdiffeq/)  
 
 
 
-**Contributing**
 
-Contributions are very welcome!  
+**Contributing:** Contributions are very welcome!  
 
 - Browse open issues (look for “good first issue”).  
 - Check the developer documentation.  
@@ -32,20 +37,20 @@ Contributions are very welcome!
 
 
 
-**Related projects**
+**Related projects:**
 
-- [Tornadox](https://github.com/pnkraemer/tornadox)  
-- [ProbNumDiffEq.jl](https://nathanaelbosch.github.io/ProbNumDiffEq.jl/stable/)  
-- [ProbNum](https://probnum.readthedocs.io/en/latest/)  
+- [Tornadox](https://github.com/pnkraemer/tornadox): One of Probdiffeq's precursors.
+- [ProbNumDiffEq.jl](https://nathanaelbosch.github.io/ProbNumDiffEq.jl/stable/): A similar library in Julia
+- [ProbNum](https://probnum.readthedocs.io/en/latest/): Probabilistic numerics in Numpy.
 
 The docs include guidance on migrating from these packages. Missing something? Open an issue or pull request!
 
 
 
-**You might also like**
+**You might also like:**
 
-- [diffeqzoo](https://diffeqzoo.readthedocs.io/en/latest/) — reference implementations of differential equations in NumPy and JAX  
-- [probfindiff](https://probfindiff.readthedocs.io/en/latest/) — probabilistic finite-difference methods in JAX  
+- [diffeqzoo](https://diffeqzoo.readthedocs.io/en/latest/): reference implementations of differential equations in NumPy and JAX  
+- [probfindiff](https://probfindiff.readthedocs.io/en/latest/): probabilistic finite-difference methods in JAX  
 
 
 ## Installation
@@ -56,7 +61,7 @@ Install the latest release from PyPI:
 pip install probdiffeq
 ```
 
-> This assumes [JAX](https://jax.readthedocs.io/en/latest/) is already installed.  
+This assumes [JAX](https://jax.readthedocs.io/en/latest/) is already installed.  
 
 To install with JAX (CPU backend):  
 
@@ -64,16 +69,14 @@ To install with JAX (CPU backend):
 pip install probdiffeq[cpu]
 ```
 
-⚠️ **Note:** This is an active research project. Expect rough edges and breaking API changes.
-
-
 
 
 **Versioning**
 
-Probdiffeq follows **0.MINOR.PATCH** until its first stable release:  
-- **PATCH** → bugfixes & new features  
-- **MINOR** → breaking changes  
+Probdiffeq follows semantic versioning via **0.MINOR.PATCH**:
+
+- **PATCH**: increase with bugfixes & new features  
+- **MINOR**: increase with breaking changes  
 
 See [semantic versioning](https://semver.org/).
 Notably, Probdiffeq's API is not guaranteed to be stable, but we do our best to follow the versioning scheme so that downstream projects remain reproducible.
@@ -87,7 +90,7 @@ Good solvers are problem-dependent. However, some guidelines exist:
 
 ### State-space model factorisation
 
-* If your problem is scalar-valued (`shape=()`), use a dense factorisation. All factorisations have the same complexity for scalar models, but dense factorisations offer the most comprehensive solver suite.
+* If your problem is scalar-valued (`shape=()`), use a dense factorisation. All factorisations have the same complexity for scalar models, but dense factorisations have the most solvers implemented.
 
 * If your problem is vector-valued, be aware that different implementation choices imply different modelling choices.
 However, if you don't care too much about modelling choices:
@@ -101,28 +104,33 @@ However, if you don't care too much about modelling choices:
 
 ### Stiffness
 
-If your problem is stiff, use a a `dense` implementation in combination with a
+* If your problem is stiff, use a a `dense` implementation in combination with a
 correction scheme that employs first-order linearisation; 
 for instance, `ts1` or `slr1`.
 Zeroth-order approximation and isotropic/blockdiag factorisations often fail for stiff problems.
 
-If your problem is stiff and high-dimensional: try first-order linearisation with a block-diagonal factorisation. 
-If that does not work: good luck; probabilistic solvers for problems that are stiff 
-*and* high-dimensional are a bit of an open problem as of writing this.
+* If your problem is stiff and high-dimensional: try first-order linearisation with a block-diagonal factorisation. 
+If that does not work: good luck ;) Probabilistic solvers for problems that are stiff 
+*and* high-dimensional are a bit of an open problem.
 
 ### Filters vs smoothers
-As a rule of thumb, use a `ivpsolvers.strategy_filter` strategy for `simulate_terminal_values`, 
-a `ivpsolvers.strategy_smoother_fixedpoint` strategy for `solve_adaptive_save_at`,
-and a `ivpsolvers.strategy_smoother_fixedinterval` strategy for `solve_fixed_step`.
-Other combinations are possible, but rare.
+As a rule of thumb:
+
+* Use a filter strategy for simulating terminal values
+* Use a fixed-point smoother for solving via the `save_at` functionality 
+* Use a fixed-interval smoother for fixed steps. 
+
+Other combinations are possible, but typically rare.
 
 
 ### Calibration
-Use a `solvers.solver_dynamic` solver if you expect that the output scale of your differential equation
-solution varies greatly (eg for first-order, linear ODEs; see the examples).
-Otherwise, use an `solvers.solver_mle` solver for plain simulation problems, 
-and a `solvers.solver` for parameter-estimation.
-See also the output scale recommendations under "Prior distributions".
+
+* Use a dynamic solver if you expect that the output scale of your differential equation
+solution varies greatly (eg for first-order, linear ODEs; see the examples)
+* Otherwise, use an MLE-based solver solver for typical simulation problems 
+* Use a solver without automatic calibration for parameter-estimation.
+
+See also the output-scale recommendations under "Prior distributions".
 
 
 ### Prior distributions
@@ -144,11 +152,12 @@ In single precision (eg on a GPU), track only 2-3 Taylor coefficients.
 
 
 ### Miscellaneous
-If you use a `ts0`, choose an `isotropic` factorisation instead of a `dense` factorisation.
+If you use a zero-th order method, choose an `isotropic` factorisation instead of a `dense` factorisation.
 They are mathematically equivalent, but the `isotropic` factorisation is faster.
 
 For parameter estimation problems with adaptive solvers, replace Probdiffeq's while-loops
 with Equinox's while-loops; see the examples for how.
+
 
 ### Future guidelines
 These guidelines are a work in progress and may change at any point. If you have any input, reach out.
@@ -297,37 +306,10 @@ To execute all tests, use:
 make test
 ```
 
-This will:
-- Run all tests.
-- Execute tests in parallel for efficiency.
-
-#### 3. Execute benchmarks
+This will execute all tests (in parallel, for efficiency).
 
 
-We maintain benchmarks comparing **Probdiffeq** against other solvers and libraries, including [SciPy](https://scipy.org/), [JAX](https://jax.readthedocs.io/en/latest/), and [Diffrax](https://docs.kidger.site/diffrax/).
-
-
-To run the full benchmark suite, use:
-
-```commandline
-make benchmarks-run
-make benchmarks-plot-results
-```
-
-This will:
-- Execute benchmarking scripts to assess performance.
-- Plot the results so that the next documentation build displays the results.
-
-Benchmarking parameters and configurations can be adjusted in the relevant benchmark scripts, located in the `doc/benchmarks/` directory.
-
-If the goal is not a full benchmark run, but simply a check whether the benchmark scripts execute correctly, use:
-```commandline
-make benchmarks-run-dry-run
-```
-This is helpful to verify that API changes are reflected in the benchmark code.
-
-
-#### 4. Build the documentation
+#### 3. Build the documentation
 
 To generate the documentation, use:
 
@@ -337,7 +319,7 @@ make doc
 
 This will:
 - Sync content in docs/* with the rest of the repo.
-- Process Jupyter notebooks and Markdown files.
+- Execute the examples and benchmarks
 - Build the documentation site.
 
 To preview the docs, use:
@@ -346,7 +328,7 @@ To preview the docs, use:
 make doc-serve
 ```
 
-#### 5. Clean Up
+#### 4. Clean Up
 
 To remove auxiliary files generated during testing or documentation builds, run:
 
@@ -369,7 +351,7 @@ pip install pre-commit  # Included in `pip install -e .[format-and-lint]`
 pre-commit install
 ```
 
-#### Rune pre-commit hooks manually
+#### Run pre-commit hooks manually
 
 To check all files, not just the staged ones, run:
 
@@ -414,6 +396,10 @@ Each example or benchmark should run in under a minute, most run in a few second
 
 ## Citation
 
+Here are some references for citing Probdiffeq and its algorithms in your research.
+
+### The library 
+
 If you use **Probdiffeq** in your research, please cite:
 
 ```bibtex
@@ -425,6 +411,8 @@ If you use **Probdiffeq** in your research, please cite:
 }
 ```
 The [PDF](https://tobias-lib.ub.uni-tuebingen.de/xmlui/handle/10900/152754) explains the mathematics and algorithms behind this library.  
+
+### The libraries' time-stepping 
 
 For the *solve-and-save-at* functionality, cite:
 
@@ -448,51 +436,49 @@ Link to the experiments:
 [Code for experiments](https://github.com/pnkraemer/code-adaptive-prob-ode-solvers).  
 
 
+### Specific algorithms
+
 Algorithms in **Probdiffeq** are based on multiple research papers. If you’re unsure which to cite, feel free to reach out. 
+A (subjective, probdiffeq-centric) list of relevant work includes the following articles.
 
-A (subjective, probdiffeq-centric) list of relevant work includes:
 
+#### Numerically robustness and state-space model factorisations
 
-- Numerically robust implementations of probabilistic solvers:
+- Nicholas Krämer & Philipp Hennig (2024). Stable implementation of probabilistic ODE solvers. Journal of Machine Learning Research, 25(111), 1–29.    All suggestions made in this work are critical to Probdiffeq (and other libraries). They are rarely discussed though, and almost taken for granted by now.
 
-  > Nicholas Krämer & Philipp Hennig (2024). Stable implementation of probabilistic ODE solvers. Journal of Machine Learning Research, 25(111), 1–29.  
+- Nicholas Krämer, Nathanael Bosch, Jonathan Schmidt & Philipp Hennig (2022). Probabilistic ODE solutions in millions of dimensions.  In ICML 2022, 11634–11649. PMLR. Every time Probdiffeq uses state-space model factorisations, it follows the recommendations in this work. 
+
+#### Adaptive step-size selection
   
-  All suggestions made in this work are critical to Probdiffeq (and other libraries). They are rarely discussed though, and almost taken for granted by now.
-
-
-- State-space model factorisations:
-
-  > Nicholas Krämer, Nathanael Bosch, Jonathan Schmidt & Philipp Hennig (2022). Probabilistic ODE solutions in millions of dimensions.  In ICML 2022, 11634–11649. PMLR.  
-
-  Every time Probdiffeq uses state-space model factorisations, it follows the recommendations in this work. 
-
-- Adaptive step-size selection:
+- Michael Schober, Simo Särkkä & Philipp Hennig (2019). A probabilistic model for the numerical solution of initial value problems. Statistics and Computing, 29(1), 99–122.  
   
-  > Michael Schober, Simo Särkkä & Philipp Hennig (2019). A probabilistic model for the numerical solution of initial value problems. Statistics and Computing, 29(1), 99–122.  
+- Nathanael Bosch, Philipp Hennig & Filip Tronarp (2021). Calibrated adaptive probabilistic ODE solvers. In AISTATS 2021, 3466–3474. PMLR.  
   
-  > Nathanael Bosch, Philipp Hennig & Filip Tronarp (2021). Calibrated adaptive probabilistic ODE solvers. In AISTATS 2021, 3466–3474. PMLR.  
+- Nicholas Krämer (2025). Adaptive Probabilistic ODE Solvers Without Adaptive Memory Requirements. In Kanagawa, M., Cockayne, J., Gessner, A., & Hennig, P. (Eds.), Proceedings of the First International Conference on Probabilistic Numerics, 12–24. PMLR.
   
-  > Nicholas Krämer (2025). Adaptive Probabilistic ODE Solvers Without Adaptive Memory Requirements. In Kanagawa, M., Cockayne, J., Gessner, A., & Hennig, P. (Eds.), Proceedings of the First International Conference on Probabilistic Numerics, 12–24. PMLR.
+#### Constraints, linearisation, and information operators
   
-- Constraints, linearisation, and information operators:
-  
-  > Bosch, Nathanael, Filip Tronarp, and Philipp Hennig. "Pick-and-mix information operators for probabilistic ODE solvers." International Conference on Artificial Intelligence and Statistics. PMLR, 2022.
+- Bosch, Nathanael, Filip Tronarp, and Philipp Hennig. "Pick-and-mix information operators for probabilistic ODE solvers." International Conference on Artificial Intelligence and Statistics. PMLR, 2022.
 
-  >Tronarp, Filip, et al. "Probabilistic solutions to ordinary differential equations as nonlinear Bayesian filtering: a new perspective." Statistics and Computing 29.6 (2019): 1297-1315.
+- Tronarp, Filip, et al. "Probabilistic solutions to ordinary differential equations as nonlinear Bayesian filtering: a new perspective." Statistics and Computing 29.6 (2019): 1297-1315.
 
-  See also the Linearisation-chapter in:
-  
-  > Krämer, Nicholas. Implementing probabilistic numerical solvers for differential equations. Diss. Dissertation, Tübingen, Universität Tübingen, 2024.
+- See also the Linearisation-chapter in: Krämer, Nicholas. Implementing probabilistic numerical solvers for differential equations. Diss. Dissertation, Tübingen, Universität Tübingen, 2024.
 
-  which describes some methods not mentioned anywhere else.
 
-- Parameter estimation:
+#### Parameter estimation
 
-  > Kersting, H., Krämer, N., Schiegg, M., Daniel, C., Tiemann, M., & Hennig, P. (2020, November). Differentiable likelihoods for fast inversion of’likelihood-free’dynamical systems. In International Conference on Machine Learning (pp. 5198-5208). PMLR.
+- Kersting, H., Krämer, N., Schiegg, M., Daniel, C., Tiemann, M., & Hennig, P. (2020, November). Differentiable likelihoods for fast inversion of’likelihood-free’dynamical systems. In International Conference on Machine Learning (pp. 5198-5208). PMLR.
 
-  > Tronarp, Filip, Nathanael Bosch, and Philipp Hennig. "Fenrir: Physics-enhanced regression for initial value problems." International Conference on Machine Learning. PMLR, 2022.
+-  Tronarp, Filip, Nathanael Bosch, and Philipp Hennig. "Fenrir: Physics-enhanced regression for initial value problems." International Conference on Machine Learning. PMLR, 2022.
 
-  > Beck, J., Bosch, N., Deistler, M., Kadhim, K. L., Macke, J. H., Hennig, P., & Berens, P. (2024, July). Diffusion Tempering Improves Parameter Estimation with Probabilistic Integrators for Ordinary Differential Equations. In International Conference on Machine Learning (pp. 3305-3326). PMLR.
+-  Beck, J., Bosch, N., Deistler, M., Kadhim, K. L., Macke, J. H., Hennig, P., & Berens, P. (2024, July). Diffusion Tempering Improves Parameter Estimation with Probabilistic Integrators for Ordinary Differential Equations. In International Conference on Machine Learning (pp. 3305-3326). PMLR.
+
+
+#### Prior distributions
+
+- Bosch, Nathanael, Philipp Hennig, and Filip Tronarp. "Probabilistic exponential integrators." Advances in Neural Information Processing Systems 36 (2023): 40450-40467.
+
+
 
 
 Anything missing? Reach out! 

@@ -1,4 +1,4 @@
-"""Taylor recursions - Pleiades problem."""
+"""Taylor recursions | Pleiades."""
 
 import functools
 import statistics

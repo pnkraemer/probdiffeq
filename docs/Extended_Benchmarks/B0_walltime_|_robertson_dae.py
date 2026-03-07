@@ -1,4 +1,4 @@
-"""Walltime | Robertson DAE."""
+## B0. Walltime | Robertson DAE
 
 import functools
 import statistics

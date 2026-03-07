@@ -1,4 +1,4 @@
-"""Taylor recursions | FitzHugh-Nagumo."""
+## C0. Taylor recursions | FitzHugh-Nagumo
 
 import functools
 import statistics
