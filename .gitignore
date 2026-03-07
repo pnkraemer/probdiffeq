@@ -8,7 +8,7 @@ probdiffeq/_version.py
 docs/*.md
 docs/API*/
 docs/Examples*/
-docs/Probdiffeq_Benchmark*/
+docs/Extended_Benchmarks*/
 
 
 # IDE stuff
