@@ -45,7 +45,7 @@ def main():
     ts1 = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
 
     # Prepare the plot
-    fig, axes = plt.subplots(
+    _fig, axes = plt.subplots(
         nrows=2,
         ncols=2,
         figsize=(5, 3),
