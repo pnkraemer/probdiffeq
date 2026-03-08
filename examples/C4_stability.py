@@ -83,7 +83,7 @@ def main():
                 markerfacecolor=f"C{i}",
                 markeredgecolor="black",
             )
-            m, s = u.mean[0][:, d], u.std[0][:, d] / jnp.sqrt(num)
+            m, s = u.mean[0][:, d], u.std[0][:, d]
             ax.plot(ts, m, alpha=0.5, color=f"C{i}")
             ax.fill_between(ts, m - s, m + s, alpha=0.25, color=f"C{i}")
 

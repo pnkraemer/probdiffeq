@@ -79,7 +79,7 @@ def main():
             ax.plot(sol.t, m)
 
             # Plot the standard deviation
-            lower, upper = m - 1.96 * std, m + 1.96 * std
+            lower, upper = m - 3 * std, m + 3 * std
             ax.fill_between(sol.t, lower, upper, alpha=0.3)
             ax.set_xlim((jnp.amin(ts), jnp.amax(ts)))
 

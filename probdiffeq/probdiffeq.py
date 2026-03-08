@@ -813,7 +813,7 @@ class ProbabilisticSolution(Generic[N, T]):
     output_scale: Any
     """The current output scale."""
 
-    num_steps: int
+    num_steps: Array
     """The number of steps taken until the current point."""
 
     auxiliary: Any
@@ -1942,6 +1942,12 @@ class solver_mle(ProbabilisticSolver):
         ones = np.ones_like(output_scale)
         output_scale = output_scale[-1]
 
+        # Improve the calibration like in other Gaussian process models
+        #   ODE priors are generally not as smooth as the ODE solutions,
+        #   which means that their uncertainty is a bit too large.
+        output_scale = output_scale / np.sqrt(solution.num_steps[-1])
+
+        # Finalize the solution with the calibrated output scale
         init = solution0.solution_full
         posterior = solution.solution_full
         estimate, posterior = self.strategy.finalize(
