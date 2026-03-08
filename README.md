@@ -17,16 +17,17 @@
 
 **Features:**
 
-- ⚡ Calibration and step-size adaptation  
+- ⚡ Automatic calibration and step-size adaptation  
 - ⚡ Stable implementations of filtering, smoothing, and other estimation strategies  
 - ⚡ Custom information operators, dense output, posterior sampling, and prior distributions.
-- ⚡ State-space model factorisations  
+- ⚡ Efficient handling of high-dimensional problems through state-space model factorisations  
 - ⚡ Parameter estimation
-- ⚡ Taylor-series estimation with and without jets  
+- ⚡ Taylor-series estimation with and without automatic differentiation  
 - ⚡ Seamless interoperability with [Optax](https://optax.readthedocs.io/en/latest/index.html), [BlackJAX](https://blackjax-devs.github.io/blackjax/), and other JAX-based libraries  
 - ⚡ Numerous examples (basic and advanced) -- see the [documentation](https://pnkraemer.github.io/probdiffeq/)  
 
 
+**Quickstart:** See [here](https://pnkraemer.github.io/probdiffeq/Examples/A0_get_started/) for a minimal example to get you started.
 
 
 **Contributing:** Contributions are very welcome!  
@@ -69,6 +70,8 @@ To install with JAX (CPU backend):
 pip install probdiffeq[cpu]
 ```
 
+**Compatibility note:** Probdiffeq requires JAX >= 0.4.0. For GPU support, install JAX with CUDA following [JAX installation instructions](https://jax.readthedocs.io/en/latest/installation.html).
+
 
 
 **Versioning**
@@ -84,190 +87,117 @@ Notably, Probdiffeq's API is not guaranteed to be stable, but we do our best to 
 
 
 
-## Choose the right solver
-
-Good solvers are problem-dependent. However, some guidelines exist:
-
-### State-space model factorisation
-
-* If your problem is scalar-valued (`shape=()`), use a dense factorisation. All factorisations have the same complexity for scalar models, but dense factorisations have the most solvers implemented.
-
-* If your problem is vector-valued, be aware that different implementation choices imply different modelling choices.
-However, if you don't care too much about modelling choices:
-
-* If your problem is high-dimensional, use a `blockdiag` or `isotropic` implementation.
-* If your problem is medium-dimensional, use any implementations. 
-  `isotropic` factorisations tend to be the fastest with the worst UQ and worst stability, 
-  `dense` factorisations tend to be the slowest with the best UQ and best stability, 
-  `blockdiag` factorisations are somewhere in between.
-
-
-### Stiffness
-
-* If your problem is stiff, use a a `dense` implementation in combination with a
-correction scheme that employs first-order linearisation; for instance, `ts1` or `slr1`.
-These first-order methods, if used in conjunction with an integrated Wiener process prior,
-are known to be $A$-stable:
-
-> Tronarp, F., Kersting, H., Särkkä, S., & Hennig, P. (2019). 
-Probabilistic solutions to ordinary differential equations as nonlinear Bayesian filtering: 
-a new perspective. Statistics and Computing, 29(6), 1297-1315.
-
-* If your problem is a discretised semilinear PDE, try an integrated Ornstein-Uhlenbeck prior.
-The combination of IOUP + first-order linearisation is $L$-stable (thus also $A$-stable):
-
-> Bosch, N., Hennig, P., & Tronarp, F. (2023). Probabilistic exponential integrators. 
-Advances in Neural Information Processing Systems, 36, 40450-40467.
-
-Often, IWP priors are still more effective than IOUP priors because the transition parameters
-are considerably cheaper to compute. Still, good priors matter.
-
-* Zeroth-order approximation (`ts0`, `slr0`) is neither $A$- nor $L$-stable, so do not use them for
-stiff problems. Relatedly, solvers in isotropic and blockdiagonal factorisations are also
-not $A$- nor $L$-stable, even if one uses IOUPs or first-order linearisation. Though for only 
-mildly stiff problems, like the Brusselator perhaps, blockdiagonal factorisations in combination
-with first-order linearisation may still deliver acceptable performance.
-
-* If your problem is stiff **and** high-dimensional: 
-Probabilistic solvers for problems that are stiff and high-dimensional are a bit of an open problem
-as of writing this. Try combining blockdiagonal factorisations with first-order linearisation,
-which may yield satisfactory results, but do not expect to outperform non-probabilistic solvers
-for stiff high-dimensional equation (eg those that exploit sparsity in Jacobians).
-
-
-### Filters vs smoothers
-As a rule of thumb:
-
-* Use a filter strategy for simulating terminal values
-* Use a fixed-point smoother for solving via the `save_at` functionality 
-* Use a fixed-interval smoother for fixed steps. 
-
-Other combinations are possible, but typically rare.
-
-
-### Calibration
-
-* Use a dynamic solver if you expect that the output scale of your differential equation
-solution varies greatly (eg for first-order, linear ODEs; see the examples)
-* Otherwise, use an MLE-based solver solver for typical simulation problems 
-* Use a solver without automatic calibration for parameter-estimation.
-
-See also the output-scale recommendations under "Prior distributions".
-
-
-### Prior distributions
-If you're uncertain which prior to choose, prefer an integrated Wiener process over more advanced priors.
-The reason is that integrated Wiener processes have closed form transition parameters, which makes
-simulations much faster. For other cases, use exponential priors according to the recommendations
-in https://arxiv.org/abs/2305.14978.
-
-Regarding output scales: 
-if the ODE states carry different magnitudes (eg in the Robertson problem, where two states 
-are O(1) and the third one is O($10^{-5}$)), a dedicated output scale when constructing the 
-prior makes sense. Consult the DAE examples for specific information.
-
-
-## Number of Taylor coefficients (''order'')
-
-Regarding the number of Taylor coefficients: assuming the ODE solution is smooth, then
-more Taylor coefficients increase the convergence *rate*:
-
-> Tronarp, F., Särkkä, S., & Hennig, P. (2021). Bayesian ODE solvers: the maximum a posteriori estimate. Statistics and Computing, 31(3), 23.
-
-> Kersting, H., Sullivan, T. J., & Hennig, P. (2020). Convergence rates of Gaussian ODE filters. Statistics and computing, 30(6), 1791-1816.
-
-However, more coefficients also increase the complexity per step 
-and the requirements on numerical robustness:
-
-> Kraemer, N., & Hennig, P. (2024). Stable implementation of probabilistic ODE solvers. Journal of Machine Learning Research, 25(111), 1-29.
-
-When in doubt, use 4-5 Taylor coefficients for most problems.
-If if the goal is to achieve accuracy close to machine precision, use 7-8 Taylor coefficients.
-In low precision (e.g. on a GPU), use 2-3 Taylor coefficients.
-
-For reference, the posterior mean of some probabilistic solvers coincides with non-probabilistic ODE simulators:
-
-- 
-
-
-### Miscellaneous
-If you use a zero-th order method, choose an `isotropic` factorisation instead of a `dense` factorisation.
-They are mathematically equivalent, but the `isotropic` factorisation is faster.
-
-For parameter estimation problems with adaptive solvers, replace Probdiffeq's while-loops
-with Equinox's while-loops; see the examples for how.
-
-
-### Future guidelines
-These guidelines are a work in progress and may change at any point. If you have any input, reach out.
-Something missing? Reach out!
-
-
-## Migrate from other libraries
+## Coming from other ODE solver libraries?
 
 This guide helps you get started with Probdiffeq for solving ordinary differential equations (ODEs), especially if you are familiar with other probabilistic or non-probabilistic ODE solvers in Python or Julia.
 
 Probdiffeq is a JAX library that focuses on state-space-model-based formulations of probabilistic IVP solvers. For what this means, have a look at [this thesis](https://tobias-lib.ub.uni-tuebingen.de/xmlui/handle/10900/152754).
 
+**Probabilistic ODE solvers in a nutshell:** Unlike traditional solvers that return a single point estimate of the solution, probabilistic solvers return a posterior distribution. This built-in uncertainty quantification  reflects the numerical error (and other modelling choices), and helps you make better decisions during the simulation and in downstream tasks, for example, during adaptive time-stepping, parameter estimation, or in physics-informed machine learning applications.
 
 
-### Migrate from ProbNumDiffEq.jl (Julia)
+### From traditional (non-probabilistic) ODE solvers
 
-[ProbNumDiffEq.jl](https://nathanaelbosch.github.io/ProbNumDiffEq.jl/stable/) is a library for probabilistic IVP solvers in Julia, similar to Probdiffeq. However, while the feature offerings are similar, the libraries are unrelated.
-To translate ProbNumDiffEq.jl code to Probdiffeq code:
+If you're coming from traditional ODE solvers like SciPy's `integrate.solve_ivp`, JAX's `jax.experimental.odeint`, or [Diffrax](https://docs.kidger.site/diffrax/), you'll notice some fundamental differences:
 
-| ProbNumDiffEq.jl           | ProbDiffEq Equivalent                                      |
-|-||
-| `EK0` / `EK1`              | `constraint_ode_ts0()` / `constraint_ode_ts1()`                         |
-| `DynamicDiffusion` / `FixedDiffusion` | `solver_dynamic()` or `solver_mle()` |
-| `IWP(diffusion=x^2)` |  `prior_wiener_integrated(output_scale=x)`                                       |
-| Filtering and smoothing via `smooth=true/false`      | `strategy_filter`, `strategy_smoother_fixedpoint`, `strategy_smoother_fixedinterval`    |
+**Key differences:**
 
+* **Solutions as distributions:** Probdiffeq returns posterior distributions instead of point estimates. You automatically get uncertainty quantification, which you can use for sensitivity analysis, model selection, or downstream decision-making.
+* **Fine-grained control:** Probdiffeq lets you customize the probabilistic model (prior distribution, calibration method, linearization order), giving you more control over solver behavior.
+Since the modeling matters, everyone *has* to build their own custom solvers, and default behaviour is rare.
+* **Explicit solver modes:** Instead of a single `solve()` function, Probdiffeq offers specialized functions for targetting terminal values, checkpoints, or fixed grids. This is not just easier to maintain, but also enables better performance by easier code optimisation and specialised default parameters (e.g. whether or not timesteps should be clipped before checkpoints).
 
-Both libraries are evolving, and these translation guides may not be up-to-date. 
-Consult each libraries' latest API documentation when in doubt.
+**Mapping from Diffrax methods:** If you're switching from Diffrax, here's how to achieve similar accuracy levels by adjusting Taylor coefficients and linearization order:
 
-
-
-### Migrate from ProbNum (Python, Numpy)
-
-[ProbNum](https://probnum.readthedocs.io/en/latest/) is a general probabilistic numerics library based on Numpy. Probdiffeq specializes in IVP solvers using pure JAX, offering:
-
-* Greater efficiency for ODE problems because of JAX (e.g. jit)
-* Probdiffeq implements more mature solvers. The algorithms are generally faster (eg state-space model factorisations, improved adaptive step-size selection)
-* Probdiffeq offers more solvers and somewhat richer outputs (sampling, marginal likelihoods, etc.).
-
-
-
-### Migrate from Diffrax
-
-[Diffrax](https://docs.kidger.site/diffrax/) is a JAX-based library for differential equations. The key difference is that Diffrax's solvers are non-probabilistic; Probdiffeq solvers are probabilistic. Approximate solver mapping:
-
-| Diffrax                     | ProbDiffEq Equivalent                                     |
+| Diffrax method               | ProbDiffEq approach                                     |
 |--|--|
-| `Heun()`, `Midpoint()`      | Track $n=2$ Taylor coefficients and use `constraint_ode_ts0()`.  |
-| `Tsit5()`, `Dopri5()`       | Track $n=4$ Taylor coefficients instead.                               |
-| `Dopri8()`                   | Track $n=5, 6, 7$ Taylor coefficients instead; `constraint_ode_ts1()` and `solver_dynamic()` recommended but not required |
-| `Kvaerno3()`, `Kvaerno5()`   | Track $n=2,3,4$ Taylor coefficients and use `constraint_ode_ts1()`         |
-| Other methods (e.g. SDE solvers)                | Work in progress                                          |
+| `Heun()`, `Midpoint()`       | Use 1 or 2 Taylor coefficients with zeroth-order linearization (simple explicit methods) |
+| `Tsit5()`, `Dopri5()`        | Use 4 or 5 Taylor coefficients with zeroth-order linearization (the usual defaults) |
+| `Dopri8()`                   | Use 5 to 7 Taylor coefficients with zeroth-order linearization (high-order methods) |
+| `Kvaerno3()`, `Kvaerno5()`   | Use 2 to 5 Taylor coefficients with first-order linearization (implicit methods) |
+
+**Note:** Probdiffeq is not a drop-in replacement for these solvers; the probabilistic approach is fundamentally different. However, you can match performance and accuracy levels by tuning the solver configuration (see the examples in the documentation).
+
+### From other probabilistic ODE solvers
+
+If you're familiar with other probabilistic solver libraries, here are the comparisons:
+
+**From ProbNum (Python, Numpy):** [ProbNum](https://probnum.readthedocs.io/en/latest/) is a general-purpose probabilistic numerics library, while Probdiffeq specializes in ODE solving with pure JAX. Advantages of Probdiffeq:
+
+* Greater efficiency due to JAX's JIT compilation and autodiff
+* More mature ODE algorithms (state-space factorizations, improved adaptive time-stepping)
+* Richer outputs (sampling, marginal likelihoods, marginal-likelihood losses, etc.)
+
+**From ProbNumDiffEq.jl (Julia):** [ProbNumDiffEq.jl](https://nathanaelbosch.github.io/ProbNumDiffEq.jl/stable/) is the Julia equivalent of Probdiffeq (though the libraries are not related), with similar features but different APIs. Here's how to translate:
+
+| ProbNumDiffEq.jl concept     | ProbDiffEq concept                                     |
+|-||
+| `EK0` / `EK1`                | `constraint_ode_ts0()` / `constraint_ode_ts1()` (ODE constraints) |
+| `DynamicDiffusion` / `FixedDiffusion` | `solver_dynamic()` / `solver_mle()` (calibration methods) |
+| `IWP(diffusion=x^2)`         | `prior_wiener_integrated(output_scale=x)` (Wiener process prior) |
+| `smooth=true/false` | `strategy_filter()` / `strategy_smoother_fixedpoint()` / `strategy_smoother_fixedinterval()` |
+
+Both libraries are actively evolving; consult their latest API documentation if you're unsure about equivalences.
+
+
+## Choose the right solver
+
+Good solvers are problem-dependent. However, some guidelines exist:
+
+### Problem characteristics
+
+Choosing the right approach matters because problem size and behavior directly impact solver efficiency, stability, and the accuracy of the uncertainty quantification.
+
+**Dimensionality:** 
+For low-dimensional problems, use dense covariances, which track full correlations between state variables and offer the best stability and uncertainty quantification. For larger problems, use blockdiagonal or isotropic state-space models, which are more efficient by tracking only partial uncertainty correlations. However, their uncertainty quantification is typically worse. The general trade-off is between accuracy and speed: dense models scale cubically in the dimension but provide the best accuracy; the other two models scale linearly in the dimension.
+
+**Stiffness:** Stiff problems have rapid changes or very different timescales. For these, use dense state-space models with first-order linearization. The default prior should be the integrated Wiener process; however, integrated Ornstein-Uhlenbeck processes work well for discretized semilinear partial differential equations (and other semilinear problems). Avoid zeroth-order methods and isotropic state-space models for stiff problems. Block-diagonal state-space models with first-order linearization may suffice for moderately stiff cases, but expect that all solvers except first-order linearisation in dense state-space models have worse stability than non-probabilistic solvers for stiff problems.
+
+
+### Filters vs smoothers
+
+Choosing between filters and smoothers matters because it balances computational cost with the accuracy of uncertainty estimates across the trajectory. 
+When in doubt, use fixed-point smoothing for adaptive timestepping and fixed-interval smoothing for fixed timestepping. When only computing the terminal value of a problem, choose a filter.
+
+
+### Calibration
+
+Calibration matters not just because it ensures uncertainty estimates reflect the real error, but also because it can considerably affect adaptive time-stepping. Use dynamic calibration when output scales vary significantly, for example in $u'(t) = 10u(t)$, $0 \leq t \leq 10$. Use maximum-likelihood calibration for other cases. Remove automatic calibration for parameter estimation.
+
+
+### Prior distributions
+
+Prior distributions encode assumptions about solution dynamics. Integrated Wiener processes work well for most problems and should be the default. 
+Use Ornstein-Uhlenbeck priors for specialized cases like discretized semilinear PDEs. For other needs, consult literature like:
+
+> Bosch, Nathanael, Philipp Hennig, and Filip Tronarp. "Probabilistic exponential integrators." Advances in Neural Information Processing Systems 36 (2023): 40450-40467.
+
+Adjust the base-output-scales of the Wiener process if state variables have vastly different magnitudes, like in the Robertson problem where one dimension is $10^{5}$-times smaller than the other.
+
+
+### Number of Taylor coefficients (''order'')
+
+The number of Taylor coefficients trades off accuracy against computational cost. Use 4-5 for most problems, higher when simulating with tolerances close to machine precision, and lower in low-precision arithmetic (eg on a GPU).
 
 
 
+### Summary: Choosing a solver
 
-### Migrate from other common ODE solvers (e.g., SciPy, jax.odeint)
+**For beginners:** Start with integrated Wiener processes and four Taylor coefficients, fixed-point smoothing, first-order linearization, and dense state-space models. For high-dimensional problems, use zeroth-order linearization and block-diagonal state-space models. For parameter estimation, use fixed steps with a fixed-interval smoother.
 
-* Probdiffeq's solutions are posterior distributions instead of point estimates, enabling uncertainty quantification and more sophisticated models (eg easy switch to second-order problems).
-* Probdiffeq's solver modes are explicit: `simulate_terminal_values()`, and `solve_adaptive_save_at()` instead of a one-size-fits-all `solve()` method.
+**For advanced users:** Use the guidelines above based on your problem's dimensionality, stiffness, and requirements. When in doubt, check the examples in the documentation.
 
 
-## Troubleshoot common issues
+### Future guidelines
+These guidelines are a work in progress and may change at any point. If you have any input, especially if something is missing, reach out.
 
-### General troubleshooting
+
+## Troubleshoot common issues 
 
 If you encounter unexpected issues, please ensure you have the latest version of JAX installed. 
 If you're not already using [virtual environments](https://docs.python.org/3/tutorial/venv.html), now might be a good time to start, as they can help manage dependencies more effectively.
 
-With these points covered, try to execute some of the examples in Probdiffeq's documentation, for example [the quickstart](https://pnkraemer.github.io/probdiffeq/examples_quickstart/quickstart/).
+With these points covered, try to execute some of the examples in Probdiffeq's documentation, for example [the quickstart](https://pnkraemer.github.io/probdiffeq/Examples/A0_get_started/).
 If these examples work, great! If not, reach out. 
 
 
@@ -276,13 +206,7 @@ If these examples work, great! If not, reach out.
 If a solution routine takes an unexpectedly long time to compile but runs quickly afterward, the issue might be related to how Taylor coefficients are computed. 
 Some functions in `probdiffeq.taylor` unroll a small loop, which can slow down compilation.  
 To avoid this, try using the padded scan, which replaces loop unrolling with a scan.  
-If the problem persists, consider:  
-
-- Reducing the number of derivatives (if appropriate for your problem).  
-- Switching to a different Taylor-coefficient routine, such as a Runge-Kutta starter.
-
-For $\nu < 5$, using a Runge-Kutta starter should maintain solver performance. However, for higher-order methods (e.g., \(\nu = 9\)), Taylor-mode ("jets") is the best choice.  
-
+If the problem persists, consider reducing the number of derivatives (if appropriate for your problem). 
 
 ### Taylor-derivative routines yield NaNs
 
@@ -419,27 +343,29 @@ Each example or benchmark should run in under a minute, most run in a few second
 
 ### Steps
 
-1. **Create the script:**  
-  Create a new  notebook in the appropriate subdirectory of `examples/` or `benchmarks/`.
+1. **Create the script:**  Create a new  notebook in the appropriate subdirectory of `examples/` or `benchmarks/`.
   Choose a meaningful name (e.g., `benchmarks/work-precision-hires.py`, `examples/demonstrate-calibration.py`). 
   The examples show up in the documentation according to the alphabetic order in the `examples/` and `benchmarks` directories.
     
 2. **Fill the script:** 
   Write the benchmark/example code. Ensure the execution time stays well below one minute to keep CI manageable.
  
-3. **Write documentation:**
-  The module docstring will become the title and description of the notebook, so choose a good one. 
+3. **Write documentation:**  The module docstring will become the title and description of the notebook, so choose a good one. 
     
-4. **Pull request:**  
-  Commit the new file (the pre-commit hook will handle formatting and linting). Open a pull request and you're done.
+4. **Make a pull request:**   Commit the new file (the pre-commit hook will handle formatting and linting). Open a pull request and you're done.
 
 ## Citation
 
-Here are some references for citing Probdiffeq and its algorithms in your research.
+Please consider citing Probdiffeq and its algorithms if it helps you in your research.
+Here are some concrete suggestions for how.
 
-### The library 
+### Essential citations
 
 If you use **Probdiffeq** in your research, please cite:
+
+> Krämer, N. (2023). Implementing probabilistic numerical solvers for differential equations (Doctoral dissertation, Dissertation, Tübingen, Universität Tübingen, 2024).
+
+Here is a bibtex:
 
 ```bibtex
 @phdthesis{kramer2024implementing,
@@ -450,10 +376,17 @@ If you use **Probdiffeq** in your research, please cite:
 }
 ```
 The [PDF](https://tobias-lib.ub.uni-tuebingen.de/xmlui/handle/10900/152754) explains the mathematics and algorithms behind this library.  
+If there is one text to reference when acknowledging Probdiffeq, it is the PhD thesis above.
 
-### The libraries' time-stepping 
+However, there are some additional references that are critical to this library:
 
-For the *solve-and-save-at* functionality, cite:
+
+**Adaptive time-stepping:**
+When using adaptive time-stepping, also cite the adaptive step-sizing paper:
+
+> Nicholas Krämer (2025). Adaptive Probabilistic ODE Solvers Without Adaptive Memory Requirements. In Kanagawa, M., Cockayne, J., Gessner, A., & Hennig, P. (Eds.), Proceedings of the First International Conference on Probabilistic Numerics, 12–24. PMLR.
+
+Here is a bibtex:
 
 ```bibtex
 @InProceedings{kramer2024adaptive,
@@ -475,47 +408,100 @@ Link to the experiments:
 [Code for experiments](https://github.com/pnkraemer/code-adaptive-prob-ode-solvers).  
 
 
+**Numerical implementations:**
+If you use more than one or two Taylor coefficients in the state-space model, you're benefitting from numerically robust implementations of probabilistic solvers:
+
+> Nicholas Krämer & Philipp Hennig (2024). Stable implementation of probabilistic ODE solvers. Journal of Machine Learning Research, 25(111), 1–29.
+
+Here is a bibtex:
+
+```bibtex
+@article{kraemer2024stable,
+  title={Stable implementation of probabilistic ODE solvers},
+  author={Kraemer, Nicholas and Hennig, Philipp},
+  journal={Journal of Machine Learning Research},
+  volume={25},
+  number={111},
+  pages={1--29},
+  year={2024}
+}
+```
+
+
 ### Specific algorithms
 
 Algorithms in **Probdiffeq** are based on multiple research papers. If you’re unsure which to cite, feel free to reach out. 
 A (subjective, probdiffeq-centric) list of relevant work includes the following articles.
 
 
-#### Numerically robustness and state-space model factorisations
+#### Numerical robustness and state-space model factorisations
 
-- Nicholas Krämer & Philipp Hennig (2024). Stable implementation of probabilistic ODE solvers. Journal of Machine Learning Research, 25(111), 1–29.    All suggestions made in this work are critical to Probdiffeq (and other libraries). They are rarely discussed though, and almost taken for granted by now.
+- Nicholas Krämer & Philipp Hennig (2024). Stable implementation of probabilistic ODE solvers. Journal of Machine Learning Research, 25(111), 1–29.  
 
-- Nicholas Krämer, Nathanael Bosch, Jonathan Schmidt & Philipp Hennig (2022). Probabilistic ODE solutions in millions of dimensions.  In ICML 2022, 11634–11649. PMLR. Every time Probdiffeq uses state-space model factorisations, it follows the recommendations in this work. 
+    **Key insights:** All suggestions made in this work are critical to numerical implementations of probabilistic solvers. They are implemented by Probdiffeq (and other libraries).
 
-#### Adaptive step-size selection
+- Nicholas Krämer, Nathanael Bosch, Jonathan Schmidt & Philipp Hennig (2022). Probabilistic ODE solutions in millions of dimensions.  In ICML 2022, 11634–11649. PMLR. 
+
+    **Key insights:** Every time Probdiffeq uses state-space model factorisations, it follows the recommendations in this work. 
+
+#### Adaptive step-size selection (and calibration)
   
 - Michael Schober, Simo Särkkä & Philipp Hennig (2019). A probabilistic model for the numerical solution of initial value problems. Statistics and Computing, 29(1), 99–122.  
+
+    **Key insights:** This work is the first on calibration and adaptive step-size selection in state-space model based ODE solvers.
   
 - Nathanael Bosch, Philipp Hennig & Filip Tronarp (2021). Calibrated adaptive probabilistic ODE solvers. In AISTATS 2021, 3466–3474. PMLR.  
-  
-- Nicholas Krämer (2025). Adaptive Probabilistic ODE Solvers Without Adaptive Memory Requirements. In Kanagawa, M., Cockayne, J., Gessner, A., & Hennig, P. (Eds.), Proceedings of the First International Conference on Probabilistic Numerics, 12–24. PMLR.
+
+    **Key insights:** This work describes calibration and adaptive step-size selection as we use it now.
+
+- Nicholas Krämer, Nathanael Bosch, Jonathan Schmidt & Philipp Hennig (2022). Probabilistic ODE solutions in millions of dimensions.  In ICML 2022, 11634–11649. PMLR. 
+
+    **Key insights:** This work is a small extension of Bosch et al. (2021)'s calibration and error estimates to factorised state-space models. 
+
+- Nicholas Krämer (2025). Adaptive Probabilistic ODE Solvers Without Adaptive Memory Requirements. In Kanagawa, M., Cockayne, J., Gessner, A., & Hennig, P. (Eds.), Proceedings of the First International Conference on Probabilistic Numerics, 12–24. PMLR. 
+
+    **Key insights:** Adaptive time-stepping with fixed-point smoothers makes memory-requirements constant. Probdiffeq's time-stepping loop implements this paper.
   
 #### Constraints, linearisation, and information operators
-  
-- Bosch, Nathanael, Filip Tronarp, and Philipp Hennig. "Pick-and-mix information operators for probabilistic ODE solvers." International Conference on Artificial Intelligence and Statistics. PMLR, 2022.
 
-- Tronarp, Filip, et al. "Probabilistic solutions to ordinary differential equations as nonlinear Bayesian filtering: a new perspective." Statistics and Computing 29.6 (2019): 1297-1315.
+- Tronarp, Filip, et al. "Probabilistic solutions to ordinary differential equations as nonlinear Bayesian filtering: a new perspective." Statistics and Computing 29.6 (2019): 1297-1315. 
 
-- See also the Linearisation-chapter in: Krämer, Nicholas. Implementing probabilistic numerical solvers for differential equations. Diss. Dissertation, Tübingen, Universität Tübingen, 2024.
+    **Key insight:** As one of the foundational works on probabilistic solvers, it links ODE solvers to zeroth- and first-order linearisation in Gaussian filters.
+
+
+- Bosch, Nathanael, Filip Tronarp, and Philipp Hennig. "Pick-and-mix information operators for probabilistic ODE solvers." International Conference on Artificial Intelligence and Statistics. PMLR, 2022. 
+
+    **Key insights:** Encode e.g. second-order dynamics, Hamiltonian preservation, or implicit differential equations directly in the constraints without transforming the problem into a first-order explicit ODE.
 
 
 #### Parameter estimation
 
-- Kersting, H., Krämer, N., Schiegg, M., Daniel, C., Tiemann, M., & Hennig, P. (2020, November). Differentiable likelihoods for fast inversion of’likelihood-free’dynamical systems. In International Conference on Machine Learning (pp. 5198-5208). PMLR.
+- Kersting, H., Krämer, N., Schiegg, M., Daniel, C., Tiemann, M., & Hennig, P. (2020, November). Differentiable likelihoods for fast inversion of `likelihood-free` dynamical systems. In International Conference on Machine Learning (pp. 5198-5208). PMLR. 
 
--  Tronarp, Filip, Nathanael Bosch, and Philipp Hennig. "Fenrir: Physics-enhanced regression for initial value problems." International Conference on Machine Learning. PMLR, 2022.
+    **Key insight:** The first work on using the likelihood of observational data under posterior distribution given by the probabilistic ODE solution. 
 
--  Beck, J., Bosch, N., Deistler, M., Kadhim, K. L., Macke, J. H., Hennig, P., & Berens, P. (2024, July). Diffusion Tempering Improves Parameter Estimation with Probabilistic Integrators for Ordinary Differential Equations. In International Conference on Machine Learning (pp. 3305-3326). PMLR.
+-  Tronarp, Filip, Nathanael Bosch, and Philipp Hennig. "Fenrir: Physics-enhanced regression for initial value problems." International Conference on Machine Learning. PMLR, 2022. 
+
+    **Key insight:** The formulation of the likelihood of the observational data as we use it now.
+
+-  Beck, J., Bosch, N., Deistler, M., Kadhim, K. L., Macke, J. H., Hennig, P., & Berens, P. (2024, July). Diffusion Tempering Improves Parameter Estimation with Probabilistic Integrators for Ordinary Differential Equations. In International Conference on Machine Learning (pp. 3305-3326). PMLR. 
+
+    **Key insight:** An improved algorithm for parameter estimation using the above likelihood formulation based on diffusion tempering (see the tutorial).
 
 
 #### Prior distributions
 
-- Bosch, Nathanael, Philipp Hennig, and Filip Tronarp. "Probabilistic exponential integrators." Advances in Neural Information Processing Systems 36 (2023): 40450-40467.
+- Schober, M., Duvenaud, D., & Hennig, P. (2014). Probabilistic ODE solvers with Runge-Kutta means. Advances in neural information processing systems, 27. 
+
+    **Key insights:** Use Gauss--Markov processes, specifically, high-order integrated Wiener processes, to replicate the efficiency of non-probabilistic ODE solvers. 
+
+- Kersting, H., Sullivan, T. J., & Hennig, P. (2020). Convergence rates of Gaussian ODE filters. Statistics and computing, 30(6), 1791-1816. 
+
+    **Key insights:** One of the first works that mentions integrated Ornstein-Uhlenbeck priors in the context of ODE solvers.
+
+- Bosch, Nathanael, Philipp Hennig, and Filip Tronarp. "Probabilistic exponential integrators." Advances in Neural Information Processing Systems 36 (2023): 40450-40467. 
+
+    **Key insights:** Replicate the behaviour of exponential integrators by choosing priors different to integrated Wiener processes.
 
 
 
