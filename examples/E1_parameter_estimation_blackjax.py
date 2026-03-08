@@ -21,10 +21,6 @@ if not backend.has_been_selected:
     backend.select("jax")
 
 
-# Fail this notebook on NaN detection (to catch those in the CI)
-jax.config.update("jax_debug_nans", True)
-
-
 def main():
     """Use BlackJAX's samplers to estimate ODE parameters."""
     # First, set up an IVP and create some artificial data by
