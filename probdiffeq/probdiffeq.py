@@ -1862,8 +1862,10 @@ class solver_mle(ProbabilisticSolver):
         prior: Callable,
         ssm: ssm_impl.FactSsmImpl,
         strategy: MarkovStrategy,
+        correct_undersmoothing: bool = True,
     ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
+        self.correct_undersmoothing = correct_undersmoothing
 
     def init(self, t, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         u_pred, prediction = self.strategy.init_posterior(u=u)
@@ -1945,7 +1947,8 @@ class solver_mle(ProbabilisticSolver):
         # Improve the calibration like in other Gaussian process models
         #   ODE priors are generally not as smooth as the ODE solutions,
         #   which means that their uncertainty is a bit too large.
-        output_scale = output_scale / np.sqrt(solution.num_steps[-1])
+        if self.correct_undersmoothing:
+            output_scale = output_scale / np.sqrt(solution.num_steps[-1])
 
         # Finalize the solution with the calibrated output scale
         init = solution0.solution_full
