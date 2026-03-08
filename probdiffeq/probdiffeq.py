@@ -813,7 +813,7 @@ class ProbabilisticSolution(Generic[N, T]):
     output_scale: Any
     """The current output scale."""
 
-    num_steps: int
+    num_steps: Array
     """The number of steps taken until the current point."""
 
     auxiliary: Any
@@ -1862,8 +1862,10 @@ class solver_mle(ProbabilisticSolver):
         prior: Callable,
         ssm: ssm_impl.FactSsmImpl,
         strategy: MarkovStrategy,
+        correct_asymptotic_underconfidence: bool = True,
     ) -> None:
         super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
+        self.correct_asymptotic_underconfidence = correct_asymptotic_underconfidence
 
     def init(self, t, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         u_pred, prediction = self.strategy.init_posterior(u=u)
@@ -1942,6 +1944,15 @@ class solver_mle(ProbabilisticSolver):
         ones = np.ones_like(output_scale)
         output_scale = output_scale[-1]
 
+        # Improve the calibration like in other Gaussian process models.
+        #   ODE priors are generally not as smooth as the ODE solutions,
+        #   which means that their uncertainty is often a bit too large.
+        #   See e.g. the "asymptotic underconfidence" derivations
+        #   in https://arxiv.org/abs/2001.10965
+        if self.correct_asymptotic_underconfidence:
+            output_scale = output_scale / np.sqrt(solution.num_steps[-1])
+
+        # Finalize the solution with the calibrated output scale
         init = solution0.solution_full
         posterior = solution.solution_full
         estimate, posterior = self.strategy.finalize(
