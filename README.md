@@ -105,13 +105,35 @@ However, if you don't care too much about modelling choices:
 ### Stiffness
 
 * If your problem is stiff, use a a `dense` implementation in combination with a
-correction scheme that employs first-order linearisation; 
-for instance, `ts1` or `slr1`.
-Zeroth-order approximation and isotropic/blockdiag factorisations often fail for stiff problems.
+correction scheme that employs first-order linearisation; for instance, `ts1` or `slr1`.
+These first-order methods, if used in conjunction with an integrated Wiener process prior,
+are known to be $A$-stable:
 
-* If your problem is stiff and high-dimensional: try first-order linearisation with a block-diagonal factorisation. 
-If that does not work: good luck ;) Probabilistic solvers for problems that are stiff 
-*and* high-dimensional are a bit of an open problem.
+> Tronarp, F., Kersting, H., Särkkä, S., & Hennig, P. (2019). 
+Probabilistic solutions to ordinary differential equations as nonlinear Bayesian filtering: 
+a new perspective. Statistics and Computing, 29(6), 1297-1315.
+
+* If your problem is a discretised semilinear PDE, try an integrated Ornstein-Uhlenbeck prior.
+The combination of IOUP + first-order linearisation is $L$-stable (thus also $A$-stable):
+
+> Bosch, N., Hennig, P., & Tronarp, F. (2023). Probabilistic exponential integrators. 
+Advances in Neural Information Processing Systems, 36, 40450-40467.
+
+Often, IWP priors are still more effective than IOUP priors because the transition parameters
+are considerably cheaper to compute. Still, good priors matter.
+
+* Zeroth-order approximation (`ts0`, `slr0`) is neither $A$- nor $L$-stable, so do not use them for
+stiff problems. Relatedly, solvers in isotropic and blockdiagonal factorisations are also
+not $A$- nor $L$-stable, even if one uses IOUPs or first-order linearisation. Though for only 
+mildly stiff problems, like the Brusselator perhaps, blockdiagonal factorisations in combination
+with first-order linearisation may still deliver acceptable performance.
+
+* If your problem is stiff **and** high-dimensional: 
+Probabilistic solvers for problems that are stiff and high-dimensional are a bit of an open problem
+as of writing this. Try combining blockdiagonal factorisations with first-order linearisation,
+which may yield satisfactory results, but do not expect to outperform non-probabilistic solvers
+for stiff high-dimensional equation (eg those that exploit sparsity in Jacobians).
+
 
 ### Filters vs smoothers
 As a rule of thumb:
@@ -144,11 +166,28 @@ if the ODE states carry different magnitudes (eg in the Robertson problem, where
 are O(1) and the third one is O($10^{-5}$)), a dedicated output scale when constructing the 
 prior makes sense. Consult the DAE examples for specific information.
 
+
+## Number of Taylor coefficients (''order'')
+
 Regarding the number of Taylor coefficients: assuming the ODE solution is smooth, then
-more Taylor coefficients increase the convergence *rate* but also increase the complexity
-per step and the requirements on numerical robustness. When in doubt, use 4-5 Taylor coefficients,
-or 7-8 Taylor coefficients if the goal is to achieve accuracy close to machine precision.
-In single precision (eg on a GPU), track only 2-3 Taylor coefficients.
+more Taylor coefficients increase the convergence *rate*:
+
+> Tronarp, F., Särkkä, S., & Hennig, P. (2021). Bayesian ODE solvers: the maximum a posteriori estimate. Statistics and Computing, 31(3), 23.
+
+> Kersting, H., Sullivan, T. J., & Hennig, P. (2020). Convergence rates of Gaussian ODE filters. Statistics and computing, 30(6), 1791-1816.
+
+However, more coefficients also increase the complexity per step 
+and the requirements on numerical robustness:
+
+> Kraemer, N., & Hennig, P. (2024). Stable implementation of probabilistic ODE solvers. Journal of Machine Learning Research, 25(111), 1-29.
+
+When in doubt, use 4-5 Taylor coefficients for most problems.
+If if the goal is to achieve accuracy close to machine precision, use 7-8 Taylor coefficients.
+In low precision (e.g. on a GPU), use 2-3 Taylor coefficients.
+
+For reference, the posterior mean of some probabilistic solvers coincides with non-probabilistic ODE simulators:
+
+- 
 
 
 ### Miscellaneous
