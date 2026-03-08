@@ -38,7 +38,7 @@ def main():
 
     # Construct solvers
     tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta_guess,), num=2)
-    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
+    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
     iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=10.0)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
@@ -50,7 +50,7 @@ def main():
 
     # Visualise the initial guess and the data
 
-    fig, ax = plt.subplots(figsize=(5, 3))
+    _fig, ax = plt.subplots(figsize=(5, 3))
 
     data_kwargs = {"alpha": 0.5, "color": "gray"}
     ax.annotate("Data", (13.0, 30.0), **data_kwargs)
@@ -96,7 +96,7 @@ def main():
 
     # Visualise the initial guess and the data
 
-    fig, ax = plt.subplots()
+    _fig, ax = plt.subplots()
 
     sample_kwargs = {"color": "C0"}
     ax.annotate("Samples", (2.75, 31.0), **sample_kwargs)
@@ -131,7 +131,7 @@ def main():
     log_M_vmapped = jax.vmap(log_M_vmapped_x, in_axes=-1, out_axes=-1)
     Zs = log_M_vmapped(Thetas)
 
-    fig, ax = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(8, 3))
+    _fig, ax = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(8, 3))
 
     ax_samples, ax_heatmap = ax
 
