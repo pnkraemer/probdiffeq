@@ -64,19 +64,17 @@ pip install probdiffeq
 
 This assumes [JAX](https://jax.readthedocs.io/en/latest/) is already installed.  
 
-To install with JAX (CPU backend):  
+To install the library with JAX (using the CPU backend):  
 
 ```bash
 pip install probdiffeq[cpu]
 ```
 
-**Compatibility note:** Probdiffeq requires JAX >= 0.4.0. For GPU support, install JAX with CUDA following [JAX installation instructions](https://jax.readthedocs.io/en/latest/installation.html).
+**Compatibility note:** For GPU support, install JAX with CUDA following [JAX installation instructions](https://jax.readthedocs.io/en/latest/installation.html).
 
 
 
-**Versioning**
-
-Probdiffeq follows semantic versioning via **0.MINOR.PATCH**:
+**Versioning:** Probdiffeq follows semantic versioning via **0.MINOR.PATCH**:
 
 - **PATCH**: increase with bugfixes & new features  
 - **MINOR**: increase with breaking changes  
@@ -111,10 +109,18 @@ Since the modeling matters, everyone *has* to build their own custom solvers, an
 
 | Diffrax method               | ProbDiffEq approach                                     |
 |--|--|
-| `Heun()`, `Midpoint()`       | Use 1 or 2 Taylor coefficients with zeroth-order linearization (simple explicit methods) |
-| `Tsit5()`, `Dopri5()`        | Use 4 or 5 Taylor coefficients with zeroth-order linearization (the usual defaults) |
-| `Dopri8()`                   | Use 5 to 7 Taylor coefficients with zeroth-order linearization (high-order methods) |
-| `Kvaerno3()`, `Kvaerno5()`   | Use 2 to 5 Taylor coefficients with first-order linearization (implicit methods) |
+| `Heun()`, `Midpoint()`       | Use 2 Taylor coefficients with zeroth-order linearization |
+| `Tsit5()`, `Dopri5()`        | Use 5 Taylor coefficients with zeroth-order linearization |
+| `Dopri8()`                   | Use 8 Taylor coefficients with zeroth-order linearization |
+| `Kvaerno3()`, `Kvaerno5()`   | Use 2 to 5 Taylor coefficients with first-order linearization |
+
+**Tidbit:** Probabilistic solvers based on the once-integrated Wiener/OU processes are closely related to (different versions of) the trapezoidal rule (Schober et al., 2019; Bosch et al., 2023). Higher-order methods connect to more general linear multistep methods (Schober et al., 2019).
+
+- > Michael Schober, Simo Särkkä & Philipp Hennig (2019). A probabilistic model for the numerical solution of initial value problems. Statistics and Computing, 29(1), 99–122.
+
+- > Bosch, Nathanael, Philipp Hennig, and Filip Tronarp. "Probabilistic exponential integrators." Advances in Neural Information Processing Systems 36 (2023): 40450-40467.
+
+
 
 **Note:** Probdiffeq is not a drop-in replacement for these solvers; the probabilistic approach is fundamentally different. However, you can match performance and accuracy levels by tuning the solver configuration (see the examples in the documentation).
 
@@ -128,13 +134,13 @@ If you're familiar with other probabilistic solver libraries, here are the compa
 * More mature ODE algorithms (state-space factorizations, improved adaptive time-stepping)
 * Richer outputs (sampling, marginal likelihoods, marginal-likelihood losses, etc.)
 
-**From ProbNumDiffEq.jl (Julia):** [ProbNumDiffEq.jl](https://nathanaelbosch.github.io/ProbNumDiffEq.jl/stable/) is the Julia equivalent of Probdiffeq (though the libraries are not related), with similar features but different APIs. Here's how to translate:
+**From ProbNumDiffEq.jl (Julia):** [ProbNumDiffEq.jl](https://nathanaelbosch.github.io/ProbNumDiffEq.jl/stable/) is a Julia equivalent of Probdiffeq (though the libraries are unrelated), with similar features but slightly different APIs. Here's how to translate:
 
 | ProbNumDiffEq.jl concept     | ProbDiffEq concept                                     |
-|-||
-| `EK0` / `EK1`                | `constraint_ode_ts0()` / `constraint_ode_ts1()` (ODE constraints) |
-| `DynamicDiffusion` / `FixedDiffusion` | `solver_dynamic()` / `solver_mle()` (calibration methods) |
-| `IWP(diffusion=x^2)`         | `prior_wiener_integrated(output_scale=x)` (Wiener process prior) |
+|----------------------------- | --------------------|
+| `EK0` / `EK1`                | `constraint_ode_ts0()` / `constraint_ode_ts1()` |
+| `DynamicDiffusion` / `FixedDiffusion` | `solver_dynamic()` / `solver_mle()` |
+| `IWP(diffusion=x^2)`         | `prior_wiener_integrated(output_scale=x)` |
 | `smooth=true/false` | `strategy_filter()` / `strategy_smoother_fixedpoint()` / `strategy_smoother_fixedinterval()` |
 
 Both libraries are actively evolving; consult their latest API documentation if you're unsure about equivalences.
@@ -151,24 +157,26 @@ Choosing the right approach matters because problem size and behavior directly i
 **Dimensionality:** 
 For low-dimensional problems, use dense covariances, which track full correlations between state variables and offer the best stability and uncertainty quantification. For larger problems, use blockdiagonal or isotropic state-space models, which are more efficient by tracking only partial uncertainty correlations. However, their uncertainty quantification is typically worse. The general trade-off is between accuracy and speed: dense models scale cubically in the dimension but provide the best accuracy; the other two models scale linearly in the dimension.
 
-**Stiffness:** Stiff problems have rapid changes or very different timescales. For these, use dense state-space models with first-order linearization. The default prior should be the integrated Wiener process; however, integrated Ornstein-Uhlenbeck processes work well for discretized semilinear partial differential equations (and other semilinear problems). Avoid zeroth-order methods and isotropic state-space models for stiff problems. Block-diagonal state-space models with first-order linearization may suffice for moderately stiff cases, but expect that all solvers except first-order linearisation in dense state-space models have worse stability than non-probabilistic solvers for stiff problems.
+**Stiffness:** Stiff problems have rapid changes or very different timescales. For these, use dense state-space models with first-order linearization. See also the prior recommendations below. Avoid zeroth-order methods and isotropic state-space models for stiff problems. Block-diagonal state-space models with first-order linearization may suffice for moderately stiff cases, but expect that all solvers except first-order linearisation in dense state-space models have worse stability than for example implicit Runge-Kutta methods.
 
 
 ### Filters vs smoothers
 
 Choosing between filters and smoothers matters because it balances computational cost with the accuracy of uncertainty estimates across the trajectory. 
-When in doubt, use fixed-point smoothing for adaptive timestepping and fixed-interval smoothing for fixed timestepping. When only computing the terminal value of a problem, choose a filter.
+Use fixed-point smoothing for adaptive timestepping and fixed-interval smoothing for fixed timestepping. When only computing the terminal value of a differential equation, choose a filter.
 
 
 ### Calibration
 
 Calibration matters not just because it ensures uncertainty estimates reflect the real error, but also because it can considerably affect adaptive time-stepping. Use dynamic calibration when output scales vary significantly, for example in $u'(t) = 10u(t)$, $0 \leq t \leq 10$. Use maximum-likelihood calibration for other cases. Remove automatic calibration for parameter estimation.
+When solving multidimensional problems where each dimension has a different magnitude, adjust the output-scale of the prior manually before the simulation.
 
 
 ### Prior distributions
 
-Prior distributions encode assumptions about solution dynamics. Integrated Wiener processes work well for most problems and should be the default. 
-Use Ornstein-Uhlenbeck priors for specialized cases like discretized semilinear PDEs. For other needs, consult literature like:
+Prior distributions encode assumptions about solution dynamics. 
+The default prior is the integrated Wiener process; however, integrated Ornstein-Uhlenbeck processes work well for discretized semilinear partial differential equations (and other semilinear problems), especially in fixed-step simulations.
+For other needs, consult:
 
 > Bosch, Nathanael, Philipp Hennig, and Filip Tronarp. "Probabilistic exponential integrators." Advances in Neural Information Processing Systems 36 (2023): 40450-40467.
 
@@ -177,26 +185,29 @@ Adjust the base-output-scales of the Wiener process if state variables have vast
 
 ### Number of Taylor coefficients (''order'')
 
-The number of Taylor coefficients trades off accuracy against computational cost. Use 4-5 for most problems, higher when simulating with tolerances close to machine precision, and lower in low-precision arithmetic (eg on a GPU).
+The number of Taylor coefficients trades off accuracy against computational cost. Use 4-5 for most problems, 7-8 when simulating with tolerances close to machine precision, and 2-3 in low-precision arithmetic (for instance on a GPU).
 
+
+### Error estimation
+
+In adaptive time-stepping, there exist different error estimates. The default for solving (explicit) ODEs is the residual-based one, because it has proven effective over many years. When solving implicit differential equations (like DAEs), use the state-based estimate instead because the constraints may live on arbitrary scales which the residual-based method struggles with.
+For error-normalisation, use scale-then-RMS when applicable, and RMS-then-scale only if necessary.
+
+For controllers, the choice does not matter much. Integral controllers seem to be slightly more effective for most problems except for stiff ODEs, where proportional-integral controllers work better. Try all and report back with any insights.
 
 
 ### Summary: Choosing a solver
 
 **For beginners:** Start with integrated Wiener processes and four Taylor coefficients, fixed-point smoothing, first-order linearization, and dense state-space models. For high-dimensional problems, use zeroth-order linearization and block-diagonal state-space models. For parameter estimation, use fixed steps with a fixed-interval smoother.
 
-**For advanced users:** Use the guidelines above based on your problem's dimensionality, stiffness, and requirements. When in doubt, check the examples in the documentation.
+**For advanced users:** Use the guidelines above based on your problem's dimensionality, stiffness, and requirements. Consult the examples in the documentation, and reach out with any questions.
 
-
-### Future guidelines
-These guidelines are a work in progress and may change at any point. If you have any input, especially if something is missing, reach out.
 
 
 ## Troubleshoot common issues 
 
 If you encounter unexpected issues, please ensure you have the latest version of JAX installed. 
 If you're not already using [virtual environments](https://docs.python.org/3/tutorial/venv.html), now might be a good time to start, as they can help manage dependencies more effectively.
-
 With these points covered, try to execute some of the examples in Probdiffeq's documentation, for example [the quickstart](https://pnkraemer.github.io/probdiffeq/Examples/A0_get_started/).
 If these examples work, great! If not, reach out. 
 
@@ -214,7 +225,7 @@ If you encounter unexpected NaNs while estimating Taylor derivative routines, th
 For instance, in the Pleiades problem, there's a term like $\|x\|^2 / (\|x\|^2 + \|y\|^2)$, which can have differentiability issues near zero, depending on how it's implemented. 
 See [this issue (external)](https://github.com/pnkraemer/diffeqzoo/issues/126) for more details.
 In some cases, the fix is as simple as wrapping the quotient in `jax.numpy.nan_to_num`. 
-You can also check out [Probdiffeq's Pleiades benchmark](https://github.com/pnkraemer/probdiffeq/blob/main/docs/benchmarks/work-precision-pleiades.py) for a concrete example.
+You can also check out [Probdiffeq's Pleiades benchmark](https://github.com/pnkraemer/probdiffeq/Benchmarks/A1_Walltime_|_Pleiades/) for a concrete example.
 
 
 ### Other problems
