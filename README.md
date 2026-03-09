@@ -225,7 +225,7 @@ If you encounter unexpected NaNs while estimating Taylor derivative routines, th
 For instance, in the Pleiades problem, there's a term like $\|x\|^2 / (\|x\|^2 + \|y\|^2)$, which can have differentiability issues near zero, depending on how it's implemented. 
 See [this issue (external)](https://github.com/pnkraemer/diffeqzoo/issues/126) for more details.
 In some cases, the fix is as simple as wrapping the quotient in `jax.numpy.nan_to_num`. 
-You can also check out [Probdiffeq's Pleiades benchmark](https://github.com/pnkraemer/probdiffeq/Benchmarks/A1_Walltime_|_Pleiades/) for a concrete example.
+You can also check out [Probdiffeq's Pleiades benchmark](https://github.com/pnkraemer/probdiffeq/Extended_Benchmarks/A1_walltime_|_pleiades/) for a concrete example.
 
 
 ### Other problems
