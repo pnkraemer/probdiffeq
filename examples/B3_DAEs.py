@@ -25,6 +25,11 @@ from probdiffeq.util import nlstsq_util
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
 
+# TODO: move DAE constraint into initialisation (so that we have parametrised diffeqs)
+# TODO: use EM for updating the initial condition
+# TODO: Train a neural network to match the differential part?
+#
+
 
 def main(t0=1e-6, t1=1e5) -> None:
     """Run the script."""
@@ -62,7 +67,7 @@ def main(t0=1e-6, t1=1e5) -> None:
 
     # Initial and terminal conditions
     y0_true = jnp.sqrt(jnp.array([1.0, 0.0, 0.0]) / output_scale)
-    y0_guess = jnp.sqrt(jnp.array([0.9, 0.0, 0.1]) / output_scale)
+    y0_guess = jnp.sqrt(jnp.array([0.5 - 1e-5, 1e-5, 0.5]) / output_scale)
 
     # Create data
     solution_true = solve(y0_true, save_at=save_at, output_scale=output_scale)
@@ -85,10 +90,10 @@ def main(t0=1e-6, t1=1e5) -> None:
     )
 
     # Initialise the optimiser
-    optim = optax.adam(1e-1)  # lr is hard to tune
+    optim = optax.adam(0.5)  # If we temper hard, we can use large LRs
     opt_state = optim.init(y0_guess)
 
-    pbar = tqdm.tqdm(range(500))
+    pbar = tqdm.tqdm(range(200))
     for i in pbar:
         # Optimisation step:
         (value, solution_guess), gradient = value_and_grad(
@@ -114,7 +119,7 @@ def main(t0=1e-6, t1=1e5) -> None:
         #   But we can temper by reducing the standard deviations
         if i % 50 == 0:
             # The exact schedule is arbitrary tbh...
-            std = jnp.maximum(std / 2.0, 1e-8 * output_scale)
+            std = jnp.maximum(std / 5.0, 1e-8 * output_scale)
 
     fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(5, 5), sharex=True)
     ax[0][0].set_title("Robertson solution", fontsize="medium")
