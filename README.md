@@ -447,70 +447,70 @@ A (subjective, probdiffeq-centric) list of relevant work includes the following 
 
 #### Numerical robustness and state-space model factorisations
 
-- Nicholas Krämer & Philipp Hennig (2024). Stable implementation of probabilistic ODE solvers. Journal of Machine Learning Research, 25(111), 1–29.  
+- > Nicholas Krämer & Philipp Hennig (2024). Stable implementation of probabilistic ODE solvers. Journal of Machine Learning Research, 25(111), 1–29.  
 
     **Key insights:** All suggestions made in this work are critical to numerical implementations of probabilistic solvers. They are implemented by Probdiffeq (and other libraries).
 
-- Nicholas Krämer, Nathanael Bosch, Jonathan Schmidt & Philipp Hennig (2022). Probabilistic ODE solutions in millions of dimensions.  In ICML 2022, 11634–11649. PMLR. 
+- > Nicholas Krämer, Nathanael Bosch, Jonathan Schmidt & Philipp Hennig (2022). Probabilistic ODE solutions in millions of dimensions.  In ICML 2022, 11634–11649. PMLR. 
 
     **Key insights:** Every time Probdiffeq uses state-space model factorisations, it follows the recommendations in this work. 
 
 #### Adaptive step-size selection (and calibration)
   
-- Michael Schober, Simo Särkkä & Philipp Hennig (2019). A probabilistic model for the numerical solution of initial value problems. Statistics and Computing, 29(1), 99–122.  
+- > Michael Schober, Simo Särkkä & Philipp Hennig (2019). A probabilistic model for the numerical solution of initial value problems. Statistics and Computing, 29(1), 99–122.  
 
     **Key insights:** This work is the first on calibration and adaptive step-size selection in state-space-model-based ODE solvers.
   
-- Nathanael Bosch, Philipp Hennig & Filip Tronarp (2021). Calibrated adaptive probabilistic ODE solvers. In AISTATS 2021, 3466–3474. PMLR.  
+- > Nathanael Bosch, Philipp Hennig & Filip Tronarp (2021). Calibrated adaptive probabilistic ODE solvers. In AISTATS 2021, 3466–3474. PMLR.  
 
     **Key insights:** This work describes calibration and adaptive step-size selection as we use it now.
 
-- Nicholas Krämer, Nathanael Bosch, Jonathan Schmidt & Philipp Hennig (2022). Probabilistic ODE solutions in millions of dimensions.  In ICML 2022, 11634–11649. PMLR. 
+- > Nicholas Krämer, Nathanael Bosch, Jonathan Schmidt & Philipp Hennig (2022). Probabilistic ODE solutions in millions of dimensions.  In ICML 2022, 11634–11649. PMLR. 
 
     **Key insights:** This work is a small extension of Bosch et al. (2021)'s calibration and error estimates to factorised state-space models. 
 
-- Nicholas Krämer (2025). Adaptive Probabilistic ODE Solvers Without Adaptive Memory Requirements. In Kanagawa, M., Cockayne, J., Gessner, A., & Hennig, P. (Eds.), Proceedings of the First International Conference on Probabilistic Numerics, 12–24. PMLR. 
+- > Nicholas Krämer (2025). Adaptive Probabilistic ODE Solvers Without Adaptive Memory Requirements. In Kanagawa, M., Cockayne, J., Gessner, A., & Hennig, P. (Eds.), Proceedings of the First International Conference on Probabilistic Numerics, 12–24. PMLR. 
 
     **Key insights:** Adaptive time-stepping with fixed-point smoothers makes memory requirements constant. Probdiffeq's time-stepping loop implements this paper.
   
 #### Constraints, linearisation, and information operators
 
-- Tronarp, Filip, et al. "Probabilistic solutions to ordinary differential equations as nonlinear Bayesian filtering: a new perspective." Statistics and Computing 29.6 (2019): 1297-1315. 
+- > Tronarp, Filip, et al. "Probabilistic solutions to ordinary differential equations as nonlinear Bayesian filtering: a new perspective." Statistics and Computing 29.6 (2019): 1297-1315. 
 
     **Key insight:** As one of the foundational works on probabilistic solvers, it links ODE solvers to zeroth- and first-order linearisation in Gaussian filters.
 
 
-- Bosch, Nathanael, Filip Tronarp, and Philipp Hennig. "Pick-and-mix information operators for probabilistic ODE solvers." International Conference on Artificial Intelligence and Statistics. PMLR, 2022. 
+- > Bosch, Nathanael, Filip Tronarp, and Philipp Hennig. "Pick-and-mix information operators for probabilistic ODE solvers." International Conference on Artificial Intelligence and Statistics. PMLR, 2022. 
 
     **Key insights:** Encode, e.g. second-order dynamics, Hamiltonian preservation, or implicit differential equations directly in the constraints without transforming the problem into a first-order explicit ODE.
 
 
 #### Parameter estimation
 
-- Kersting, H., Krämer, N., Schiegg, M., Daniel, C., Tiemann, M., & Hennig, P. (2020, November). Differentiable likelihoods for fast inversion of `likelihood-free` dynamical systems. In International Conference on Machine Learning (pp. 5198-5208). PMLR. 
+- > Kersting, H., Krämer, N., Schiegg, M., Daniel, C., Tiemann, M., & Hennig, P. (2020, November). Differentiable likelihoods for fast inversion of `likelihood-free` dynamical systems. In International Conference on Machine Learning (pp. 5198-5208). PMLR. 
 
     **Key insight:** The first work on using the likelihood of observational data under a posterior distribution given by the probabilistic ODE solution. 
 
-- Tronarp, Filip, Nathanael Bosch, and Philipp Hennig. "Fenrir: Physics-enhanced regression for initial value problems." International Conference on Machine Learning. PMLR, 2022. 
+- > Tronarp, Filip, Nathanael Bosch, and Philipp Hennig. "Fenrir: Physics-enhanced regression for initial value problems." International Conference on Machine Learning. PMLR, 2022. 
 
     **Key insight:** The formulation of the likelihood of the observational data as we use it now.
 
-- Beck, J., Bosch, N., Deistler, M., Kadhim, K. L., Macke, J. H., Hennig, P., & Berens, P. (2024, July). Diffusion Tempering Improves Parameter Estimation with Probabilistic Integrators for Ordinary Differential Equations. In International Conference on Machine Learning (pp. 3305-3326). PMLR. 
+- > Beck, J., Bosch, N., Deistler, M., Kadhim, K. L., Macke, J. H., Hennig, P., & Berens, P. (2024, July). Diffusion Tempering Improves Parameter Estimation with Probabilistic Integrators for Ordinary Differential Equations. In International Conference on Machine Learning (pp. 3305-3326). PMLR. 
 
     **Key insight:** An improved algorithm for parameter estimation using the above likelihood formulation based on diffusion tempering (see the tutorial).
 
 
 #### Prior distributions
 
-- Schober, M., Duvenaud, D., & Hennig, P. (2014). Probabilistic ODE solvers with Runge-Kutta means. Advances in neural information processing systems, 27. 
+- > Schober, M., Duvenaud, D., & Hennig, P. (2014). Probabilistic ODE solvers with Runge-Kutta means. Advances in neural information processing systems, 27. 
 
     **Key insights:** Use Gauss--Markov processes, specifically, high-order integrated Wiener processes, to replicate the efficiency of non-probabilistic ODE solvers. 
 
-- Kersting, H., Sullivan, T. J., & Hennig, P. (2020). Convergence rates of Gaussian ODE filters. Statistics and computing, 30(6), 1791-1816. 
+- > Kersting, H., Sullivan, T. J., & Hennig, P. (2020). Convergence rates of Gaussian ODE filters. Statistics and computing, 30(6), 1791-1816. 
 
     **Key insights:** One of the first works that mentions integrated Ornstein-Uhlenbeck priors in the context of ODE solvers.
 
-- Bosch, Nathanael, Philipp Hennig, and Filip Tronarp. "Probabilistic exponential integrators." Advances in Neural Information Processing Systems 36 (2023): 40450-40467. 
+- > Bosch, Nathanael, Philipp Hennig, and Filip Tronarp. "Probabilistic exponential integrators." Advances in Neural Information Processing Systems 36 (2023): 40450-40467. 
 
     **Key insights:** Replicate the behaviour of exponential integrators by choosing priors different to integrated Wiener processes.
 
