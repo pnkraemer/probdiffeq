@@ -92,13 +92,15 @@ class AbstractPrototype(abc.ABC):
         raise NotImplementedError
 
 
-class AbstractLinearization:
+class AbstractLinearization(abc.ABC):
     """Interface for linearizations."""
 
+    @abc.abstractmethod
     def init_linearization(self):
         """Initialize a linearization."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def linearize(self, rv, state: None, *, damp: float, t):
         """Evaluate a linearization."""
         raise NotImplementedError
@@ -145,49 +147,41 @@ class AbstractLinearizationFactory(abc.ABC):
         """Construct an implementation of 1st-order Taylor-linearization for ODEs."""
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def ode_statistical_1st(
-        self, vf, *, cubature_fun: Callable
-    ) -> AbstractLinearizationOde:
-        """Construct an implementation of 1st-order SLR for ODEs."""
-        raise NotImplementedError
 
-    @abc.abstractmethod
-    def ode_statistical_0th(
-        self, vf, *, cubature_fun: Callable
-    ) -> AbstractLinearizationOde:
-        """Construct an implementation of 0th-order SLR for ODEs."""
-        raise NotImplementedError
-
-
-class AbstractTreeNormal:
+class AbstractTreeNormal(abc.ABC):
     """Interface for pytree-valued normal distributions."""
 
     def __init__(self, mean) -> None:
         self.mean = mean
 
+    @abc.abstractmethod
     def evaluate_mean(self):
         """Evaluate the mean."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def evaluate_std(self):
         """Evaluate the standard deviation."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def rescale_cholesky(self, factor, /):
         """Rescale the Cholesky factor of a normal distribution."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def sample(self, key):
         """Sample from a normal distribution."""
         raise NotImplementedError
 
     @classmethod
+    @abc.abstractmethod
     def from_mean_and_std(cls, mean, std):
         """Construct a normal distribution from mean and standard deviation."""
         raise NotImplementedError
 
     @classmethod
+    @abc.abstractmethod
     def from_dirac(cls, mean, *, damp):
         """Construct a normal distribution from a Dirac distribution."""
         raise NotImplementedError
@@ -492,24 +486,6 @@ class DenseLinearizationFactory(AbstractLinearizationFactory):
             ode_shape=self.ode_shape,
             unravel=self.unravel,
             jacobian=jacobian,
-        )
-
-    def ode_statistical_1st(self, vf, *, cubature_fun):
-        cubature_rule = cubature_fun(input_shape=self.ode_shape)
-        return DenseLinearizationOdeSlr1(
-            vf,
-            cubature_rule=cubature_rule,
-            ode_shape=self.ode_shape,
-            unravel=self.unravel,
-        )
-
-    def ode_statistical_0th(self, vf, *, cubature_fun):
-        cubature_rule = cubature_fun(input_shape=self.ode_shape)
-        return DenseLinearizationOdeSlr0(
-            vf,
-            cubature_rule=cubature_rule,
-            ode_shape=self.ode_shape,
-            unravel=self.unravel,
         )
 
 
@@ -856,161 +832,6 @@ class DenseLinearizationRootTs1(AbstractLinearizationRoot):
         return cond, state
 
 
-class DenseLinearizationOdeSlr0(AbstractLinearizationOde):
-    """Construct a dense implementation of ODE-SLR0 linearization."""
-
-    def __init__(self, vf, *, cubature_rule, ode_shape, unravel) -> None:
-        # No higher order ODEs supported for any SLR,
-        # not even in dense models
-        super().__init__(vf, ode_order=1)
-
-        self.cubature_rule = cubature_rule
-        self.ode_shape = ode_shape
-        self.unravel = unravel
-
-    def init_linearization(self) -> None:
-        return None
-
-    def linearize(self, rv, state: None, *, damp: float, t):
-        del state
-        fun = func.partial(self.vector_field, t=t)
-
-        def select_0(s):
-            return tree.ravel_pytree(self.unravel(s)[0])
-
-        m0, unravel = select_0(rv.mean)
-
-        extract_ = func.vmap(lambda s: select_0(s)[0], in_axes=1, out_axes=1)
-        r_0_nonsquare = extract_(rv.cholesky)
-
-        # Extract the linearisation point
-        r_0_square = cholesky_util.triu_via_qr(r_0_nonsquare.T)
-        linearisation_pt = DenseNormal(m0, r_0_square.T, unravel=unravel)
-
-        def vf_flat(u):
-            return tree.ravel_pytree(fun(unravel(u)))[0]
-
-        # linearize
-        noise = self.slr0(vf_flat, linearisation_pt)
-        mean, cov_lower = noise.mean, noise.cholesky
-
-        # Include the damping term. (TODO: use a single qr?)
-        damping = damp * np.eye(len(cov_lower))
-        stack = np.concatenate((cov_lower.T, damping.T))
-        cov_lower = cholesky_util.triu_via_qr(stack).T
-
-        def select_1(s):
-            return tree.ravel_pytree(self.unravel(s)[1])
-
-        linop = func.jacrev(lambda s: select_1(s)[0])(rv.mean)
-        bias = DenseNormal(-mean, cov_lower, unravel=unravel)
-        to_latent = np.ones(linop.shape[1])
-        to_observed = np.ones(linop.shape[0])
-        cond = LatentCond(linop, bias, to_latent=to_latent, to_observed=to_observed)
-        return cond, None
-
-    def slr0(self, fn, x):
-        """Linearize a function with zeroth-order statistical linear regression.
-
-        !!! warning "Warning: highly EXPERIMENTAL feature!"
-            This feature is highly experimental.
-            There is no guarantee that it works correctly.
-            It might be deleted tomorrow
-            and without any deprecation policy.
-
-        """
-        # Create sigma-points
-        pts_centered = self.cubature_rule.points @ x.cholesky.T
-        pts = x.mean[None, :] + pts_centered
-
-        # Evaluate the nonlinear function
-        fx = func.vmap(fn)(pts)
-        fx_mean = self.cubature_rule.weights_sqrtm**2 @ fx
-        fx_centered = fx - fx_mean[None, :]
-        fx_centered_normed = fx_centered * self.cubature_rule.weights_sqrtm[:, None]
-
-        cov_sqrtm = cholesky_util.triu_via_qr(fx_centered_normed)
-
-        return DenseNormal(fx_mean, cov_sqrtm.T, unravel=x.unravel)
-
-
-class DenseLinearizationOdeSlr1(AbstractLinearizationOde):
-    """Construct a dense implementation of ODE-SLR1 linearization."""
-
-    def __init__(self, vf, *, cubature_rule, ode_shape, unravel) -> None:
-        super().__init__(vf, ode_order=1)
-
-        self.cubature_rule = cubature_rule
-        self.ode_shape = ode_shape
-        self.unravel = unravel
-
-    def init_linearization(self) -> None:
-        return None
-
-    def linearize(self, rv, state: None, *, damp: float, t):
-        del state
-        fun = func.partial(self.vector_field, t=t)
-
-        # TODO: Implement a DenseRootSlr1
-        def select_0(s):
-            return tree.ravel_pytree(self.unravel(s)[0])
-
-        def select_1(s):
-            return tree.ravel_pytree(self.unravel(s)[1])
-
-        m0, unravel = select_0(rv.mean)
-
-        extract_ = func.vmap(lambda s: select_0(s)[0], in_axes=1, out_axes=1)
-        r_0_nonsquare = extract_(rv.cholesky)
-
-        # Extract the linearisation point
-        r_0_square = cholesky_util.triu_via_qr(r_0_nonsquare.T)
-        linearisation_pt = DenseNormal(m0, r_0_square.T, unravel=unravel)
-
-        def vf_flat(u):
-            return tree.ravel_pytree(fun(unravel(u)))[0]
-
-        # Gather the variables and return
-        J, noise = self.slr1(vf_flat, linearisation_pt)
-        mean, cov_lower = noise.mean, noise.cholesky
-
-        def A(x):
-            return select_1(x)[0] - J @ select_0(x)[0]
-
-        linop = func.jacrev(A)(rv.mean)
-
-        # Include the damping term. (TODO: use a single qr?)
-        damping = damp * np.eye(len(cov_lower))
-        stack = np.concatenate((cov_lower.T, damping.T))
-        cov_lower = cholesky_util.triu_via_qr(stack).T
-        bias = DenseNormal(-mean, cov_lower, unravel=unravel)
-        to_latent = np.ones(linop.shape[1])
-        to_observed = np.ones(linop.shape[0])
-        cond = LatentCond(linop, bias, to_latent=to_latent, to_observed=to_observed)
-        return cond, None
-
-    def slr1(self, fn, x):
-        """Linearize a function with first-order statistical linear regression."""
-        # Create sigma-points
-        pts_centered = self.cubature_rule.points @ x.cholesky.T
-        pts = x.mean[None, :] + pts_centered
-        pts_centered_normed = pts_centered * self.cubature_rule.weights_sqrtm[:, None]
-
-        # Evaluate the nonlinear function
-        fx = func.vmap(fn)(pts)
-        fx_mean = self.cubature_rule.weights_sqrtm**2 @ fx
-        fx_centered = fx - fx_mean[None, :]
-        fx_centered_normed = fx_centered * self.cubature_rule.weights_sqrtm[:, None]
-
-        # Compute statistical linear regression matrices
-        _, (cov_sqrtm_cond, linop_cond) = cholesky_util.revert_conditional_noisefree(
-            R_X_F=pts_centered_normed, R_X=fx_centered_normed
-        )
-        mean_cond = fx_mean - linop_cond @ x.mean
-        rv_cond = DenseNormal(mean_cond, cov_sqrtm_cond.T, unravel=x.unravel)
-        return linop_cond, rv_cond
-
-
 class IsotropicLinearizationOdeTs0(AbstractLinearizationOde):
     """Construct an isotropic implementation of ODE-TS0 linearization."""
 
@@ -1180,12 +1001,6 @@ class IsotropicLinearizationFactory(AbstractLinearizationFactory):
             vf, ode_order=ode_order, unravel=self.unravel
         )
 
-    def ode_statistical_0th(self, vf, *, cubature_fun):
-        raise NotImplementedError
-
-    def ode_statistical_1st(self, vf, *, cubature_fun):
-        raise NotImplementedError
-
 
 class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
     """Construct a block-diagonal linearization-factory."""
@@ -1207,12 +1022,6 @@ class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
         return BlockDiagLinearizationOdeTs1(
             vf, ode_order=ode_order, unravel=self.unravel, jacobian=jacobian
         )
-
-    def ode_statistical_0th(self, vf, *, cubature_fun):
-        raise NotImplementedError
-
-    def ode_statistical_1st(self, vf, *, cubature_fun):
-        raise NotImplementedError
 
 
 class IsotropicConditional(AbstractConditional):

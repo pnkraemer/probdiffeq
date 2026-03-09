@@ -4,48 +4,6 @@ from probdiffeq import probdiffeq
 from probdiffeq.backend import func, linalg, np, random, testing, tree
 
 
-def test_exponential_prior_matches_matern32():
-    u = np.ones((4,))
-    tcoeffs = [u, u]
-
-    ell = 0.3456
-
-    def vf_exponential(u, du):
-        return -(ell**2) * u - 2 * ell * du
-
-    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
-    exponential = probdiffeq.prior_exponential(vf_exponential, ssm=ssm)
-
-    matern = probdiffeq.prior_matern(ell, ssm=ssm)
-
-    scale = 12.3456
-    dt = 0.123456
-    cond1 = func.jit(exponential)(dt, scale)
-    cond2 = func.jit(matern)(dt, scale)
-    assert testing.allclose(cond1, cond2)
-
-
-def test_exponential_prior_matches_matern52():
-    u = np.ones((4,))
-    tcoeffs = [u, u, u]
-
-    ell = 0.3456
-
-    def vf_exponential(u, du, ddu):
-        return -(ell**3) * u - 3 * ell**2 * du - 3 * ell * ddu
-
-    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
-    exponential = probdiffeq.prior_exponential(vf_exponential, ssm=ssm)
-
-    matern = probdiffeq.prior_matern(ell, ssm=ssm)
-
-    scale = 12.3456
-    dt = 0.123456
-    cond1 = func.jit(exponential)(dt, scale)
-    cond2 = func.jit(matern)(dt, scale)
-    assert testing.allclose(cond1, cond2)
-
-
 def test_exponential_prior_matches_ioup():
     u = np.ones((4,))
     M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
@@ -64,32 +22,6 @@ def test_exponential_prior_matches_ioup():
     exponential = probdiffeq.prior_exponential(vf_exponential, ssm=ssm)
 
     ioup = probdiffeq.prior_ornstein_uhlenbeck_integrated(linop_ioup, ssm=ssm)
-
-    scale = 12.3456
-    dt = 0.123456
-    cond1 = func.jit(exponential)(dt, scale)
-    cond2 = func.jit(ioup)(dt, scale)
-    assert testing.allclose(cond1, cond2)
-
-
-def test_exponential_prior_matches_oscillator():
-    u = np.ones((4,))
-    M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
-    tcoeffs = [u, u, u, u]
-
-    def vf_exponential(u, du, ddu, dddu):
-        del u
-        del du
-        del dddu
-        return linop_ioup(ddu)
-
-    def linop_ioup(x):
-        return M @ x
-
-    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
-    exponential = probdiffeq.prior_exponential(vf_exponential, ssm=ssm)
-
-    ioup = probdiffeq.prior_oscillator(linop_ioup, ssm=ssm)
 
     scale = 12.3456
     dt = 0.123456

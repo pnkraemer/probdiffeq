@@ -4,21 +4,10 @@ See the tutorials for example use cases.
 """
 
 from probdiffeq import ssm_impl, taylor
-from probdiffeq.backend import (
-    flow,
-    func,
-    inspect,
-    linalg,
-    np,
-    random,
-    special,
-    structs,
-    tree,
-)
+from probdiffeq.backend import flow, func, inspect, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import (
     Any,
     Array,
-    ArrayLike,
     Callable,
     Generic,
     Literal,
@@ -38,129 +27,6 @@ N = TypeVar("N", bound=ssm_impl.AbstractTreeNormal)
 
 Used to type marginals, for example.
 """
-
-
-@tree.register_dataclass
-@structs.dataclass
-class CubaturePositiveWeights:
-    """A datastructure for cubature rules that have positive weights.
-
-    Related:
-    [`cubature_gauss_hermite`](#probdiffeq.probdiffeq.cubature_gauss_hermite),
-    [`cubature_third_order_spherical`](#probdiffeq.probdiffeq.cubature_third_order_spherical),
-    [`cubature_unscented_transform`](#probdiffeq.probdiffeq.cubature_unscented_transform).
-
-    """
-
-    points: ArrayLike
-    """Cubature points."""
-
-    weights_sqrtm: ArrayLike
-    """Square roots of cubature weights."""
-
-
-def cubature_third_order_spherical(input_shape):
-    """Third-order spherical cubature integration.
-
-    Related:
-    [`CubaturePositiveWeights`](#probdiffeq.probdiffeq.CubaturePositiveWeights).
-
-    """
-    assert len(input_shape) <= 1
-    if len(input_shape) == 1:
-        (d,) = input_shape
-        points_mat, weights_sqrtm = _third_order_spherical_params(d=d)
-        return CubaturePositiveWeights(points=points_mat, weights_sqrtm=weights_sqrtm)
-
-    # If input_shape == (), compute weights via input_shape=(1,)
-    # and 'squeeze' the points.
-    points_mat, weights_sqrtm = _third_order_spherical_params(d=1)
-    (S, _) = points_mat.shape
-    points = np.reshape(points_mat, (S,))
-    return CubaturePositiveWeights(points=points, weights_sqrtm=weights_sqrtm)
-
-
-def _third_order_spherical_params(*, d):
-    eye_d = np.eye(d) * np.sqrt(d)
-    pts = np.concatenate((eye_d, -1 * eye_d))
-    weights_sqrtm = np.ones((2 * d,)) / np.sqrt(2.0 * d)
-    return pts, weights_sqrtm
-
-
-def cubature_unscented_transform(input_shape, r=1.0):
-    """Unscented transform.
-
-    Related:
-    [`CubaturePositiveWeights`](#probdiffeq.probdiffeq.CubaturePositiveWeights).
-
-    """
-    assert len(input_shape) <= 1
-    if len(input_shape) == 1:
-        (d,) = input_shape
-        points_mat, weights_sqrtm = _unscented_transform_params(d=d, r=r)
-        return CubaturePositiveWeights(points=points_mat, weights_sqrtm=weights_sqrtm)
-
-    # If input_shape == (), compute weights via input_shape=(1,)
-    # and 'squeeze' the points.
-    points_mat, weights_sqrtm = _unscented_transform_params(d=1, r=r)
-    (S, _) = points_mat.shape
-    points = np.reshape(points_mat, (S,))
-    return CubaturePositiveWeights(points=points, weights_sqrtm=weights_sqrtm)
-
-
-def _unscented_transform_params(d, *, r):
-    eye_d = np.eye(d) * np.sqrt(d + r)
-    zeros = np.zeros((1, d))
-    pts = np.concatenate((eye_d, zeros, -1 * eye_d))
-    _scale = d + r
-    weights_sqrtm1 = np.ones((d,)) / np.sqrt(2.0 * _scale)
-    weights_sqrtm2 = np.sqrt(r / _scale)
-    weights_sqrtm = np.hstack((weights_sqrtm1, weights_sqrtm2, weights_sqrtm1))
-    return pts, weights_sqrtm
-
-
-def cubature_gauss_hermite(input_shape, degree=5):
-    """(Statistician's) Gauss-Hermite cubature.
-
-    The number of cubature points is `prod(input_shape)**degree`.
-
-    Related:
-    [`CubaturePositiveWeights`](#probdiffeq.probdiffeq.CubaturePositiveWeights).
-
-    """
-    assert len(input_shape) == 1
-    (dim,) = input_shape
-
-    # Roots of the probabilist/statistician's Hermite polynomials (in Numpy...)
-    _roots = special.roots_hermitenorm(n=degree, mu=True)
-    pts, weights, sum_of_weights = _roots
-    weights = weights / sum_of_weights
-
-    # Transform into jax arrays and take square root of weights
-    pts = np.asarray(pts)
-    weights_sqrtm = np.sqrt(np.asarray(weights))
-
-    # Build a tensor grid and return class
-    tensor_pts = _tensor_points(pts, d=dim)
-    tensor_weights_sqrtm = _tensor_weights(weights_sqrtm, d=dim)
-    return CubaturePositiveWeights(
-        points=tensor_pts, weights_sqrtm=tensor_weights_sqrtm
-    )
-
-
-# TODO: how does this generalise to an input_shape instead of an input_dimension?
-#  via tree_map(lambda s: _tensor_points(x, s), input_shape)?
-
-
-def _tensor_weights(*args, **kwargs):
-    mesh = _tensor_points(*args, **kwargs)
-    return np.prod_along_axis(mesh, axis=1)
-
-
-def _tensor_points(x, /, *, d):
-    x_mesh = np.meshgrid(*([x] * d))
-    y_mesh = tree.tree_map(lambda s: np.reshape(s, (-1,)), x_mesh)
-    return np.stack(y_mesh).T
 
 
 class JacobianHandler:
@@ -403,8 +269,6 @@ class Constraint(Protocol):
     Related:
     [`constraint_ode_ts0`](#probdiffeq.probdiffeq.constraint_ode_ts0),
     [`constraint_ode_ts1`](#probdiffeq.probdiffeq.constraint_ode_ts1),
-    [`constraint_ode_slr0`](#probdiffeq.probdiffeq.constraint_ode_slr0),
-    [`constraint_ode_slr1`](#probdiffeq.probdiffeq.constraint_ode_slr1).
     """
 
     init_linearization: Callable
@@ -502,8 +366,6 @@ def constraint_dae_jet(
 
         return [primals1, *series1, primals2, *series2]
 
-    # TODO: once we have a second root constraint (eg slr1),
-    #       offer the below as a function argument.
     return ssm.linearize.root_taylor_1st(
         root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian, nlstsq=nlstsq
     )
@@ -526,50 +388,9 @@ def constraint_ode_ts1(
     """
     ode_order = _verify_vector_field_signature_and_parse_order(vf)
     if jacobian is None:
-        # Use hutchinson Jacobian handling for backward compatibility.
+        # Use Hutchinson-Jacobian handling for backward compatibility.
         jacobian = jacobian_hutchinson_fwd()
     return ssm.linearize.ode_taylor_1st(vf, ode_order=ode_order, jacobian=jacobian)
-
-
-def constraint_ode_slr0(
-    vf, /, *, ssm: ssm_impl.FactSsmImpl, cubature_fun=cubature_third_order_spherical
-):
-    """Create an ODE constraint with zeroth-order statistical linear regression.
-
-    Related:
-    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
-
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This function is highly experimental and not safe to use.
-        There is no guarantee that it works correctly (or at all).
-        It might be deleted tomorrow and without any deprecation policy.
-
-    """
-    ode_order = _verify_vector_field_signature_and_parse_order(vf)
-    if ode_order > 1:
-        msg = "SLR0 constraints cannot handle higher-order ODEs as of now."
-        msg += " However, ode_order={ode_order} has been detected."
-        msg += " Try a Taylor-series-based constraint instead."
-        raise ValueError(msg)
-    return ssm.linearize.ode_statistical_0th(vf, cubature_fun=cubature_fun)
-
-
-def constraint_ode_slr1(
-    vf, *, ssm: ssm_impl.FactSsmImpl, cubature_fun=cubature_third_order_spherical
-):
-    """Create an ODE constraint with first-order statistical linear regression.
-
-    Related:
-    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
-
-    """
-    ode_order = _verify_vector_field_signature_and_parse_order(vf)
-    if ode_order > 1:
-        msg = "SLR1 constraints cannot handle higher-order ODEs as of now."
-        msg += " However, ode_order={ode_order} has been detected."
-        msg += " Try a Taylor-series-based constraint instead."
-        raise ValueError(msg)
-    return ssm.linearize.ode_statistical_1st(vf, cubature_fun=cubature_fun)
 
 
 def _verify_vector_field_signature_and_parse_order(vf) -> int:
@@ -1293,20 +1114,6 @@ def prior_wiener_integrated(
     return ssm.conditional.transition_wiener_integrated(base_scale=output_scale)
 
 
-def prior_oscillator(
-    linop: Callable, /, *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
-):
-    """Construct an oscillating prior."""
-
-    def vf_linear(*tcoeffs):
-        assert len(tcoeffs) > 1
-        return linop(tcoeffs[-2])
-
-    return ssm.conditional.transition_exponential(
-        vf_linear=vf_linear, base_scale=output_scale
-    )
-
-
 def prior_ornstein_uhlenbeck_integrated(
     linop: Callable, /, *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
 ):
@@ -1314,28 +1121,6 @@ def prior_ornstein_uhlenbeck_integrated(
 
     def vf_linear(*tcoeffs):
         return linop(tcoeffs[-1])
-
-    return ssm.conditional.transition_exponential(
-        vf_linear=vf_linear, base_scale=output_scale
-    )
-
-
-def prior_matern(
-    lengthscale: Array,
-    /,
-    *,
-    ssm: ssm_impl.FactSsmImpl,
-    output_scale: Array | None = None,
-):
-    """Construct a Matern prior."""
-
-    def vf_linear(*tcoeffs):
-        D = len(tcoeffs)
-        coeffs = [np.binomial_coeff(D, i) for i in range(D)]
-        output = 0.0
-        for c, n, u in zip(coeffs, range(D, -1, -1), tcoeffs):
-            output -= c * lengthscale**n * u
-        return output
 
     return ssm.conditional.transition_exponential(
         vf_linear=vf_linear, base_scale=output_scale
