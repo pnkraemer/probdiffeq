@@ -35,4 +35,4 @@ doc-serve:
 	JUPYTER_PLATFORM_DIRS=1 mkdocs serve
 
 find-dead-code:
-	vulture . --ignore-names case*,fixture*,*jvp --exclude probdiffeq/_version.py
+	vulture . --ignore-names case*,fixture*,*jvp --exclude probdiffeq/_version.py,build/**/*.py

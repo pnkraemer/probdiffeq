@@ -140,32 +140,6 @@ def case_factory_constraint_root_ts1(ivp):
 
 
 @testing.case
-def case_factory_constraint_ode_slr0():
-    def constraint(*args, **kwargs):
-        try:
-            return probdiffeq.constraint_ode_slr0(*args, **kwargs)
-        except NotImplementedError:
-            reason = "This linearisation is not implemented"
-            reason += ", likely due to the selected state-space factorisation."
-            testing.skip(reason)
-
-    return Factory(constraint=constraint)
-
-
-@testing.case
-def case_factory_constraint_ode_slr1():
-    def constraint(*args, **kwargs):
-        try:
-            return probdiffeq.constraint_ode_slr1(*args, **kwargs)
-        except NotImplementedError:
-            reason = "This linearisation is not implemented"
-            reason += ", likely due to the selected state-space factorisation."
-            testing.skip(reason)
-
-    return Factory(constraint=constraint)
-
-
-@testing.case
 def case_factory_error_state_std_cached():
     error = func.partial(probdiffeq.error_state_std, re_linearize_before_error=True)
     return Factory(error=error)

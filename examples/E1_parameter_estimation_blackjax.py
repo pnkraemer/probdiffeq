@@ -160,7 +160,7 @@ def solve_adaptive(vf, *, solver, error, save_at):
         tcoeffs = taylor.odejet_padded_scan(
             lambda y: vf(y, t=save_at[0]), (theta,), num=2
         )
-        init, __ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
+        init, _ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
         solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
         return solve(init, save_at=save_at, dt0=0.1, atol=1e-4, rtol=1e-2)
 
