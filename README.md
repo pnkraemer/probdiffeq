@@ -38,7 +38,7 @@
 
 
 
-**Related projects:**
+**Acknowledgements:**
 
 - [Tornadox](https://github.com/pnkraemer/tornadox): One of Probdiffeq's precursors.
 - [ProbNumDiffEq.jl](https://nathanaelbosch.github.io/ProbNumDiffEq.jl/stable/): A similar library in Julia

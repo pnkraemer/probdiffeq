@@ -320,6 +320,35 @@ def constraint_root_ts1(
     )
 
 
+def constraint_root_jet(root, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlstsq=None):
+    """Construct a Jet-based linearization/constraint for a root-constraint.
+
+    To use posterior linearisation, pass a `nlstsq` implementation.
+    """
+    root_order = _verify_vector_field_signature_and_parse_order(root)
+
+    if jacobian is None:
+        jacobian = jacobian_hutchinson_fwd()
+
+    def root_jet(*tcoeffs_all, t):
+        flat = [tree.ravel_pytree(s)[0] for s in tcoeffs_all]
+        unravel = tree.ravel_pytree(tcoeffs_all[0])[1]
+
+        # Flatten the root because jax.jet is a bit high maintenance :)
+        def jet_call(*y):
+            y_tree = [unravel(s) for s in y]
+            fx = root(*y_tree, t=t)
+            return tree.ravel_pytree(fx)[0]
+
+        ps, ss = taylor.jet_unpack_series(flat, root_order)
+        primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
+        return [primals, *series]
+
+    return ssm.linearize.root_taylor_1st(
+        root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian, nlstsq=nlstsq
+    )
+
+
 def constraint_dae_jet(
     differential, algebraic, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlstsq=None
 ):
@@ -327,11 +356,11 @@ def constraint_dae_jet(
 
     To use posterior linearisation, pass a `nlstsq` implementation.
     """
-    root_order = _verify_vector_field_signature_and_parse_order(differential)
-    assert root_order == 2
+    root_order_differential = _verify_vector_field_signature_and_parse_order(
+        differential
+    )
 
-    root_order2 = _verify_vector_field_signature_and_parse_order(algebraic)
-    assert root_order2 == 1
+    root_order_algebraic = _verify_vector_field_signature_and_parse_order(algebraic)
 
     if jacobian is None:
         jacobian = jacobian_hutchinson_fwd()
@@ -353,7 +382,7 @@ def constraint_dae_jet(
         #   Eg use a suitable power of dt + factorial?
         #   That might be a lot easier to optimise
 
-        ps, ss = taylor.jet_unpack_series(flat, 2)
+        ps, ss = taylor.jet_unpack_series(flat, root_order_differential)
         primals1, series1 = func.jet(jet_call_differential, ps, ss, is_tcoeff=False)
 
         def jet_call_algebraic(*y):
@@ -361,7 +390,7 @@ def constraint_dae_jet(
             fx = algebraic(*y_tree, t=t)
             return tree.ravel_pytree(fx)[0]
 
-        ps, ss = taylor.jet_unpack_series(flat, 1)
+        ps, ss = taylor.jet_unpack_series(flat, root_order_algebraic)
         primals2, series2 = func.jet(jet_call_algebraic, ps, ss, is_tcoeff=False)
 
         return [primals1, *series1, primals2, *series2]
@@ -764,11 +793,13 @@ class ProbabilisticSolver:
         prior: Callable,
         constraint: Constraint,
         ssm: ssm_impl.FactSsmImpl,
+        constraint_init: Constraint | None,
     ) -> None:
         self.ssm = ssm
         self.strategy = strategy
         self.prior = prior
         self.constraint = constraint
+        self.constraint_init = constraint_init
 
     @property
     def error_contraction_rate(self):
@@ -1647,9 +1678,16 @@ class solver_mle(ProbabilisticSolver):
         prior: Callable,
         ssm: ssm_impl.FactSsmImpl,
         strategy: MarkovStrategy,
+        constraint_init: Constraint | None = None,
         correct_asymptotic_underconfidence: bool = True,
     ) -> None:
-        super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
+        super().__init__(
+            strategy=strategy,
+            ssm=ssm,
+            prior=prior,
+            constraint=constraint,
+            constraint_init=constraint_init,
+        )
         self.correct_asymptotic_underconfidence = correct_asymptotic_underconfidence
 
     def init(self, t, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
@@ -1663,10 +1701,25 @@ class solver_mle(ProbabilisticSolver):
         fx, _cstate = func.eval_shape(lin_fun, u_pred.marginals, cstate)
         fx = tree.tree_map(np.zeros_like, fx)
 
-        u = u_pred
-        posterior = prediction
-        output_scale_running = np.zeros_like(output_scale_prior)
-        auxiliary = (cstate, output_scale_running, 0)
+        if self.constraint_init is not None:
+            cstate_init = self.constraint_init.init_linearization()
+            fx_init, _cstate = self.constraint_init.linearize(
+                u_pred.marginals, cstate_init, damp=damp, t=t
+            )
+            observed, reverted = self.ssm.conditional.revert(u_pred.marginals, fx_init)
+            u, posterior = self.strategy.apply_updates(
+                prediction, updates=reverted.noise
+            )
+            output_scale_running = observed.mahalanobis_norm_relative(0.0)
+            num_data = 1.0
+
+        else:
+            u, posterior = u_pred, prediction
+
+            output_scale_running = np.zeros_like(output_scale_prior)
+            num_data = 0.0
+
+        auxiliary = (cstate, output_scale_running, num_data)
 
         return ProbabilisticSolution(
             t=t,
@@ -1771,9 +1824,16 @@ class solver_dynamic(ProbabilisticSolver):
         prior: Callable,
         constraint: Constraint,
         ssm: ssm_impl.FactSsmImpl,
+        constraint_init: Constraint | None = None,
         re_linearize_after_calibration=False,
     ) -> None:
-        super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
+        super().__init__(
+            strategy=strategy,
+            ssm=ssm,
+            prior=prior,
+            constraint=constraint,
+            constraint_init=constraint_init,
+        )
         self.re_linearize_after_calibration = re_linearize_after_calibration
 
     def init(self, t, u, *, damp) -> ProbabilisticSolution:
@@ -1781,15 +1841,21 @@ class solver_dynamic(ProbabilisticSolver):
         lin_state = self.constraint.init_linearization()
 
         output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
-
         lin_fun = func.partial(self.constraint.linearize, damp=damp, t=t)
         fx, _lin_state = func.eval_shape(lin_fun, u_pred.marginals, lin_state)
         fx = tree.tree_map(np.zeros_like, fx)
 
-        u = u_pred
-        posterior = prediction
-
-        posterior = prediction
+        if self.constraint_init is not None:
+            cstate_init = self.constraint_init.init_linearization()
+            fx_init, _cstate = self.constraint_init.linearize(
+                u_pred.marginals, cstate_init, damp=damp, t=t
+            )
+            _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx_init)
+            u, posterior = self.strategy.apply_updates(
+                prediction, updates=reverted.noise
+            )
+        else:
+            u, posterior = u_pred, prediction
         return ProbabilisticSolution(
             t=t,
             u=u,
@@ -1898,16 +1964,32 @@ class solver(ProbabilisticSolver):
         prior: Callable,
         ssm: ssm_impl.FactSsmImpl,
         strategy: MarkovStrategy,
+        constraint_init: Constraint | None = None,
     ) -> None:
-        super().__init__(strategy=strategy, ssm=ssm, prior=prior, constraint=constraint)
+        super().__init__(
+            strategy=strategy,
+            ssm=ssm,
+            prior=prior,
+            constraint=constraint,
+            constraint_init=constraint_init,
+        )
 
     def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
         u_pred, prediction = self.strategy.init_posterior(u=u)
 
-        u, posterior = u_pred, prediction
+        if self.constraint_init is not None:
+            cstate_init = self.constraint_init.init_linearization()
+            fx_init, _cstate = self.constraint_init.linearize(
+                u_pred.marginals, cstate_init, damp=damp, t=t
+            )
+            _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx_init)
+            u, posterior = self.strategy.apply_updates(
+                prediction, updates=reverted.noise
+            )
+        else:
+            u, posterior = u_pred, prediction
 
         cstate = self.constraint.init_linearization()
-
         lin_fun = func.partial(self.constraint.linearize, damp=damp, t=t)
         fx, _cstate = func.eval_shape(lin_fun, u_pred.marginals, cstate)
         fx = tree.tree_map(np.zeros_like, fx)
