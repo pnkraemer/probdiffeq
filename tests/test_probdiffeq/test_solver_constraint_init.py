@@ -35,7 +35,7 @@ def test_output_matches_reference(ivp, solver) -> None:
 
     # Build a solver
     prior = probdiffeq.prior_wiener_integrated(ssm=ssm)
-    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
     constraint = probdiffeq.constraint_root_jet(root, ssm=ssm)
     solver = solver(
         strategy=strategy,
@@ -44,15 +44,14 @@ def test_output_matches_reference(ivp, solver) -> None:
         ssm=ssm,
         constraint_init=constraint,
     )
-    error = probdiffeq.error_state_std(prior=prior, ssm=ssm, constraint=constraint)
+    solve = ivpsolve.solve_fixed_grid(solver=solver)
 
     # Compute the PN solution
-    save_at = np.linspace(t0, t1, endpoint=True, num=7)
-    solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    received = func.jit(solve)(init, save_at=save_at, atol=1e-4, rtol=1e-4)
+    grid = np.linspace(t0, t1, endpoint=True, num=20)
+    received = func.jit(solve)(init, grid=grid)
 
     # Compute a reference solution
-    expected = ode.odeint_and_save_at(vf, (u0,), save_at=save_at, atol=1e-7, rtol=1e-7)
+    expected = ode.odeint_and_save_at(vf, (u0,), save_at=grid, atol=1e-7, rtol=1e-7)
 
     # The results should be very similar
     assert testing.allclose(received.u.mean[0], expected)
