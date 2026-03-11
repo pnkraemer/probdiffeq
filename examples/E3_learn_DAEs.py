@@ -87,16 +87,13 @@ def main(t0=1e-6, t1=1e5) -> None:
         (value, solution_guess), gradient = value_and_grad(
             y0_guess, std=std, output_scale=output_scale
         )
+        pbar.set_description(f"{(value):.3f}, {y0_guess**2 * output_scale}, {std}")
 
         updates, opt_state = optim.update(gradient, opt_state)
         y0_guess = optax.apply_updates(y0_guess, updates)
 
-        # # Gradient descent update, but normalise
-        # # the gradient to be relatively small
-        # update = stepsize * gradient / (nugget + gradient0)
-        pbar.set_description(f"{(value):.3f}, {y0_guess**2 * output_scale}, {std}")
-
-        # Square, normalise (to satisfy the algebraic constraint), and square-root
+        # Square, normalise (to satisfy the algebraic constraint),
+        # and go back to the square-root
         y0_guess_square = y0_guess**2 * output_scale
         y0_guess_square /= jnp.sum(y0_guess_square)
         y0_guess = jnp.sqrt(y0_guess_square / output_scale)
