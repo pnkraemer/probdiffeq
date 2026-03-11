@@ -441,8 +441,9 @@ def constraint_jet(
         primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
         return [primals, *series]
 
+    order = ssm.num_derivatives + 1 if jet_order == "max" else jet_order + root_order
     return ssm.linearize.root(
-        root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian, nlstsq=nlstsq
+        root_jet, root_order=order, jacobian=jacobian, nlstsq=nlstsq
     )
 
 
@@ -533,8 +534,14 @@ def constraint_jet_imex(
         primals1, series1 = func.jet(jet_call, ps, ss, is_tcoeff=False)
         return [primals1, *series1]
 
+    if jet_order_explicit == "max" or jet_order_implicit == "max":
+        order = ssm.num_derivatives + 1
+    else:
+        order_ex = root_order_ex + jet_order_explicit
+        order_im = root_order_im + jet_order_implicit
+        order = max(order_ex, order_im)
     return ssm.linearize.root(
-        root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian, nlstsq=nlstsq
+        root_jet, root_order=order, jacobian=jacobian, nlstsq=nlstsq
     )
 
 
@@ -618,8 +625,14 @@ def constraint_jet_dae(
         primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
         return [primals, *series]
 
+    if jet_order_differential == "max" or jet_order_algebraic == "max":
+        order = ssm.num_derivatives + 1
+    else:
+        order_diff = root_order_diff + jet_order_differential
+        order_alg = root_order_alg + jet_order_algebraic
+        order = max(order_diff, order_alg)
     return ssm.linearize.root(
-        root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian, nlstsq=nlstsq
+        root_jet, root_order=order, jacobian=jacobian, nlstsq=nlstsq
     )
 
 
