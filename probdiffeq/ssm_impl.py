@@ -131,7 +131,7 @@ class AbstractLinearizationFactory(abc.ABC):
     """Interface for linearization factories."""
 
     @abc.abstractmethod
-    def root_taylor_1st(
+    def root(
         self, root, *, jacobian, root_order: int, nlstsq: Callable | None
     ) -> AbstractLinearizationRoot:
         """Construct an implementation of 1st-order Taylor-linearization for roots."""
@@ -479,8 +479,8 @@ class DenseLinearizationFactory(AbstractLinearizationFactory):
         self.ode_shape = ode_shape
         self.unravel = unravel
 
-    def root_taylor_1st(self, root, *, jacobian, root_order: int, nlstsq: bool):
-        return DenseLinearizationRootTs1(
+    def root(self, root, *, jacobian, root_order: int, nlstsq: bool):
+        return DenseLinearizationRoot(
             root,
             unravel=self.unravel,
             jacobian=jacobian,
@@ -804,7 +804,7 @@ class DenseLinearizationOdeTs1(AbstractLinearizationOde):
         return cond, state
 
 
-class DenseLinearizationRootTs1(AbstractLinearizationRoot):
+class DenseLinearizationRoot(AbstractLinearizationRoot):
     """Construct a dense implementation of root-TS1 linearization."""
 
     def __init__(self, root, *, root_order, unravel, jacobian, nlstsq) -> None:
@@ -1024,9 +1024,7 @@ class IsotropicLinearizationFactory(AbstractLinearizationFactory):
     def __init__(self, unravel) -> None:
         self.unravel = unravel
 
-    def root_taylor_1st(
-        self, root, *, jacobian, root_order: int, nlstsq: Callable | None
-    ):
+    def root(self, root, *, jacobian, root_order: int, nlstsq: Callable | None):
         raise NotImplementedError
 
     def ode_taylor_1st(self, vf, *, ode_order, jacobian):
@@ -1046,9 +1044,7 @@ class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
     def __init__(self, unravel) -> None:
         self.unravel = unravel
 
-    def root_taylor_1st(
-        self, root, *, jacobian, root_order: int, nlstsq: Callable | None
-    ):
+    def root(self, root, *, jacobian, root_order: int, nlstsq: Callable | None):
         raise NotImplementedError
 
     def ode_taylor_0th(self, vf, *, ode_order):

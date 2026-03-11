@@ -51,7 +51,7 @@ def test_output_matches_reference(ivp, solver_factory, derivatives) -> None:
     nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=50, tol=1e-10)
     prior = probdiffeq.prior_wiener_integrated(ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
-    constraint = probdiffeq.constraint_root_jet(root, ssm=ssm, nlstsq=nlstsq)
+    constraint = probdiffeq.constraint_jet(root, ssm=ssm, nlstsq=nlstsq)
     solver = solver_factory(
         strategy=strategy,
         prior=prior,

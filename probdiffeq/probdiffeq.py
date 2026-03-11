@@ -311,7 +311,7 @@ def constraint_root_ts1(
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
-    # TODO: Delete this function in favour of constraint_root_jet(jet_order=root_order)
+    # TODO: Delete this function in favour of constraint_jet(jet_order=root_order)
 
     root_order = _verify_vector_field_signature_and_parse_order(root)
     if root_order == 1:
@@ -321,16 +321,12 @@ def constraint_root_ts1(
     if jacobian is None:
         # Use hutchinson Jacobian handling for backward compatibility.
         jacobian = jacobian_hutchinson_fwd()
-    return ssm.linearize.root_taylor_1st(
+    return ssm.linearize.root(
         root, root_order=root_order, jacobian=jacobian, nlstsq=nlstsq
     )
 
 
-# TODO: Rename all constraint_root_jet into constraint_jet because
-#       the "root" part is implied in the jet
-
-
-def constraint_root_jet(root, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlstsq=None):
+def constraint_jet(root, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlstsq=None):
     """Construct a constraint that implements Jet-linearization.
 
     To use posterior linearisation, pass a `nlstsq` implementation.
@@ -359,12 +355,12 @@ def constraint_root_jet(root, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlsts
         primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
         return [primals, *series]
 
-    return ssm.linearize.root_taylor_1st(
+    return ssm.linearize.root(
         root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian, nlstsq=nlstsq
     )
 
 
-def constraint_root_jet_imex(
+def constraint_jet_imex(
     *,
     implicit: Callable,
     explicit: Callable,
@@ -377,7 +373,7 @@ def constraint_root_jet_imex(
     #       Currently, we abuse the tests for constraint_init for checking this behaviour...
     jet_order=-1,
 ):
-    """Like `constraint_root_jet`, but for roots summing implicit and explicit terms.
+    """Like `constraint_jet`, but for roots summing implicit and explicit terms.
 
     Think of this as a generalisation of the EK0 to implicit differential equations.
     """
@@ -428,17 +424,15 @@ def constraint_root_jet_imex(
         primals1, series1 = func.jet(jet_call_implicit, ps, ss, is_tcoeff=False)
         return [primals1, *series1]
 
-    # TODO: rename this to ssm.linearize.root() because there is no more slr
-    #       and root_0th doesn't exist.
-    return ssm.linearize.root_taylor_1st(
+    return ssm.linearize.root(
         root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian, nlstsq=nlstsq
     )
 
 
-def constraint_root_jet_dae(
+def constraint_jet_dae(
     differential, algebraic, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlstsq=None
 ):
-    """Like `constraint_root_jet`, but for DAEs.
+    """Like `constraint_jet`, but for DAEs.
 
     The advantage of a dedicated DAE constraint is that algebraic and differential
     roots can enjoy different jet-orders, which increases accuracy.
@@ -477,7 +471,7 @@ def constraint_root_jet_dae(
 
         return [primals1, *series1, primals2, *series2]
 
-    return ssm.linearize.root_taylor_1st(
+    return ssm.linearize.root(
         root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian, nlstsq=nlstsq
     )
 

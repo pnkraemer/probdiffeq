@@ -188,7 +188,7 @@ def solver(differential, algebraic, tol, while_loop):
         prior = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=output_scale)
 
         # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
-        jet = probdiffeq.constraint_root_jet_dae(
+        jet = probdiffeq.constraint_jet_dae(
             differential, algebraic, ssm=ssm, nlstsq=nlstsq
         )
         strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)

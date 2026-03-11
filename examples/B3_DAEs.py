@@ -63,9 +63,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     ioup = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=base_scale)
 
     # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
-    jet = probdiffeq.constraint_root_jet_dae(
-        differential, algebraic, ssm=ssm, nlstsq=nlstsq
-    )
+    jet = probdiffeq.constraint_jet_dae(differential, algebraic, ssm=ssm, nlstsq=nlstsq)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_dynamic(
         strategy=strategy, prior=ioup, constraint=jet, ssm=ssm

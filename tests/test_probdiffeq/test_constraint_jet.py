@@ -91,7 +91,7 @@ def case_jet_iterated_dae(root):
     nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=50, tol=1e-10)
 
     def constraint(ssm):
-        return probdiffeq.constraint_root_jet_dae(
+        return probdiffeq.constraint_jet_dae(
             differential=root.root_dae_differential,
             algebraic=root.root_dae_algebraic,
             ssm=ssm,
@@ -105,7 +105,7 @@ def case_jet_iterated_imex(root):
     nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=50, tol=1e-10)
 
     def constraint(ssm):
-        return probdiffeq.constraint_root_jet_imex(
+        return probdiffeq.constraint_jet_imex(
             implicit=root.root_imex_linear,
             explicit=root.root_imex_nonlinear,
             ssm=ssm,
@@ -119,7 +119,7 @@ def case_jet_iterated(root):
     nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=50, tol=1e-10)
 
     def constraint(ssm):
-        return probdiffeq.constraint_root_jet(root.root, ssm=ssm, nlstsq=nlstsq)
+        return probdiffeq.constraint_jet(root.root, ssm=ssm, nlstsq=nlstsq)
 
     return constraint
 
@@ -128,7 +128,7 @@ def case_jet_standard(root):
     nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=50, tol=1e-10)
 
     def constraint(ssm):
-        return probdiffeq.constraint_root_jet_imex(
+        return probdiffeq.constraint_jet_imex(
             implicit=root.root_imex_linear,
             explicit=root.root_imex_nonlinear,
             ssm=ssm,
