@@ -820,8 +820,6 @@ class DenseLinearizationRoot(AbstractLinearizationRoot):
 
         def constraint_flat(m: Array) -> Array:
             """Evaluate a flattened version of the root constraint."""
-            # # Stop gradients through known values
-
             # Unravel the location and extract derivatives
             m_tree = self.unravel(m)
             relevant_tcoeffs = m_tree[: self.root_order]

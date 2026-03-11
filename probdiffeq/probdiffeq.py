@@ -311,22 +311,17 @@ def constraint_root_ts1(
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
-    # TODO: Delete this function in favour of constraint_jet(jet_order=root_order)
-
-    root_order = _verify_vector_field_signature_and_parse_order(root)
-    if root_order == 1:
-        msg = "Did you accidentally pass a vector field instead of a root-constraint?"
-        raise ValueError(msg)
-
-    if jacobian is None:
-        # Use hutchinson Jacobian handling for backward compatibility.
-        jacobian = jacobian_hutchinson_fwd()
-    return ssm.linearize.root(
-        root, root_order=root_order, jacobian=jacobian, nlstsq=nlstsq
-    )
+    return constraint_jet(root, ssm=ssm, jacobian=jacobian, nlstsq=nlstsq, jet_order=0)
 
 
-def constraint_jet(root, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlstsq=None):
+def constraint_jet(
+    root,
+    *,
+    ssm: ssm_impl.FactSsmImpl,
+    jacobian=None,
+    nlstsq=None,
+    jet_order: int | Literal["max"] = "max",
+):
     """Construct a constraint that implements Jet-linearization.
 
     To use posterior linearisation, pass a `nlstsq` implementation.
@@ -337,6 +332,19 @@ def constraint_jet(root, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlstsq=Non
         jacobian = jacobian_hutchinson_fwd()
 
     def root_jet(*tcoeffs_all, t):
+        if jet_order == "max":
+            tcoeffs = tcoeffs_all
+        else:
+            jet_order_upper = len(tcoeffs_all) - root_order
+            if jet_order < 0 or jet_order > jet_order_upper:
+                msg = "The provided jet-order is incompatible with the root order."
+                msg += f" Expected: 0 <= jet_order <= {jet_order_upper}."
+                msg += f" Received: jet_order == {jet_order}."
+                raise ValueError(msg)
+
+            order = root_order + jet_order
+            tcoeffs = tcoeffs_all[:order]
+
         flat = [tree.ravel_pytree(s)[0] for s in tcoeffs_all]
         unravel = tree.ravel_pytree(tcoeffs_all[0])[1]
 
@@ -367,11 +375,8 @@ def constraint_jet_imex(
     ssm: ssm_impl.FactSsmImpl,
     jacobian=None,
     nlstsq=None,
-    # TODO: for jet_order=root_order, traditional TS1 and TS0 are recovered so offer this?
-    # TODO: offer this jet_order for other root-jet constraints as well?
-    # TODO: write proper tests for these functions?
-    #       Currently, we abuse the tests for constraint_init for checking this behaviour...
-    jet_order=-1,
+    jet_order_implicit="max",
+    jet_order_explicit="max",
 ):
     """Like `constraint_jet`, but for roots summing implicit and explicit terms.
 
@@ -379,24 +384,28 @@ def constraint_jet_imex(
     """
     root_order_im = _verify_vector_field_signature_and_parse_order(implicit)
     root_order_ex = _verify_vector_field_signature_and_parse_order(explicit)
-    assert root_order_im == root_order_ex
-    root_order = root_order_im
 
     if jacobian is None:
         jacobian = jacobian_hutchinson_fwd()
 
     def root_jet(*tcoeffs_all, t):
-        if jet_order < root_order and jet_order != -1:
-            msg = "The provided jet-order incompatible with the root order."
-            msg += f" Required: jet_order >= {root_order}."
-            msg += f" Received: jet_order == {jet_order}."
-            raise ValueError(msg)
-        tcoeffs_subset = tcoeffs_all if jet_order == -1 else tcoeffs_all[:jet_order]
-        flat = [tree.ravel_pytree(s)[0] for s in tcoeffs_subset]
-        unravel = tree.ravel_pytree(tcoeffs_subset[0])[1]
-
-        fx_implicit = jet_call(implicit, flat, unravel=unravel, t=t)
-        fx_explicit = jet_call(explicit, flat, unravel=unravel, t=t)
+        _, unravel = tree.ravel_pytree(tcoeffs_all[0])
+        fx_implicit = jet_call(
+            implicit,
+            tcoeffs_all,
+            root_order=root_order_im,
+            jet_order=jet_order_implicit,
+            unravel=unravel,
+            t=t,
+        )
+        fx_explicit = jet_call(
+            explicit,
+            tcoeffs_all,
+            root_order=root_order_ex,
+            jet_order=jet_order_explicit,
+            unravel=unravel,
+            t=t,
+        )
 
         # The Jacobian of the explicit term is ignored,
         # which turns first-order linearisation of root_jet into
@@ -407,21 +416,33 @@ def constraint_jet_imex(
         # Return the sum: c(x) = I(x) + E(x)
         return [a + b for a, b in zip(fx_implicit, fx_explicit)]
 
-    def jet_call(fun, coeffs_flat, /, *, unravel, t):
+    def jet_call(fun, tcoeffs_all, /, *, root_order, jet_order, unravel, t):
         """Evaluate the jet'ed root function."""
+        if jet_order == "max":
+            tcoeffs = tcoeffs_all
+        else:
+            jet_order_upper = len(tcoeffs_all) - root_order
+            if jet_order < 0 or jet_order > jet_order_upper:
+                msg = "The provided jet-order is incompatible with the root order."
+                msg += f" Expected: 0 <= jet_order <= {jet_order_upper}."
+                msg += f" Received: jet_order == {jet_order}."
+                raise ValueError(msg)
+            order = jet_order + root_order
+            tcoeffs = tcoeffs_all[:order]
+        coeffs_flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
 
         # Flatten the root because jax.jet is a bit high maintenance :)
-        def jet_call_implicit(*y):
+        def jet_call(*y):
             y_tree = [unravel(s) for s in y]
             fx = fun(*y_tree, t=t)
             return tree.ravel_pytree(fx)[0]
 
         ps, ss = taylor.jet_unpack_series(coeffs_flat, root_order)
         if len(tree.tree_leaves(ss)) == 0:
-            fx = jet_call_implicit(*ps)
+            fx = jet_call(*ps)
             return [fx]
 
-        primals1, series1 = func.jet(jet_call_implicit, ps, ss, is_tcoeff=False)
+        primals1, series1 = func.jet(jet_call, ps, ss, is_tcoeff=False)
         return [primals1, *series1]
 
     return ssm.linearize.root(
@@ -430,7 +451,14 @@ def constraint_jet_imex(
 
 
 def constraint_jet_dae(
-    differential, algebraic, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlstsq=None
+    differential,
+    algebraic,
+    *,
+    ssm: ssm_impl.FactSsmImpl,
+    jacobian=None,
+    nlstsq=None,
+    jet_order_differential: int | Literal["max"] = "max",
+    jet_order_algebraic: int | Literal["max"] = "max",
 ):
     """Like `constraint_jet`, but for DAEs.
 
@@ -438,38 +466,63 @@ def constraint_jet_dae(
     roots can enjoy different jet-orders, which increases accuracy.
     """
     root_order_diff = _verify_vector_field_signature_and_parse_order(differential)
-
     root_order_alg = _verify_vector_field_signature_and_parse_order(algebraic)
 
     if jacobian is None:
         jacobian = jacobian_hutchinson_fwd()
 
     def root_jet(*tcoeffs_all, t):
-        flat = [tree.ravel_pytree(s)[0] for s in tcoeffs_all]
         unravel = tree.ravel_pytree(tcoeffs_all[0])[1]
 
+        fx1 = jet_evaluate(
+            differential,
+            tcoeffs_all,
+            jet_order=jet_order_differential,
+            root_order=root_order_diff,
+            unravel=unravel,
+            t=t,
+        )
+        fx2 = jet_evaluate(
+            algebraic,
+            tcoeffs_all,
+            jet_order=jet_order_algebraic,
+            root_order=root_order_alg,
+            unravel=unravel,
+            t=t,
+        )
+
+        return [*fx1, *fx2]
+
+    def jet_evaluate(fun, tcoeffs_all, /, *, jet_order, root_order, unravel, t):
         # Flatten the root because jax.jet is a bit high maintenance :)
-        def jet_call_diff(*y):
+        def jet_call(*y):
             y_tree = [unravel(s) for s in y]
-            fx = differential(*y_tree, t=t)
+            fx = fun(*y_tree, t=t)
             return tree.ravel_pytree(fx)[0]
 
-        ps, ss = taylor.jet_unpack_series(flat, root_order_diff)
-        if len(tree.tree_leaves(ss)) == 0:
-            fx = jet_call_diff(*ps)
-            primals1, series1 = [fx], []
+        if jet_order == "max":
+            tcoeffs = tcoeffs_all
         else:
-            primals1, series1 = func.jet(jet_call_diff, ps, ss, is_tcoeff=False)
+            jet_order_upper = len(tcoeffs_all) - root_order
+            if jet_order < 0 or jet_order > jet_order_upper:
+                msg = "The provided jet-order is incompatible with the root order."
+                msg += f" Expected: 0 <= jet_order <= {jet_order_upper}."
+                msg += f" Received: jet_order == {jet_order}."
+                raise ValueError(msg)
 
-        def jet_call_alg(*y):
-            y_tree = [unravel(s) for s in y]
-            fx = algebraic(*y_tree, t=t)
-            return tree.ravel_pytree(fx)[0]
+            order = jet_order + root_order
+            tcoeffs = tcoeffs_all[:order]
 
-        ps, ss = taylor.jet_unpack_series(flat, root_order_alg)
-        primals2, series2 = func.jet(jet_call_alg, ps, ss, is_tcoeff=False)
+        flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
 
-        return [primals1, *series1, primals2, *series2]
+        ps, ss = taylor.jet_unpack_series(flat, root_order)
+
+        if len(tree.tree_leaves(ss)) == 0:
+            fx = jet_call(*ps)
+            return [fx]
+
+        primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
+        return [primals, *series]
 
     return ssm.linearize.root(
         root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian, nlstsq=nlstsq
