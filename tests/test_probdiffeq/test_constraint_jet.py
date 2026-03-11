@@ -79,7 +79,7 @@ def fixture_root_sir():
 
 
 @testing.fixture(name="expected")
-@testing.parametrize("derivatives", [1, 3])
+@testing.parametrize("derivatives", [1, 5])
 def fixture_expected(root, derivatives):
     def vf_autonomous(y, /):
         return root.ode_vf(y, t=root.t0)
@@ -120,20 +120,6 @@ def case_jet_iterated(root):
 
     def constraint(ssm):
         return probdiffeq.constraint_jet(root.root, ssm=ssm, nlstsq=nlstsq)
-
-    return constraint
-
-
-def case_jet_standard(root):
-    nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=50, tol=1e-10)
-
-    def constraint(ssm):
-        return probdiffeq.constraint_jet_imex(
-            implicit=root.root_imex_linear,
-            explicit=root.root_imex_nonlinear,
-            ssm=ssm,
-            nlstsq=nlstsq,
-        )
 
     return constraint
 

@@ -818,13 +818,6 @@ class DenseLinearizationRoot(AbstractLinearizationRoot):
 
     def linearize(self, rv, state, *, damp: float, t):
 
-        # # Remove deterministic elements from the state
-        # std = rv.evaluate_std()
-        # std_flat, _ = tree.ravel_pytree(std)
-        # m_known = np.where(std_flat == 0, m, 0.)
-        # m_known = func.stop_gradient(m_known)
-        # m = np.where(std_flat == 0., m_known, m)
-
         def constraint_flat(m: Array) -> Array:
             """Evaluate a flattened version of the root constraint."""
             # # Stop gradients through known values
@@ -840,19 +833,8 @@ class DenseLinearizationRoot(AbstractLinearizationRoot):
             return tree.ravel_pytree(root_eval)[0]
 
         mean = rv.mean
-
         if self.nlstsq is not None:
-            # mean_known = np.where(std_flat == 0, rv.mean, 0)
-            # mean_unknown = np.where(std_flat== 0, 0, rv.mean)
-
-            # def put_together(m_unknown):
-            #     return np.where(std_flat==0, mean_known, m_unknown)
-
             mean, _info = self.nlstsq(constraint_flat, mean, rv.mean, rv.cholesky)
-
-        import jax
-
-        jax.debug.print("{}", mean, ordered=True)
 
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
         fx = fx - linop @ mean
