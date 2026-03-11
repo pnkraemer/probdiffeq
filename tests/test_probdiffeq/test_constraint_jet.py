@@ -8,6 +8,12 @@ from probdiffeq.util import nlstsq_util
 
 @structs.dataclass
 class Root:
+    """Different APIs for one and the same root-finding problem.
+
+    Its purpose is to enable different jet-constraints to solve the same
+    problem but work with different roots.
+    """
+
     root: Callable
     root_imex_linear: Callable
     root_imex_nonlinear: Callable
@@ -36,6 +42,7 @@ def fixture_root_sir():
         return -vf(u, t=t)
 
     def vf(y, *, t):
+        del t
         # infection and recovery rates
         beta, gamma = 2.0, 0.5
 
@@ -49,10 +56,12 @@ def fixture_root_sir():
         return np.stack([f0, f1, f2])
 
     def dae_algebraic(u, /, *, t):
+        del t
         N = 1.0  # total population
         return u[0] + u[1] + u[2] - N
 
     def dae_differential(u, du, /, *, t):
+        del t
         beta, gamma = 2.0, 0.5
         S, I, _R = u  # noqa: E741 ("I" is a good variable name in an SIR model)
 

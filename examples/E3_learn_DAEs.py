@@ -1,16 +1,4 @@
-"""Simulate DAEs.
-
-Solve a differential-algebraic equation, namely, the Robertson problem.
-The Robertson problem is interesting for many reasons:
-  - It comes in DAE, and ODE form
-    so we can compare different information operators
-  - It has an exponential timescale so (good) adaptive
-    steps are needed; fixed steps are hopeless.
-  - Its y-states have wildly different scales,
-    so a good prior model is important.
-
-
-"""
+"""Learn a DAE."""
 
 import equinox
 import jax
@@ -25,11 +13,11 @@ from probdiffeq.util import nlstsq_util
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
 
-# TODO: move DAE constraint into initialisation (so that we have parametrised diffeqs)
+# TODO: move DAE constraint into initialisation
+# TODO: Make probdiffeq compatible with parametrised diffeqs
 # TODO: use EM for updating the initial condition
 # TODO: learn one of Robertson's differential parameters
 # TODO: Train a neural network to match the differential part?
-#
 
 
 def main(t0=1e-6, t1=1e5) -> None:
@@ -66,7 +54,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     # (but don't vary much within these scales).
     output_scale = jnp.asarray([0.8, 2e-05, 0.2])
 
-    # Initial and terminal conditions
+    # True condition and initial guess
     y0_true = jnp.sqrt(jnp.array([1.0, 0.0, 0.0]) / output_scale)
     y0_guess = jnp.sqrt(jnp.array([0.5 - 1e-5, 1e-5, 0.5]) / output_scale)
 
@@ -75,11 +63,11 @@ def main(t0=1e-6, t1=1e5) -> None:
     inputs = solution_true.t
     labels = solution_true.u.mean[0]
 
-    # Fake SSM (to build a loss)
+    # Fake SSM (to get the conditioning-functions to build a loss)
     _, ssm = probdiffeq.ssm_taylor([jnp.zeros((3,))], diffuse_derivatives=3)
 
     # Loss
-    loss = loss_data_fit(solve, inputs, labels, tol=1e-6, ssm=ssm)
+    loss = loss_data_fit(solve, inputs, labels, ssm=ssm)
     value_and_grad = jax.jit(jax.value_and_grad(loss, has_aux=True))
 
     # Initialise diffusion tempering
@@ -91,9 +79,8 @@ def main(t0=1e-6, t1=1e5) -> None:
     )
 
     # Initialise the optimiser
-    optim = optax.adam(0.5)  # If we temper hard, we can use large LRs
+    optim = optax.adam(0.25)  # If we temper hard, we can use large LRs
     opt_state = optim.init(y0_guess)
-
     pbar = tqdm.tqdm(range(200))
     for i in pbar:
         # Optimisation step:
@@ -120,16 +107,19 @@ def main(t0=1e-6, t1=1e5) -> None:
         #   But we can temper by reducing the standard deviations
         if i % 50 == 0:
             # The exact schedule is arbitrary tbh...
-            std = jnp.maximum(std / 5.0, 1e-8 * output_scale)
+            std = jnp.maximum(std / 2.0, 1e-8 * output_scale)
 
     fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(5, 5), sharex=True)
     ax[0][0].set_title("Robertson solution", fontsize="medium")
     ax[0][1].set_title("Standard deviations", fontsize="medium")
 
     # Plot means and standard deviations of the true solution, initial guess, and final guess
-    for label, solution in zip(
-        ["True", "Initial", "Final"], [solution_true, solution_guess0, solution_guess]
-    ):
+    results = {
+        "True": solution_true,
+        "Initial": solution_guess0,
+        "Final": solution_guess,
+    }
+    for label, solution in results.items():
         ax[0][0].semilogx(save_at, solution.u.mean[0][:, 0], label=label)
         ax[1][0].semilogx(save_at, solution.u.mean[0][:, 1])
         ax[2][0].semilogx(save_at, solution.u.mean[0][:, 2])
@@ -151,7 +141,8 @@ def main(t0=1e-6, t1=1e5) -> None:
     plt.show()
 
 
-def loss_data_fit(solve, inputs, labels, *, tol, ssm):
+def loss_data_fit(solve, inputs, labels, *, ssm):
+    """Create a loss that measures the data fit."""
 
     def loss(y0, std, output_scale):
         std_ts = jnp.ones_like(inputs)[:, None] * std[None, ...]
@@ -164,6 +155,7 @@ def loss_data_fit(solve, inputs, labels, *, tol, ssm):
 
 
 def solver(differential, algebraic, tol, while_loop):
+    """Create a reverse-mode differentiable probabilistic solver."""
 
     @jax.jit
     def solve(y0_sqrt, save_at, output_scale):

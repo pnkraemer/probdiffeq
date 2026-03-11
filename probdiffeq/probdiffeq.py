@@ -304,9 +304,7 @@ def constraint_ode_ts0(vf, /, *, ssm):
 def constraint_root_ts1(
     root, /, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlstsq=None
 ):
-    """Construct a constraint based on a custom root.
-
-    See the custom information operator tutorial for details.
+    """Alias for `constraint_jet(..., jet_order=0)`.
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
@@ -332,6 +330,7 @@ def constraint_jet(
         jacobian = jacobian_hutchinson_fwd()
 
     def root_jet(*tcoeffs_all, t):
+        unravel = tree.ravel_pytree(tcoeffs_all[0])[1]
         if jet_order == "max":
             tcoeffs = tcoeffs_all
         else:
@@ -345,8 +344,7 @@ def constraint_jet(
             order = root_order + jet_order
             tcoeffs = tcoeffs_all[:order]
 
-        flat = [tree.ravel_pytree(s)[0] for s in tcoeffs_all]
-        unravel = tree.ravel_pytree(tcoeffs_all[0])[1]
+        flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
 
         # Flatten the root because jax.jet is a bit high maintenance :)
         def jet_call(*y):
@@ -380,7 +378,7 @@ def constraint_jet_imex(
 ):
     """Like `constraint_jet`, but for roots summing implicit and explicit terms.
 
-    Think of this as a generalisation of the EK0 to implicit differential equations.
+    Think of this as a generalisation of zeroth-order methods to implicit differential equations.
     """
     root_order_im = _verify_vector_field_signature_and_parse_order(implicit)
     root_order_ex = _verify_vector_field_signature_and_parse_order(explicit)
@@ -429,6 +427,7 @@ def constraint_jet_imex(
                 raise ValueError(msg)
             order = jet_order + root_order
             tcoeffs = tcoeffs_all[:order]
+
         coeffs_flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
 
         # Flatten the root because jax.jet is a bit high maintenance :)
