@@ -307,6 +307,8 @@ def constraint_root_ts1(
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
+    # TODO: Delete this function in favour of constraint_root_jet(jet_order=root_order)
+
     root_order = _verify_vector_field_signature_and_parse_order(root)
     if root_order == 1:
         msg = "Did you accidentally pass a vector field instead of a root-constraint?"
@@ -320,8 +322,12 @@ def constraint_root_ts1(
     )
 
 
+# TODO: Rename all constraint_root_jet into constraint_jet because
+#       the "root" part is implied in the jet
+
+
 def constraint_root_jet(root, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlstsq=None):
-    """Construct a Jet-based linearization/constraint for a root-constraint.
+    """Construct a constraint that implements Jet-linearization.
 
     To use posterior linearisation, pass a `nlstsq` implementation.
     """
@@ -341,6 +347,11 @@ def constraint_root_jet(root, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlsts
             return tree.ravel_pytree(fx)[0]
 
         ps, ss = taylor.jet_unpack_series(flat, root_order)
+
+        if len(tree.tree_leaves(ss)) == 0:
+            fx = jet_call(*ps)
+            return [fx]
+
         primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
         return [primals, *series]
 
@@ -349,18 +360,88 @@ def constraint_root_jet(root, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlsts
     )
 
 
-def constraint_dae_jet(
-    differential, algebraic, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlstsq=None
+def constraint_root_jet_imex(
+    *,
+    implicit: Callable,
+    explicit: Callable,
+    ssm: ssm_impl.FactSsmImpl,
+    jacobian=None,
+    nlstsq=None,
+    # TODO: for jet_order=root_order, traditional TS1 and TS0 are recovered so offer this?
+    # TODO: offer this jet_order for other root-jet constraints as well?
+    # TODO: write proper tests for these functions?
+    #       Currently, we abuse the tests for constraint_init for checking this behaviour...
+    jet_order=-1,
 ):
-    """Construct a Jet-based linearization/constraint for DAEs.
+    """Like `constraint_root_jet`, but for roots summing implicit and explicit terms.
 
-    To use posterior linearisation, pass a `nlstsq` implementation.
+    Think of this as a generalisation of the EK0 to implicit differential equations.
     """
-    root_order_differential = _verify_vector_field_signature_and_parse_order(
-        differential
+    root_order_im = _verify_vector_field_signature_and_parse_order(implicit)
+    root_order_ex = _verify_vector_field_signature_and_parse_order(explicit)
+    assert root_order_im == root_order_ex
+    root_order = root_order_im
+
+    if jacobian is None:
+        jacobian = jacobian_hutchinson_fwd()
+
+    def root_jet(*tcoeffs_all, t):
+        if jet_order < root_order and jet_order != -1:
+            msg = "The provided jet-order incompatible with the root order."
+            msg += f" Required: jet_order >= {root_order}."
+            msg += f" Received: jet_order == {jet_order}."
+            raise ValueError(msg)
+        tcoeffs_subset = tcoeffs_all if jet_order == -1 else tcoeffs_all[:jet_order]
+        flat = [tree.ravel_pytree(s)[0] for s in tcoeffs_subset]
+        unravel = tree.ravel_pytree(tcoeffs_subset[0])[1]
+
+        fx_implicit = jet_call(implicit, flat, unravel=unravel, t=t)
+        fx_explicit = jet_call(explicit, flat, unravel=unravel, t=t)
+
+        # The Jacobian of the explicit term is ignored,
+        # which turns first-order linearisation of root_jet into
+        # first-order linearisation of the implicit term but zeroth-order
+        # linearisation in the explicit term!
+        fx_explicit = [func.stop_gradient(f) for f in fx_explicit]
+
+        # Return the sum: c(x) = I(x) + E(x)
+        return [a + b for a, b in zip(fx_implicit, fx_explicit)]
+
+    def jet_call(fun, coeffs_flat, /, *, unravel, t):
+        """Evaluate the jet'ed root function."""
+
+        # Flatten the root because jax.jet is a bit high maintenance :)
+        def jet_call_implicit(*y):
+            y_tree = [unravel(s) for s in y]
+            fx = fun(*y_tree, t=t)
+            return tree.ravel_pytree(fx)[0]
+
+        ps, ss = taylor.jet_unpack_series(coeffs_flat, root_order)
+        if len(tree.tree_leaves(ss)) == 0:
+            fx = jet_call_implicit(*ps)
+            return [fx]
+
+        primals1, series1 = func.jet(jet_call_implicit, ps, ss, is_tcoeff=False)
+        return [primals1, *series1]
+
+    # TODO: rename this to ssm.linearize.root() because there is no more slr
+    #       and root_0th doesn't exist.
+    return ssm.linearize.root_taylor_1st(
+        root_jet, root_order=ssm.num_derivatives + 1, jacobian=jacobian, nlstsq=nlstsq
     )
 
-    root_order_algebraic = _verify_vector_field_signature_and_parse_order(algebraic)
+
+def constraint_root_jet_dae(
+    differential, algebraic, *, ssm: ssm_impl.FactSsmImpl, jacobian=None, nlstsq=None
+):
+    """Like `constraint_root_jet`, but for DAEs.
+
+    The advantage of a dedicated DAE constraint is that algebraic and differential
+    roots can enjoy different jet-orders, which increases accuracy.
+    """
+    root_order_diff = _verify_vector_field_signature_and_parse_order(differential)
+
+    root_order_alg = _verify_vector_field_signature_and_parse_order(algebraic)
 
     if jacobian is None:
         jacobian = jacobian_hutchinson_fwd()
@@ -370,28 +451,25 @@ def constraint_dae_jet(
         unravel = tree.ravel_pytree(tcoeffs_all[0])[1]
 
         # Flatten the root because jax.jet is a bit high maintenance :)
-        def jet_call_differential(*y):
+        def jet_call_diff(*y):
             y_tree = [unravel(s) for s in y]
             fx = differential(*y_tree, t=t)
             return tree.ravel_pytree(fx)[0]
 
-        # TODO: if we apply the preconditioner before passing
-        #   things in here, we can set is_tcoeff to True and possibly
-        #   gain a bunch of numerical robustness? (And speed?)
-        # TODO: can we further precondition the output?
-        #   Eg use a suitable power of dt + factorial?
-        #   That might be a lot easier to optimise
+        ps, ss = taylor.jet_unpack_series(flat, root_order_diff)
+        if len(tree.tree_leaves(ss)) == 0:
+            fx = jet_call_diff(*ps)
+            primals1, series1 = [fx], []
+        else:
+            primals1, series1 = func.jet(jet_call_diff, ps, ss, is_tcoeff=False)
 
-        ps, ss = taylor.jet_unpack_series(flat, root_order_differential)
-        primals1, series1 = func.jet(jet_call_differential, ps, ss, is_tcoeff=False)
-
-        def jet_call_algebraic(*y):
+        def jet_call_alg(*y):
             y_tree = [unravel(s) for s in y]
             fx = algebraic(*y_tree, t=t)
             return tree.ravel_pytree(fx)[0]
 
-        ps, ss = taylor.jet_unpack_series(flat, root_order_algebraic)
-        primals2, series2 = func.jet(jet_call_algebraic, ps, ss, is_tcoeff=False)
+        ps, ss = taylor.jet_unpack_series(flat, root_order_alg)
+        primals2, series2 = func.jet(jet_call_alg, ps, ss, is_tcoeff=False)
 
         return [primals1, *series1, primals2, *series2]
 
@@ -566,7 +644,9 @@ class MarkovSequence(Generic[N]):
         # Process the terminal value
         u0 = tree.tree_map(lambda s: s[-1], u)
         model0 = tree.tree_map(lambda s: s[-1], model)
-        marg, cond = ssm.conditional.revert(self.marginal, model0)
+        marg, cond = ssm.conditional.revert(
+            self.marginal, model0, solve_triu=linalg.solve_triangular
+        )
         updated = ssm.conditional.apply(u0, cond)
         pdf0 = marg.logpdf(u0)
 
@@ -576,7 +656,9 @@ class MarkovSequence(Generic[N]):
             prior, observation, data = prior_and_observation_and_data
 
             predicted = ssm.conditional.marginalise(rv, prior)
-            observed, noise = ssm.conditional.revert(predicted, observation)
+            observed, noise = ssm.conditional.revert(
+                predicted, observation, solve_triu=linalg.solve_triangular
+            )
             logpdf_n = observed.logpdf(data)
             corrected = ssm.conditional.apply(data, noise)
 
@@ -1273,7 +1355,9 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
     def predict(
         self, posterior: MarkovSequence, *, transition
     ) -> tuple[TaylorCoeffTarget, MarkovSequence]:
-        marginals, cond = self.ssm.conditional.revert(posterior.marginal, transition)
+        marginals, cond = self.ssm.conditional.revert(
+            posterior.marginal, transition, solve_triu=linalg.solve_triangular
+        )
         posterior = MarkovSequence(
             marginal=marginals, conditional=cond, reverse=posterior.reverse
         )
@@ -1512,7 +1596,9 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
     ) -> tuple[TaylorCoeffTarget, MarkovSequence]:
         rv = posterior.marginal
         bw0 = posterior.conditional
-        marginals, cond = self.ssm.conditional.revert(rv, transition)
+        marginals, cond = self.ssm.conditional.revert(
+            rv, transition, solve_triu=linalg.solve_triangular
+        )
         cond = self.ssm.conditional.merge(bw0, cond)
         predicted = MarkovSequence(marginals, cond, reverse=posterior.reverse)
 
@@ -1706,7 +1792,9 @@ class solver_mle(ProbabilisticSolver):
             fx_init, _cstate = self.constraint_init.linearize(
                 u_pred.marginals, cstate_init, damp=damp, t=t
             )
-            observed, reverted = self.ssm.conditional.revert(u_pred.marginals, fx_init)
+            observed, reverted = self.ssm.conditional.revert(
+                u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
+            )
             u, posterior = self.strategy.apply_updates(
                 prediction, updates=reverted.noise
             )
@@ -1748,7 +1836,9 @@ class solver_mle(ProbabilisticSolver):
         )
 
         # Do the full correction step
-        observed, reverted = self.ssm.conditional.revert(u.marginals, fx)
+        observed, reverted = self.ssm.conditional.revert(
+            u.marginals, fx, solve_triu=linalg.solve_triangular
+        )
         updates = reverted.noise
         u, posterior = self.strategy.apply_updates(
             prediction=prediction, updates=updates
@@ -1850,7 +1940,9 @@ class solver_dynamic(ProbabilisticSolver):
             fx_init, _cstate = self.constraint_init.linearize(
                 u_pred.marginals, cstate_init, damp=damp, t=t
             )
-            _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx_init)
+            _, reverted = self.ssm.conditional.revert(
+                u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
+            )
             u, posterior = self.strategy.apply_updates(
                 prediction, updates=reverted.noise
             )
@@ -1897,7 +1989,9 @@ class solver_dynamic(ProbabilisticSolver):
             )
 
         # Complete the update
-        _, reverted = self.ssm.conditional.revert(u.marginals, fx)
+        _, reverted = self.ssm.conditional.revert(
+            u.marginals, fx, solve_triu=linalg.solve_triangular
+        )
         updates = reverted.noise
         u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
@@ -1982,10 +2076,17 @@ class solver(ProbabilisticSolver):
             fx_init, _cstate = self.constraint_init.linearize(
                 u_pred.marginals, cstate_init, damp=damp, t=t
             )
-            _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx_init)
+            _, reverted = self.ssm.conditional.revert(
+                u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
+            )
             u, posterior = self.strategy.apply_updates(
                 prediction, updates=reverted.noise
             )
+            # import jax
+
+            # jax.debug.print("{}", fx_init.A, ordered=True)
+            # jax.debug.print("{}", fx_init.noise.mean, ordered=True)
+
         else:
             u, posterior = u_pred, prediction
 
@@ -2023,7 +2124,9 @@ class solver(ProbabilisticSolver):
         )
 
         # Update
-        _, reverted = self.ssm.conditional.revert(u_pred.marginals, fx)
+        _, reverted = self.ssm.conditional.revert(
+            u_pred.marginals, fx, solve_triu=linalg.solve_triangular
+        )
         u, posterior = self.strategy.apply_updates(prediction, updates=reverted.noise)
 
         # Return solution
@@ -2346,7 +2449,9 @@ class error_state_std(ErrorEstimator):
             linearized = proposed.fun_evals
 
         # Extract the local residual std from the linearization
-        observed, conditional = self.ssm.conditional.revert(rv, linearized)
+        observed, conditional = self.ssm.conditional.revert(
+            rv, linearized, solve_triu=linalg.solve_triangular
+        )
         output_scale = observed.mahalanobis_norm_relative(0.0)
 
         # Measure error on the n-th state (usually, n=0 because why not)

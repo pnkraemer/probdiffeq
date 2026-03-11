@@ -2,6 +2,7 @@
 
 import jax
 import jax.experimental.ode
+import jax.numpy as jnp
 
 
 def odeint_and_save_at(vf, y0: tuple, /, save_at, *, atol, rtol):
@@ -15,19 +16,21 @@ def odeint_and_save_at(vf, y0: tuple, /, save_at, *, atol, rtol):
 
 
 def ivp_lotka_volterra():
-    # Local imports because diffeqzoo is not an official dependency
-    from diffeqzoo import backend, ivps
-
-    if not backend.has_been_selected:
-        backend.select("jax")
-
-    f, u0, (t0, _), f_args = ivps.lotka_volterra()
     t1 = 2.0  # Short time-intervals are sufficient for this test.
+    t0, t1 = (0.0, 2.0)
+    u0 = jnp.asarray([20.0, 20.0])
 
     # Dictionary to ensure pytree compatibility
     @jax.jit
     def vf(x, *, t):  # noqa: ARG001
-        return {"u": f(x["u"], *f_args)}
+        """Lotka--Volterra dynamics."""
+        return {"u": f(x["u"])}
+
+    def f(y, /):
+        a, b, c, d = 0.5, 0.05, 0.5, 0.05
+        y0_y1_a = y[0] * y[1]
+        y0_y1_b = y[0] * y[1]
+        return jnp.asarray([a * y[0] - b * y0_y1_a, -c * y[1] + d * y0_y1_b])
 
     return vf, ({"u": u0},), (t0, t1)
 

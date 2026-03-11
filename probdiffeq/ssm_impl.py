@@ -539,14 +539,16 @@ class DenseConditional(AbstractConditional):
             g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
         )
 
-    def revert(self, rv: DenseNormal, cond: LatentCond, /):
+    def revert(self, rv: DenseNormal, cond: LatentCond, /, *, solve_triu: Callable):
         # Pull RV into the latent space
         mean = cond.to_latent * rv.mean
         cholesky = cond.to_latent[:, None] * rv.cholesky
 
         # QR-decomposition
         R_X_F, R_X, R_YX = (cond.A @ cholesky).T, cholesky.T, cond.noise.cholesky.T
-        tmp = cholesky_util.revert_conditional(R_X_F=R_X_F, R_X=R_X, R_YX=R_YX)
+        tmp = cholesky_util.revert_conditional(
+            R_X_F=R_X_F, R_X=R_X, R_YX=R_YX, solve_triu=solve_triu
+        )
         r_obs, (r_cor, gain) = tmp
 
         # Push correction into observed space
@@ -798,8 +800,17 @@ class DenseLinearizationRootTs1(AbstractLinearizationRoot):
 
     def linearize(self, rv, state, *, damp: float, t):
 
+        # # Remove deterministic elements from the state
+        # std = rv.evaluate_std()
+        # std_flat, _ = tree.ravel_pytree(std)
+        # m_known = np.where(std_flat == 0, m, 0.)
+        # m_known = func.stop_gradient(m_known)
+        # m = np.where(std_flat == 0., m_known, m)
+
         def constraint_flat(m: Array) -> Array:
             """Evaluate a flattened version of the root constraint."""
+            # # Stop gradients through known values
+
             # Unravel the location and extract derivatives
             m_tree = self.unravel(m)
             relevant_tcoeffs = m_tree[: self.root_order]
@@ -810,11 +821,20 @@ class DenseLinearizationRootTs1(AbstractLinearizationRoot):
             # Flatten the output so that the Jacobians are matrices, not Pytrees.
             return tree.ravel_pytree(root_eval)[0]
 
-        # Linearize the constraint
         mean = rv.mean
 
         if self.nlstsq is not None:
+            # mean_known = np.where(std_flat == 0, rv.mean, 0)
+            # mean_unknown = np.where(std_flat== 0, 0, rv.mean)
+
+            # def put_together(m_unknown):
+            #     return np.where(std_flat==0, mean_known, m_unknown)
+
             mean, _info = self.nlstsq(constraint_flat, mean, rv.mean, rv.cholesky)
+
+        import jax
+
+        jax.debug.print("{}", mean, ordered=True)
 
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
         fx = fx - linop @ mean
@@ -1075,14 +1095,16 @@ class IsotropicConditional(AbstractConditional):
             g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
         )
 
-    def revert(self, rv, cond, /):
+    def revert(self, rv, cond, /, *, solve_triu):
         # Pull RV into the latent space
         mean = cond.to_latent[:, None] * rv.mean
         cholesky = cond.to_latent[:, None] * rv.cholesky
 
         # QR-decomposition
         R_X_F, R_X, R_YX = (cond.A @ cholesky).T, cholesky.T, cond.noise.cholesky.T
-        tmp = cholesky_util.revert_conditional(R_X_F=R_X_F, R_X=R_X, R_YX=R_YX)
+        tmp = cholesky_util.revert_conditional(
+            R_X_F=R_X_F, R_X=R_X, R_YX=R_YX, solve_triu=solve_triu
+        )
         r_obs, (r_cor, gain) = tmp
 
         # Push correction into observed space
@@ -1253,7 +1275,7 @@ class BlockDiagConditional(AbstractConditional):
             g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
         )
 
-    def revert(self, rv, cond, /):
+    def revert(self, rv, cond, /, *, solve_triu):
         # Pull RV into latent space
         mean = cond.to_latent * rv.mean
         cholesky = cond.to_latent[:, :, None] * rv.cholesky
@@ -1262,7 +1284,9 @@ class BlockDiagConditional(AbstractConditional):
         rv_chol_upper = _transpose(cholesky)
         noise_chol_upper = _transpose(cond.noise.cholesky)
         A_rv_chol_upper = _transpose(cond.A @ cholesky)
-        revert = func.vmap(cholesky_util.revert_conditional)
+        revert = func.vmap(
+            lambda **kw: cholesky_util.revert_conditional(**kw, solve_triu=solve_triu)
+        )
         r_obs, (r_cor, gain) = revert(A_rv_chol_upper, rv_chol_upper, noise_chol_upper)
         cholesky_obs = np.transpose(r_obs, axes=(0, 2, 1))
         cholesky_cor = np.transpose(r_cor, axes=(0, 2, 1))

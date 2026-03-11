@@ -86,7 +86,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     std = 1e0 * output_scale
 
     # Evaluate the initial loss and gradient
-    (value0, solution_guess0), gradient0 = value_and_grad(
+    (_value0, solution_guess0), _gradient0 = value_and_grad(
         y0_guess, std=std, output_scale=output_scale
     )
 
@@ -169,7 +169,7 @@ def solver(differential, algebraic, tol, while_loop):
     def solve(y0_sqrt, save_at, output_scale):
 
         y0 = y0_sqrt**2 * output_scale
-        t0, t1 = save_at[0], save_at[-1]
+        t0, _t1 = save_at[0], save_at[-1]
 
         def differential_auto(u, du):
             return differential(u, du, t=t0)
@@ -188,7 +188,7 @@ def solver(differential, algebraic, tol, while_loop):
         prior = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=output_scale)
 
         # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
-        jet = probdiffeq.constraint_dae_jet(
+        jet = probdiffeq.constraint_root_jet_dae(
             differential, algebraic, ssm=ssm, nlstsq=nlstsq
         )
         strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)

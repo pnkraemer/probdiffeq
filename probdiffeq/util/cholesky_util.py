@@ -21,6 +21,7 @@ manipulation of square root matrices.
 """
 
 from probdiffeq.backend import flow, linalg, np, tree
+from probdiffeq.backend.typing import Callable
 
 
 def revert_conditional_noisefree(R_X_F, R_X):
@@ -47,7 +48,7 @@ def revert_conditional_noisefree(R_X_F, R_X):
     return r_marg, (r_cor, gain)
 
 
-def revert_conditional(R_X_F, R_X, R_YX):
+def revert_conditional(R_X_F, R_X, R_YX, *, solve_triu: Callable):
     r"""Revert the  square-root correlation in a Gaussian transition kernel.
 
     What does this mean? Assume we have two normally-distributed random variables,
@@ -98,7 +99,7 @@ def revert_conditional(R_X_F, R_X, R_YX):
     R12 = R[:d_out, d_out:]
 
     # Implements G = R12.T @ np.linalg.inv(R_Y.T) in clever:
-    G = linalg.solve_triangular(R_Y, R12, lower=False).T
+    G = solve_triu(R_Y, R12).T
 
     # ~R_{X \mid Y}
     R_XY = R[d_out:, d_out:]

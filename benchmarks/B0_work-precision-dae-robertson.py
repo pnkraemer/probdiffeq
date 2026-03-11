@@ -221,7 +221,7 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
         iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=base_scale)
 
         # We build a Jet constraint
-        jet = probdiffeq.constraint_dae_jet(
+        jet = probdiffeq.constraint_root_jet_dae(
             differential, algebraic, ssm=ssm, nlstsq=nlstsq
         )
         strategy = probdiffeq.strategy_filter(ssm=ssm)
