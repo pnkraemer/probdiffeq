@@ -39,7 +39,7 @@ def test_exact(seed, nrows, ncols, pade_legendre, use_triu):
     if use_triu:
         A = np.triu(A)
         algorithm = gram_util.exp_gram_cholesky(
-            pade_legendre=pade_legendre, solve=linalg.solve_triangular
+            pade_legendre=pade_legendre, solve=linalg.solve_triu
         )
     else:
         algorithm = gram_util.exp_gram_cholesky(

@@ -190,6 +190,22 @@ class AbstractTreeNormal(abc.ABC):
 class AbstractConditional(abc.ABC):
     """Interface for implementations of manipulating conditionals."""
 
+    def bayes_rule(self, data, rv, conditional, /, *, solve_triu):
+        _, reverted = self.revert(rv, conditional, solve_triu=solve_triu)
+        return self.apply(data, reverted)
+
+    def bayes_rule_and_logpdf(self, data, rv, conditional, /, *, solve_triu):
+        observed, reverted = self.revert(rv, conditional, solve_triu=solve_triu)
+        logpdf = observed.logpdf(data)
+        updated = self.apply(data, reverted)
+        return logpdf, updated
+
+    def bayes_rule_and_mahalanobis(self, data, rv, conditional, /, *, solve_triu):
+        observed, reverted = self.revert(rv, conditional, solve_triu=solve_triu)
+        mahalanobis = observed.mahalanobis_norm_relative(data)
+        updated = self.apply(data, reverted)
+        return mahalanobis, updated
+
     @abc.abstractmethod
     def marginalise(self, rv, conditional, /):
         """Compute a marginal of a random variable and conditional."""
@@ -404,8 +420,9 @@ class DenseNormal(AbstractTreeNormal):
         return self.unravel(std)
 
     def mahalanobis_norm_relative(self, u):
+        u, _ = tree.ravel_pytree(u)
         dx = u - self.mean
-        residual_white = linalg.solve_triangular(self.cholesky.T, dx, trans="T")
+        residual_white = linalg.solve_triu(self.cholesky.T, dx, trans="T")
         mahalanobis = linalg.qr_r(residual_white[:, None])
         return np.reshape(np.abs(mahalanobis) / np.sqrt(self.mean.size), ())
 
@@ -420,7 +437,7 @@ class DenseNormal(AbstractTreeNormal):
         slogdet = np.sum(np.log(np.abs(diagonal)))
 
         dx = u - self.mean
-        residual_white = linalg.solve_triangular(cholesky, dx, lower=True, trans=0)
+        residual_white = linalg.solve_tril(cholesky, dx, trans=0)
         sqrnorm = linalg.vector_dot(residual_white, residual_white)
 
         const = np.log(np.pi() * 2)
@@ -499,6 +516,7 @@ class DenseConditional(AbstractConditional):
         self.flat_shape = flat_shape
 
     def apply(self, x, cond, /):
+
         # 'x' is expected to live in target-space,
         # so we ravel it before applying the conditional
         x, _ = tree.ravel_pytree(x)
@@ -1058,7 +1076,6 @@ class IsotropicConditional(AbstractConditional):
     def apply(self, x, cond, /):
         leaves = tree.tree_leaves(x)
         x = np.stack(leaves)
-
         x = cond.to_latent[:, None] * x
         mean_new = cond.to_observed[:, None] * cond.A @ x + cond.noise.mean
         cholesky_new = cond.to_observed[:, None] * cond.noise.cholesky
@@ -1284,10 +1301,14 @@ class BlockDiagConditional(AbstractConditional):
         rv_chol_upper = _transpose(cholesky)
         noise_chol_upper = _transpose(cond.noise.cholesky)
         A_rv_chol_upper = _transpose(cond.A @ cholesky)
-        revert = func.vmap(
-            lambda **kw: cholesky_util.revert_conditional(**kw, solve_triu=solve_triu)
+
+        revert_conditional = func.partial(
+            cholesky_util.revert_conditional, solve_triu=solve_triu
         )
-        r_obs, (r_cor, gain) = revert(A_rv_chol_upper, rv_chol_upper, noise_chol_upper)
+        revert_vmap = func.vmap(revert_conditional)
+        r_obs, (r_cor, gain) = revert_vmap(
+            A_rv_chol_upper, rv_chol_upper, noise_chol_upper
+        )
         cholesky_obs = np.transpose(r_obs, axes=(0, 2, 1))
         cholesky_cor = np.transpose(r_cor, axes=(0, 2, 1))
 
@@ -1518,7 +1539,10 @@ class IsotropicNormal(AbstractTreeNormal):
     def mahalanobis_norm_relative(self, u):
         if self.cholesky.size > 1:
             raise ValueError
-        residual_white = (self.mean - u) / self.cholesky
+        u_leaves = tree.tree_leaves(u)
+        u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
+        u_latent = np.stack(u_flat)
+        residual_white = (self.mean - u_latent) / self.cholesky
         residual_white_matrix = linalg.qr_r(residual_white.T)
         return np.reshape(np.abs(residual_white_matrix) / np.sqrt(self.mean.size), ())
 
@@ -1541,7 +1565,7 @@ class IsotropicNormal(AbstractTreeNormal):
         cholesky = linalg.qr_r(self.cholesky.T).T
 
         dx = u - self.mean
-        w = linalg.solve_triangular(cholesky.T, dx, trans="T")
+        w = linalg.solve_triu(cholesky.T, dx, trans="T")
 
         maha_term = linalg.vector_dot(w, w)
 
@@ -1661,9 +1685,13 @@ class BlockDiagNormal(AbstractTreeNormal):
     def mahalanobis_norm_relative(self, u, /):
         # assumes rv.chol = (d,1,1)
         # return array of norms! See calibration
-        mean = np.reshape(self.mean, (-1,))
+        u_leaves = tree.tree_leaves(u)
+        u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
+        u_latent = np.stack(u_flat).T
+
+        mean = np.reshape(self.mean - u_latent, (-1,))
         cholesky = np.reshape(self.cholesky, (-1,))
-        return (mean - u) / cholesky / np.sqrt(mean.size)
+        return mean / cholesky / np.sqrt(mean.size)
 
     def rescale_cholesky(self, factor, /):
         cholesky = factor[..., None, None] * self.cholesky
@@ -1674,14 +1702,14 @@ class BlockDiagNormal(AbstractTreeNormal):
     def logpdf(self, u, /):
         u_leaves = tree.tree_leaves(u)
         u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
-        u_ = np.stack(u_flat).T
-        return np.sum(func.vmap(BlockDiagNormal.logpdf_scalar)(self, u_))
+        u_latent = np.stack(u_flat).T
+        return np.sum(func.vmap(BlockDiagNormal.logpdf_scalar)(self, u_latent))
 
     def logpdf_scalar(self, u):
         cholesky = linalg.qr_r(self.cholesky.T).T
 
         dx = u - self.mean
-        w = linalg.solve_triangular(cholesky.T, dx, trans="T")
+        w = linalg.solve_triu(cholesky.T, dx, trans="T")
 
         maha_term = linalg.vector_dot(w, w)
 

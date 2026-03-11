@@ -222,7 +222,11 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
 
 
 def loss_lml_timeseries(
-    *, ssm: ssm_impl.FactSsmImpl, average_pdfs: bool = True, tcoeff_index=0
+    *,
+    ssm: ssm_impl.FactSsmImpl,
+    average_pdfs: bool = True,
+    tcoeff_index=0,
+    solve_triu=linalg.lstsq_svd,
 ):
     """Construct a log-marginal-likelihood loss for a time-series."""
 
@@ -257,7 +261,7 @@ def loss_lml_timeseries(
 
         model = func.vmap(make_model)(std)
         return posterior.evaluate_lml(
-            u, model=model, ssm=ssm, average_pdfs=average_pdfs
+            u, model=model, ssm=ssm, average_pdfs=average_pdfs, solve_triu=solve_triu
         )
 
     return loss
@@ -632,23 +636,33 @@ class MarkovSequence(Generic[N]):
 
         return tree.tree_array_prepend(self.marginal, marginals)
 
-    def evaluate_lml(self, u, *, model, ssm: ssm_impl.FactSsmImpl, average_pdfs: bool):
+    def evaluate_lml(
+        self,
+        u,
+        *,
+        model,
+        ssm: ssm_impl.FactSsmImpl,
+        average_pdfs: bool,
+        solve_triu: Callable,
+    ):
         assert self.reverse
 
         if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
             markov_seq = self._select_terminal()
             return markov_seq.evaluate_lml(
-                u, model=model, ssm=ssm, average_pdfs=average_pdfs
+                u,
+                model=model,
+                ssm=ssm,
+                average_pdfs=average_pdfs,
+                solve_triu=solve_triu,
             )
 
         # Process the terminal value
         u0 = tree.tree_map(lambda s: s[-1], u)
         model0 = tree.tree_map(lambda s: s[-1], model)
-        marg, cond = ssm.conditional.revert(
-            self.marginal, model0, solve_triu=linalg.solve_triangular
+        pdf0, updated = ssm.conditional.bayes_rule_and_logpdf(
+            u0, self.marginal, model0, solve_triu=solve_triu
         )
-        updated = ssm.conditional.apply(u0, cond)
-        pdf0 = marg.logpdf(u0)
 
         # Process the remaining values
         def body(rv_and_logpdf, prior_and_observation_and_data):
@@ -656,15 +670,16 @@ class MarkovSequence(Generic[N]):
             prior, observation, data = prior_and_observation_and_data
 
             predicted = ssm.conditional.marginalise(rv, prior)
-            observed, noise = ssm.conditional.revert(
-                predicted, observation, solve_triu=linalg.solve_triangular
-            )
-            logpdf_n = observed.logpdf(data)
-            corrected = ssm.conditional.apply(data, noise)
 
-            # The mean of the PDFs usually leads to LML values that are more
-            # "human-readable" (ie O(1) instead O(N)). This is technically not
-            # a log-marginal-likelihood, but much nicer to work with.
+            logpdf_n, corrected = ssm.conditional.bayes_rule_and_logpdf(
+                data, predicted, observation, solve_triu=solve_triu
+            )
+
+            # The mean of the PDFs (as opposed to their sum) usually
+            # leads to LML values that are more "human-readable"
+            # (ie magnitude O(1) instead O(N)). This is technically not
+            # a log-marginal-likelihood, but much nicer to work with when
+            # optimising the loss.
             if average_pdfs:
                 logpdf1 = (logpdf * num_data + logpdf_n) / (num_data + 1)
             else:
@@ -1087,6 +1102,7 @@ def ssm_taylor(
     tcoeffs: C,
     *,
     # Which of the Taylor coefficients are differential variables
+    # TODO: Remove this. It is outdated.
     is_differential: C | None = None,
     nondifferential_eps: float = 1e-6,  # a small value
     # The state-space model factorisation
@@ -1169,7 +1185,7 @@ def ssm_taylor_diffuse(
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     # How many extra derivatives to model in the state-space
     diffuse_derivatives: int = 0,
-    diffuse_eps: float = 1.0,  # a large value
+    diffuse_eps: float = 1.0,
 ):
     """Initialize a diffuse state-space model for Taylor coefficients.
 
@@ -1356,7 +1372,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         self, posterior: MarkovSequence, *, transition
     ) -> tuple[TaylorCoeffTarget, MarkovSequence]:
         marginals, cond = self.ssm.conditional.revert(
-            posterior.marginal, transition, solve_triu=linalg.solve_triangular
+            posterior.marginal, transition, solve_triu=linalg.solve_triu
         )
         posterior = MarkovSequence(
             marginal=marginals, conditional=cond, reverse=posterior.reverse
@@ -1382,7 +1398,6 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
 
         # Marginalise
         marginals = posterior.evaluate_marginals(ssm=self.ssm)
-        # marginals = self.markov_marginals(posterior, reverse=True)
 
         # Prepend the initial condition to the filtering distributions
         init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
@@ -1597,7 +1612,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         rv = posterior.marginal
         bw0 = posterior.conditional
         marginals, cond = self.ssm.conditional.revert(
-            rv, transition, solve_triu=linalg.solve_triangular
+            rv, transition, solve_triu=linalg.solve_triu
         )
         cond = self.ssm.conditional.merge(bw0, cond)
         predicted = MarkovSequence(marginals, cond, reverse=posterior.reverse)
@@ -1792,13 +1807,13 @@ class solver_mle(ProbabilisticSolver):
             fx_init, _cstate = self.constraint_init.linearize(
                 u_pred.marginals, cstate_init, damp=damp, t=t
             )
-            observed, reverted = self.ssm.conditional.revert(
-                u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
+            zeros = tree.tree_map(np.zeros_like, fx_init.noise.evaluate_mean())
+            tmp = self.ssm.conditional.bayes_rule_and_mahalanobis(
+                zeros, u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
             )
-            u, posterior = self.strategy.apply_updates(
-                prediction, updates=reverted.noise
-            )
-            output_scale_running = observed.mahalanobis_norm_relative(0.0)
+            output_scale_running, updates = tmp
+
+            u, posterior = self.strategy.apply_updates(prediction, updates=updates)
             num_data = 1.0
 
         else:
@@ -1836,16 +1851,15 @@ class solver_mle(ProbabilisticSolver):
         )
 
         # Do the full correction step
-        observed, reverted = self.ssm.conditional.revert(
-            u.marginals, fx, solve_triu=linalg.solve_triangular
+        zeros = tree.tree_map(np.zeros_like, fx.noise.evaluate_mean())
+        new_term, updates = self.ssm.conditional.bayes_rule_and_mahalanobis(
+            zeros, u.marginals, fx, solve_triu=linalg.solve_triu
         )
-        updates = reverted.noise
         u, posterior = self.strategy.apply_updates(
             prediction=prediction, updates=updates
         )
 
         # Calibrate the output scale
-        new_term = observed.mahalanobis_norm_relative(0.0)
         output_scale_running = self.ssm.normal.update_moving_avg(  # type: ignore
             output_scale_running, new_term, num=num_data
         )
@@ -1940,12 +1954,11 @@ class solver_dynamic(ProbabilisticSolver):
             fx_init, _cstate = self.constraint_init.linearize(
                 u_pred.marginals, cstate_init, damp=damp, t=t
             )
-            _, reverted = self.ssm.conditional.revert(
-                u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
+            zeros = tree.tree_map(np.zeros_like, fx_init.noise.evaluate_mean())
+            updates = self.ssm.conditional.bayes_rule(
+                zeros, u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
             )
-            u, posterior = self.strategy.apply_updates(
-                prediction, updates=reverted.noise
-            )
+            u, posterior = self.strategy.apply_updates(prediction, updates=updates)
         else:
             u, posterior = u_pred, prediction
         return ProbabilisticSolution(
@@ -1973,7 +1986,8 @@ class solver_dynamic(ProbabilisticSolver):
             u, state=lin_state, damp=damp, t=state.t + dt
         )
         observed = self.ssm.conditional.marginalise(u, fx)
-        output_scale = observed.mahalanobis_norm_relative(0.0)
+        zeros = tree.tree_map(np.zeros_like, fx.noise.evaluate_mean())
+        output_scale = observed.mahalanobis_norm_relative(zeros)
 
         # Do the full extrapolation with the calibrated output scale
         # (Includes re-discretisation)
@@ -1990,7 +2004,7 @@ class solver_dynamic(ProbabilisticSolver):
 
         # Complete the update
         _, reverted = self.ssm.conditional.revert(
-            u.marginals, fx, solve_triu=linalg.solve_triangular
+            u.marginals, fx, solve_triu=linalg.solve_triu
         )
         updates = reverted.noise
         u, posterior = self.strategy.apply_updates(prediction, updates=updates)
@@ -2076,16 +2090,11 @@ class solver(ProbabilisticSolver):
             fx_init, _cstate = self.constraint_init.linearize(
                 u_pred.marginals, cstate_init, damp=damp, t=t
             )
-            _, reverted = self.ssm.conditional.revert(
-                u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
+            zeros = tree.tree_map(np.zeros_like, fx_init.noise.evaluate_mean())
+            updates = self.ssm.conditional.bayes_rule(
+                zeros, u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
             )
-            u, posterior = self.strategy.apply_updates(
-                prediction, updates=reverted.noise
-            )
-            # import jax
-
-            # jax.debug.print("{}", fx_init.A, ordered=True)
-            # jax.debug.print("{}", fx_init.noise.mean, ordered=True)
+            u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
         else:
             u, posterior = u_pred, prediction
@@ -2124,10 +2133,11 @@ class solver(ProbabilisticSolver):
         )
 
         # Update
-        _, reverted = self.ssm.conditional.revert(
-            u_pred.marginals, fx, solve_triu=linalg.solve_triangular
+        zeros = tree.tree_map(np.zeros_like, fx.noise.evaluate_mean())
+        updates = self.ssm.conditional.bayes_rule(
+            zeros, u_pred.marginals, fx, solve_triu=linalg.solve_triu
         )
-        u, posterior = self.strategy.apply_updates(prediction, updates=reverted.noise)
+        u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
         # Return solution
         return ProbabilisticSolution(
@@ -2343,7 +2353,6 @@ class error_residual_std(ErrorEstimator):
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
-        # TODO: should conditional.apply take the Pytree mean?
         mean = previous.u.marginals.evaluate_mean()
         rv = self.ssm.conditional.apply(mean, transition)
 
@@ -2357,7 +2366,8 @@ class error_residual_std(ErrorEstimator):
 
         # Extract the local residual std from the linearization
         observed = self.ssm.conditional.marginalise(rv, linearized)
-        output_scale = observed.mahalanobis_norm_relative(0.0)
+        zeros = tree.tree_map(np.zeros_like, linearized.noise.evaluate_mean())
+        output_scale = observed.mahalanobis_norm_relative(zeros)
         observed = observed.rescale_cholesky(output_scale)
         error = observed.evaluate_std()
         error, _ = tree.ravel_pytree(error)
@@ -2449,16 +2459,16 @@ class error_state_std(ErrorEstimator):
             linearized = proposed.fun_evals
 
         # Extract the local residual std from the linearization
-        observed, conditional = self.ssm.conditional.revert(
-            rv, linearized, solve_triu=linalg.solve_triangular
+        zeros = tree.tree_map(np.zeros_like, linearized.noise.evaluate_mean())
+        output_scale, conditional = self.ssm.conditional.bayes_rule_and_mahalanobis(
+            zeros, rv, linearized, solve_triu=linalg.solve_triu
         )
-        output_scale = observed.mahalanobis_norm_relative(0.0)
 
         # Measure error on the n-th state (usually, n=0 because why not)
         n = self.derivative_idx
 
         # *New:* Go back into solution space
-        std = conditional.noise.evaluate_std()[n]
+        std = conditional.evaluate_std()[n]
         error, _ = tree.ravel_pytree(std)
         error = output_scale * error
         error, _ = tree.ravel_pytree(error)
