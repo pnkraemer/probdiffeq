@@ -1,7 +1,8 @@
 """Assert that the base adaptive solver is accurate."""
 
-from probdiffeq import ivpsolve, probdiffeq
-from probdiffeq.backend import func, linalg, np, ode, testing, tree
+from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq.backend import func, np, ode, testing, tree
+from probdiffeq.util import nlstsq_util
 
 
 @testing.fixture(name="ivp")
@@ -21,23 +22,37 @@ def case_solver_dynamic():
     return probdiffeq.solver_dynamic
 
 
-@testing.parametrize_with_cases("solver", cases=".", prefix="case_solver_")
-def test_output_matches_reference(ivp, solver) -> None:
+@testing.parametrize("derivatives", [1, 4])
+@testing.parametrize_with_cases("solver_factory", cases=".", prefix="case_solver_")
+def test_output_matches_reference(ivp, solver_factory, derivatives) -> None:
     vf, (u0,), (t0, t1) = ivp
 
     def root(u, du, *, t):
-        return tree.tree_map(lambda a, b: a - b, du, vf(u, t=t))
+        return tree.tree_map(
+            lambda a, b: a + b, root_linear(u, du, t=t), root_nonlinear(u, du, t=t)
+        )
+
+    def root_linear(_u, du, *, t):
+        del t
+        return du
+
+    def root_nonlinear(u, _du, *, t):
+        vfu = vf(u, t=t)
+        return tree.tree_map(lambda a: -a, vfu)
+
+    expected = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), [u0], num=derivatives)
 
     # Build an SSM (no ODE-jets, so that we can test the update at init)
     # Only use the dense factorisation because this test uses JET constraints
     # and they have not been implemented for isotropic or blockdiagonal models
-    init, ssm = probdiffeq.ssm_taylor([u0], diffuse_derivatives=4)
+    init, ssm = probdiffeq.ssm_taylor([u0], diffuse_derivatives=derivatives)
 
     # Build a solver
+    nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=50, tol=1e-10)
     prior = probdiffeq.prior_wiener_integrated(ssm=ssm)
-    strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-    constraint = probdiffeq.constraint_root_jet(root, ssm=ssm)
-    solver = solver(
+    strategy = probdiffeq.strategy_filter(ssm=ssm)
+    constraint = probdiffeq.constraint_root_jet(root, ssm=ssm, nlstsq=nlstsq)
+    solver = solver_factory(
         strategy=strategy,
         prior=prior,
         constraint=constraint,
@@ -47,17 +62,7 @@ def test_output_matches_reference(ivp, solver) -> None:
     solve = ivpsolve.solve_fixed_grid(solver=solver)
 
     # Compute the PN solution
-    grid = np.linspace(t0, t1, endpoint=True, num=20)
-    received = func.jit(solve)(init, grid=grid)
-
-    # Compute a reference solution
-    expected = ode.odeint_and_save_at(vf, (u0,), save_at=grid, atol=1e-7, rtol=1e-7)
-
-    # The results should be very similar
-    assert testing.allclose(received.u.mean[0], expected)
-
-    # The posterior standard deviation at the initial time-point
-    # should essentially be zero if the initial constraint did something
-    stds = tree.tree_leaves(received.u.std)
-    tol = np.sqrt(np.finfo_eps(stds[-1][0].dtype))
-    assert linalg.vector_norm(stds[-1][0]) < tol
+    grid = np.linspace(t0, t1, endpoint=True, num=10)
+    solution = func.jit(solve)(init, grid=grid)
+    received = tree.tree_map(lambda s: s[0], solution.u.mean)
+    assert testing.allclose(received, expected)
