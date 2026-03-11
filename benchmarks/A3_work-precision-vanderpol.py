@@ -134,7 +134,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
 
         init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
         iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
-        ts = probdiffeq.constraint_root_ts1(root, ssm=ssm)
+        ts = probdiffeq.constraint_jet(root, ssm=ssm, jet_order=0)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         solver = probdiffeq.solver_dynamic(
