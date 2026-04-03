@@ -2399,6 +2399,7 @@ class error_residual_std(ErrorEstimator):
         ssm: ssm_impl.FactSsmImpl,
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default
+        error_per_unit_step: bool = False,
     ) -> None:
         if error_norm is None:
             error_norm = error_norm_scale_then_rms()
@@ -2408,6 +2409,7 @@ class error_residual_std(ErrorEstimator):
         self.prior = prior
         self.ssm = ssm
         self.re_linearize_before_error = re_linearize_before_error
+        self.error_per_unit_step = error_per_unit_step
 
     def init_error(self):
         return self.constraint.init_linearization()
@@ -2463,6 +2465,9 @@ class error_residual_std(ErrorEstimator):
         # (non-probabilistic) ODE solvers; for example, refer to
         # Tan et al. (2026; https://arxiv.org/pdf/2602.04086).
         n = self.constraint.root_order - 1
+        if self.error_per_unit_step:
+            n += 1
+
         error_abs = error * dt**n / np.factorial(n)
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
@@ -2492,6 +2497,7 @@ class error_state_std(ErrorEstimator):
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default
         derivative_idx: int = 0,
+        error_per_unit_step: bool = False,
     ) -> None:
         if error_norm is None:
             error_norm = error_norm_scale_then_rms()
@@ -2502,6 +2508,7 @@ class error_state_std(ErrorEstimator):
         self.ssm = ssm
         self.re_linearize_before_error = re_linearize_before_error
         self.derivative_idx = derivative_idx
+        self.error_per_unit_step = error_per_unit_step
 
     def init_error(self):
         return self.constraint.init_linearization()
@@ -2542,6 +2549,9 @@ class error_state_std(ErrorEstimator):
 
         # Measure error on the n-th state (usually, n=0 because why not)
         n = self.derivative_idx
+
+        if self.error_per_unit_step:
+            n += 1
 
         # *New:* Go back into solution space
         std = conditional.evaluate_std()[n]
