@@ -212,7 +212,7 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
         nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(
             maxiter=10, tol=jnp.finfo(y0[0].dtype).eps ** 0.5
         )
-        tcoeffs, _info = taylor.daejet_nonlinear_lstsq(
+        tcoeffs, _info = taylor.daejet_nlstsq(
             differential_auto, algebraic_auto, y0, num=num_derivatives, nlstsq=nlstsq
         )
         init, ssm = probdiffeq.ssm_taylor(tcoeffs)

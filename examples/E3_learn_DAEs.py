@@ -169,7 +169,7 @@ def solver(differential, algebraic, tol, while_loop):
         nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(
             maxiter=10, tol=tol, while_loop=while_loop
         )
-        y0, _info = taylor.daejet_nonlinear_lstsq(
+        y0, _info = taylor.daejet_nlstsq(
             differential_auto, algebraic_auto, [y0], num=3, nlstsq=nlstsq
         )
         init, ssm = probdiffeq.ssm_taylor(y0)

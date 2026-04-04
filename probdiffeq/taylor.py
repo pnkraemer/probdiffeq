@@ -326,7 +326,29 @@ def odejet_affine(vf: Callable, inits: Sequence[Array], /, num: int):
     return [*inits, fx, *fx_evaluations]
 
 
-def daejet_nonlinear_lstsq(
+def daejet_nlstsq_recursive(
+    differential: Callable,
+    algebraic: Callable,
+    inits: Sequence[Array],
+    /,
+    num: int,
+    stride: int,
+    nlstsq: Callable,
+):
+    """Evaluate the Taylor series of a differential-algebraic equation system.
+
+    Like daejet_nlstsq(), but called recursively which means that extremely high orders
+    can be initialised exactly at the cost of multiple calls to the nonlinear least squares solver.
+    """
+    received = inits
+    for _ in range(num // stride):
+        received, _info = daejet_nlstsq(
+            differential, algebraic, received, num=stride, nlstsq=nlstsq
+        )
+    return received, {}
+
+
+def daejet_nlstsq(
     differential: Callable,
     algebraic: Callable,
     inits: Sequence[Array],
