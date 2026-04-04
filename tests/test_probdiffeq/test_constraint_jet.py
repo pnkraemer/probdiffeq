@@ -1,4 +1,4 @@
-"""Assert that all jet-linearisation constraints are decent."""
+"""Assert that all jet-linearisation constraints are correct."""
 
 from probdiffeq import probdiffeq, taylor
 from probdiffeq.backend import linalg, np, structs, testing
@@ -141,7 +141,7 @@ def case_jet_iterated(root):
 
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
 @testing.parametrize("jet_order", [0, "max"])
-def test_output_matches_reference(
+def test_posterior_linearisation_matches_closed_form_recursion(
     root: Root, jet_factory: Callable, expected: list, jet_order: int | Literal["max"]
 ):
     derivatives = len(expected) - 1

@@ -444,6 +444,9 @@ class DenseNormal(AbstractTreeNormal):
         return -1 / 2 * sqrnorm - u.size / 2 * const - slogdet
 
     def to_multivariate_normal(self):
+        if self.mean.ndim > 1:
+            return func.vmap(DenseNormal.to_multivariate_normal)(self)
+
         return self.mean, self.cholesky @ self.cholesky.T
 
     def sample(self, key):
@@ -831,7 +834,7 @@ class DenseLinearizationRoot(AbstractLinearizationRoot):
             return tree.ravel_pytree(root_eval)[0]
 
         mean = rv.mean
-        if self.nlstsq is not None:
+        if self.nlstsq is not None:  # posterior linearization
             mean, _info = self.nlstsq(constraint_flat, mean, rv.mean, rv.cholesky)
 
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
