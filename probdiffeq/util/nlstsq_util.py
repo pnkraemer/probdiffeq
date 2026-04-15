@@ -7,7 +7,14 @@ from probdiffeq.backend.typing import Array
 def nlstsq_constrained_gauss_newton(
     *, maxiter, tol, lstsq=linalg.lstsq_svd, while_loop=flow.while_loop
 ):
-    """Solve nonlinearly constrained least-squares problems."""
+    r"""Solve nonlinearly constrained least-squares problems.
+
+    Concretely, solve problems of the form
+
+    \min_x \| L^{-1}(x - mean)\|^2 s.t. constraint(x) = 0,
+
+    where L is the Cholesky factor of a covariance matrix.
+    """
 
     def solve(constraint, x0, mean, cholesky):
         @tree.register_dataclass

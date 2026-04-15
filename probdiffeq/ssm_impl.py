@@ -819,22 +819,23 @@ class DenseLinearizationRoot(AbstractLinearizationRoot):
     def init_linearization(self):
         return self.jacobian.init_jacobian_handler()
 
+    def constraint_flat(self, m: Array, *, t) -> Array:
+        """Evaluate a flattened version of the root constraint."""
+        # Unravel the location and extract derivatives
+        m_tree = self.unravel(m)
+        relevant_tcoeffs = m_tree[: self.root_order]
+
+        # Evaluate the root
+        root_eval = self.root(*relevant_tcoeffs, t=t)
+
+        # Flatten the output so that the Jacobians are matrices, not Pytrees.
+        return tree.ravel_pytree(root_eval)[0]
+
     def linearize(self, rv, state, *, damp: float, t):
-
-        def constraint_flat(m: Array) -> Array:
-            """Evaluate a flattened version of the root constraint."""
-            # Unravel the location and extract derivatives
-            m_tree = self.unravel(m)
-            relevant_tcoeffs = m_tree[: self.root_order]
-
-            # Evaluate the vector field
-            root_eval = self.root(*relevant_tcoeffs, t=t)
-
-            # Flatten the output so that the Jacobians are matrices, not Pytrees.
-            return tree.ravel_pytree(root_eval)[0]
 
         mean = rv.mean
         if self.nlstsq is not None:  # posterior linearization
+            constraint_flat = func.partial(self.constraint_flat, t=t)
             mean, _info = self.nlstsq(constraint_flat, mean, rv.mean, rv.cholesky)
 
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
