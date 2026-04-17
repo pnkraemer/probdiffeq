@@ -1180,10 +1180,9 @@ class ProbabilisticSolver:
 def ssm_taylor(
     tcoeffs: C,
     *,
-    # Which of the Taylor coefficients are differential variables
-    # TODO: Remove this. It is outdated.
-    is_differential: C | None = None,
-    nondifferential_eps: float = 1e-6,  # a small value
+    # Which of the Taylor coefficients are exact
+    is_exact: C | bool = True,
+    inexact_eps: float = 1e-6,  # a small value
     # The state-space model factorisation
     ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
     # How many extra derivatives to model in the state-space
@@ -1192,10 +1191,7 @@ def ssm_taylor(
 ):
     """Initialize a state-space model over Taylor coefficients."""
     tcoeffs_std = _tcoeffs_std_from_differential_variables(
-        tcoeffs,
-        is_differential=is_differential,
-        nondifferential_eps=nondifferential_eps,
-        ssm_fact=ssm_fact,
+        tcoeffs, is_exact=is_exact, inexact_eps=inexact_eps, ssm_fact=ssm_fact
     )
 
     return ssm_taylor_diffuse(
@@ -1208,7 +1204,7 @@ def ssm_taylor(
 
 
 def _tcoeffs_std_from_differential_variables(
-    tcoeffs, *, ssm_fact, is_differential, nondifferential_eps
+    tcoeffs, *, ssm_fact, is_exact, inexact_eps
 ):
     # Decide the standard deviation template based on the factorisations
     if ssm_fact in ["dense", "blockdiag"]:
@@ -1224,36 +1220,38 @@ def _tcoeffs_std_from_differential_variables(
     leaves, structure = tree.tree_flatten(tcoeffs)
     std_template = tree.tree_unflatten(structure, [std_per_leaf for _ in leaves])
 
-    # If 'is_differential' hasn't been provided, simply return zeros everywhere
-    if is_differential is None:
-        return std_template
+    # If 'is_exact' is a boolean, keep things simple
+    if isinstance(is_exact, bool):
+        if is_exact:
+            return tree.tree_map(np.zeros_like, std_template)
+        return tree.tree_map(lambda s: inexact_eps * np.ones_like(s), std_template)
 
-    is_differential = tree.tree_map(np.asarray, is_differential)
+    is_exact = tree.tree_map(np.asarray, is_exact)
 
-    # Before using is_differential, verify it has the correct structure and shape
+    # Before using is_exact, verify it has the correct structure and shape
     try:
 
         def shape_equal(A, B):
             return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
 
-        assert tree.tree_all(shape_equal(is_differential, std_template))
+        assert tree.tree_all(shape_equal(is_exact, std_template))
     except (ValueError, AssertionError) as err:
-        msg = "Input 'is_differential' has the wrong PyTree structure."
+        msg = "Input 'is_exact' has the wrong PyTree structure."
         msg += f" Expected: {tree.tree_map(np.shape, std_template)}."
-        msg += f" Received: {tree.tree_map(np.shape, is_differential)}."
+        msg += f" Received: {tree.tree_map(np.shape, is_exact)}."
         raise ValueError(msg) from err
 
-    # Wherever is_differential is True, initialize with zeros.
+    # Wherever is_exact is True, initialize with zeros.
     # Elsewhere, initialize with a small positivec value.
 
     def std_init(s: Array) -> Array:
         if s.dtype != np.dtype(bool):
-            msg = "Boolean entries expected in `is_differential`."
+            msg = "Boolean entries expected in `is_exact`."
             msg += f" Received: dtype={np.dtype(s)}"
             raise TypeError(msg)
-        return np.where(s, 0.0, nondifferential_eps)
+        return np.where(s, 0.0, inexact_eps)
 
-    return tree.tree_map(std_init, is_differential)
+    return tree.tree_map(std_init, is_exact)
 
 
 def ssm_taylor_diffuse(
