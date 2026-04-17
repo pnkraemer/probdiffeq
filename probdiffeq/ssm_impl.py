@@ -255,16 +255,19 @@ class ShapeInfo:
     """Information about shapes of Taylor coefficients (lengths, sizes, etc.)."""
 
     def __init__(self, tcoeffs: Sequence, /):
+        # Ensure everything has shapes and dtypes
+        tcoeffs = tree.tree_map(np.asarray, tcoeffs)
+
         # TODO: assert that the tree is a tree of Taylor coefficients
         #       (which means each leaf has the same tree structure)
 
-        # TODO: don't store the arrays but only the shape and dtype
-
         # A flattened representation of the Taylor coefficients
-        self.all_flat, self.all_unravel = tree.ravel_pytree(tcoeffs)
+        flat, self.all_unravel = tree.ravel_pytree(tcoeffs)
+        self.all_flat = structs.ShapeDtypeStruct(flat.shape, flat.dtype)
 
         # A flattened representation of each Taylor coefficient
-        self.single_flat, self.single_unravel = tree.ravel_pytree(tcoeffs[0])
+        flat, self.single_unravel = tree.ravel_pytree(tcoeffs[0])
+        self.single_flat = structs.ShapeDtypeStruct(flat.shape, flat.dtype)
 
         # The leaves in the Taylor coefficients.
         # Note how each Taylor coefficient can itself be a PyTree,
@@ -272,8 +275,9 @@ class ShapeInfo:
         # This specific info is especially important for blockdiagonal models.
         # TODO: this somewhat duplicates the above,
         #       but not enough to prioritise refactoring...
-        self.leaves, self.treedef = tree.tree_flatten(tcoeffs)
-        _, self.leaf_unravel = tree.ravel_pytree(self.leaves[0])
+        leaves, self.treedef = tree.tree_flatten(tcoeffs)
+        _, self.leaf_unravel = tree.ravel_pytree(leaves[0])
+        self.leaves = [structs.ShapeDtypeStruct(s.shape, s.dtype) for s in leaves]
 
     @property
     def num_derivatives(self):
@@ -321,19 +325,6 @@ class FactSsmImpl:
     def from_tcoeffs_isotropic(cls, tcoeffs_like, /):
         """Construct a factorised state-space model implementation."""
         shape_info = ShapeInfo(tcoeffs_like)
-
-        # ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
-        # num_derivatives = len(tcoeffs_like) - 1
-
-        # tcoeffs_tree_only = tree.tree_map(lambda *_a: 0.0, tcoeffs_like)
-        # _, unravel_tree = tree.ravel_pytree(tcoeffs_tree_only)
-
-        # leaves, tree_structure = tree.tree_flatten(tcoeffs_like)
-        # _, unravel_leaf = tree.ravel_pytree(leaves[0])
-
-        # def unravel(z):
-        #     pytree = func.vmap(unravel_tree, in_axes=1, out_axes=0)(z)
-        #     return tree.tree_map(unravel_leaf, pytree)
 
         prototypes = IsotropicPrototype()
         normal = IsotropicNormal
@@ -876,9 +867,6 @@ class IsotropicLinearizationOdeTs0(AbstractLinearizationOde):
 
         m1 = [*(mean[: self.ode_order])]
         m1 = tree.tree_map(self.shape_info.single_unravel, m1)
-
-        # mean_tree = self.unravel(mean)
-        # m1 = mean_tree[: self.ode_order]
         fx_tree = fun(*m1)
         fx, unravel_obs = tree.ravel_pytree(fx_tree)
 
