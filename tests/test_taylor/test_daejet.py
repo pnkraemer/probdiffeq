@@ -100,9 +100,4 @@ def test_daejet_recursive_matches_expectation_on_sir_model(num):
         return tcoeffs
 
     received = initialize(y0)
-    # for r, e in zip(received, expected):
-    #     print("received", r)
-    #     print("expected", e)
-    #     print()
-
     assert testing.allclose(received, expected)
