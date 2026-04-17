@@ -51,8 +51,12 @@ def matrix_norm(arr, /, *, order=None):
     return jnp.linalg.norm(arr, ord=order)
 
 
-def solve_triangular(matrix, rhs, /, *, trans=0, lower=False):
-    return jax.scipy.linalg.solve_triangular(matrix, rhs, trans=trans, lower=lower)
+def solve_triu(matrix, rhs, /, *, trans=0):
+    return jax.scipy.linalg.solve_triangular(matrix, rhs, trans=trans, lower=False)
+
+
+def solve_tril(matrix, rhs, /, *, trans=0):
+    return jax.scipy.linalg.solve_triangular(matrix, rhs, trans=trans, lower=True)
 
 
 def solve_lu(matrix, rhs, /):

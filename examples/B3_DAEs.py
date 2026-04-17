@@ -51,7 +51,7 @@ def main(t0=1e-6, t1=1e5) -> None:
 
     y0 = [jnp.array([1.0, 0.0, 0.0])]
     nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=10, tol=1e-8)
-    y0, _info = taylor.daejet_nonlinear_lstsq(
+    y0, _info = taylor.daejet_nlstsq(
         differential_auto, algebraic_auto, y0, num=4, nlstsq=nlstsq
     )
     init, ssm = probdiffeq.ssm_taylor(y0)
@@ -63,7 +63,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     ioup = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=base_scale)
 
     # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
-    jet = probdiffeq.constraint_dae_jet(differential, algebraic, ssm=ssm, nlstsq=nlstsq)
+    jet = probdiffeq.constraint_jet_dae(differential, algebraic, ssm=ssm, nlstsq=nlstsq)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_dynamic(
         strategy=strategy, prior=ioup, constraint=jet, ssm=ssm

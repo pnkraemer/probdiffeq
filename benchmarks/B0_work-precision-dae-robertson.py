@@ -212,7 +212,7 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
         nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(
             maxiter=10, tol=jnp.finfo(y0[0].dtype).eps ** 0.5
         )
-        tcoeffs, _info = taylor.daejet_nonlinear_lstsq(
+        tcoeffs, _info = taylor.daejet_nlstsq(
             differential_auto, algebraic_auto, y0, num=num_derivatives, nlstsq=nlstsq
         )
         init, ssm = probdiffeq.ssm_taylor(tcoeffs)
@@ -221,7 +221,7 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
         iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=base_scale)
 
         # We build a Jet constraint
-        jet = probdiffeq.constraint_dae_jet(
+        jet = probdiffeq.constraint_jet_dae(
             differential, algebraic, ssm=ssm, nlstsq=nlstsq
         )
         strategy = probdiffeq.strategy_filter(ssm=ssm)

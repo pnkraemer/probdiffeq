@@ -10,7 +10,8 @@ _SHAPES = ([(4, 3), (3, 3), (4, 4)], [(2, 3), (3, 3), (2, 2)])
 
 
 @testing.parametrize("HCshape, Cshape, Xshape", _SHAPES)
-def test_revert_conditional(HCshape, Cshape, Xshape) -> None:
+@testing.parametrize("solve_triu", [linalg.solve_triu, linalg.lstsq_svd])
+def test_revert_conditional(HCshape, Cshape, Xshape, solve_triu) -> None:
     HC = _some_array(HCshape) + 1.0
     C = _some_array(Cshape) + 2.0
     X = _some_array(Xshape) + 3.0 + np.eye(Xshape[0])
@@ -20,7 +21,7 @@ def test_revert_conditional(HCshape, Cshape, Xshape) -> None:
     C1 = C @ C.T - K @ S @ K.T
 
     extra, (bw_noise, g) = cholesky_util.revert_conditional(
-        R_X_F=HC.T, R_X=C.T, R_YX=X.T
+        R_X_F=HC.T, R_X=C.T, R_YX=X.T, solve_triu=solve_triu
     )
 
     def cov(x):
@@ -85,7 +86,10 @@ def test_reverse_conditional_jacrev_zero_matrix() -> None:
     HC = _some_array((2, 3)) * 0.0
     X = _some_array((2, 2)) + 3.0 + np.eye(2)
 
-    result = func.jacrev(cholesky_util.revert_conditional)(HC.T, C.T, X.T)
+    revert_conditional = func.partial(
+        cholesky_util.revert_conditional, solve_triu=linalg.solve_triu
+    )
+    result = func.jacrev(revert_conditional)(HC.T, C.T, X.T)
     is_not_nan = _tree_is_free_of_nans(result)
     assert is_not_nan
 

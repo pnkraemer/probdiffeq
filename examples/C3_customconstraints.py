@@ -91,7 +91,7 @@ def main():
     iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
 
     # Use this constraint function for custom roots:
-    ts1 = probdiffeq.constraint_root_ts1(root, ssm=ssm)
+    ts1 = probdiffeq.constraint_jet(root, ssm=ssm, jet_order=0)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver_2nd = probdiffeq.solver_mle(
         strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm
