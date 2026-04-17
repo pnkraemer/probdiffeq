@@ -227,7 +227,7 @@ class AbstractConditional(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def identity(self, ndim, /):
+    def identity(self, /):
         """Construct an identity conditional (unit linop, zero noise)."""
         raise NotImplementedError
 
@@ -258,9 +258,23 @@ class ShapeInfo:
         # TODO: assert that the tree is a tree of Taylor coefficients
         #       (which means each leaf has the same tree structure)
 
-        self.tree_flat, self.tree_unravel = tree.ravel_pytree(tcoeffs)
-        self.leaf_flat, self.leaf_unravel = tree.ravel_pytree(tcoeffs[0])
+        # A flattened representation of the Taylor coefficients
+        self.all_flat, self.all_unravel = tree.ravel_pytree(tcoeffs)
+
+        # A flattened representation of each Taylor coefficient
+        self.single_flat, self.single_unravel = tree.ravel_pytree(tcoeffs[0])
+
+        # The number of derivatives in the SSM
         self.num_derivatives = len(tcoeffs) - 1
+
+        # The leaves in the Taylor coefficients.
+        # Note how each Taylor coefficient can itself be a PyTree,
+        # but the leaves must always be arrays.
+        # This specific info is especially important for blockdiagonal models.
+        # TODO: this somewhat duplicates the above,
+        #       but not enough to prioritise refactoring...
+        self.leaves, self.treedef = tree.tree_flatten(tcoeffs)
+        _, self.leaf_unravel = tree.ravel_pytree(self.leaves[0])
 
 
 @structs.dataclass
@@ -279,8 +293,8 @@ class FactSsmImpl:
     conditional: AbstractConditional
     """An implementation of manipulating conditionals."""
 
-    num_derivatives: int
-    """The number of derivatives in the state-space model."""
+    shape_info: ShapeInfo
+    """Information about Taylor-coefficient shapes/counts/etc.."""
 
     @classmethod
     def from_tcoeffs_dense(cls, tcoeffs_like, /):
@@ -296,74 +310,53 @@ class FactSsmImpl:
             conditional=conditional,
             normal=normal,
             prototypes=prototypes,
-            num_derivatives=len(tcoeffs_like) - 1,
+            shape_info=shape_info,
         )
 
     @classmethod
     def from_tcoeffs_isotropic(cls, tcoeffs_like, /):
         """Construct a factorised state-space model implementation."""
-        ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
-        num_derivatives = len(tcoeffs_like) - 1
+        shape_info = ShapeInfo(tcoeffs_like)
 
-        tcoeffs_tree_only = tree.tree_map(lambda *_a: 0.0, tcoeffs_like)
-        _, unravel_tree = tree.ravel_pytree(tcoeffs_tree_only)
+        # ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
+        # num_derivatives = len(tcoeffs_like) - 1
 
-        leaves, tree_structure = tree.tree_flatten(tcoeffs_like)
-        _, unravel_leaf = tree.ravel_pytree(leaves[0])
+        # tcoeffs_tree_only = tree.tree_map(lambda *_a: 0.0, tcoeffs_like)
+        # _, unravel_tree = tree.ravel_pytree(tcoeffs_tree_only)
 
-        def unravel(z):
-            pytree = func.vmap(unravel_tree, in_axes=1, out_axes=0)(z)
-            return tree.tree_map(unravel_leaf, pytree)
+        # leaves, tree_structure = tree.tree_flatten(tcoeffs_like)
+        # _, unravel_leaf = tree.ravel_pytree(leaves[0])
 
-        prototypes = IsotropicPrototype(ode_shape=ode_shape)
+        # def unravel(z):
+        #     pytree = func.vmap(unravel_tree, in_axes=1, out_axes=0)(z)
+        #     return tree.tree_map(unravel_leaf, pytree)
+
+        prototypes = IsotropicPrototype()
         normal = IsotropicNormal
-        linearize = IsotropicLinearizationFactory(unravel=unravel)
-        conditional = IsotropicConditional(
-            ode_shape=ode_shape,
-            num_derivatives=num_derivatives,
-            unravel_tree=unravel_tree,
-            tree_structure=tree_structure,
-        )
+        linearize = IsotropicLinearizationFactory(shape_info=shape_info)
+        conditional = IsotropicConditional(shape_info=shape_info)
         return cls(
             prototypes=prototypes,
             normal=normal,
             linearize=linearize,
             conditional=conditional,
-            num_derivatives=len(tcoeffs_like) - 1,
+            shape_info=shape_info,
         )
 
     @classmethod
     def from_tcoeffs_blockdiag(cls, tcoeffs_like, /):
         """Construct a factorised state-space model implementation."""
-        ode_shape = tree.ravel_pytree(tcoeffs_like[0])[0].shape
-        num_derivatives = len(tcoeffs_like) - 1
-
-        tcoeffs_tree_only = tree.tree_map(lambda *_a: 0.0, tcoeffs_like)
-        _, unravel_tree = tree.ravel_pytree(tcoeffs_tree_only)
-
-        leaves, treedef = tree.tree_flatten(tcoeffs_like)
-        _, unravel_leaf = tree.ravel_pytree(leaves[0])
-
-        def unravel(z):
-            pytree = func.vmap(unravel_tree, in_axes=0, out_axes=0)(z)
-            return tree.tree_map(unravel_leaf, pytree)
-
-        prototypes = BlockDiagPrototype(ode_shape=ode_shape)
+        shape_info = ShapeInfo(tcoeffs_like)
+        prototypes = BlockDiagPrototype(shape_info=shape_info)
         normal = BlockDiagNormal
-        linearize = BlockDiagLinearizationFactory(unravel=unravel)
-        conditional = BlockDiagConditional(
-            ode_shape=ode_shape,
-            num_derivatives=num_derivatives,
-            unravel_tree=unravel_tree,
-            treedef=treedef,
-            unravel_leaf=unravel_leaf,
-        )
+        linearize = BlockDiagLinearizationFactory(shape_info=shape_info)
+        conditional = BlockDiagConditional(shape_info=shape_info)
         return cls(
             prototypes=prototypes,
             normal=normal,
             linearize=linearize,
             conditional=conditional,
-            num_derivatives=len(tcoeffs_like) - 1,
+            shape_info=shape_info,
         )
 
 
@@ -586,14 +579,15 @@ class DenseConditional(AbstractConditional):
         observed = DenseNormal(mean, cholesky, unravel=cond.noise.unravel)
         return observed, cond_new
 
-    def identity(self, ndim, /) -> LatentCond:
-        (d,) = self.shape_info.leaf_flat.shape
+    def identity(self, /) -> LatentCond:
+        ndim = self.shape_info.num_derivatives + 1
+        (d,) = self.shape_info.single_flat.shape
         n = ndim * d
 
         A = np.eye(n)
         m = np.zeros((n,))
         C = np.zeros((n, n))
-        noise = DenseNormal(m, C, unravel=self.shape_info.tree_unravel)
+        noise = DenseNormal(m, C, unravel=self.shape_info.all_unravel)
         ones = np.ones((n,))
         return LatentCond(A, noise, to_latent=ones, to_observed=ones)
 
@@ -602,13 +596,13 @@ class DenseConditional(AbstractConditional):
 
         # Construct the transitions
         a, q_sqrtm = system_matrices_1d_iwp(self.shape_info.num_derivatives)
-        (d,) = self.shape_info.leaf_flat.shape
+        (d,) = self.shape_info.single_flat.shape
 
         eye_d = np.eye(d)
         A = np.kron(a, eye_d)
         Q = np.kron(q_sqrtm, Lambda)
 
-        q0 = np.zeros(self.shape_info.tree_flat.shape)
+        q0 = np.zeros(self.shape_info.all_flat.shape)
         precon_fun = preconditioner_taylor(
             num_derivatives=self.shape_info.num_derivatives
         )
@@ -620,7 +614,7 @@ class DenseConditional(AbstractConditional):
             p = np.repeat(p, d)
             p_inv = np.repeat(p_inv, d)
 
-            unravel = self.shape_info.tree_unravel
+            unravel = self.shape_info.all_unravel
             noise = DenseNormal(q0, output_scale * Q, unravel=unravel)
             return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
@@ -628,8 +622,8 @@ class DenseConditional(AbstractConditional):
 
     def _process_base_scale(self, base_scale):
         # Process the expected shape of the base-scale
-        ones_like = np.ones_like(self.shape_info.leaf_flat)
-        base_scale_expected = self.shape_info.leaf_unravel(ones_like)
+        ones_like = np.ones_like(self.shape_info.single_flat)
+        base_scale_expected = self.shape_info.single_unravel(ones_like)
 
         if base_scale is None:
             base_scale = base_scale_expected
@@ -658,11 +652,11 @@ class DenseConditional(AbstractConditional):
         Lambda = self._process_base_scale(base_scale)
 
         # Turn the linear vector field into the bottom block of the IOUP
-        leaf_like = np.ones_like(self.shape_info.leaf_flat)
+        leaf_like = np.ones_like(self.shape_info.single_flat)
         leaves = [leaf_like for _ in range(self.shape_info.num_derivatives + 1)]
 
         def vf_flat(tcoeffs):
-            tcoeffs_tree = tree.tree_map(self.shape_info.leaf_unravel, tcoeffs)
+            tcoeffs_tree = tree.tree_map(self.shape_info.single_unravel, tcoeffs)
             fx = vf_linear(*tcoeffs_tree)
             return tree.ravel_pytree(fx)[0]
 
@@ -670,7 +664,7 @@ class DenseConditional(AbstractConditional):
         bottom_block = np.concatenate(rate, axis=-1)
 
         # Construct the SDE matrices
-        (d,) = self.shape_info.leaf_flat.shape
+        (d,) = self.shape_info.single_flat.shape
         num_derivatives = self.shape_info.num_derivatives
         eye_d = np.eye(d)
         a = linalg.diagonal_matrix(np.ones((num_derivatives,)), k=1)
@@ -693,7 +687,7 @@ class DenseConditional(AbstractConditional):
         exp_gram = gram_util.exp_gram_cholesky(
             pade_legendre=pade_legendre, solve=linalg.solve_lu
         )
-        q0 = np.zeros(self.shape_info.tree_flat.shape)
+        q0 = np.zeros(self.shape_info.all_flat.shape)
 
         def discretise(dt, output_scale=1.0):
             output_scale = self._process_calibrated_scale(output_scale)
@@ -707,7 +701,7 @@ class DenseConditional(AbstractConditional):
             B_p = np.sqrt(dt) * p_inv[:, None] * B
 
             eA, L = exp_gram(A_p, B_p)
-            unravel = self.shape_info.tree_unravel
+            unravel = self.shape_info.all_unravel
             noise = DenseNormal(q0, output_scale * L, unravel=unravel)
             return LatentCond(eA, noise, to_latent=p_inv, to_observed=p)
 
@@ -748,10 +742,10 @@ class DenseLinearizationOdeTs0(AbstractLinearizationOde):
 
         def a1(m):
             """Select the 'n'-th derivative."""
-            m0 = self.shape_info.tree_unravel(m)[self.ode_order]
+            m0 = self.shape_info.all_unravel(m)[self.ode_order]
             return tree.ravel_pytree(m0)[0]
 
-        Ms = self.shape_info.tree_unravel(rv.mean)
+        Ms = self.shape_info.all_unravel(rv.mean)
         fm = fun(*Ms[: self.ode_order])
         fx, unravel = tree.ravel_pytree(fm)
         linop = func.jacrev(a1)(rv.mean)
@@ -782,7 +776,7 @@ class DenseLinearizationOdeTs1(AbstractLinearizationOde):
 
     def linearize(self, rv, state: None, *, damp: float, t):
         fun = func.partial(self.vector_field, t=t)
-        m_tree = self.shape_info.tree_unravel(rv.mean)
+        m_tree = self.shape_info.all_unravel(rv.mean)
         m0, unravel = tree.ravel_pytree(m_tree[0])
 
         def vf_flat(s):
@@ -792,7 +786,7 @@ class DenseLinearizationOdeTs1(AbstractLinearizationOde):
 
         def select_i(i):
             def select(s):
-                s_tree = self.shape_info.tree_unravel(s)
+                s_tree = self.shape_info.all_unravel(s)
                 s_flat, _ = tree.ravel_pytree(s_tree[i])
                 return s_flat
 
@@ -825,7 +819,7 @@ class DenseLinearizationRoot(AbstractLinearizationRoot):
     def constraint_flat(self, m: Array, *, t) -> Array:
         """Evaluate a flattened version of the root constraint."""
         # Unravel the location and extract derivatives
-        m_tree = self.shape_info.tree_unravel(m)
+        m_tree = self.shape_info.all_unravel(m)
         relevant_tcoeffs = m_tree[: self.root_order]
 
         # Evaluate the root
@@ -845,7 +839,7 @@ class DenseLinearizationRoot(AbstractLinearizationRoot):
         fx = fx - linop @ mean
 
         # Understand how to unravel
-        m_tree = func.eval_shape(self.shape_info.tree_unravel, rv.mean)
+        m_tree = func.eval_shape(self.shape_info.all_unravel, rv.mean)
         relevant_tcoeffs = m_tree[: self.root_order]
         root_eval = func.eval_shape(lambda s: self.root(*s, t=t), relevant_tcoeffs)
         root_eval = tree.tree_map(np.zeros_like, root_eval)
@@ -860,9 +854,9 @@ class DenseLinearizationRoot(AbstractLinearizationRoot):
 class IsotropicLinearizationOdeTs0(AbstractLinearizationOde):
     """Construct an isotropic implementation of ODE-TS0 linearization."""
 
-    def __init__(self, vf, *, ode_order, unravel) -> None:
+    def __init__(self, vf, *, ode_order, shape_info) -> None:
         super().__init__(vf, ode_order=ode_order)
-        self.unravel = unravel
+        self.shape_info = shape_info
 
     @property
     def root_order(self):
@@ -876,8 +870,11 @@ class IsotropicLinearizationOdeTs0(AbstractLinearizationOde):
         fun = func.partial(self.vector_field, t=t)
         mean = rv.mean
 
-        mean_tree = self.unravel(mean)
-        m1 = mean_tree[: self.ode_order]
+        m1 = [*(mean[: self.ode_order])]
+        m1 = tree.tree_map(self.shape_info.single_unravel, m1)
+
+        # mean_tree = self.unravel(mean)
+        # m1 = mean_tree[: self.ode_order]
         fx_tree = fun(*m1)
         fx, unravel_obs = tree.ravel_pytree(fx_tree)
 
@@ -893,13 +890,13 @@ class IsotropicLinearizationOdeTs0(AbstractLinearizationOde):
 class IsotropicLinearizationOdeTs1(AbstractLinearizationOde):
     """Construct an isotropic implementation of ODE-TS1 linearization."""
 
-    def __init__(self, vf, *, ode_order: int, unravel: Callable, jacobian: Any) -> None:
+    def __init__(self, vf, *, ode_order: int, shape_info, jacobian: Any) -> None:
         if ode_order > 1:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
             raise ValueError(msg)
         super().__init__(vf, ode_order=1)
 
-        self.unravel = unravel
+        self.shape_info = shape_info
         self.jacobian = jacobian
 
     def init_linearization(self):
@@ -908,10 +905,12 @@ class IsotropicLinearizationOdeTs1(AbstractLinearizationOde):
     def linearize(self, rv, state, *, damp: float, t):
         fun = func.partial(self.vector_field, t=t)
         # Evaluate the linearisation
-        m0, unravel = tree.ravel_pytree(self.unravel(rv.mean)[0])
+        m0 = rv.mean[0]
 
         def vf_ravel(s):
-            return tree.ravel_pytree(fun(unravel(s)))[0]
+            s_tree = self.shape_info.single_unravel(s)
+            fs = fun(s_tree)
+            return tree.ravel_pytree(fs)[0]
 
         # Estimate the trace using Hutchinson's estimator
         fx, J_trace, state = self.jacobian.calculate_trace(vf_ravel, m0, state)
@@ -924,7 +923,7 @@ class IsotropicLinearizationOdeTs1(AbstractLinearizationOde):
         fx = fx - linop @ rv.mean
 
         # Turn fx and J_trace into an observation model
-        vf_dummy = func.eval_shape(lambda s: fun(unravel(s)), m0)
+        vf_dummy = func.eval_shape(lambda s: fun(self.shape_info.single_unravel(s)), m0)
         _, structure = tree.tree_flatten(vf_dummy)
         fx = tree.tree_unflatten(structure, [*fx])
         noise = IsotropicNormal.from_dirac(fx, damp=damp)
@@ -935,9 +934,8 @@ class IsotropicLinearizationOdeTs1(AbstractLinearizationOde):
 class BlockDiagLinearizationOdeTs0(AbstractLinearizationOde):
     """Construct a block-diagonal implementation of ODE-TS0 linearization."""
 
-    def __init__(self, vf, *, ode_order: int, unravel: Callable) -> None:
+    def __init__(self, vf, *, ode_order: int) -> None:
         super().__init__(vf, ode_order=ode_order)
-        self.unravel = unravel
 
     def init_linearization(self) -> None:
         return None
@@ -962,12 +960,12 @@ class BlockDiagLinearizationOdeTs0(AbstractLinearizationOde):
 class BlockDiagLinearizationOdeTs1(AbstractLinearizationOde):
     """Construct a block-diagonal implementation of ODE-TS1 linearization."""
 
-    def __init__(self, vf, *, ode_order: int, unravel: Callable, jacobian: Any) -> None:
+    def __init__(self, vf, *, ode_order: int, shape_info, jacobian: Any) -> None:
         if ode_order > 1:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
             raise ValueError(msg)
         super().__init__(vf, ode_order=1)
-        self.unravel = unravel
+        self.shape_info = shape_info
         self.jacobian = jacobian
 
     def init_linearization(self):
@@ -983,13 +981,15 @@ class BlockDiagLinearizationOdeTs1(AbstractLinearizationOde):
         linop = func.vmap(func.jacrev(a1))(mean)
 
         def vf_flat(u):
-            return tree.ravel_pytree(fun(unravel(u)))[0]
+            u_tree = self.shape_info.single_unravel(u)
+            fu_tree = fun(u_tree)
+            return tree.ravel_pytree(fu_tree)[0]
 
         def select_0(s):
-            return tree.ravel_pytree(self.unravel(s)[0])
+            return s[:, 0]
 
         # Evaluate the linearisation
-        m0, unravel = select_0(rv.mean)
+        m0 = select_0(rv.mean)
         fx, J_diag, state = self.jacobian.calculate_diagonal(vf_flat, m0, state)
 
         E1 = func.jacrev(lambda s: s[0])(rv.mean[0])
@@ -1008,53 +1008,46 @@ class BlockDiagLinearizationOdeTs1(AbstractLinearizationOde):
 class IsotropicLinearizationFactory(AbstractLinearizationFactory):
     """Construct an isotropic linearization-factory."""
 
-    def __init__(self, unravel) -> None:
-        self.unravel = unravel
+    def __init__(self, shape_info) -> None:
+        self.shape_info = shape_info
 
     def root(self, root, *, jacobian, root_order: int, nlstsq: Callable | None):
         raise NotImplementedError
 
     def ode_taylor_1st(self, vf, *, ode_order, jacobian):
         return IsotropicLinearizationOdeTs1(
-            vf, jacobian=jacobian, ode_order=ode_order, unravel=self.unravel
+            vf, jacobian=jacobian, ode_order=ode_order, shape_info=self.shape_info
         )
 
     def ode_taylor_0th(self, vf, *, ode_order):
         return IsotropicLinearizationOdeTs0(
-            vf, ode_order=ode_order, unravel=self.unravel
+            vf, ode_order=ode_order, shape_info=self.shape_info
         )
 
 
 class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
     """Construct a block-diagonal linearization-factory."""
 
-    def __init__(self, unravel) -> None:
-        self.unravel = unravel
+    def __init__(self, shape_info) -> None:
+        self.shape_info = shape_info
 
     def root(self, root, *, jacobian, root_order: int, nlstsq: Callable | None):
         raise NotImplementedError
 
     def ode_taylor_0th(self, vf, *, ode_order):
-        return BlockDiagLinearizationOdeTs0(
-            vf, ode_order=ode_order, unravel=self.unravel
-        )
+        return BlockDiagLinearizationOdeTs0(vf, ode_order=ode_order)
 
     def ode_taylor_1st(self, vf, *, ode_order, jacobian):
         return BlockDiagLinearizationOdeTs1(
-            vf, ode_order=ode_order, unravel=self.unravel, jacobian=jacobian
+            vf, ode_order=ode_order, shape_info=self.shape_info, jacobian=jacobian
         )
 
 
 class IsotropicConditional(AbstractConditional):
     """Construct an isotropic implementation of manipulating conditionals."""
 
-    def __init__(
-        self, *, ode_shape, num_derivatives, unravel_tree, tree_structure
-    ) -> None:
-        self.ode_shape = ode_shape
-        self.num_derivatives = num_derivatives
-        self.unravel_tree = unravel_tree
-        self.tree_structure = tree_structure
+    def __init__(self, *, shape_info) -> None:
+        self.shape_info = shape_info
 
     def apply(self, x, cond, /):
         leaves = tree.tree_leaves(x)
@@ -1127,10 +1120,12 @@ class IsotropicConditional(AbstractConditional):
         observed = IsotropicNormal(mean, cholesky, treedef=cond.noise.treedef)
         return observed, cond_new
 
-    def identity(self, num, /) -> LatentCond:
-        m0 = np.zeros((num, *self.ode_shape))
+    def identity(self, /) -> LatentCond:
+        num = self.shape_info.num_derivatives + 1
+        (d,) = self.shape_info.single_flat.shape
+        m0 = np.zeros((num, d))
         c0 = np.zeros((num, num))
-        noise = IsotropicNormal(m0, c0, treedef=self.tree_structure)
+        noise = IsotropicNormal(m0, c0, treedef=self.shape_info.treedef)
         matrix = np.eye(num)
         ones = np.ones((num,))
         return LatentCond(matrix, noise, to_latent=ones, to_observed=ones)
@@ -1147,9 +1142,11 @@ class IsotropicConditional(AbstractConditional):
                 msg += f" Received: {base_scale.shape}."
                 raise ValueError(msg)
 
-        A, q_sqrtm = system_matrices_1d_iwp(self.num_derivatives)
-        q0 = np.zeros((self.num_derivatives + 1, *self.ode_shape))
-        precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
+        num_derivatives = self.shape_info.num_derivatives
+        (d,) = self.shape_info.single_flat.shape
+        A, q_sqrtm = system_matrices_1d_iwp(num_derivatives)
+        q0 = np.zeros((num_derivatives + 1, d))
+        precon_fun = preconditioner_taylor(num_derivatives=num_derivatives)
 
         def discretise(dt, output_scale: Array = 1.0):
             output_scale = np.asarray(output_scale)
@@ -1162,7 +1159,9 @@ class IsotropicConditional(AbstractConditional):
             scale = base_scale * output_scale
 
             p, p_inv = precon_fun(dt)
-            noise = IsotropicNormal(q0, scale * q_sqrtm, treedef=self.tree_structure)
+            noise = IsotropicNormal(
+                q0, scale * q_sqrtm, treedef=self.shape_info.treedef
+            )
             return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
         return discretise
@@ -1199,14 +1198,8 @@ class IsotropicConditional(AbstractConditional):
 class BlockDiagConditional(AbstractConditional):
     """Construct a block-diagonal implementation of manipulating conditionals."""
 
-    def __init__(
-        self, *, ode_shape, num_derivatives, unravel_tree, treedef, unravel_leaf
-    ) -> None:
-        self.ode_shape = ode_shape
-        self.num_derivatives = num_derivatives
-        self.unravel_tree = unravel_tree
-        self.treedef = treedef
-        self.unravel_leaf = unravel_leaf
+    def __init__(self, *, shape_info) -> None:
+        self.shape_info = shape_info
 
     def apply(self, x, cond, /):
         leaves = tree.tree_leaves(x)
@@ -1322,18 +1315,24 @@ class BlockDiagConditional(AbstractConditional):
         )
         return observed, bwd
 
-    def identity(self, ndim, /) -> LatentCond:
-        m0 = np.zeros((*self.ode_shape, ndim))
-        c0 = np.zeros((*self.ode_shape, ndim, ndim))
+    def identity(self, /) -> LatentCond:
+        ndim = self.shape_info.num_derivatives + 1
+        (d,) = self.shape_info.single_flat.shape
+        m0 = np.zeros((d, ndim))
+        c0 = np.zeros((d, ndim, ndim))
         noise = BlockDiagNormal(
-            m0, c0, treedef=self.treedef, unravel_leaf=self.unravel_leaf
+            m0,
+            c0,
+            treedef=self.shape_info.treedef,
+            unravel_leaf=self.shape_info.leaf_unravel,
         )
-        matrix = np.ones((*self.ode_shape, 1, 1)) * np.eye(ndim, ndim)[None, ...]
+        matrix = np.ones((d, 1, 1)) * np.eye(ndim, ndim)[None, ...]
         return LatentCond.from_linop_and_noise(matrix, noise)
 
     def transition_wiener_integrated(self, base_scale: Array | None):
 
-        base_scale_expected = self.unravel_leaf(np.ones(self.ode_shape))
+        coeff_like = np.ones_like(self.shape_info.single_flat)
+        base_scale_expected = self.shape_info.single_unravel(coeff_like)
         if base_scale is None:
             base_scale = base_scale_expected
         else:
@@ -1345,9 +1344,10 @@ class BlockDiagConditional(AbstractConditional):
 
         base_scale, _ = tree.ravel_pytree(base_scale)
 
-        a, q_sqrtm = system_matrices_1d_iwp(self.num_derivatives)
-        q0 = np.zeros((self.num_derivatives + 1,))
-        precon_fun = preconditioner_taylor(num_derivatives=self.num_derivatives)
+        num_derivatives = self.shape_info.num_derivatives
+        a, q_sqrtm = system_matrices_1d_iwp(num_derivatives)
+        q0 = np.zeros((num_derivatives + 1,))
+        precon_fun = preconditioner_taylor(num_derivatives=num_derivatives)
 
         def discretise(dt, output_scale: Array | None = None):
             p, p_inv = precon_fun(dt)
@@ -1370,8 +1370,10 @@ class BlockDiagConditional(AbstractConditional):
             A_batch = np.ones((d, 1, 1)) * a[None, :, :]
             mean = np.ones((d, 1)) * q0[None, :]
             cholesky = scale[:, None, None] * q_sqrtm[None, :, :]
+            treedef = self.shape_info.treedef
+            unravel_leaf = self.shape_info.leaf_unravel
             noise = BlockDiagNormal(
-                mean, cholesky, treedef=self.treedef, unravel_leaf=self.unravel_leaf
+                mean, cholesky, treedef=treedef, unravel_leaf=unravel_leaf
             )
             p = np.ones((d, 1)) * p[None, :]
             p_inv = np.ones((d, 1)) * p_inv[None, :]
@@ -1602,7 +1604,13 @@ class BlockDiagNormal(AbstractTreeNormal):
     def __init__(self, mean, cholesky, treedef, unravel_leaf) -> None:
         super().__init__(mean=mean)
         self.cholesky = cholesky
+
+        # The treedef of the target
         self.treedef = treedef
+
+        # A map that unravels each leaf. Note that this is not the same
+        # as unravelling each Taylor coefficient, because the Taylor coefficients
+        # themselves can be pytrees, whereas the leaves are always arrays.
         self.unravel_leaf = unravel_leaf
 
     def __repr__(self) -> str:
@@ -1654,7 +1662,9 @@ class BlockDiagNormal(AbstractTreeNormal):
     def evaluate_mean(self):
         if self.mean.ndim > 2:
             return func.vmap(BlockDiagNormal.evaluate_mean)(self)
-        mean_tree = tree.tree_unflatten(self.treedef, [*(self.mean.T)])
+
+        mean_leaves = [*(self.mean.T)]
+        mean_tree = tree.tree_unflatten(self.treedef, mean_leaves)
         return tree.tree_map(self.unravel_leaf, mean_tree)
 
     def evaluate_std(self):
@@ -1757,9 +1767,6 @@ BlockDiagNormal.register_pytree_node()
 class IsotropicPrototype(AbstractPrototype):
     """Construct an isotropic implementation of prototypes."""
 
-    def __init__(self, ode_shape) -> None:
-        self.ode_shape = ode_shape
-
     def std(self):
         return np.ones(())
 
@@ -1770,11 +1777,15 @@ class IsotropicPrototype(AbstractPrototype):
 class BlockDiagPrototype(AbstractPrototype):
     """Construct a block-diagonal implementation of prototypes."""
 
-    def __init__(self, ode_shape) -> None:
-        self.ode_shape = ode_shape
+    def __init__(self, shape_info) -> None:
+        self.shape_info = shape_info
 
     def std(self):
-        return np.ones(self.ode_shape)
+        # TODO: technically, these should be pytrees according
+        # to the leaf structure, right?
+        return np.ones(self.shape_info.single_flat.shape)
 
     def output_scale_calibrated(self):
-        return np.ones(self.ode_shape)
+        # TODO: technically, these should be pytrees according
+        # to the leaf structure, right?
+        return np.ones(self.shape_info.single_flat.shape)

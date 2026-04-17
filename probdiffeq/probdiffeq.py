@@ -979,11 +979,6 @@ class ProbabilisticSolver:
         self.constraint_init = constraint_init
 
     @property
-    def error_contraction_rate(self):
-        """The error-contraction rate of the solver."""
-        return self.ssm.num_derivatives + 1
-
-    @property
     def is_suitable_for_offgrid_marginals(self):
         """Whether the solver admits offgrid-marginal calculation.
 
@@ -1444,7 +1439,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         )
 
     def init_posterior(self, *, u: TaylorCoeffTarget):
-        cond = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
+        cond = self.ssm.conditional.identity()
         posterior = MarkovSequence(marginal=u.marginals, conditional=cond, reverse=True)
         return u, posterior
 
@@ -1682,7 +1677,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         )
 
     def init_posterior(self, *, u):
-        cond = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
+        cond = self.ssm.conditional.identity()
         posterior = MarkovSequence(u.marginals, cond, reverse=True)
         return u, posterior
 
@@ -1729,7 +1724,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         return estimate, posterior
 
     def interpolate_at_t1(self, *, posterior_t1: MarkovSequence):
-        cond_identity = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
+        cond_identity = self.ssm.conditional.identity()
         resume_from = MarkovSequence(
             posterior_t1.marginal,
             conditional=cond_identity,
@@ -1815,7 +1810,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         _, extrapolated_t = self.predict(
             posterior=posterior_t0, transition=transition_t0_t
         )
-        conditional_id = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
+        conditional_id = self.ssm.conditional.identity()
         previous_new = MarkovSequence(
             extrapolated_t.marginal, conditional_id, reverse=extrapolated_t.reverse
         )
@@ -2455,7 +2450,9 @@ class error_residual_std(ErrorEstimator):
         error, _ = tree.ravel_pytree(error)
 
         # Compute a reference
-        u0 = tree.tree_leaves(previous.u.mean)[0]
+        previous_leaves = tree.tree_leaves(previous.u.mean)
+        error_contraction_rate = len(previous_leaves)
+        u0 = previous_leaves[0]
         u1 = tree.tree_leaves(proposed.u.mean)[0]
         reference = np.maximum(np.abs(u0), np.abs(u1))
         reference, _ = tree.ravel_pytree(reference)
@@ -2476,7 +2473,6 @@ class error_residual_std(ErrorEstimator):
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
         # Scale the error norm with the error contraction rate and return
-        error_contraction_rate = self.ssm.num_derivatives + 1
         error_power = error_norm ** (-1.0 / error_contraction_rate)
         return error_power, state
 
@@ -2537,6 +2533,8 @@ class error_state_std(ErrorEstimator):
         mean = previous.u.marginals.evaluate_mean()
         rv = self.ssm.conditional.apply(mean, transition)
 
+        mean_leaves = tree.tree_leaves(mean)
+        error_contraction_rate = len(mean_leaves)
         # Optionally: re-linearize
         if self.re_linearize_before_error:
             linearized, state = self.constraint.linearize(
@@ -2573,6 +2571,5 @@ class error_state_std(ErrorEstimator):
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
         # Scale the error norm with the error contraction rate and return
-        error_contraction_rate = self.ssm.num_derivatives + 1
         error_power = error_norm ** (-1.0 / error_contraction_rate)
         return error_power, state
