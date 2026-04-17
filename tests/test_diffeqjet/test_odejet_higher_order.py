@@ -1,17 +1,17 @@
 """Test the exactness of differentiation-based routines on first-order problems."""
 
-from probdiffeq import taylor
+from probdiffeq import diffeqjet
 from probdiffeq.backend import func, np, ode, testing
 
 
 @testing.case()
 def case_odejet_via_jvp():
-    return taylor.odejet_via_jvp
+    return diffeqjet.odejet_via_jvp
 
 
 @testing.case()
 def case_taylor_mode_scan():
-    return taylor.odejet_padded_scan
+    return diffeqjet.odejet_padded_scan
 
 
 @testing.fixture(name="pb_with_solution")

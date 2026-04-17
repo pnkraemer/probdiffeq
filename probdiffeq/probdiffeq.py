@@ -3,7 +3,7 @@
 See the tutorials for example use cases.
 """
 
-from probdiffeq import ssm_impl, taylor
+from probdiffeq import diffeqjet, ssm_impl
 from probdiffeq.backend import flow, func, inspect, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import (
     Any,
@@ -436,7 +436,7 @@ def constraint_jet(
             return tree.ravel_pytree(fx)[0]
 
         flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
-        ps, ss = taylor.jet_unpack_series(flat, root_order)
+        ps, ss = diffeqjet.jet_unpack_series(flat, root_order)
 
         if len(tree.tree_leaves(ss)) == 0:
             fx = jet_call(*ps)
@@ -530,7 +530,7 @@ def constraint_jet_imex(
             return tree.ravel_pytree(fx)[0]
 
         coeffs_flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
-        ps, ss = taylor.jet_unpack_series(coeffs_flat, root_order)
+        ps, ss = diffeqjet.jet_unpack_series(coeffs_flat, root_order)
         if len(tree.tree_leaves(ss)) == 0:
             fx = jet_call(*ps)
             return [fx]
@@ -619,7 +619,7 @@ def constraint_jet_dae(
             tcoeffs = tcoeffs_all[:order]
 
         flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
-        ps, ss = taylor.jet_unpack_series(flat, root_order)
+        ps, ss = diffeqjet.jet_unpack_series(flat, root_order)
 
         if len(tree.tree_leaves(ss)) == 0:
             fx = jet_call(*ps)

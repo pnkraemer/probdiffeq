@@ -1,6 +1,6 @@
 """Tests for the DAE initialization routines."""
 
-from probdiffeq import taylor
+from probdiffeq import diffeqjet
 from probdiffeq.backend import func, np, testing
 from probdiffeq.util import nlstsq_util
 
@@ -38,14 +38,14 @@ def test_daejet_matches_expectation_on_sir_model(num):
         return np.stack([F1, F2])
 
     y0 = [np.asarray([0.99, 0.01, 0.0])]
-    expected = taylor.odejet_unroll(vf_ode, y0, num=num)
+    expected = diffeqjet.odejet_unroll(vf_ode, y0, num=num)
 
     eps = np.finfo_eps(y0[0].dtype)
     nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=10, tol=eps)
 
     @func.jit
     def initialize(inits):
-        tcoeffs, _info = taylor.daejet_nlstsq(
+        tcoeffs, _info = diffeqjet.daejet_nlstsq(
             differential, algebraic, inits, num=num, nlstsq=nlstsq
         )
         return tcoeffs
@@ -87,14 +87,14 @@ def test_daejet_recursive_matches_expectation_on_sir_model(num):
         return np.stack([F1, F2])
 
     y0 = [np.asarray([0.99, 0.01, 0.0])]
-    expected = taylor.odejet_unroll(vf_ode, y0, num=num)
+    expected = diffeqjet.odejet_unroll(vf_ode, y0, num=num)
 
     eps = np.finfo_eps(y0[0].dtype)
     nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=3, tol=eps)
 
     @func.jit
     def initialize(inits):
-        tcoeffs, _info = taylor.daejet_nlstsq_recursive(
+        tcoeffs, _info = diffeqjet.daejet_nlstsq_recursive(
             differential, algebraic, inits, num=num, stride=4, nlstsq=nlstsq
         )
         return tcoeffs

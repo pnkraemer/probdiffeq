@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import optax
 import tqdm
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 from probdiffeq.util import nlstsq_util
 
 # Fail this notebook on NaN detection (to catch those in the CI)
@@ -169,7 +169,7 @@ def solver(differential, algebraic, tol, while_loop):
         nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(
             maxiter=10, tol=tol, while_loop=while_loop
         )
-        y0, _info = taylor.daejet_nlstsq(
+        y0, _info = diffeqjet.daejet_nlstsq(
             differential_auto, algebraic_auto, [y0], num=3, nlstsq=nlstsq
         )
         init, ssm = probdiffeq.ssm_taylor(y0)

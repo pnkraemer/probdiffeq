@@ -1,6 +1,6 @@
 """Assert that the base adaptive solver is accurate."""
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, structs, testing, tree
 from probdiffeq.backend.typing import Callable
 
@@ -171,7 +171,7 @@ def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
     vf, u0, (t0, t1) = ivp
 
     # Build a solver
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
+    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=ssm_fact)
     prior = factory.prior(ssm=ssm)
     strategy = factory.strategy(ssm=ssm)

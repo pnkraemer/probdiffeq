@@ -16,7 +16,7 @@ import jax.experimental.ode
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -38,7 +38,7 @@ def main():
     A = jnp.asarray([[-0.5, 20], [0, -20]])
 
     # Set up a state-space model over Taylor coefficients
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
+    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
     init, ssm = probdiffeq.ssm_taylor(tcoeffs)
 
     # Build a solver

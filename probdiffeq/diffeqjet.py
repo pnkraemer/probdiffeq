@@ -1,11 +1,4 @@
-r"""Taylor-series estimation in initial value problems.
-
-This module does not contain any probabilistic numerics logic.
-Instead, its sole purpose is to make the probabilistic solvers
-in probdiffeq.probdiffeq easier to access.
-
-See the tutorials for example use cases.
-"""
+r"""Evaluate jet-recursions in differential equations."""
 
 from probdiffeq import ssm_impl
 from probdiffeq.backend import flow, func, inspect, np, tree

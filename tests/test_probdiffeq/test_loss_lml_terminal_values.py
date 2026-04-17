@@ -1,6 +1,6 @@
 """Tests for marginal log likelihood functionality (terminal values)."""
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, testing, tree
 
 
@@ -25,7 +25,7 @@ def case_strategy_smoother_fixedpoint():
 def fixture_solution_and_loss_and_data(strategy_func, fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
+    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
     iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
