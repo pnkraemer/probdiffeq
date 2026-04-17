@@ -17,7 +17,7 @@ def test_differential_variables_dense() -> None:
     tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray([True, False, True])]
     init, _ssm = probdiffeq.ssm_taylor(
-        tcoeffs, is_differential=isdiff, nondifferential_eps=0.123, ssm_fact="dense"
+        tcoeffs, is_exact=isdiff, inexact_eps=0.123, ssm_fact="dense"
     )
 
     [m], [s] = init.mean, init.std
@@ -27,14 +27,14 @@ def test_differential_variables_dense() -> None:
     with testing.raises(ValueError, match="wrong PyTree structure"):
         tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
         isdiff = [np.asarray(False)]  # wrong shape
-        _ = probdiffeq.ssm_taylor(tcoeffs, is_differential=isdiff)
+        _ = probdiffeq.ssm_taylor(tcoeffs, is_exact=isdiff)
 
 
 def test_differential_variables_blockdiag() -> None:
     tcoeffs = [np.asarray([1.0, 2.0, 3.0]), np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray([True, False, True]), np.asarray([False, False, True])]
     init, _ssm = probdiffeq.ssm_taylor(
-        tcoeffs, is_differential=isdiff, nondifferential_eps=0.123, ssm_fact="blockdiag"
+        tcoeffs, is_exact=isdiff, inexact_eps=0.123, ssm_fact="blockdiag"
     )
 
     [m1, m2], [s1, s2] = init.mean, init.std
@@ -46,14 +46,14 @@ def test_differential_variables_blockdiag() -> None:
     with testing.raises(ValueError, match="wrong PyTree structure"):
         tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
         isdiff = [np.asarray(False)]  # wrong shape
-        _ = probdiffeq.ssm_taylor(tcoeffs, is_differential=isdiff, ssm_fact="blockdiag")
+        _ = probdiffeq.ssm_taylor(tcoeffs, is_exact=isdiff, ssm_fact="blockdiag")
 
 
 def test_differential_variables_isotropic() -> None:
     tcoeffs = [np.asarray([1.0, 2.0, 3.0]), np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray(True), np.asarray(False)]
     init, _ssm = probdiffeq.ssm_taylor(
-        tcoeffs, is_differential=isdiff, nondifferential_eps=0.123, ssm_fact="isotropic"
+        tcoeffs, is_exact=isdiff, inexact_eps=0.123, ssm_fact="isotropic"
     )
 
     [m1, m2], [s1, s2] = init.mean, init.std
@@ -65,4 +65,4 @@ def test_differential_variables_isotropic() -> None:
     with testing.raises(ValueError, match="wrong PyTree structure"):
         tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
         isdiff = [np.asarray([True, False, True])]  # wrong shape
-        _ = probdiffeq.ssm_taylor(tcoeffs, is_differential=isdiff, ssm_fact="isotropic")
+        _ = probdiffeq.ssm_taylor(tcoeffs, is_exact=isdiff, ssm_fact="isotropic")
