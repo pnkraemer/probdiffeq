@@ -9,7 +9,7 @@ quickstart:
 	# Otherwise, it's unclear whether the listed main dependencies
 	# are specified correctly. This avoids issues like
 	# https://github.com/pnkraemer/probdiffeq/issues/810
-	python scripts/examples_and_benchmarks_to_py_light.py 
+	python scripts/examples_and_benchmarks_to_py_light.py
 	python docs/Examples/A0*.py
 	python docs/Examples/A1*.py
 
@@ -19,19 +19,17 @@ clean:
 	git clean -xdf
 
 doc:
-	python scripts/generate_api_docs.py 
-	python scripts/readme_to_dev_docs.py 
-	python scripts/examples_and_benchmarks_to_py_light.py 
-	# Execute the examples and benchmarks manually and not 
-	# via mkdocs-jupyter to gain clear error messages.
+	python scripts/generate_api_docs.py
+	python scripts/readme_to_dev_docs.py
+	python scripts/examples_and_benchmarks_to_py_light.py
+	# The following line executes the examples and benchmarks
 	JUPYTER_PLATFORM_DIRS=1 mkdocs build
 
 doc-serve:
-	python scripts/generate_api_docs.py 
-	python scripts/readme_to_dev_docs.py 
-	python scripts/examples_and_benchmarks_to_py_light.py 
-	# Execute the examples and benchmarks manually and not 
-	# via mkdocs-jupyter to gain clear error messages.
+	python scripts/generate_api_docs.py
+	python scripts/readme_to_dev_docs.py
+	python scripts/examples_and_benchmarks_to_py_light.py
+	# The following line executes the examples and benchmarks
 	JUPYTER_PLATFORM_DIRS=1 mkdocs serve
 
 find-dead-code:

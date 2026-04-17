@@ -253,7 +253,7 @@ class AbstractConditional(abc.ABC):
 
 @structs.dataclass
 class FactSsmImpl:
-    """Implementation of factorized state-space models."""
+    """Implementation of factorized Markovian state-space models."""
 
     prototypes: AbstractPrototype
     """An implementation of variable prototypes."""
@@ -834,8 +834,8 @@ class DenseLinearizationRoot(AbstractLinearizationRoot):
     def linearize(self, rv, state, *, damp: float, t):
 
         mean = rv.mean
+        constraint_flat = func.partial(self.constraint_flat, t=t)
         if self.nlstsq is not None:  # posterior linearization
-            constraint_flat = func.partial(self.constraint_flat, t=t)
             mean, _info = self.nlstsq(constraint_flat, mean, rv.mean, rv.cholesky)
 
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
