@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -28,7 +28,7 @@ def main():
         del t
         return f(y, *f_args)
 
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
+    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
     iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=1.0)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
@@ -56,7 +56,9 @@ def main():
 
     # Different derivative count because we don't transform to first order
     # The goal is to match the number of tracked taylor coefficients.
-    tcoeffs = taylor.odejet_padded_scan(lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3)
+    tcoeffs = diffeqjet.odejet_padded_scan(
+        lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3
+    )
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
     iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=1.0)
     ts0 = probdiffeq.constraint_ode_ts0(vf_2, ssm=ssm)

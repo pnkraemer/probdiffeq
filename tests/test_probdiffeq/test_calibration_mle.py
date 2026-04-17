@@ -5,7 +5,7 @@ The output scale is different.
 After applying stats.calibrate(), the posterior is different.
 """
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, testing
 
 
@@ -13,7 +13,7 @@ from probdiffeq.backend import func, np, ode, testing
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
 def case_solve_fixed_grid(fact):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
+    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
     iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
@@ -36,7 +36,7 @@ def case_simulate_terminal_values(fact):
     # this test-case covers both solvers
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
     dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
+    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
 
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
     iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)

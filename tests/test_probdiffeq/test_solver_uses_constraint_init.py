@@ -1,6 +1,6 @@
 """Assert that the base adaptive solver is accurate."""
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, testing, tree
 from probdiffeq.util import nlstsq_util
 
@@ -40,7 +40,9 @@ def test_output_matches_reference(ivp, solver_factory, derivatives) -> None:
         vfu = vf(u, t=t)
         return tree.tree_map(lambda a: -a, vfu)
 
-    expected = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), [u0], num=derivatives)
+    expected = diffeqjet.odejet_padded_scan(
+        lambda y: vf(y, t=t0), [u0], num=derivatives
+    )
 
     # Build an SSM (no ODE-jets, so that we can test the update at init)
     # Only use the dense factorisation because this test uses JET constraints

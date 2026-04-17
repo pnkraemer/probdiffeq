@@ -1,6 +1,6 @@
 """Assert that the base adaptive solver is accurate."""
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, testing, tree
 
 
@@ -10,7 +10,7 @@ def test_output_matches_reference(fact) -> None:
 
     # Don't try all solvers because they're tested in a different file.
     # This test here is only to assert that terminal-value simulation works.
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
+    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
     iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)

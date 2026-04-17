@@ -8,7 +8,7 @@ import equinox
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -50,7 +50,7 @@ def solution_routine(while_loop):
     t0, t1 = 0.0, 1.0
     u0 = jnp.asarray([0.1])
 
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
+    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
     iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)

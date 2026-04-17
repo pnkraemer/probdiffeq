@@ -1,11 +1,11 @@
 """Tests for the DAE initialization routines."""
 
-from probdiffeq import taylor
+from probdiffeq import diffeqjet
 from probdiffeq.backend import func, np, testing
 from probdiffeq.util import nlstsq_util
 
 
-@testing.parametrize("num", [10])
+@testing.parametrize("num", [0, 1, 10])
 def test_daejet_matches_expectation_on_sir_model(num):
 
     # Use SIR model because it is structurally similar to DAEs,
@@ -38,14 +38,14 @@ def test_daejet_matches_expectation_on_sir_model(num):
         return np.stack([F1, F2])
 
     y0 = [np.asarray([0.99, 0.01, 0.0])]
-    expected = taylor.odejet_unroll(vf_ode, y0, num=num)
+    expected = diffeqjet.odejet_unroll(vf_ode, y0, num=num)
 
     eps = np.finfo_eps(y0[0].dtype)
     nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=10, tol=eps)
 
     @func.jit
     def initialize(inits):
-        tcoeffs, _info = taylor.daejet_nlstsq(
+        tcoeffs, _info = diffeqjet.daejet_nlstsq(
             differential, algebraic, inits, num=num, nlstsq=nlstsq
         )
         return tcoeffs
@@ -54,8 +54,9 @@ def test_daejet_matches_expectation_on_sir_model(num):
     assert testing.allclose(received, expected)
 
 
-@testing.parametrize("num", [12])
-def test_daejet_recursive_matches_expectation_on_sir_model(num):
+@testing.parametrize("num_strides", [0, 1, 3])
+@testing.parametrize("stride", [4])
+def test_daejet_recursive_matches_expectation_on_sir_model(num_strides, stride):
 
     # Use SIR model because it is structurally similar to DAEs,
     # but really not that hard to solve so we can test in single precision
@@ -87,22 +88,21 @@ def test_daejet_recursive_matches_expectation_on_sir_model(num):
         return np.stack([F1, F2])
 
     y0 = [np.asarray([0.99, 0.01, 0.0])]
-    expected = taylor.odejet_unroll(vf_ode, y0, num=num)
-
+    expected = diffeqjet.odejet_unroll(vf_ode, y0, num=num_strides * stride)
     eps = np.finfo_eps(y0[0].dtype)
     nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=3, tol=eps)
 
     @func.jit
     def initialize(inits):
-        tcoeffs, _info = taylor.daejet_nlstsq_recursive(
-            differential, algebraic, inits, num=num, stride=4, nlstsq=nlstsq
+        tcoeffs, _info = diffeqjet.daejet_nlstsq_recursive(
+            differential,
+            algebraic,
+            inits,
+            num_strides=num_strides,
+            stride=stride,
+            nlstsq=nlstsq,
         )
         return tcoeffs
 
     received = initialize(y0)
-    # for r, e in zip(received, expected):
-    #     print("received", r)
-    #     print("expected", e)
-    #     print()
-
     assert testing.allclose(received, expected)

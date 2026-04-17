@@ -13,7 +13,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -163,7 +163,7 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
     def param_to_solution(tol):
         # Do inside the function so we jit the Taylor code
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = taylor.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
+        tcoeffs = diffeqjet.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
 
         # Build a solver
         init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")

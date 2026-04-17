@@ -1,6 +1,6 @@
 """Tests for IVP solvers."""
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, testing, tree
 from probdiffeq.util import test_util
 
@@ -11,7 +11,7 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact) -> None:
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     # Generate a solver
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
+    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2)
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
     iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
@@ -86,7 +86,7 @@ def test_smoother_marginals_close_to_both_boundaries(fact) -> None:
     """Assert that the smoother-marginals interpolate well close to the boundary."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
+    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=4)
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
     iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)

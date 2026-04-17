@@ -1,11 +1,4 @@
-r"""Taylor-series estimation in initial value problems.
-
-This module does not contain any probabilistic numerics logic.
-Instead, its sole purpose is to make the probabilistic solvers
-in probdiffeq.probdiffeq easier to access.
-
-See the tutorials for example use cases.
-"""
+r"""Evaluate jet-recursions in differential equations."""
 
 from probdiffeq import ssm_impl
 from probdiffeq.backend import flow, func, inspect, np, tree
@@ -35,6 +28,8 @@ def odejet_padded_scan(vf: Callable, inits: Sequence[ArrayLike], /, num: int):
         tcoeffs = odejet_padded_scan(vf_wrapped, inits_flat, num=num)
         return tree.tree_map(unravel, tcoeffs)
 
+    if num == 0:
+        return inits
     # Number of positional arguments in f
     num_arguments = len(inits)
 
@@ -98,6 +93,8 @@ def odejet_unroll(vf: Callable, inits: Sequence[Array], /, num: int):
         tcoeffs = odejet_unroll(vf_wrapped, inits_flat, num=num)
         return tree.tree_map(unravel, tcoeffs)
 
+    if num == 0:
+        return inits
     # Number of positional arguments in f
     num_arguments = len(inits)
 
@@ -113,6 +110,10 @@ def odejet_unroll(vf: Callable, inits: Sequence[Array], /, num: int):
 
 def jet_unpack_series(taylor_series, num, /):
     """Compute Jet-compatible arguments from a Taylor series.
+
+    That is, for a function like f(u, u'), the present function
+    turns a Taylor series (u, u', u'', ...) into arguments
+    compatible with jax.experimental.jet.
 
     Arguments
     ---------
@@ -160,6 +161,9 @@ def odejet_via_jvp(vf: Callable, inits: Sequence[Array], /, num: int):
 
         tcoeffs = odejet_via_jvp(vf_wrapped, inits_flat, num=num)
         return tree.tree_map(unravel, tcoeffs)
+
+    if num == 0:
+        return inits
 
     g_n, g_0 = vf, vf
     taylor_coeffs = [*inits, vf(*inits)]
@@ -296,42 +300,12 @@ def _unnormalise(primals, *series):
     return [primals, *series_new]
 
 
-def odejet_affine(vf: Callable, inits: Sequence[Array], /, num: int):
-    """Evaluate the Taylor series of an affine differential equation.
-
-    !!! warning "Compilation time"
-        JIT-compiling this function unrolls a loop of length `num`.
-
-    """
-    inits = tree.tree_map(np.asarray, inits)
-
-    if num == 0:
-        return inits
-
-    if not isinstance(inits[0], Array):
-        _, unravel = tree.ravel_pytree(inits[0])
-        inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
-
-        def vf_wrapped(*ys, **kwargs):
-            ys = tree.tree_map(unravel, ys)
-            return tree.ravel_pytree(vf(*ys, **kwargs))[0]
-
-        tcoeffs = odejet_affine(vf_wrapped, inits_flat, num=num)
-        return tree.tree_map(unravel, tcoeffs)
-
-    fx, jvp_fn = func.linearize(vf, *inits)
-
-    tmp = fx
-    fx_evaluations = [tmp := jvp_fn(tmp) for _ in range(num - 1)]
-    return [*inits, fx, *fx_evaluations]
-
-
 def daejet_nlstsq_recursive(
     differential: Callable,
     algebraic: Callable,
     inits: Sequence[Array],
     /,
-    num: int,
+    num_strides: int,
     stride: int,
     nlstsq: Callable,
 ):
@@ -341,7 +315,10 @@ def daejet_nlstsq_recursive(
     can be initialised exactly at the cost of multiple calls to the nonlinear least squares solver.
     """
     received = inits
-    for _ in range(num // stride):
+    if num_strides == 0:
+        return received, {}
+
+    for _ in range(num_strides):
         received, _info = daejet_nlstsq(
             differential, algebraic, received, num=stride, nlstsq=nlstsq
         )
@@ -357,7 +334,8 @@ def daejet_nlstsq(
     nlstsq: Callable,
 ):
     """Evaluate the Taylor series of a differential-algebraic equation system."""
-    # For really high orders, recursively call this function
+    if num == 0:
+        return inits, {}
 
     root_order_differential = _verify_dae_signature_and_parse_order(differential)
     root_order_algebraic = _verify_dae_signature_and_parse_order(algebraic)

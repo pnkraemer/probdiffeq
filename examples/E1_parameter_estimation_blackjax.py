@@ -14,7 +14,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffeqzoo import backend, ivps
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 
 # IVP examples in JAX
 if not backend.has_been_selected:
@@ -37,7 +37,7 @@ def main():
     theta_guess = u0  # initial guess
 
     # Construct solvers
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=t0), (theta_guess,), num=2)
+    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (theta_guess,), num=2)
     _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
     iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=10.0)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
@@ -157,7 +157,7 @@ def solve_adaptive(vf, *, solver, error, save_at):
     @jax.jit
     def solve(theta):
         """Evaluate the parameter-to-solution map, solving on an adaptive grid."""
-        tcoeffs = taylor.odejet_padded_scan(
+        tcoeffs = diffeqjet.odejet_padded_scan(
             lambda y: vf(y, t=save_at[0]), (theta,), num=2
         )
         init, _ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
@@ -178,7 +178,9 @@ def plot_solution(t, u, *, ax, marker=".", **plotting_kwargs):
 
 def log_posterior(vf, theta_true, *, solver, ts, mean, cov, obs_std=0.1):
     """Create a log-posterior density function."""
-    tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=ts[0]), (theta_true,), num=2)
+    tcoeffs = diffeqjet.odejet_padded_scan(
+        lambda y: vf(y, t=ts[0]), (theta_true,), num=2
+    )
     init, _ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
     solve = ivpsolve.solve_fixed_grid(solver=solver)
     sol = solve(init, grid=ts)
@@ -187,7 +189,9 @@ def log_posterior(vf, theta_true, *, solver, ts, mean, cov, obs_std=0.1):
     @jax.jit
     def logposterior(theta):
         """Evaluate the logposterior-function of the data."""
-        tcoeffs = taylor.odejet_padded_scan(lambda y: vf(y, t=ts[0]), (theta,), num=2)
+        tcoeffs = diffeqjet.odejet_padded_scan(
+            lambda y: vf(y, t=ts[0]), (theta,), num=2
+        )
         init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
         solve = ivpsolve.solve_fixed_grid(solver=solver)
         solution = solve(init, grid=ts)

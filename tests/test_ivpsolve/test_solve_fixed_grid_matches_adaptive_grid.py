@@ -1,6 +1,6 @@
 """Compare solve_fixed_grid to solve_adaptive_save_every_step."""
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 from probdiffeq.backend import func, ode, structs, testing, tree
 from probdiffeq.backend.typing import Array
 from probdiffeq.util import test_util
@@ -15,7 +15,7 @@ def test_fixed_grid_result_matches_adaptive_grid_result_when_reusing_grid(fact) 
         velocity: Array
         acceleration: Array
 
-    tcoeffs = Taylor(*taylor.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2))
+    tcoeffs = Taylor(*diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2))
 
     init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
     iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)

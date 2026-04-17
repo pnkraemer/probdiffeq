@@ -12,7 +12,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import ivpsolve, probdiffeq, taylor
+from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 from probdiffeq.util import nlstsq_util
 
 # Fail this notebook on NaN detection (to catch those in the CI)
@@ -160,7 +160,7 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
     def param_to_solution(tol):
         # Build a solver
         vf_auto = functools.partial(vf, t=t0)
-        tcoeffs = taylor.odejet_padded_scan(vf_auto, (y0,), num=num_derivatives - 1)
+        tcoeffs = diffeqjet.odejet_padded_scan(vf_auto, (y0,), num=num_derivatives - 1)
         init, ssm = probdiffeq.ssm_taylor(tcoeffs)
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
@@ -212,7 +212,7 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
         nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(
             maxiter=10, tol=jnp.finfo(y0[0].dtype).eps ** 0.5
         )
-        tcoeffs, _info = taylor.daejet_nlstsq(
+        tcoeffs, _info = diffeqjet.daejet_nlstsq(
             differential_auto, algebraic_auto, y0, num=num_derivatives, nlstsq=nlstsq
         )
         init, ssm = probdiffeq.ssm_taylor(tcoeffs)
