@@ -260,6 +260,10 @@ def loss_lml_timeseries(
             return ssm.conditional.to_derivative(tcoeff_index, s)
 
         model = func.vmap(make_model)(std)
+
+        # Use solve_triu=lstsq because for noise-free observations, the initial state
+        # of the ODE solution tends to be noise-free,
+        # which clashes and returns NaNs if we use exact solvers.
         return posterior.evaluate_lml(
             u, model=model, ssm=ssm, average_pdfs=average_pdfs, solve_triu=solve_triu
         )

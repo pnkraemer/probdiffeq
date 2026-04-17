@@ -48,7 +48,7 @@ doc = [
     "tueplots",
     "tqdm",
     "optax",
-    "blackjax>=1.0.0",
+    "blackjax[progress]>=1.0.0",
     "diffrax",
     "numba",
     # mkdocs 2.0 is a backwards-incompatible rewrite
@@ -141,7 +141,7 @@ ignore = [
     "D105",
     # Some backend's names shadow builtins, eg backend.abc. Ignore the warnings.
     "A005",
-    # Line-too-long is handled by the formatter, not the linter 
+    # Line-too-long is handled by the formatter, not the linter
     "E501",
 ]
 
