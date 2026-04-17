@@ -107,6 +107,10 @@ def odejet_unroll(vf: Callable, inits: Sequence[Array], /, num: int):
 def jet_unpack_series(taylor_series, num, /):
     """Compute Jet-compatible arguments from a Taylor series.
 
+    That is, for a function like f(u, u'), the present function
+    turns a Taylor series (u, u', u'', ...) into arguments
+    compatible with jax.experimental.jet.
+
     Arguments
     ---------
     taylor_series
