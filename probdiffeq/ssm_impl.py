@@ -258,14 +258,13 @@ class ShapeInfo:
         # TODO: assert that the tree is a tree of Taylor coefficients
         #       (which means each leaf has the same tree structure)
 
+        # TODO: don't store the arrays but only the shape and dtype
+
         # A flattened representation of the Taylor coefficients
         self.all_flat, self.all_unravel = tree.ravel_pytree(tcoeffs)
 
         # A flattened representation of each Taylor coefficient
         self.single_flat, self.single_unravel = tree.ravel_pytree(tcoeffs[0])
-
-        # The number of derivatives in the SSM
-        self.num_derivatives = len(tcoeffs) - 1
 
         # The leaves in the Taylor coefficients.
         # Note how each Taylor coefficient can itself be a PyTree,
@@ -275,6 +274,11 @@ class ShapeInfo:
         #       but not enough to prioritise refactoring...
         self.leaves, self.treedef = tree.tree_flatten(tcoeffs)
         _, self.leaf_unravel = tree.ravel_pytree(self.leaves[0])
+
+    @property
+    def num_derivatives(self):
+        """The number of derivatives in the SSM."""
+        return len(self.leaves) - 1
 
 
 @structs.dataclass
