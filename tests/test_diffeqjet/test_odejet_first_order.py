@@ -24,12 +24,12 @@ def fixture_pb_with_solution():
     vf, (u0,), (t0, _) = ode.ivp_three_body_1st()
     vf = func.partial(vf, t=t0)
 
-    solution = np.load("./tests/test_taylor/data/three_body_first_solution.npy")
+    solution = np.load("./tests/test_diffeqjet/data/three_body_first_solution.npy")
     return (vf, (u0,)), solution
 
 
 @testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_odejet_")
-@testing.parametrize("num", [1, 4])
+@testing.parametrize("num", [0, 1, 4])
 def test_approximation_identical_to_reference_odejet(
     pb_with_solution, taylor_fun, num
 ) -> None:
@@ -46,7 +46,7 @@ def case_doubling_odejet_unroll():
 
 
 @testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_doubling_odejet_")
-@testing.parametrize("num_doublings", [1, 2])
+@testing.parametrize("num_doublings", [0, 1, 2])
 def test_approximation_identical_to_reference_doubling(
     pb_with_solution, taylor_fun, num_doublings
 ) -> None:

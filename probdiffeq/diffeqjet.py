@@ -28,6 +28,8 @@ def odejet_padded_scan(vf: Callable, inits: Sequence[ArrayLike], /, num: int):
         tcoeffs = odejet_padded_scan(vf_wrapped, inits_flat, num=num)
         return tree.tree_map(unravel, tcoeffs)
 
+    if num == 0:
+        return inits
     # Number of positional arguments in f
     num_arguments = len(inits)
 
@@ -91,6 +93,8 @@ def odejet_unroll(vf: Callable, inits: Sequence[Array], /, num: int):
         tcoeffs = odejet_unroll(vf_wrapped, inits_flat, num=num)
         return tree.tree_map(unravel, tcoeffs)
 
+    if num == 0:
+        return inits
     # Number of positional arguments in f
     num_arguments = len(inits)
 
@@ -157,6 +161,9 @@ def odejet_via_jvp(vf: Callable, inits: Sequence[Array], /, num: int):
 
         tcoeffs = odejet_via_jvp(vf_wrapped, inits_flat, num=num)
         return tree.tree_map(unravel, tcoeffs)
+
+    if num == 0:
+        return inits
 
     g_n, g_0 = vf, vf
     taylor_coeffs = [*inits, vf(*inits)]
@@ -298,7 +305,7 @@ def daejet_nlstsq_recursive(
     algebraic: Callable,
     inits: Sequence[Array],
     /,
-    num: int,
+    num_strides: int,
     stride: int,
     nlstsq: Callable,
 ):
@@ -308,7 +315,10 @@ def daejet_nlstsq_recursive(
     can be initialised exactly at the cost of multiple calls to the nonlinear least squares solver.
     """
     received = inits
-    for _ in range(num // stride):
+    if num_strides == 0:
+        return received, {}
+
+    for _ in range(num_strides):
         received, _info = daejet_nlstsq(
             differential, algebraic, received, num=stride, nlstsq=nlstsq
         )
@@ -324,7 +334,8 @@ def daejet_nlstsq(
     nlstsq: Callable,
 ):
     """Evaluate the Taylor series of a differential-algebraic equation system."""
-    # For really high orders, recursively call this function
+    if num == 0:
+        return inits, {}
 
     root_order_differential = _verify_dae_signature_and_parse_order(differential)
     root_order_algebraic = _verify_dae_signature_and_parse_order(algebraic)

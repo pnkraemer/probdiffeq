@@ -18,7 +18,7 @@ def van_der_pol_second(num_derivatives_max=10):
 
 if __name__ == "__main__":
     solution1 = three_body_first()
-    np.save("./tests/test_taylor/data/three_body_first_solution.npy", solution1)
+    np.save("./tests/test_diffeqjet/data/three_body_first_solution.npy", solution1)
 
     solution2 = van_der_pol_second()
-    np.save("./tests/test_taylor/data/van_der_pol_second_solution.npy", solution2)
+    np.save("./tests/test_diffeqjet/data/van_der_pol_second_solution.npy", solution2)
