@@ -367,7 +367,7 @@ class DensePrototype(AbstractPrototype):
         self.shape_info = shape_info
 
     def std(self):
-        return np.ones(self.shape_info.shape_leaf_flat)
+        return np.ones(self.shape_info.single_flat.shape)
 
     def output_scale_calibrated(self):
         return np.ones(())
@@ -711,17 +711,17 @@ class DenseConditional(AbstractConditional):
         A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
         mean = cond.to_observed * cond.noise.mean
         cholesky = cond.to_observed[:, None] * cond.noise.cholesky
-        noise = DenseNormal(mean, cholesky, unravel=self.unravel)
+        noise = DenseNormal(mean, cholesky, unravel=self.shape_info.all_unravel)
         return LatentCond.from_linop_and_noise(A, noise)
 
     def to_derivative(self, i, std):
         def select(a):
-            return tree.ravel_pytree(self.unravel(a)[i])[0]
+            return tree.ravel_pytree(self.shape_info.all_unravel(a)[i])[0]
 
-        x = np.zeros(self.flat_shape)
+        x = np.zeros(self.shape_info.all_flat.shape)
         linop = func.jacfwd(select)(x)
 
-        data_like = self.unravel(x)[0]
+        data_like = self.shape_info.all_unravel(x)[0]
         noise = DenseNormal.from_mean_and_std(data_like, std)
         return LatentCond.from_linop_and_noise(linop, noise)
 
@@ -1177,17 +1177,15 @@ class IsotropicConditional(AbstractConditional):
         A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
         mean = cond.to_observed[:, None] * cond.noise.mean
         cholesky = cond.to_observed[:, None] * cond.noise.cholesky
-        noise = IsotropicNormal(mean, cholesky, treedef=self.tree_structure)
+        noise = IsotropicNormal(mean, cholesky, treedef=self.shape_info.treedef)
         return LatentCond.from_linop_and_noise(A, noise)
 
     def to_derivative(self, i, std):
 
-        def select(a):
-            return tree.ravel_pytree(self.unravel_tree(a)[i])[0]
+        m = np.zeros((self.shape_info.num_derivatives + 1,))
+        linop = func.jacfwd(lambda s: np.asarray([s[i]]))(m)
 
-        m = np.zeros((self.num_derivatives + 1,))
-        linop = func.jacfwd(select)(m)
-        u_like = self.unravel_tree(m)[0]
+        u_like = tree.tree_unflatten(self.shape_info.treedef, m)[0]
 
         # Wrap u_like and std into a list because the random variable
         # expects TaylorCoefficients.
@@ -1393,7 +1391,10 @@ class BlockDiagConditional(AbstractConditional):
         mean = cond.to_observed * cond.noise.mean
         cholesky = cond.to_observed[:, :, None] * cond.noise.cholesky
         noise = BlockDiagNormal(
-            mean, cholesky, treedef=self.treedef, unravel_leaf=self.unravel_leaf
+            mean,
+            cholesky,
+            treedef=self.shape_info.treedef,
+            unravel_leaf=self.shape_info.leaf_unravel,
         )
         to_observed = np.ones_like(cond.to_observed)
         to_latent = np.ones_like(cond.to_latent)
@@ -1402,13 +1403,15 @@ class BlockDiagConditional(AbstractConditional):
     def to_derivative(self, i, std):
 
         def select(a):
-            return tree.ravel_pytree(self.unravel_tree(a)[i])[0]
+            return np.asarray([a[i]])
 
-        x = np.zeros((*self.ode_shape, self.num_derivatives + 1))
+        (d,) = self.shape_info.single_flat.shape
+        n = self.shape_info.num_derivatives + 1
+        x = np.zeros((d, n))
         linop = func.vmap(func.jacrev(select))(x)
 
-        u_like = tree.tree_unflatten(self.treedef, x.T)
-        u_like = tree.tree_map(self.unravel_leaf, u_like)
+        u_like = tree.tree_unflatten(self.shape_info.treedef, x.T)
+        u_like = tree.tree_map(self.shape_info.leaf_unravel, u_like)
         u_like = tree.tree_map(np.zeros_like, u_like[0])
         noise = BlockDiagNormal.from_mean_and_std(u_like, std)
         return LatentCond.from_linop_and_noise(linop, noise)
