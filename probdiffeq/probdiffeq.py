@@ -202,6 +202,7 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
     def loss(u, /, *, marginals, std):
         u = tree.tree_map(np.asarray, u)
 
+        # TODO: this is the wrong shape! We should expect std.shape == u.shape...
         std_expected = tree.tree_map(lambda _s: ssm.prototypes.std(), u)
         std = tree.tree_map(np.asarray, std)
         shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
@@ -445,7 +446,11 @@ def constraint_jet(
         primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
         return [primals, *series]
 
-    order = ssm.num_derivatives + 1 if jet_order == "max" else jet_order + root_order
+    order = (
+        ssm.shape_info.num_derivatives + 1
+        if jet_order == "max"
+        else jet_order + root_order
+    )
     return ssm.linearize.root(
         root_jet, root_order=order, jacobian=jacobian, nlstsq=nlstsq
     )
@@ -539,7 +544,7 @@ def constraint_jet_imex(
         return [primals1, *series1]
 
     if jet_order_explicit == "max" or jet_order_implicit == "max":
-        order = ssm.num_derivatives + 1
+        order = ssm.shape_info.num_derivatives + 1
     else:
         order_ex = root_order_ex + jet_order_explicit
         order_im = root_order_im + jet_order_implicit
@@ -629,7 +634,7 @@ def constraint_jet_dae(
         return [primals, *series]
 
     if jet_order_differential == "max" or jet_order_algebraic == "max":
-        order = ssm.num_derivatives + 1
+        order = ssm.shape_info.num_derivatives + 1
     else:
         order_diff = root_order_diff + jet_order_differential
         order_alg = root_order_alg + jet_order_algebraic
@@ -976,11 +981,6 @@ class ProbabilisticSolver:
         self.prior = prior
         self.constraint = constraint
         self.constraint_init = constraint_init
-
-    @property
-    def error_contraction_rate(self):
-        """The error-contraction rate of the solver."""
-        return self.ssm.num_derivatives + 1
 
     @property
     def is_suitable_for_offgrid_marginals(self):
@@ -1347,17 +1347,17 @@ def prior_exponential(
     """
     # TODO: offer a "jacobian" option to enable isotropic and blockdiag implementations?
     prior_order = _verify_ioup_signature_and_parse_order(vf_linear)
-    if prior_order != ssm.num_derivatives + 1:
+    if prior_order != ssm.shape_info.num_derivatives + 1:
         msg = f"""The exponential prior does not match the Taylor coefficients in the SSM.
 
         Concretely:
 
         - For two Taylor coefficients, we expect `f(u, du, /)`.
-        - For three Taylor coefficients, we expect `f(u, du, ddu /)`.
-        - For two Taylor coefficients, we expect `f(u, du, ddu, dddu/)`.
+        - For three Taylor coefficients, we expect `f(u, du, ddu, /)`.
+        - For two Taylor coefficients, we expect `f(u, du, ddu, dddu, /)`.
 
         and so on. The passed dynamics correspond to **{prior_order}** Taylor
-        coefficients, whereas the state-space model includes **{ssm.num_derivatives + 1}**
+        coefficients, whereas the state-space model includes **{ssm.shape_info.num_derivatives + 1}**
         Taylor coeffients.
         """
         raise TypeError(msg)
@@ -1441,7 +1441,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         )
 
     def init_posterior(self, *, u: TaylorCoeffTarget):
-        cond = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
+        cond = self.ssm.conditional.identity()
         posterior = MarkovSequence(marginal=u.marginals, conditional=cond, reverse=True)
         return u, posterior
 
@@ -1679,7 +1679,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         )
 
     def init_posterior(self, *, u):
-        cond = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
+        cond = self.ssm.conditional.identity()
         posterior = MarkovSequence(u.marginals, cond, reverse=True)
         return u, posterior
 
@@ -1726,7 +1726,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         return estimate, posterior
 
     def interpolate_at_t1(self, *, posterior_t1: MarkovSequence):
-        cond_identity = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
+        cond_identity = self.ssm.conditional.identity()
         resume_from = MarkovSequence(
             posterior_t1.marginal,
             conditional=cond_identity,
@@ -1812,7 +1812,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         _, extrapolated_t = self.predict(
             posterior=posterior_t0, transition=transition_t0_t
         )
-        conditional_id = self.ssm.conditional.identity(self.ssm.num_derivatives + 1)
+        conditional_id = self.ssm.conditional.identity()
         previous_new = MarkovSequence(
             extrapolated_t.marginal, conditional_id, reverse=extrapolated_t.reverse
         )
@@ -2452,7 +2452,9 @@ class error_residual_std(ErrorEstimator):
         error, _ = tree.ravel_pytree(error)
 
         # Compute a reference
-        u0 = tree.tree_leaves(previous.u.mean)[0]
+        previous_leaves = tree.tree_leaves(previous.u.mean)
+        error_contraction_rate = len(previous_leaves)
+        u0 = previous_leaves[0]
         u1 = tree.tree_leaves(proposed.u.mean)[0]
         reference = np.maximum(np.abs(u0), np.abs(u1))
         reference, _ = tree.ravel_pytree(reference)
@@ -2473,7 +2475,6 @@ class error_residual_std(ErrorEstimator):
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
         # Scale the error norm with the error contraction rate and return
-        error_contraction_rate = self.ssm.num_derivatives + 1
         error_power = error_norm ** (-1.0 / error_contraction_rate)
         return error_power, state
 
@@ -2534,6 +2535,8 @@ class error_state_std(ErrorEstimator):
         mean = previous.u.marginals.evaluate_mean()
         rv = self.ssm.conditional.apply(mean, transition)
 
+        mean_leaves = tree.tree_leaves(mean)
+        error_contraction_rate = len(mean_leaves)
         # Optionally: re-linearize
         if self.re_linearize_before_error:
             linearized, state = self.constraint.linearize(
@@ -2570,6 +2573,5 @@ class error_state_std(ErrorEstimator):
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 
         # Scale the error norm with the error contraction rate and return
-        error_contraction_rate = self.ssm.num_derivatives + 1
         error_power = error_norm ** (-1.0 / error_contraction_rate)
         return error_power, state
