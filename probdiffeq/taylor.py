@@ -296,36 +296,6 @@ def _unnormalise(primals, *series):
     return [primals, *series_new]
 
 
-def odejet_affine(vf: Callable, inits: Sequence[Array], /, num: int):
-    """Evaluate the Taylor series of an affine differential equation.
-
-    !!! warning "Compilation time"
-        JIT-compiling this function unrolls a loop of length `num`.
-
-    """
-    inits = tree.tree_map(np.asarray, inits)
-
-    if num == 0:
-        return inits
-
-    if not isinstance(inits[0], Array):
-        _, unravel = tree.ravel_pytree(inits[0])
-        inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
-
-        def vf_wrapped(*ys, **kwargs):
-            ys = tree.tree_map(unravel, ys)
-            return tree.ravel_pytree(vf(*ys, **kwargs))[0]
-
-        tcoeffs = odejet_affine(vf_wrapped, inits_flat, num=num)
-        return tree.tree_map(unravel, tcoeffs)
-
-    fx, jvp_fn = func.linearize(vf, *inits)
-
-    tmp = fx
-    fx_evaluations = [tmp := jvp_fn(tmp) for _ in range(num - 1)]
-    return [*inits, fx, *fx_evaluations]
-
-
 def daejet_nlstsq_recursive(
     differential: Callable,
     algebraic: Callable,
