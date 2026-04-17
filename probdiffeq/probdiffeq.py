@@ -202,6 +202,7 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
     def loss(u, /, *, marginals, std):
         u = tree.tree_map(np.asarray, u)
 
+        # TODO: this is the wrong shape! We should expect std.shape == u.shape...
         std_expected = tree.tree_map(lambda _s: ssm.prototypes.std(), u)
         std = tree.tree_map(np.asarray, std)
         shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
