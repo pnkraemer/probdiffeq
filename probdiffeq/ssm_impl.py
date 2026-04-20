@@ -27,6 +27,11 @@ class LatentCond:
         self.to_latent = to_latent
         self.to_observed = to_observed
 
+    def __repr__(self) -> str:
+        msg = f"LatentCond(A={self.A}, noise={self.noise}"
+        msg += f", to_latent={self.to_latent}, to_observed={self.to_observed})"
+        return msg
+
     @staticmethod
     def register_pytree_node() -> None:
         """Register the conditional as a pytree."""
@@ -69,11 +74,6 @@ LatentCond.register_pytree_node()
 
 class AbstractPrototype(abc.ABC):
     """Interface for state-space model prototyped variables."""
-
-    @abc.abstractmethod
-    def std(self):
-        """Prototype the standard deviation."""
-        raise NotImplementedError
 
     @abc.abstractmethod
     def output_scale_calibrated(self):
@@ -354,9 +354,6 @@ class DensePrototype(AbstractPrototype):
 
     def __init__(self, shape_info) -> None:
         self.shape_info = shape_info
-
-    def std(self):
-        return np.ones(self.shape_info.single_flat.shape)
 
     def output_scale_calibrated(self):
         return np.ones(())
@@ -1731,10 +1728,6 @@ BlockDiagNormal.register_pytree_node()
 class IsotropicPrototype(AbstractPrototype):
     """Construct an isotropic implementation of prototypes."""
 
-    def std(self):
-
-        return np.ones(())
-
     def output_scale_calibrated(self):
         return np.ones(())
 
@@ -1744,12 +1737,6 @@ class BlockDiagPrototype(AbstractPrototype):
 
     def __init__(self, shape_info) -> None:
         self.shape_info = shape_info
-
-    def std(self):
-
-        # TODO: technically, these should be pytrees according
-        # to the leaf structure, right?
-        return np.ones(self.shape_info.single_flat.shape)
 
     def output_scale_calibrated(self):
         # TODO: technically, these should be pytrees according

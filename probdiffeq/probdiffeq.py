@@ -203,7 +203,7 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
         u = tree.tree_map(np.asarray, u)
 
         # TODO: this is the wrong shape! We should expect std.shape == u.shape...
-        std_expected = tree.tree_map(lambda _s: ssm.prototypes.std(), u)
+        std_expected = marginals.evaluate_std()[tcoeff_index]
         std = tree.tree_map(np.asarray, std)
         shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
         shapes_equal = tree.tree_all(shapes)
@@ -242,10 +242,7 @@ def loss_lml_timeseries(
 
         u = tree.tree_map(np.asarray, u)
 
-        def batch_std(s):
-            return func.vmap(lambda _s: ssm.prototypes.std())(s)
-
-        std_expected = tree.tree_map(batch_std, u)
+        std_expected = posterior.marginal.evaluate_std()[tcoeff_index]
         std = tree.tree_map(np.asarray, std)
         shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
         shapes_equal = tree.tree_all(shapes)
