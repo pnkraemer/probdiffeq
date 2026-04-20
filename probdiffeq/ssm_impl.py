@@ -303,8 +303,9 @@ class FactSsmImpl:
         shape_info = ShapeInfo(tcoeffs_mean)
         marginal = DenseNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
 
-        linearize = DenseLinearizationFactory(shape_info=shape_info)
         prior = DensePriorFactory(shape_info=shape_info)
+
+        linearize = DenseLinearizationFactory()
         conditional = DenseConditional()
         ssm = cls(
             linearize=linearize,
@@ -321,7 +322,7 @@ class FactSsmImpl:
         marginal = IsotropicNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
 
         prior = IsotropicPriorFactory(shape_info=shape_info)
-        linearize = IsotropicLinearizationFactory(shape_info=shape_info)
+        linearize = IsotropicLinearizationFactory()
         conditional = IsotropicConditional()
         ssm = cls(
             linearize=linearize,
@@ -338,7 +339,7 @@ class FactSsmImpl:
         marginal = BlockDiagNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
 
         prior = BlockDiagPriorFactory(shape_info=shape_info)
-        linearize = BlockDiagLinearizationFactory(shape_info=shape_info)
+        linearize = BlockDiagLinearizationFactory()
         conditional = BlockDiagConditional()
         ssm = cls(
             linearize=linearize,
@@ -768,30 +769,19 @@ class DenseNormal(AbstractTreeNormal):
 class DenseLinearizationFactory(AbstractLinearizationFactory):
     """Construct a dense linearization factory."""
 
-    def __init__(self, shape_info) -> None:
-        self.shape_info = shape_info
-
     def root(self, root, *, jacobian, root_order: int, nlstsq: bool):
         return DenseLinearizationRoot(
-            root,
-            shape_info=self.shape_info,
-            jacobian=jacobian,
-            root_order=root_order,
-            nlstsq=nlstsq,
+            root, jacobian=jacobian, root_order=root_order, nlstsq=nlstsq
         )
 
     def ode_taylor_0th(self, vf, *, ode_order):
-        return DenseLinearizationOdeTs0(
-            vf, ode_order=ode_order, shape_info=self.shape_info
-        )
+        return DenseLinearizationOdeTs0(vf, ode_order=ode_order)
 
     def ode_taylor_1st(self, vf, *, ode_order, jacobian):
         if ode_order > 1:
             raise ValueError
 
-        return DenseLinearizationOdeTs1(
-            vf, ode_order=ode_order, shape_info=self.shape_info, jacobian=jacobian
-        )
+        return DenseLinearizationOdeTs1(vf, ode_order=ode_order, jacobian=jacobian)
 
 
 class DenseConditional(AbstractConditional):
@@ -879,23 +869,22 @@ class DenseConditional(AbstractConditional):
 class DenseLinearizationOdeTs0(AbstractLinearizationOde):
     """Construct a dense implementation of ODE-TS0 linearization."""
 
-    def __init__(self, vf, *, ode_order: int, shape_info: ShapeInfo) -> None:
+    def __init__(self, vf, *, ode_order: int) -> None:
         super().__init__(vf, ode_order=ode_order)
-        self.shape_info = shape_info
 
     def init_linearization(self) -> None:
         return None
 
-    def linearize(self, rv, state: None, *, damp: float, t):
+    def linearize(self, rv: DenseNormal, state: None, *, damp: float, t):
         fun = func.partial(self.vector_field, t=t)
         del state
 
         def a1(m):
             """Select the 'n'-th derivative."""
-            m0 = self.shape_info.all_unravel(m)[self.ode_order]
+            m0 = rv.unravel(m)[self.ode_order]
             return tree.ravel_pytree(m0)[0]
 
-        Ms = self.shape_info.all_unravel(rv.mean)
+        Ms = rv.evaluate_mean()
         fm = fun(*Ms[: self.ode_order])
         fx, unravel = tree.ravel_pytree(fm)
         linop = func.jacrev(a1)(rv.mean)
@@ -907,14 +896,11 @@ class DenseLinearizationOdeTs0(AbstractLinearizationOde):
 class DenseLinearizationOdeTs1(AbstractLinearizationOde):
     """Construct a dense implementation of ODE-TS1 linearization."""
 
-    def __init__(
-        self, vf: Callable, ode_order: int, shape_info: ShapeInfo, jacobian: Any
-    ) -> None:
+    def __init__(self, vf: Callable, ode_order: int, jacobian: Any) -> None:
         if ode_order > 1:
             msg = "Not implemented. Try the a root-based TS1 constraint instead."
             raise ValueError(msg)
         super().__init__(vf, ode_order=ode_order)
-        self.shape_info = shape_info
         self.jacobian = jacobian
 
     @property
@@ -926,7 +912,7 @@ class DenseLinearizationOdeTs1(AbstractLinearizationOde):
 
     def linearize(self, rv, state: None, *, damp: float, t):
         fun = func.partial(self.vector_field, t=t)
-        m_tree = self.shape_info.all_unravel(rv.mean)
+        m_tree = rv.unravel(rv.mean)
         m0, unravel = tree.ravel_pytree(m_tree[0])
 
         def vf_flat(s):
@@ -936,7 +922,7 @@ class DenseLinearizationOdeTs1(AbstractLinearizationOde):
 
         def select_i(i):
             def select(s):
-                s_tree = self.shape_info.all_unravel(s)
+                s_tree = rv.unravel(s)
                 s_flat, _ = tree.ravel_pytree(s_tree[i])
                 return s_flat
 
@@ -957,19 +943,18 @@ class DenseLinearizationOdeTs1(AbstractLinearizationOde):
 class DenseLinearizationRoot(AbstractLinearizationRoot):
     """Construct a dense implementation of root-TS1 linearization."""
 
-    def __init__(self, root, *, root_order, shape_info, jacobian, nlstsq) -> None:
+    def __init__(self, root, *, root_order, jacobian, nlstsq) -> None:
         super().__init__(root, root_order=root_order)
-        self.shape_info = shape_info
         self.jacobian = jacobian
         self.nlstsq = nlstsq
 
     def init_linearization(self):
         return self.jacobian.init_jacobian_handler()
 
-    def constraint_flat(self, m: Array, *, t) -> Array:
+    def constraint_flat(self, m: Array, *, t, unravel) -> Array:
         """Evaluate a flattened version of the root constraint."""
         # Unravel the location and extract derivatives
-        m_tree = self.shape_info.all_unravel(m)
+        m_tree = unravel(m)
         relevant_tcoeffs = m_tree[: self.root_order]
 
         # Evaluate the root
@@ -981,7 +966,7 @@ class DenseLinearizationRoot(AbstractLinearizationRoot):
     def linearize(self, rv, state, *, damp: float, t):
 
         mean = rv.mean
-        constraint_flat = func.partial(self.constraint_flat, t=t)
+        constraint_flat = func.partial(self.constraint_flat, t=t, unravel=rv.unravel)
         if self.nlstsq is not None:  # posterior linearization
             mean, _info = self.nlstsq(constraint_flat, mean, rv.mean, rv.cholesky)
 
@@ -989,7 +974,7 @@ class DenseLinearizationRoot(AbstractLinearizationRoot):
         fx = fx - linop @ mean
 
         # Understand how to unravel
-        m_tree = func.eval_shape(self.shape_info.all_unravel, rv.mean)
+        m_tree = func.eval_shape(rv.unravel, rv.mean)
         relevant_tcoeffs = m_tree[: self.root_order]
         root_eval = func.eval_shape(lambda s: self.root(*s, t=t), relevant_tcoeffs)
         root_eval = tree.tree_map(np.zeros_like, root_eval)
@@ -1004,9 +989,8 @@ class DenseLinearizationRoot(AbstractLinearizationRoot):
 class IsotropicLinearizationOdeTs0(AbstractLinearizationOde):
     """Construct an isotropic implementation of ODE-TS0 linearization."""
 
-    def __init__(self, vf, *, ode_order, shape_info) -> None:
+    def __init__(self, vf, *, ode_order) -> None:
         super().__init__(vf, ode_order=ode_order)
-        self.shape_info = shape_info
 
     @property
     def root_order(self):
@@ -1020,30 +1004,27 @@ class IsotropicLinearizationOdeTs0(AbstractLinearizationOde):
         fun = func.partial(self.vector_field, t=t)
         mean = rv.mean
 
-        m1 = [*(mean[: self.ode_order])]
-        m1 = tree.tree_map(self.shape_info.single_unravel, m1)
-        fx_tree = fun(*m1)
+        Ms = tree.tree_unflatten(rv.treedef, [*rv.mean])
+
+        fx_tree = fun(*(Ms[: self.ode_order]))
         fx, unravel_obs = tree.ravel_pytree(fx_tree)
 
         bias = IsotropicNormal.from_dirac(unravel_obs(-fx), damp=damp)
 
         linop = func.jacrev(lambda s: s[[self.ode_order], ...])(mean[..., 0])
-        to_latent = np.ones((linop.shape[1],))
-        to_observed = np.ones((linop.shape[0],))
-        cond = LatentCond(linop, bias, to_latent=to_latent, to_observed=to_observed)
+        cond = LatentCond.from_linop_and_noise(linop, bias)
         return cond, None
 
 
 class IsotropicLinearizationOdeTs1(AbstractLinearizationOde):
     """Construct an isotropic implementation of ODE-TS1 linearization."""
 
-    def __init__(self, vf, *, ode_order: int, shape_info, jacobian: Any) -> None:
+    def __init__(self, vf, *, ode_order: int, jacobian: Any) -> None:
         if ode_order > 1:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
             raise ValueError(msg)
         super().__init__(vf, ode_order=1)
 
-        self.shape_info = shape_info
         self.jacobian = jacobian
 
     def init_linearization(self):
@@ -1054,8 +1035,12 @@ class IsotropicLinearizationOdeTs1(AbstractLinearizationOde):
         # Evaluate the linearisation
         m0 = rv.mean[0]
 
+        mean_tree = tree.tree_unflatten(rv.treedef, [*rv.mean])
+        m0_tree = mean_tree[0]
+        rv0 = IsotropicNormal.from_dirac(m0_tree, damp=0.0)
+
         def vf_ravel(s):
-            s_tree = self.shape_info.single_unravel(s)
+            s_tree = tree.tree_unflatten(rv0.treedef, [s])
             fs = fun(s_tree)
             return tree.ravel_pytree(fs)[0]
 
@@ -1070,7 +1055,9 @@ class IsotropicLinearizationOdeTs1(AbstractLinearizationOde):
         fx = fx - linop @ rv.mean
 
         # Turn fx and J_trace into an observation model
-        vf_dummy = func.eval_shape(lambda s: fun(self.shape_info.single_unravel(s)), m0)
+        vf_dummy = func.eval_shape(
+            lambda s: fun(tree.tree_unflatten(rv0.treedef, [s])), m0
+        )
         _, structure = tree.tree_flatten(vf_dummy)
         fx = tree.tree_unflatten(structure, [*fx])
         noise = IsotropicNormal.from_dirac(fx, damp=damp)
@@ -1107,12 +1094,11 @@ class BlockDiagLinearizationOdeTs0(AbstractLinearizationOde):
 class BlockDiagLinearizationOdeTs1(AbstractLinearizationOde):
     """Construct a block-diagonal implementation of ODE-TS1 linearization."""
 
-    def __init__(self, vf, *, ode_order: int, shape_info, jacobian: Any) -> None:
+    def __init__(self, vf, *, ode_order: int, jacobian: Any) -> None:
         if ode_order > 1:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
             raise ValueError(msg)
         super().__init__(vf, ode_order=1)
-        self.shape_info = shape_info
         self.jacobian = jacobian
 
     def init_linearization(self):
@@ -1122,13 +1108,17 @@ class BlockDiagLinearizationOdeTs1(AbstractLinearizationOde):
         fun = func.partial(self.vector_field, t=t)
         mean = rv.mean
 
+        mean_tree = tree.tree_unflatten(rv.treedef, [*(rv.mean.T)])
+        m0_tree = mean_tree[0]
+        rv0 = BlockDiagNormal.from_dirac(m0_tree, damp=0.0)
+
         def a1(s):
             return s[[1], ...]
 
         linop = func.vmap(func.jacrev(a1))(mean)
 
         def vf_flat(u):
-            u_tree = self.shape_info.single_unravel(u)
+            u_tree = tree.tree_unflatten(rv0.treedef, [u])
             fu_tree = fun(u_tree)
             return tree.ravel_pytree(fu_tree)[0]
 
@@ -1155,28 +1145,18 @@ class BlockDiagLinearizationOdeTs1(AbstractLinearizationOde):
 class IsotropicLinearizationFactory(AbstractLinearizationFactory):
     """Construct an isotropic linearization-factory."""
 
-    def __init__(self, shape_info) -> None:
-        self.shape_info = shape_info
-
     def root(self, root, *, jacobian, root_order: int, nlstsq: Callable | None):
         raise NotImplementedError
 
     def ode_taylor_1st(self, vf, *, ode_order, jacobian):
-        return IsotropicLinearizationOdeTs1(
-            vf, jacobian=jacobian, ode_order=ode_order, shape_info=self.shape_info
-        )
+        return IsotropicLinearizationOdeTs1(vf, jacobian=jacobian, ode_order=ode_order)
 
     def ode_taylor_0th(self, vf, *, ode_order):
-        return IsotropicLinearizationOdeTs0(
-            vf, ode_order=ode_order, shape_info=self.shape_info
-        )
+        return IsotropicLinearizationOdeTs0(vf, ode_order=ode_order)
 
 
 class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
     """Construct a block-diagonal linearization-factory."""
-
-    def __init__(self, shape_info) -> None:
-        self.shape_info = shape_info
 
     def root(self, root, *, jacobian, root_order: int, nlstsq: Callable | None):
         raise NotImplementedError
@@ -1185,9 +1165,7 @@ class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
         return BlockDiagLinearizationOdeTs0(vf, ode_order=ode_order)
 
     def ode_taylor_1st(self, vf, *, ode_order, jacobian):
-        return BlockDiagLinearizationOdeTs1(
-            vf, ode_order=ode_order, shape_info=self.shape_info, jacobian=jacobian
-        )
+        return BlockDiagLinearizationOdeTs1(vf, ode_order=ode_order, jacobian=jacobian)
 
 
 class IsotropicConditional(AbstractConditional):
@@ -1594,6 +1572,7 @@ class BlockDiagNormal(AbstractTreeNormal):
         # A map that unravels each leaf. Note that this is not the same
         # as unravelling each Taylor coefficient, because the Taylor coefficients
         # themselves can be pytrees, whereas the leaves are always arrays.
+        # The below function exclusively reshapes arrays
         self.unravel_leaf = unravel_leaf
 
     def __repr__(self) -> str:
