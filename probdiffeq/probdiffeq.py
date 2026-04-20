@@ -444,7 +444,7 @@ def constraint_jet(
         return [primals, *series]
 
     order = (
-        ssm.shape_info.num_derivatives + 1
+        ssm.prior.shape_info.num_derivatives + 1
         if jet_order == "max"
         else jet_order + root_order
     )
@@ -541,7 +541,7 @@ def constraint_jet_imex(
         return [primals1, *series1]
 
     if jet_order_explicit == "max" or jet_order_implicit == "max":
-        order = ssm.shape_info.num_derivatives + 1
+        order = ssm.prior.shape_info.num_derivatives + 1
     else:
         order_ex = root_order_ex + jet_order_explicit
         order_im = root_order_im + jet_order_implicit
@@ -631,7 +631,7 @@ def constraint_jet_dae(
         return [primals, *series]
 
     if jet_order_differential == "max" or jet_order_algebraic == "max":
-        order = ssm.shape_info.num_derivatives + 1
+        order = ssm.prior.shape_info.num_derivatives + 1
     else:
         order_diff = root_order_diff + jet_order_differential
         order_alg = root_order_alg + jet_order_algebraic
@@ -1349,7 +1349,7 @@ def prior_exponential(
     """
     # TODO: offer a "jacobian" option to enable isotropic and blockdiag implementations?
     prior_order = _verify_ioup_signature_and_parse_order(vf_linear)
-    if prior_order != ssm.shape_info.num_derivatives + 1:
+    if prior_order != ssm.prior.shape_info.num_derivatives + 1:
         msg = f"""The exponential prior does not match the Taylor coefficients in the SSM.
 
         Concretely:
@@ -1359,7 +1359,7 @@ def prior_exponential(
         - For two Taylor coefficients, we expect `f(u, du, ddu, dddu, /)`.
 
         and so on. The passed dynamics correspond to **{prior_order}** Taylor
-        coefficients, whereas the state-space model includes **{ssm.shape_info.num_derivatives + 1}**
+        coefficients, whereas the state-space model includes **{ssm.prior.shape_info.num_derivatives + 1}**
         Taylor coeffients.
         """
         raise TypeError(msg)

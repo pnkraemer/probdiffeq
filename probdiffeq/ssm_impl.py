@@ -131,7 +131,7 @@ class AbstractLinearizationFactory(abc.ABC):
 class AbstractTreeNormal(abc.ABC):
     """Interface for pytree-valued normal distributions."""
 
-    def __init__(self, mean, cholesky) -> None:
+    def __init__(self, mean: Array, cholesky: Array) -> None:
         self.mean = mean
         self.cholesky = cholesky
 
@@ -250,6 +250,9 @@ class ShapeInfo:
 class AbstractPriorFactory:
     """Interface for prior constructions."""
 
+    def __init__(self, shape_info) -> None:
+        self.shape_info = shape_info
+
     @abc.abstractmethod
     def identity(self, /):
         """Construct an identity conditional (unit linop, zero noise)."""
@@ -285,17 +288,18 @@ class AbstractPriorFactory:
 class FactSsmImpl:
     """Implementation of factorized Markovian state-space models."""
 
+    # Linearization and priors: construct RVs and conditionals
+
     linearize: AbstractLinearizationFactory
     """An implementation of linearization constructors."""
 
     prior: AbstractPriorFactory
     """An implementation of constructing prior distributions."""
 
+    # Manipulate RVs and conditionals
+
     conditional: AbstractConditional
     """An implementation of manipulating conditionals."""
-
-    shape_info: ShapeInfo
-    """Information about Taylor-coefficient shapes/counts/etc.."""
 
     @classmethod
     def from_tcoeffs_dense(cls, tcoeffs_mean, tcoeffs_std, /):
@@ -307,12 +311,7 @@ class FactSsmImpl:
 
         linearize = DenseLinearizationFactory()
         conditional = DenseConditional()
-        ssm = cls(
-            linearize=linearize,
-            conditional=conditional,
-            prior=prior,
-            shape_info=shape_info,
-        )
+        ssm = cls(linearize=linearize, conditional=conditional, prior=prior)
         return marginal, ssm
 
     @classmethod
@@ -324,12 +323,7 @@ class FactSsmImpl:
         prior = IsotropicPriorFactory(shape_info=shape_info)
         linearize = IsotropicLinearizationFactory()
         conditional = IsotropicConditional()
-        ssm = cls(
-            linearize=linearize,
-            prior=prior,
-            conditional=conditional,
-            shape_info=shape_info,
-        )
+        ssm = cls(linearize=linearize, prior=prior, conditional=conditional)
         return marginal, ssm
 
     @classmethod
@@ -341,20 +335,12 @@ class FactSsmImpl:
         prior = BlockDiagPriorFactory(shape_info=shape_info)
         linearize = BlockDiagLinearizationFactory()
         conditional = BlockDiagConditional()
-        ssm = cls(
-            linearize=linearize,
-            prior=prior,
-            conditional=conditional,
-            shape_info=shape_info,
-        )
+        ssm = cls(linearize=linearize, prior=prior, conditional=conditional)
         return marginal, ssm
 
 
 class BlockDiagPriorFactory(AbstractPriorFactory):
     """Implementation of block-diagonal prior constructors."""
-
-    def __init__(self, shape_info) -> None:
-        self.shape_info = shape_info
 
     def identity(self, /) -> LatentCond:
         ndim = self.shape_info.num_derivatives + 1
@@ -453,9 +439,6 @@ class BlockDiagPriorFactory(AbstractPriorFactory):
 class IsotropicPriorFactory(AbstractPriorFactory):
     """Implementation of isotropic prior constructors."""
 
-    def __init__(self, shape_info) -> None:
-        self.shape_info = shape_info
-
     def identity(self, /) -> LatentCond:
         num = self.shape_info.num_derivatives + 1
         (d,) = self.shape_info.single_flat.shape
@@ -527,9 +510,6 @@ class IsotropicPriorFactory(AbstractPriorFactory):
 
 class DensePriorFactory(AbstractPriorFactory):
     """Implementation of dense prior constructors."""
-
-    def __init__(self, shape_info) -> None:
-        self.shape_info = shape_info
 
     def identity(self, /) -> LatentCond:
         ndim = self.shape_info.num_derivatives + 1
