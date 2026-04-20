@@ -20,32 +20,8 @@ manipulation of square root matrices.
 
 """
 
-from probdiffeq.backend import flow, linalg, np, tree
+from probdiffeq.backend import flow, linalg, np
 from probdiffeq.backend.typing import Callable
-
-
-def revert_conditional_noisefree(R_X_F, R_X):
-    """Like revert_conditional, but without observation noise."""
-    if not R_X_F.shape[1] <= R_X_F.shape[0]:
-        msg = (
-            "Reverting noise-free conditionals requires "
-            "that the conditional dimension is at most as "
-            "large as the prior dimension. "
-            f"Received: {R_X_F.shape[1]} >= {R_X_F.shape[0]}"
-        )
-        raise ValueError(msg)
-
-    r_marg = triu_via_qr(R_X_F)
-    crosscov = R_X.T @ R_X_F
-    gain = linalg.cholesky_solve(r_marg.T, crosscov.T).T
-    r_cor = R_X - R_X_F @ gain.T
-
-    # TODO: only with this line is the output equivalent to the other function
-    #  I don't like the double-QR decomposition --
-    #  it feels that we don't save any computation here...
-    if r_cor.shape[0] != r_cor.shape[1]:
-        r_cor = triu_via_qr(r_cor)
-    return r_marg, (r_cor, gain)
 
 
 def revert_conditional(R_X_F, R_X, R_YX, *, solve_triu: Callable):
@@ -117,22 +93,6 @@ def sum_of_sqrtm_factors(R_stack: tuple):
     if np.ndim(R_stack[0]) == 0:
         return np.reshape(uppertri, ())
     return uppertri
-
-
-# logsumexp but for squares
-def sqrt_sum_square_scalar(*args):
-    """Compute sqrt(a**2 + b**2) without squaring a or b."""
-    args_are_scalar = tree.tree_map(lambda x: np.ndim(x) == 0, args)
-    if not tree.tree_all(args_are_scalar):
-        args_shapes = tree.tree_map(np.shape, args)
-        msg1 = "'sqrt_sum_square_scalar' expects scalar arguments. "
-        msg2 = f"PyTree with shapes {args_shapes} received."
-        raise ValueError(msg1 + msg2)
-
-    stack = np.stack(args)
-    sqrt_mat = triu_via_qr(stack[:, None])
-    sqrt_mat_abs = np.abs(sqrt_mat)  # convention
-    return np.reshape(sqrt_mat_abs, ())
 
 
 def triu_via_qr(R, /):

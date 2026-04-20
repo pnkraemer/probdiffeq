@@ -350,8 +350,7 @@ def daejet_nlstsq(
     zeros = tree.tree_map(np.zeros_like, inits[0])
     inits_mean = [*inits, *[zeros for _ in range(num)]]
 
-    ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(inits_mean)
-    rv = ssm.normal.from_mean_and_std(inits_mean, inits_std)
+    rv, _ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(inits_mean, inits_std)
 
     x0, unravel = tree.ravel_pytree(inits_mean)
 

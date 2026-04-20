@@ -32,49 +32,9 @@ def test_revert_conditional(HCshape, Cshape, Xshape, solve_triu) -> None:
     assert testing.allclose(cov(bw_noise), C1)
 
 
-@testing.parametrize("Cshape, Hshape", ([(3, 3), (2, 3)],))
-def test_revert_kernel_noisefree(Cshape, Hshape) -> None:
-    C = _some_array(Cshape) + 1.0
-    H = _some_array(Hshape) + 2.0
-    HC = H @ C
-
-    S = HC @ HC.T
-    K = C @ HC.T @ linalg.inv(S)
-
-    C1 = (np.eye(Cshape[0]) - K @ H) @ C @ C.T @ (np.eye(Cshape[0]) - K @ H).T
-
-    extra, (bw_noise, g) = cholesky_util.revert_conditional_noisefree(
-        R_X_F=HC.T, R_X=C.T
-    )
-
-    def cov(x):
-        return x.T @ x
-
-    assert testing.allclose(cov(extra), S)
-    assert testing.allclose(g, K)
-    assert testing.allclose(cov(bw_noise), C1)
-
-
 def _some_array(shape):
     key = random.prng_key(seed=1)
     return random.normal(key, shape=shape)
-
-
-def test_sqrt_sum_square_scalar() -> None:
-    a = 3.0
-    b = 4.0
-    c = 5.0
-    expected = np.sqrt(a**2 + b**2 + c**2)
-    received = cholesky_util.sqrt_sum_square_scalar(a, b, c)
-    assert testing.allclose(expected, received)
-
-
-def test_sqrt_sum_square_error() -> None:
-    a = 3.0 * np.eye(2)
-    b = 4.0 * np.eye(2)
-    c = 5.0 * np.eye(2)
-    with testing.raises(ValueError, match="scalar"):
-        _ = cholesky_util.sqrt_sum_square_scalar(a, b, c)
 
 
 def test_reverse_conditional_jacrev_zero_matrix() -> None:
@@ -107,29 +67,8 @@ def test_sum_of_sqrtm_factors_jacrev_zero_matrix() -> None:
     assert is_not_nan
 
 
-def test_sqrt_sum_square_scalar_derivative_value_test() -> None:
-    """Test that the values match previous versions.
-
-    Why? Because we implement custom derivatives for triangularisation
-    to resolve specific corner cases, but need to assert that these are correct.
-    """
-
-    @func.grad
-    def triu_via_naive_arithmetic_and_autograd(x, y, z):
-        return np.sqrt(x**2 + y**2 + z**2)
-
-    @func.grad
-    def triu_via_qr_r(x, y, z):
-        return cholesky_util.sqrt_sum_square_scalar(x, y, z)
-
-    a, b, c = 3.0, 4.0, 5.0
-    expected = triu_via_naive_arithmetic_and_autograd(a, b, c)
-    received = triu_via_qr_r(a, b, c)
-    assert testing.allclose(expected, received)
-
-
-def test_sqrt_sum_square_scalar_derivative_value_test_at_origin() -> None:
-    """Like the previous test, but for zero inputs.
+def test_hypot_derivative_well_defined_at_origin() -> None:
+    """Ensure that np.hypot is well-defined at the origin.
 
     This ensures that the QR decomposition is differentiable at the origin,
     which is not the case unless we use custom JVPs.
@@ -138,16 +77,16 @@ def test_sqrt_sum_square_scalar_derivative_value_test_at_origin() -> None:
     # Use square of triu to ensure that the reference is differentiable
     # (np.sqrt is not differentiable at zero)
     @func.grad
-    def triu_via_naive_arithmetic_and_autograd(x, y, z):
-        return x**2 + y**2 + z**2
+    def triu_via_naive_arithmetic_and_autograd(x, y):
+        return x**2 + y**2
 
     @func.grad
-    def triu_via_qr_r(x, y, z):
-        return cholesky_util.sqrt_sum_square_scalar(x, y, z) ** 2
+    def triu_via_qr_r(x, y):
+        return np.hypot(x, y) ** 2
 
-    a, b, c = 0.0, 0.0, 0.0
-    expected = triu_via_naive_arithmetic_and_autograd(a, b, c)
-    received = triu_via_qr_r(a, b, c)
+    a, b = 0.0, 0.0
+    expected = triu_via_naive_arithmetic_and_autograd(a, b)
+    received = triu_via_qr_r(a, b)
     assert testing.allclose(expected, received)
 
 

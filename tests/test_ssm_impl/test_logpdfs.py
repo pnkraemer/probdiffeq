@@ -4,7 +4,7 @@ Necessary because the implementation has been faulty in the past.
 """
 
 from probdiffeq import ssm_impl
-from probdiffeq.backend import func, np, random, stats, testing, tree
+from probdiffeq.backend import func, np, random, testing, tree
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
@@ -17,7 +17,7 @@ def test_logpdf(fact) -> None:
     u_dense = np.ones_like(mean_dense)
 
     pdf1 = rv.logpdf(u)
-    pdf2 = stats.multivariate_normal_logpdf(u_dense, mean_dense, cov_dense)
+    pdf2 = random.logpdf_multivariate_normal(u_dense, mean_dense, cov_dense)
     assert testing.allclose(pdf1, pdf2)
 
 
@@ -37,21 +37,24 @@ def create_random_variable(fact):
     tcoeffs = [np.ones((3,))] * 5  # values irrelevant
 
     if fact == "dense":
-        ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(tcoeffs)
+        stds = [np.ones((3,))] * 5
+        _, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(tcoeffs, stds)
         output_scale = np.ones((3,))
         discretize = ssm.conditional.transition_wiener_integrated(output_scale)
 
         output_scale = np.ones(())
         rv = discretize(0.1, output_scale)
     elif fact == "blockdiag":
-        ssm = ssm_impl.FactSsmImpl.from_tcoeffs_blockdiag(tcoeffs)
+        stds = [np.ones((3,))] * 5
+        _, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_blockdiag(tcoeffs, stds)
         output_scale = np.ones((3,))
         discretize = ssm.conditional.transition_wiener_integrated(output_scale)
 
         output_scale = np.ones((3,))
         rv = discretize(0.1, output_scale)
     elif fact == "isotropic":
-        ssm = ssm_impl.FactSsmImpl.from_tcoeffs_isotropic(tcoeffs)
+        stds = [np.ones(())] * 5
+        _, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_isotropic(tcoeffs, stds)
         output_scale = np.ones(())
         discretize = ssm.conditional.transition_wiener_integrated(output_scale)
 

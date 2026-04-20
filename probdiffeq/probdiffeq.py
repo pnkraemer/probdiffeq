@@ -1286,18 +1286,23 @@ def ssm_taylor_diffuse(
     # Choose a state-space model factorisation
     match ssm_fact:
         case "dense":
-            ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(tcoeffs_mean)
+            marginal, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(
+                tcoeffs_mean, tcoeffs_std
+            )
         case "blockdiag":
-            ssm = ssm_impl.FactSsmImpl.from_tcoeffs_blockdiag(tcoeffs_mean)
+            marginal, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_blockdiag(
+                tcoeffs_mean, tcoeffs_std
+            )
         case "isotropic":
-            ssm = ssm_impl.FactSsmImpl.from_tcoeffs_isotropic(tcoeffs_mean)
+            marginal, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_isotropic(
+                tcoeffs_mean, tcoeffs_std
+            )
         case _:
             msg = f"Factorisation ssm_fact='{ssm_fact}' unknown. "
             msg += "Choose one out of {'dense', 'isotropic', 'blockdiag'}."
             raise ValueError(msg)
 
     # Return the target
-    marginal = ssm.normal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
     target = TaylorCoeffTarget(marginal)
     return target, ssm
 
@@ -1936,10 +1941,10 @@ class solver_mle(ProbabilisticSolver):
             prediction=prediction, updates=updates
         )
 
-        # Calibrate the output scale
-        output_scale_running = self.ssm.normal.update_moving_avg(  # type: ignore
-            output_scale_running, new_term, num=num_data
-        )
+        # Calibrate the output scale: c^2 = w_1 * a^2 + w_2 * b^2
+        x1 = np.sqrt(num_data / (num_data + 1)) * output_scale_running
+        x2 = np.sqrt(1 / (num_data + 1)) * new_term
+        output_scale_running = np.hypot(x1, x2)
 
         # Return the state
         auxiliary = (cstate, output_scale_running, num_data + 1)
