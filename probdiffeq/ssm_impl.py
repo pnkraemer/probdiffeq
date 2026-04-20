@@ -27,11 +27,6 @@ class LatentCond:
         self.to_latent = to_latent
         self.to_observed = to_observed
 
-    def __repr__(self) -> str:
-        msg = f"LatentCond(A={self.A}, noise={self.noise}"
-        msg += f", to_latent={self.to_latent}, to_observed={self.to_observed})"
-        return msg
-
     @staticmethod
     def register_pytree_node() -> None:
         """Register the conditional as a pytree."""
@@ -151,8 +146,9 @@ class AbstractLinearizationFactory(abc.ABC):
 class AbstractTreeNormal(abc.ABC):
     """Interface for pytree-valued normal distributions."""
 
-    def __init__(self, mean) -> None:
+    def __init__(self, mean, cholesky) -> None:
         self.mean = mean
+        self.cholesky = cholesky
 
     @abc.abstractmethod
     def evaluate_mean(self):
@@ -370,8 +366,7 @@ class DenseNormal(AbstractTreeNormal):
     """Construct a dense implementation of a normal distribution."""
 
     def __init__(self, mean: T, cholesky: T, unravel: Callable[[T], C]) -> None:
-        super().__init__(mean=mean)
-        self.cholesky = cholesky
+        super().__init__(mean=mean, cholesky=cholesky)
         self.unravel = unravel
 
     @classmethod
@@ -1453,8 +1448,7 @@ class IsotropicNormal(AbstractTreeNormal):
     """Construct an isotropic normal distribution."""
 
     def __init__(self, mean: T, cholesky: T, treedef) -> None:
-        super().__init__(mean=mean)
-        self.cholesky = cholesky
+        super().__init__(mean=mean, cholesky=cholesky)
         self.treedef = treedef
 
     def __repr__(self) -> str:
@@ -1583,8 +1577,7 @@ class BlockDiagNormal(AbstractTreeNormal):
     """Construct a block-diagonal normal distribution."""
 
     def __init__(self, mean, cholesky, treedef, unravel_leaf) -> None:
-        super().__init__(mean=mean)
-        self.cholesky = cholesky
+        super().__init__(mean=mean, cholesky=cholesky)
 
         # The treedef of the target
         self.treedef = treedef
