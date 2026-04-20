@@ -72,21 +72,6 @@ class LatentCond:
 LatentCond.register_pytree_node()
 
 
-class AbstractPrototype(abc.ABC):
-    """Interface for state-space model prototyped variables."""
-
-    @abc.abstractmethod
-    def output_scale_calibrated(self):
-        """Prototype the calibrated output scale.
-
-        Note how this may differ from the base-output scale.
-        For example, base output scales for dense factorisations
-        are vector-valued even though the calibrations are scalar.
-        See the Robertson DAE examples for why this is helpful.
-        """
-        raise NotImplementedError
-
-
 class AbstractLinearization(abc.ABC):
     """Interface for linearizations."""
 
@@ -284,13 +269,21 @@ class AbstractPriorFactory:
         """Construct an observation model for the i'th derivative."""
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def prototype_output_scale_calibrated(self):
+        """Prototype the calibrated output scale.
+
+        Note how this may differ from the base-output scale.
+        For example, base output scales for dense factorisations
+        are vector-valued even though the calibrations are scalar.
+        See the Robertson DAE examples for why this is helpful.
+        """
+        raise NotImplementedError
+
 
 @structs.dataclass
 class FactSsmImpl:
     """Implementation of factorized Markovian state-space models."""
-
-    prototypes: AbstractPrototype
-    """An implementation of variable prototypes."""
 
     linearize: AbstractLinearizationFactory
     """An implementation of linearization constructors."""
@@ -310,15 +303,13 @@ class FactSsmImpl:
         shape_info = ShapeInfo(tcoeffs_mean)
         marginal = DenseNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
 
-        prototypes = DensePrototype(shape_info=shape_info)
         linearize = DenseLinearizationFactory(shape_info=shape_info)
         prior = DensePriorFactory(shape_info=shape_info)
-        conditional = DenseConditional(shape_info=shape_info)
+        conditional = DenseConditional()
         ssm = cls(
             linearize=linearize,
             conditional=conditional,
             prior=prior,
-            prototypes=prototypes,
             shape_info=shape_info,
         )
         return marginal, ssm
@@ -330,14 +321,12 @@ class FactSsmImpl:
         marginal = IsotropicNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
 
         prior = IsotropicPriorFactory(shape_info=shape_info)
-        prototypes = IsotropicPrototype()
         linearize = IsotropicLinearizationFactory(shape_info=shape_info)
-        conditional = IsotropicConditional(shape_info=shape_info)
+        conditional = IsotropicConditional()
         ssm = cls(
             linearize=linearize,
             prior=prior,
             conditional=conditional,
-            prototypes=prototypes,
             shape_info=shape_info,
         )
         return marginal, ssm
@@ -349,27 +338,15 @@ class FactSsmImpl:
         marginal = BlockDiagNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
 
         prior = BlockDiagPriorFactory(shape_info=shape_info)
-        prototypes = BlockDiagPrototype(shape_info=shape_info)
         linearize = BlockDiagLinearizationFactory(shape_info=shape_info)
-        conditional = BlockDiagConditional(shape_info=shape_info)
+        conditional = BlockDiagConditional()
         ssm = cls(
             linearize=linearize,
             prior=prior,
             conditional=conditional,
-            prototypes=prototypes,
             shape_info=shape_info,
         )
         return marginal, ssm
-
-
-class DensePrototype(AbstractPrototype):
-    """Construct a dense implementation of prototypes."""
-
-    def __init__(self, shape_info) -> None:
-        self.shape_info = shape_info
-
-    def output_scale_calibrated(self):
-        return np.ones(())
 
 
 class BlockDiagPriorFactory(AbstractPriorFactory):
@@ -466,6 +443,11 @@ class BlockDiagPriorFactory(AbstractPriorFactory):
         noise = BlockDiagNormal.from_mean_and_std(u_like, std)
         return LatentCond.from_linop_and_noise(linop, noise)
 
+    def prototype_output_scale_calibrated(self):
+        # TODO: technically, these should be pytrees according
+        # to the leaf structure, right?
+        return np.ones(self.shape_info.single_flat.shape)
+
 
 class IsotropicPriorFactory(AbstractPriorFactory):
     """Implementation of isotropic prior constructors."""
@@ -537,6 +519,9 @@ class IsotropicPriorFactory(AbstractPriorFactory):
         # expects TaylorCoefficients.
         noise = IsotropicNormal.from_mean_and_std([u_like], [std])
         return LatentCond.from_linop_and_noise(linop, noise)
+
+    def prototype_output_scale_calibrated(self):
+        return np.ones(())
 
 
 class DensePriorFactory(AbstractPriorFactory):
@@ -684,6 +669,9 @@ class DensePriorFactory(AbstractPriorFactory):
         noise = DenseNormal.from_mean_and_std(data_like, std)
         return LatentCond.from_linop_and_noise(linop, noise)
 
+    def prototype_output_scale_calibrated(self):
+        return np.ones(())
+
 
 class DenseNormal(AbstractTreeNormal):
     """Construct a dense implementation of a normal distribution."""
@@ -809,9 +797,6 @@ class DenseLinearizationFactory(AbstractLinearizationFactory):
 class DenseConditional(AbstractConditional):
     """Construct a dense implementation of manipulating conditionals."""
 
-    def __init__(self, shape_info) -> None:
-        self.shape_info = shape_info
-
     def apply(self, x, cond, /):
         # 'x' is expected to live in target-space,
         # so we ravel it before applying the conditional
@@ -887,7 +872,7 @@ class DenseConditional(AbstractConditional):
         A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
         mean = cond.to_observed * cond.noise.mean
         cholesky = cond.to_observed[:, None] * cond.noise.cholesky
-        noise = DenseNormal(mean, cholesky, unravel=self.shape_info.all_unravel)
+        noise = DenseNormal(mean, cholesky, unravel=cond.noise.unravel)
         return LatentCond.from_linop_and_noise(A, noise)
 
 
@@ -1208,9 +1193,6 @@ class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
 class IsotropicConditional(AbstractConditional):
     """Construct an isotropic implementation of manipulating conditionals."""
 
-    def __init__(self, *, shape_info) -> None:
-        self.shape_info = shape_info
-
     def apply(self, x, cond, /):
         leaves = tree.tree_leaves(x)
         x = np.stack(leaves)
@@ -1286,15 +1268,12 @@ class IsotropicConditional(AbstractConditional):
         A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
         mean = cond.to_observed[:, None] * cond.noise.mean
         cholesky = cond.to_observed[:, None] * cond.noise.cholesky
-        noise = IsotropicNormal(mean, cholesky, treedef=self.shape_info.treedef)
+        noise = IsotropicNormal(mean, cholesky, treedef=cond.noise.treedef)
         return LatentCond.from_linop_and_noise(A, noise)
 
 
 class BlockDiagConditional(AbstractConditional):
     """Construct a block-diagonal implementation of manipulating conditionals."""
-
-    def __init__(self, *, shape_info) -> None:
-        self.shape_info = shape_info
 
     def apply(self, x, cond, /):
         leaves = tree.tree_leaves(x)
@@ -1417,8 +1396,8 @@ class BlockDiagConditional(AbstractConditional):
         noise = BlockDiagNormal(
             mean,
             cholesky,
-            treedef=self.shape_info.treedef,
-            unravel_leaf=self.shape_info.leaf_unravel,
+            treedef=cond.noise.treedef,
+            unravel_leaf=cond.noise.unravel_leaf,
         )
         to_observed = np.ones_like(cond.to_observed)
         to_latent = np.ones_like(cond.to_latent)
@@ -1756,22 +1735,3 @@ class BlockDiagNormal(AbstractTreeNormal):
 DenseNormal.register_pytree_node()
 IsotropicNormal.register_pytree_node()
 BlockDiagNormal.register_pytree_node()
-
-
-class IsotropicPrototype(AbstractPrototype):
-    """Construct an isotropic implementation of prototypes."""
-
-    def output_scale_calibrated(self):
-        return np.ones(())
-
-
-class BlockDiagPrototype(AbstractPrototype):
-    """Construct a block-diagonal implementation of prototypes."""
-
-    def __init__(self, shape_info) -> None:
-        self.shape_info = shape_info
-
-    def output_scale_calibrated(self):
-        # TODO: technically, these should be pytrees according
-        # to the leaf structure, right?
-        return np.ones(self.shape_info.single_flat.shape)

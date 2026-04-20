@@ -1471,7 +1471,8 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
     ):
-        assert output_scale.shape == self.ssm.prototypes.output_scale_calibrated().shape
+        prototype = self.ssm.prior.prototype_output_scale_calibrated()
+        assert output_scale.shape == prototype.shape
         posterior0 = posterior0.rescale_cholesky(output_scale)
         posterior = posterior.rescale_cholesky(output_scale)
 
@@ -1591,7 +1592,8 @@ class strategy_filter(MarkovStrategy):
         return estimate, marginals
 
     def finalize(self, *, posterior0, posterior, output_scale):
-        assert output_scale.shape == self.ssm.prototypes.output_scale_calibrated().shape
+        expected = self.ssm.prior.prototype_output_scale_calibrated()
+        assert output_scale.shape == expected.shape
 
         # No rescaling because no calibration at the initial step
         posterior0 = posterior0.rescale_cholesky(output_scale)
@@ -1710,7 +1712,8 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
     ):
-        assert output_scale.shape == self.ssm.prototypes.output_scale_calibrated().shape
+        expected = self.ssm.prior.prototype_output_scale_calibrated()
+        assert output_scale.shape == expected.shape
         posterior0 = posterior0.rescale_cholesky(output_scale)
         posterior = posterior.rescale_cholesky(output_scale)
 
@@ -1874,7 +1877,8 @@ class solver_mle(ProbabilisticSolver):
         u_pred, prediction = self.strategy.init_posterior(u=u)
         cstate = self.constraint.init_linearization()
 
-        output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+        prototype = self.ssm.prior.prototype_output_scale_calibrated()
+        output_scale_prior = np.ones_like(prototype)
 
         # Update
         lin_fun = func.partial(self.constraint.linearize, damp=damp, t=t)
@@ -1915,7 +1919,7 @@ class solver_mle(ProbabilisticSolver):
 
     def step(self, state, *, dt: float, damp: float):
         # Discretize
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+        output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         transition = self.prior(dt, output_scale)
 
         # Predict
@@ -2023,7 +2027,7 @@ class solver_dynamic(ProbabilisticSolver):
         u_pred, prediction = self.strategy.init_posterior(u=u)
         lin_state = self.constraint.init_linearization()
 
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+        output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         lin_fun = func.partial(self.constraint.linearize, damp=damp, t=t)
         fx, _lin_state = func.eval_shape(lin_fun, u_pred.marginals, lin_state)
         fx = tree.tree_map(np.zeros_like, fx)
@@ -2054,7 +2058,7 @@ class solver_dynamic(ProbabilisticSolver):
         lin_state = state.auxiliary
 
         # Calibrate the output scale
-        ones = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+        ones = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         transition = self.prior(dt, ones)
         mean = state.u.marginals.evaluate_mean()
         u = self.ssm.conditional.apply(mean, transition)
@@ -2183,7 +2187,7 @@ class solver(ProbabilisticSolver):
         fx, _cstate = func.eval_shape(lin_fun, u_pred.marginals, cstate)
         fx = tree.tree_map(np.zeros_like, fx)
 
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+        output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         return ProbabilisticSolution(
             t=t,
             u=u,
@@ -2430,7 +2434,7 @@ class error_residual_std(ErrorEstimator):
     ) -> tuple[float, tuple]:
         # Discretize; The output scale is set to one
         # since the error is multiplied with a local scale estimate anyway
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+        output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
@@ -2530,7 +2534,7 @@ class error_state_std(ErrorEstimator):
     ) -> tuple[float, tuple]:
         # Discretize; The output scale is set to one
         # since the error is multiplied with a local scale estimate anyway
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+        output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
