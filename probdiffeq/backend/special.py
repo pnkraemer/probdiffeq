@@ -1,12 +1,17 @@
-"""Special functions."""
+# """Special functions."""
 
-import jax.numpy as jnp
-import scipy.special
+# import jax.nn
+# import jax.numpy as jnp
+# import scipy.special
 
 
-def roots_hermitenorm(n, mu):
-    pts, weights, sum_ = scipy.special.roots_hermitenorm(n=n, mu=mu)
-    pts = jnp.asarray(pts)
-    weights = jnp.asarray(weights)
-    sum_ = jnp.asarray(sum_)
-    return pts, weights, sum_
+# def roots_hermitenorm(n, mu):
+#     pts, weights, sum_ = scipy.special.roots_hermitenorm(n=n, mu=mu)
+#     pts = jnp.asarray(pts)
+#     weights = jnp.asarray(weights)
+#     sum_ = jnp.asarray(sum_)
+#     return pts, weights, sum_
+
+
+# def logsumexp(a, b=None, axis=None):
+#     return jax.nn.logsumexp(a, b=b, axis=axis)

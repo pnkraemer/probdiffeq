@@ -120,6 +120,7 @@ def sum_of_sqrtm_factors(R_stack: tuple):
 
 
 # logsumexp but for squares
+# TODO: this duplicates jnp.hypot(x1, x2)
 def sqrt_sum_square_scalar(*args):
     """Compute sqrt(a**2 + b**2) without squaring a or b."""
     args_are_scalar = tree.tree_map(lambda x: np.ndim(x) == 0, args)

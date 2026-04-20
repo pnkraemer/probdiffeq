@@ -238,3 +238,7 @@ def triu(arr, /):
 
 def dtype(arr_or_dtype, /):
     return jnp.dtype(arr_or_dtype)
+
+
+def hypot(x1, x2, /):
+    return jnp.hypot(x1, x2)

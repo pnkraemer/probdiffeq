@@ -292,9 +292,6 @@ class FactSsmImpl:
     prototypes: AbstractPrototype
     """An implementation of variable prototypes."""
 
-    normal: type[AbstractTreeNormal]
-    """An implementation of normal distributions."""
-
     linearize: AbstractLinearizationFactory
     """An implementation of linearization constructors."""
 
@@ -305,54 +302,55 @@ class FactSsmImpl:
     """Information about Taylor-coefficient shapes/counts/etc.."""
 
     @classmethod
-    def from_tcoeffs_dense(cls, tcoeffs_like, /):
+    def from_tcoeffs_dense(cls, tcoeffs_mean, tcoeffs_std, /):
         """Construct a factorised state-space model implementation."""
-        shape_info = ShapeInfo(tcoeffs_like)
+        shape_info = ShapeInfo(tcoeffs_mean)
+        marginal = DenseNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
 
         prototypes = DensePrototype(shape_info=shape_info)
-        normal = DenseNormal
         linearize = DenseLinearizationFactory(shape_info=shape_info)
         conditional = DenseConditional(shape_info=shape_info)
-        return cls(
+        ssm = cls(
             linearize=linearize,
             conditional=conditional,
-            normal=normal,
             prototypes=prototypes,
             shape_info=shape_info,
         )
+        return marginal, ssm
 
     @classmethod
-    def from_tcoeffs_isotropic(cls, tcoeffs_like, /):
+    def from_tcoeffs_isotropic(cls, tcoeffs_mean, tcoeffs_std, /):
         """Construct a factorised state-space model implementation."""
-        shape_info = ShapeInfo(tcoeffs_like)
+        shape_info = ShapeInfo(tcoeffs_mean)
+        marginal = IsotropicNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
 
         prototypes = IsotropicPrototype()
-        normal = IsotropicNormal
         linearize = IsotropicLinearizationFactory(shape_info=shape_info)
         conditional = IsotropicConditional(shape_info=shape_info)
-        return cls(
-            prototypes=prototypes,
-            normal=normal,
+        ssm = cls(
             linearize=linearize,
             conditional=conditional,
+            prototypes=prototypes,
             shape_info=shape_info,
         )
+        return marginal, ssm
 
     @classmethod
-    def from_tcoeffs_blockdiag(cls, tcoeffs_like, /):
+    def from_tcoeffs_blockdiag(cls, tcoeffs_mean, tcoeffs_std, /):
         """Construct a factorised state-space model implementation."""
-        shape_info = ShapeInfo(tcoeffs_like)
+        shape_info = ShapeInfo(tcoeffs_mean)
+        marginal = BlockDiagNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
+
         prototypes = BlockDiagPrototype(shape_info=shape_info)
-        normal = BlockDiagNormal
         linearize = BlockDiagLinearizationFactory(shape_info=shape_info)
         conditional = BlockDiagConditional(shape_info=shape_info)
-        return cls(
-            prototypes=prototypes,
-            normal=normal,
+        ssm = cls(
             linearize=linearize,
             conditional=conditional,
+            prototypes=prototypes,
             shape_info=shape_info,
         )
+        return marginal, ssm
 
 
 class DensePrototype(AbstractPrototype):
@@ -447,12 +445,6 @@ class DenseNormal(AbstractTreeNormal):
         return self.unravel(sample_latent)
 
     @staticmethod
-    def update_moving_avg(mean, x, /, num):
-        nominator = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
-        denominator = np.sqrt(num + 1)
-        return nominator / denominator
-
-    @staticmethod
     def register_pytree_node() -> None:
         def flatten(normal):
             children = normal.mean, normal.cholesky
@@ -503,7 +495,6 @@ class DenseConditional(AbstractConditional):
         self.shape_info = shape_info
 
     def apply(self, x, cond, /):
-
         # 'x' is expected to live in target-space,
         # so we ravel it before applying the conditional
         x, _ = tree.ravel_pytree(x)
@@ -1574,11 +1565,6 @@ class IsotropicNormal(AbstractTreeNormal):
         return tree.tree_unflatten(self.treedef, [*sample_latent])
 
     @staticmethod
-    def update_moving_avg(mean, x, /, num):
-        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
-        return sum_updated / np.sqrt(num + 1)
-
-    @staticmethod
     def register_pytree_node() -> None:
         def flatten(normal):
             children = normal.mean, normal.cholesky
@@ -1730,16 +1716,6 @@ class BlockDiagNormal(AbstractTreeNormal):
         return tree.tree_map(self.unravel_leaf, tree_sample)
 
     @staticmethod
-    def update_moving_avg(mean, x, /, num):
-        if np.ndim(mean) > 0:
-            assert np.shape(mean) == np.shape(x)
-            fun = BlockDiagNormal.update_moving_avg
-            return func.vmap(fun, in_axes=(0, 0, None))(mean, x, num)
-
-        sum_updated = cholesky_util.sqrt_sum_square_scalar(np.sqrt(num) * mean, x)
-        return sum_updated / np.sqrt(num + 1)
-
-    @staticmethod
     def register_pytree_node() -> None:
         def flatten(normal):
             children = normal.mean, normal.cholesky
@@ -1763,6 +1739,7 @@ class IsotropicPrototype(AbstractPrototype):
     """Construct an isotropic implementation of prototypes."""
 
     def std(self):
+
         return np.ones(())
 
     def output_scale_calibrated(self):
@@ -1776,6 +1753,7 @@ class BlockDiagPrototype(AbstractPrototype):
         self.shape_info = shape_info
 
     def std(self):
+
         # TODO: technically, these should be pytrees according
         # to the leaf structure, right?
         return np.ones(self.shape_info.single_flat.shape)
