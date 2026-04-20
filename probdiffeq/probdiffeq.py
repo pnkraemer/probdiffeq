@@ -215,7 +215,7 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
             msg += f" For reference, data: shape={tree.tree_map(np.shape, u)}."
             raise ValueError(msg)
 
-        model = ssm.conditional.to_derivative(tcoeff_index, std)
+        model = ssm.prior.to_derivative(tcoeff_index, std)
         marg = ssm.conditional.marginalise(marginals, model)
         return marg.logpdf(u)
 
@@ -255,7 +255,7 @@ def loss_lml_timeseries(
             raise ValueError(msg)
 
         def make_model(s):
-            return ssm.conditional.to_derivative(tcoeff_index, s)
+            return ssm.prior.to_derivative(tcoeff_index, s)
 
         model = func.vmap(make_model)(std)
 
@@ -1319,7 +1319,7 @@ def prior_wiener_integrated(
     *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
 ):
     """Construct an integrated Wiener process prior."""
-    return ssm.conditional.transition_wiener_integrated(base_scale=output_scale)
+    return ssm.prior.transition_wiener_integrated(base_scale=output_scale)
 
 
 def prior_ornstein_uhlenbeck_integrated(
@@ -1330,7 +1330,7 @@ def prior_ornstein_uhlenbeck_integrated(
     def vf_linear(*tcoeffs):
         return linop(tcoeffs[-1])
 
-    return ssm.conditional.transition_exponential(
+    return ssm.prior.transition_exponential(
         vf_linear=vf_linear, base_scale=output_scale
     )
 
@@ -1364,7 +1364,7 @@ def prior_exponential(
         """
         raise TypeError(msg)
 
-    return ssm.conditional.transition_exponential(
+    return ssm.prior.transition_exponential(
         vf_linear=vf_linear, base_scale=output_scale
     )
 
@@ -1443,7 +1443,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         )
 
     def init_posterior(self, *, u: TaylorCoeffTarget):
-        cond = self.ssm.conditional.identity()
+        cond = self.ssm.prior.identity()
         posterior = MarkovSequence(marginal=u.marginals, conditional=cond, reverse=True)
         return u, posterior
 
@@ -1681,7 +1681,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         )
 
     def init_posterior(self, *, u):
-        cond = self.ssm.conditional.identity()
+        cond = self.ssm.prior.identity()
         posterior = MarkovSequence(u.marginals, cond, reverse=True)
         return u, posterior
 
@@ -1728,7 +1728,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         return estimate, posterior
 
     def interpolate_at_t1(self, *, posterior_t1: MarkovSequence):
-        cond_identity = self.ssm.conditional.identity()
+        cond_identity = self.ssm.prior.identity()
         resume_from = MarkovSequence(
             posterior_t1.marginal,
             conditional=cond_identity,
@@ -1814,7 +1814,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         _, extrapolated_t = self.predict(
             posterior=posterior_t0, transition=transition_t0_t
         )
-        conditional_id = self.ssm.conditional.identity()
+        conditional_id = self.ssm.prior.identity()
         previous_new = MarkovSequence(
             extrapolated_t.marginal, conditional_id, reverse=extrapolated_t.reverse
         )

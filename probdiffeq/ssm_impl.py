@@ -223,27 +223,8 @@ class AbstractConditional(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def identity(self, /):
-        """Construct an identity conditional (unit linop, zero noise)."""
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def transition_wiener_integrated(self, output_scale: Array | None):
-        """Construct the transitions for an integrated Wiener process."""
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def transition_exponential(self, vf_linear: Callable, base_scale: Array | None):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def preconditioner_apply(self, cond: LatentCond, /) -> LatentCond:
         """Apply a preconditioner to a conditional."""
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def to_derivative(self, i, std) -> LatentCond:
-        """Construct an observation model for the i'th derivative."""
         raise NotImplementedError
 
 
@@ -281,6 +262,29 @@ class ShapeInfo:
         return len(self.leaves) - 1
 
 
+class AbstractPriorFactory:
+    """Interface for prior constructions."""
+
+    @abc.abstractmethod
+    def identity(self, /):
+        """Construct an identity conditional (unit linop, zero noise)."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def transition_wiener_integrated(self, base_scale: Array | None):
+        """Construct the transitions for an integrated Wiener process."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def transition_exponential(self, vf_linear: Callable, base_scale: Array | None):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def to_derivative(self, i, std) -> LatentCond:
+        """Construct an observation model for the i'th derivative."""
+        raise NotImplementedError
+
+
 @structs.dataclass
 class FactSsmImpl:
     """Implementation of factorized Markovian state-space models."""
@@ -290,6 +294,9 @@ class FactSsmImpl:
 
     linearize: AbstractLinearizationFactory
     """An implementation of linearization constructors."""
+
+    prior: AbstractPriorFactory
+    """An implementation of constructing prior distributions."""
 
     conditional: AbstractConditional
     """An implementation of manipulating conditionals."""
@@ -305,10 +312,12 @@ class FactSsmImpl:
 
         prototypes = DensePrototype(shape_info=shape_info)
         linearize = DenseLinearizationFactory(shape_info=shape_info)
+        prior = DensePriorFactory(shape_info=shape_info)
         conditional = DenseConditional(shape_info=shape_info)
         ssm = cls(
             linearize=linearize,
             conditional=conditional,
+            prior=prior,
             prototypes=prototypes,
             shape_info=shape_info,
         )
@@ -320,11 +329,13 @@ class FactSsmImpl:
         shape_info = ShapeInfo(tcoeffs_mean)
         marginal = IsotropicNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
 
+        prior = IsotropicPriorFactory(shape_info=shape_info)
         prototypes = IsotropicPrototype()
         linearize = IsotropicLinearizationFactory(shape_info=shape_info)
         conditional = IsotropicConditional(shape_info=shape_info)
         ssm = cls(
             linearize=linearize,
+            prior=prior,
             conditional=conditional,
             prototypes=prototypes,
             shape_info=shape_info,
@@ -337,11 +348,13 @@ class FactSsmImpl:
         shape_info = ShapeInfo(tcoeffs_mean)
         marginal = BlockDiagNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
 
+        prior = BlockDiagPriorFactory(shape_info=shape_info)
         prototypes = BlockDiagPrototype(shape_info=shape_info)
         linearize = BlockDiagLinearizationFactory(shape_info=shape_info)
         conditional = BlockDiagConditional(shape_info=shape_info)
         ssm = cls(
             linearize=linearize,
+            prior=prior,
             conditional=conditional,
             prototypes=prototypes,
             shape_info=shape_info,
@@ -357,6 +370,319 @@ class DensePrototype(AbstractPrototype):
 
     def output_scale_calibrated(self):
         return np.ones(())
+
+
+class BlockDiagPriorFactory(AbstractPriorFactory):
+    """Implementation of block-diagonal prior constructors."""
+
+    def __init__(self, shape_info) -> None:
+        self.shape_info = shape_info
+
+    def identity(self, /) -> LatentCond:
+        ndim = self.shape_info.num_derivatives + 1
+        (d,) = self.shape_info.single_flat.shape
+        m0 = np.zeros((d, ndim))
+        c0 = np.zeros((d, ndim, ndim))
+        noise = BlockDiagNormal(
+            m0,
+            c0,
+            treedef=self.shape_info.treedef,
+            unravel_leaf=self.shape_info.leaf_unravel,
+        )
+        matrix = np.ones((d, 1, 1)) * np.eye(ndim, ndim)[None, ...]
+        return LatentCond.from_linop_and_noise(matrix, noise)
+
+    def transition_wiener_integrated(self, base_scale: Array | None):
+
+        coeff_like = np.ones_like(self.shape_info.single_flat)
+        base_scale_expected = self.shape_info.single_unravel(coeff_like)
+        if base_scale is None:
+            base_scale = base_scale_expected
+        else:
+            if base_scale.shape != base_scale_expected.shape:
+                msg = "The base-scale has the wrong shape."
+                msg += f" Expected: {base_scale_expected.shape}."
+                msg += f" Received: {base_scale.shape}."
+                raise ValueError(msg)
+
+        base_scale, _ = tree.ravel_pytree(base_scale)
+
+        num_derivatives = self.shape_info.num_derivatives
+        a, q_sqrtm = system_matrices_1d_iwp(num_derivatives)
+        q0 = np.zeros((num_derivatives + 1,))
+        precon_fun = preconditioner_taylor(num_derivatives=num_derivatives)
+
+        def discretise(dt, output_scale: Array | None = None):
+            p, p_inv = precon_fun(dt)
+            if output_scale is None:
+                output_scale = np.ones_like(base_scale)
+            else:
+                output_scale = np.asarray(output_scale)
+
+                if output_scale.shape != base_scale.shape:
+                    msg = "The output-scale has the wrong shape."
+                    msg += f" Expected: {base_scale.shape}."
+                    msg += f" Received: {output_scale.shape}."
+                    raise ValueError(msg)
+                output_scale, _ = tree.ravel_pytree(output_scale)
+
+            scale = output_scale * base_scale
+            # Flatten the scale into something compatible with the flattened SSM
+            (d,) = scale.shape
+
+            A_batch = np.ones((d, 1, 1)) * a[None, :, :]
+            mean = np.ones((d, 1)) * q0[None, :]
+            cholesky = scale[:, None, None] * q_sqrtm[None, :, :]
+            treedef = self.shape_info.treedef
+            unravel_leaf = self.shape_info.leaf_unravel
+            noise = BlockDiagNormal(
+                mean, cholesky, treedef=treedef, unravel_leaf=unravel_leaf
+            )
+            p = np.ones((d, 1)) * p[None, :]
+            p_inv = np.ones((d, 1)) * p_inv[None, :]
+            return LatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
+
+        return discretise
+
+    def transition_exponential(self, vf_linear, base_scale):
+        del vf_linear
+        del base_scale
+        msg = "Isotropic IOUPs have not been implemented (yet.)."
+        msg += " If you need them, reach out."
+        raise NotImplementedError(msg)
+
+    def to_derivative(self, i, std):
+        def select(a):
+            return np.asarray([a[i]])
+
+        (d,) = self.shape_info.single_flat.shape
+        n = self.shape_info.num_derivatives + 1
+        x = np.zeros((d, n))
+        linop = func.vmap(func.jacrev(select))(x)
+
+        u_like = tree.tree_unflatten(self.shape_info.treedef, x.T)
+        u_like = tree.tree_map(self.shape_info.leaf_unravel, u_like)
+        u_like = tree.tree_map(np.zeros_like, u_like[0])
+        noise = BlockDiagNormal.from_mean_and_std(u_like, std)
+        return LatentCond.from_linop_and_noise(linop, noise)
+
+
+class IsotropicPriorFactory(AbstractPriorFactory):
+    """Implementation of isotropic prior constructors."""
+
+    def __init__(self, shape_info) -> None:
+        self.shape_info = shape_info
+
+    def identity(self, /) -> LatentCond:
+        num = self.shape_info.num_derivatives + 1
+        (d,) = self.shape_info.single_flat.shape
+        m0 = np.zeros((num, d))
+        c0 = np.zeros((num, num))
+        noise = IsotropicNormal(m0, c0, treedef=self.shape_info.treedef)
+        matrix = np.eye(num)
+        ones = np.ones((num,))
+        return LatentCond(matrix, noise, to_latent=ones, to_observed=ones)
+
+    def transition_wiener_integrated(self, base_scale: Array | None):
+
+        if base_scale is None:
+            base_scale = np.ones(())
+        else:
+            base_scale = np.asarray(base_scale)
+            if base_scale.shape != ():
+                msg = "The base-scale has the wrong shape."
+                msg += f" Expected: {()}."
+                msg += f" Received: {base_scale.shape}."
+                raise ValueError(msg)
+
+        num_derivatives = self.shape_info.num_derivatives
+        (d,) = self.shape_info.single_flat.shape
+        A, q_sqrtm = system_matrices_1d_iwp(num_derivatives)
+        q0 = np.zeros((num_derivatives + 1, d))
+        precon_fun = preconditioner_taylor(num_derivatives=num_derivatives)
+
+        def discretise(dt, output_scale: Array = 1.0):
+            output_scale = np.asarray(output_scale)
+            if output_scale.shape != ():
+                msg = "The base-scale has the wrong shape."
+                msg += f" Expected: {()}."
+                msg += f" Received: {output_scale.shape}."
+                raise ValueError(msg)
+
+            scale = base_scale * output_scale
+
+            p, p_inv = precon_fun(dt)
+            noise = IsotropicNormal(
+                q0, scale * q_sqrtm, treedef=self.shape_info.treedef
+            )
+            return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
+
+        return discretise
+
+    def transition_exponential(self, vf_linear, base_scale):
+        del vf_linear
+        del base_scale
+        msg = "Isotropic IOUPs have not been implemented (yet.)."
+        msg += " If you need them, reach out."
+        raise NotImplementedError(msg)
+
+    def to_derivative(self, i, std):
+
+        m = np.zeros((self.shape_info.num_derivatives + 1,))
+        linop = func.jacfwd(lambda s: np.asarray([s[i]]))(m)
+
+        u_like = tree.tree_unflatten(self.shape_info.treedef, m)[0]
+
+        # Wrap u_like and std into a list because the random variable
+        # expects TaylorCoefficients.
+        noise = IsotropicNormal.from_mean_and_std([u_like], [std])
+        return LatentCond.from_linop_and_noise(linop, noise)
+
+
+class DensePriorFactory(AbstractPriorFactory):
+    """Implementation of dense prior constructors."""
+
+    def __init__(self, shape_info) -> None:
+        self.shape_info = shape_info
+
+    def identity(self, /) -> LatentCond:
+        ndim = self.shape_info.num_derivatives + 1
+        (d,) = self.shape_info.single_flat.shape
+        n = ndim * d
+
+        A = np.eye(n)
+        m = np.zeros((n,))
+        C = np.zeros((n, n))
+        noise = DenseNormal(m, C, unravel=self.shape_info.all_unravel)
+        ones = np.ones((n,))
+        return LatentCond(A, noise, to_latent=ones, to_observed=ones)
+
+    def transition_wiener_integrated(self, base_scale: Array | None):
+        Lambda = self._process_base_scale(base_scale)
+
+        # Construct the transitions
+        a, q_sqrtm = system_matrices_1d_iwp(self.shape_info.num_derivatives)
+        (d,) = self.shape_info.single_flat.shape
+
+        eye_d = np.eye(d)
+        A = np.kron(a, eye_d)
+        Q = np.kron(q_sqrtm, Lambda)
+
+        q0 = np.zeros(self.shape_info.all_flat.shape)
+        precon_fun = preconditioner_taylor(
+            num_derivatives=self.shape_info.num_derivatives
+        )
+
+        def discretise(dt, output_scale=1.0):
+            output_scale = self._process_calibrated_scale(output_scale)
+
+            p, p_inv = precon_fun(dt)
+            p = np.repeat(p, d)
+            p_inv = np.repeat(p_inv, d)
+
+            unravel = self.shape_info.all_unravel
+            noise = DenseNormal(q0, output_scale * Q, unravel=unravel)
+            return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
+
+        return discretise
+
+    def _process_base_scale(self, base_scale):
+        # Process the expected shape of the base-scale
+        ones_like = np.ones_like(self.shape_info.single_flat)
+        base_scale_expected = self.shape_info.single_unravel(ones_like)
+
+        if base_scale is None:
+            base_scale = base_scale_expected
+        else:
+            base_scale = np.asarray(base_scale)
+            if base_scale.shape != base_scale_expected.shape:
+                msg = "The base-scale has the wrong shape."
+                msg += f" Expected: {base_scale_expected.shape}."
+                msg += f" Received: {base_scale.shape}."
+                raise ValueError(msg)
+
+        # Flatten the scale into something compatible with the flattened SSM
+        base_scale, _ = tree.ravel_pytree(base_scale)
+        return linalg.diagonal_matrix(base_scale)
+
+    def _process_calibrated_scale(self, output_scale):
+        output_scale = np.asarray(output_scale)
+        if output_scale.shape != ():
+            msg = "The output-scale has the wrong shape."
+            msg += f" Expected: {()}."
+            msg += f" Received: {output_scale.shape}."
+            raise ValueError(msg)
+        return output_scale
+
+    def transition_exponential(self, vf_linear: Array, base_scale: Array | None):
+        Lambda = self._process_base_scale(base_scale)
+
+        # Turn the linear vector field into the bottom block of the IOUP
+        leaf_like = np.ones_like(self.shape_info.single_flat)
+        leaves = [leaf_like for _ in range(self.shape_info.num_derivatives + 1)]
+
+        def vf_flat(tcoeffs):
+            tcoeffs_tree = tree.tree_map(self.shape_info.single_unravel, tcoeffs)
+            fx = vf_linear(*tcoeffs_tree)
+            return tree.ravel_pytree(fx)[0]
+
+        rate = func.jacfwd(vf_flat)(leaves)
+        bottom_block = np.concatenate(rate, axis=-1)
+
+        # Construct the SDE matrices
+        (d,) = self.shape_info.single_flat.shape
+        num_derivatives = self.shape_info.num_derivatives
+        eye_d = np.eye(d)
+        a = linalg.diagonal_matrix(np.ones((num_derivatives,)), k=1)
+        A = np.kron(a, eye_d)
+        A = A.at[-d:, :].set(bottom_block)
+
+        b = np.eye(num_derivatives + 1)[-1][:, None]
+        B = np.kron(b, Lambda)
+
+        precon_fun = preconditioner_taylor(num_derivatives=num_derivatives)
+
+        # TODO: find a good default. Always using high orders seems wasteful.
+        pade_legendre = (
+            gram_util.pade_and_legendre_9()
+            if B.dtype == "float64"
+            else gram_util.pade_and_legendre_5()
+        )
+
+        # Pascal matrices are upper triangular so we use a dedicated solver
+        exp_gram = gram_util.exp_gram_cholesky(
+            pade_legendre=pade_legendre, solve=linalg.solve_lu
+        )
+        q0 = np.zeros(self.shape_info.all_flat.shape)
+
+        def discretise(dt, output_scale=1.0):
+            output_scale = self._process_calibrated_scale(output_scale)
+
+            p, p_inv = precon_fun(dt)
+            p = np.repeat(p, d)
+            p_inv = np.repeat(p_inv, d)
+
+            # Precondition. (I've not seen a big impact, but we do it anyway)
+            A_p = dt * p_inv[:, None] * A * p[None, :]
+            B_p = np.sqrt(dt) * p_inv[:, None] * B
+
+            eA, L = exp_gram(A_p, B_p)
+            unravel = self.shape_info.all_unravel
+            noise = DenseNormal(q0, output_scale * L, unravel=unravel)
+            return LatentCond(eA, noise, to_latent=p_inv, to_observed=p)
+
+        return discretise
+
+    def to_derivative(self, i, std):
+        def select(a):
+            return tree.ravel_pytree(self.shape_info.all_unravel(a)[i])[0]
+
+        x = np.zeros(self.shape_info.all_flat.shape)
+        linop = func.jacfwd(select)(x)
+
+        data_like = self.shape_info.all_unravel(x)[0]
+        noise = DenseNormal.from_mean_and_std(data_like, std)
+        return LatentCond.from_linop_and_noise(linop, noise)
 
 
 class DenseNormal(AbstractTreeNormal):
@@ -557,151 +883,12 @@ class DenseConditional(AbstractConditional):
         observed = DenseNormal(mean, cholesky, unravel=cond.noise.unravel)
         return observed, cond_new
 
-    def identity(self, /) -> LatentCond:
-        ndim = self.shape_info.num_derivatives + 1
-        (d,) = self.shape_info.single_flat.shape
-        n = ndim * d
-
-        A = np.eye(n)
-        m = np.zeros((n,))
-        C = np.zeros((n, n))
-        noise = DenseNormal(m, C, unravel=self.shape_info.all_unravel)
-        ones = np.ones((n,))
-        return LatentCond(A, noise, to_latent=ones, to_observed=ones)
-
-    def transition_wiener_integrated(self, base_scale: Array | None):
-        Lambda = self._process_base_scale(base_scale)
-
-        # Construct the transitions
-        a, q_sqrtm = system_matrices_1d_iwp(self.shape_info.num_derivatives)
-        (d,) = self.shape_info.single_flat.shape
-
-        eye_d = np.eye(d)
-        A = np.kron(a, eye_d)
-        Q = np.kron(q_sqrtm, Lambda)
-
-        q0 = np.zeros(self.shape_info.all_flat.shape)
-        precon_fun = preconditioner_taylor(
-            num_derivatives=self.shape_info.num_derivatives
-        )
-
-        def discretise(dt, output_scale=1.0):
-            output_scale = self._process_calibrated_scale(output_scale)
-
-            p, p_inv = precon_fun(dt)
-            p = np.repeat(p, d)
-            p_inv = np.repeat(p_inv, d)
-
-            unravel = self.shape_info.all_unravel
-            noise = DenseNormal(q0, output_scale * Q, unravel=unravel)
-            return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
-
-        return discretise
-
-    def _process_base_scale(self, base_scale):
-        # Process the expected shape of the base-scale
-        ones_like = np.ones_like(self.shape_info.single_flat)
-        base_scale_expected = self.shape_info.single_unravel(ones_like)
-
-        if base_scale is None:
-            base_scale = base_scale_expected
-        else:
-            base_scale = np.asarray(base_scale)
-            if base_scale.shape != base_scale_expected.shape:
-                msg = "The base-scale has the wrong shape."
-                msg += f" Expected: {base_scale_expected.shape}."
-                msg += f" Received: {base_scale.shape}."
-                raise ValueError(msg)
-
-        # Flatten the scale into something compatible with the flattened SSM
-        base_scale, _ = tree.ravel_pytree(base_scale)
-        return linalg.diagonal_matrix(base_scale)
-
-    def _process_calibrated_scale(self, output_scale):
-        output_scale = np.asarray(output_scale)
-        if output_scale.shape != ():
-            msg = "The output-scale has the wrong shape."
-            msg += f" Expected: {()}."
-            msg += f" Received: {output_scale.shape}."
-            raise ValueError(msg)
-        return output_scale
-
-    def transition_exponential(self, vf_linear: Array, base_scale: Array | None):
-        Lambda = self._process_base_scale(base_scale)
-
-        # Turn the linear vector field into the bottom block of the IOUP
-        leaf_like = np.ones_like(self.shape_info.single_flat)
-        leaves = [leaf_like for _ in range(self.shape_info.num_derivatives + 1)]
-
-        def vf_flat(tcoeffs):
-            tcoeffs_tree = tree.tree_map(self.shape_info.single_unravel, tcoeffs)
-            fx = vf_linear(*tcoeffs_tree)
-            return tree.ravel_pytree(fx)[0]
-
-        rate = func.jacfwd(vf_flat)(leaves)
-        bottom_block = np.concatenate(rate, axis=-1)
-
-        # Construct the SDE matrices
-        (d,) = self.shape_info.single_flat.shape
-        num_derivatives = self.shape_info.num_derivatives
-        eye_d = np.eye(d)
-        a = linalg.diagonal_matrix(np.ones((num_derivatives,)), k=1)
-        A = np.kron(a, eye_d)
-        A = A.at[-d:, :].set(bottom_block)
-
-        b = np.eye(num_derivatives + 1)[-1][:, None]
-        B = np.kron(b, Lambda)
-
-        precon_fun = preconditioner_taylor(num_derivatives=num_derivatives)
-
-        # TODO: find a good default. Always using high orders seems wasteful.
-        pade_legendre = (
-            gram_util.pade_and_legendre_9()
-            if B.dtype == "float64"
-            else gram_util.pade_and_legendre_5()
-        )
-
-        # Pascal matrices are upper triangular so we use a dedicated solver
-        exp_gram = gram_util.exp_gram_cholesky(
-            pade_legendre=pade_legendre, solve=linalg.solve_lu
-        )
-        q0 = np.zeros(self.shape_info.all_flat.shape)
-
-        def discretise(dt, output_scale=1.0):
-            output_scale = self._process_calibrated_scale(output_scale)
-
-            p, p_inv = precon_fun(dt)
-            p = np.repeat(p, d)
-            p_inv = np.repeat(p_inv, d)
-
-            # Precondition. (I've not seen a big impact, but we do it anyway)
-            A_p = dt * p_inv[:, None] * A * p[None, :]
-            B_p = np.sqrt(dt) * p_inv[:, None] * B
-
-            eA, L = exp_gram(A_p, B_p)
-            unravel = self.shape_info.all_unravel
-            noise = DenseNormal(q0, output_scale * L, unravel=unravel)
-            return LatentCond(eA, noise, to_latent=p_inv, to_observed=p)
-
-        return discretise
-
     def preconditioner_apply(self, cond, /):
         A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
         mean = cond.to_observed * cond.noise.mean
         cholesky = cond.to_observed[:, None] * cond.noise.cholesky
         noise = DenseNormal(mean, cholesky, unravel=self.shape_info.all_unravel)
         return LatentCond.from_linop_and_noise(A, noise)
-
-    def to_derivative(self, i, std):
-        def select(a):
-            return tree.ravel_pytree(self.shape_info.all_unravel(a)[i])[0]
-
-        x = np.zeros(self.shape_info.all_flat.shape)
-        linop = func.jacfwd(select)(x)
-
-        data_like = self.shape_info.all_unravel(x)[0]
-        noise = DenseNormal.from_mean_and_std(data_like, std)
-        return LatentCond.from_linop_and_noise(linop, noise)
 
 
 class DenseLinearizationOdeTs0(AbstractLinearizationOde):
@@ -1095,77 +1282,12 @@ class IsotropicConditional(AbstractConditional):
         observed = IsotropicNormal(mean, cholesky, treedef=cond.noise.treedef)
         return observed, cond_new
 
-    def identity(self, /) -> LatentCond:
-        num = self.shape_info.num_derivatives + 1
-        (d,) = self.shape_info.single_flat.shape
-        m0 = np.zeros((num, d))
-        c0 = np.zeros((num, num))
-        noise = IsotropicNormal(m0, c0, treedef=self.shape_info.treedef)
-        matrix = np.eye(num)
-        ones = np.ones((num,))
-        return LatentCond(matrix, noise, to_latent=ones, to_observed=ones)
-
-    def transition_wiener_integrated(self, base_scale: Array | None):
-
-        if base_scale is None:
-            base_scale = np.ones(())
-        else:
-            base_scale = np.asarray(base_scale)
-            if base_scale.shape != ():
-                msg = "The base-scale has the wrong shape."
-                msg += f" Expected: {()}."
-                msg += f" Received: {base_scale.shape}."
-                raise ValueError(msg)
-
-        num_derivatives = self.shape_info.num_derivatives
-        (d,) = self.shape_info.single_flat.shape
-        A, q_sqrtm = system_matrices_1d_iwp(num_derivatives)
-        q0 = np.zeros((num_derivatives + 1, d))
-        precon_fun = preconditioner_taylor(num_derivatives=num_derivatives)
-
-        def discretise(dt, output_scale: Array = 1.0):
-            output_scale = np.asarray(output_scale)
-            if output_scale.shape != ():
-                msg = "The base-scale has the wrong shape."
-                msg += f" Expected: {()}."
-                msg += f" Received: {output_scale.shape}."
-                raise ValueError(msg)
-
-            scale = base_scale * output_scale
-
-            p, p_inv = precon_fun(dt)
-            noise = IsotropicNormal(
-                q0, scale * q_sqrtm, treedef=self.shape_info.treedef
-            )
-            return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
-
-        return discretise
-
-    def transition_exponential(self, vf_linear, base_scale):
-        del vf_linear
-        del base_scale
-        msg = "Isotropic IOUPs have not been implemented (yet.)."
-        msg += " If you need them, reach out."
-        raise NotImplementedError(msg)
-
     def preconditioner_apply(self, cond, /):
         A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
         mean = cond.to_observed[:, None] * cond.noise.mean
         cholesky = cond.to_observed[:, None] * cond.noise.cholesky
         noise = IsotropicNormal(mean, cholesky, treedef=self.shape_info.treedef)
         return LatentCond.from_linop_and_noise(A, noise)
-
-    def to_derivative(self, i, std):
-
-        m = np.zeros((self.shape_info.num_derivatives + 1,))
-        linop = func.jacfwd(lambda s: np.asarray([s[i]]))(m)
-
-        u_like = tree.tree_unflatten(self.shape_info.treedef, m)[0]
-
-        # Wrap u_like and std into a list because the random variable
-        # expects TaylorCoefficients.
-        noise = IsotropicNormal.from_mean_and_std([u_like], [std])
-        return LatentCond.from_linop_and_noise(linop, noise)
 
 
 class BlockDiagConditional(AbstractConditional):
@@ -1288,79 +1410,6 @@ class BlockDiagConditional(AbstractConditional):
         )
         return observed, bwd
 
-    def identity(self, /) -> LatentCond:
-        ndim = self.shape_info.num_derivatives + 1
-        (d,) = self.shape_info.single_flat.shape
-        m0 = np.zeros((d, ndim))
-        c0 = np.zeros((d, ndim, ndim))
-        noise = BlockDiagNormal(
-            m0,
-            c0,
-            treedef=self.shape_info.treedef,
-            unravel_leaf=self.shape_info.leaf_unravel,
-        )
-        matrix = np.ones((d, 1, 1)) * np.eye(ndim, ndim)[None, ...]
-        return LatentCond.from_linop_and_noise(matrix, noise)
-
-    def transition_wiener_integrated(self, base_scale: Array | None):
-
-        coeff_like = np.ones_like(self.shape_info.single_flat)
-        base_scale_expected = self.shape_info.single_unravel(coeff_like)
-        if base_scale is None:
-            base_scale = base_scale_expected
-        else:
-            if base_scale.shape != base_scale_expected.shape:
-                msg = "The base-scale has the wrong shape."
-                msg += f" Expected: {base_scale_expected.shape}."
-                msg += f" Received: {base_scale.shape}."
-                raise ValueError(msg)
-
-        base_scale, _ = tree.ravel_pytree(base_scale)
-
-        num_derivatives = self.shape_info.num_derivatives
-        a, q_sqrtm = system_matrices_1d_iwp(num_derivatives)
-        q0 = np.zeros((num_derivatives + 1,))
-        precon_fun = preconditioner_taylor(num_derivatives=num_derivatives)
-
-        def discretise(dt, output_scale: Array | None = None):
-            p, p_inv = precon_fun(dt)
-            if output_scale is None:
-                output_scale = np.ones_like(base_scale)
-            else:
-                output_scale = np.asarray(output_scale)
-
-                if output_scale.shape != base_scale.shape:
-                    msg = "The output-scale has the wrong shape."
-                    msg += f" Expected: {base_scale.shape}."
-                    msg += f" Received: {output_scale.shape}."
-                    raise ValueError(msg)
-                output_scale, _ = tree.ravel_pytree(output_scale)
-
-            scale = output_scale * base_scale
-            # Flatten the scale into something compatible with the flattened SSM
-            (d,) = scale.shape
-
-            A_batch = np.ones((d, 1, 1)) * a[None, :, :]
-            mean = np.ones((d, 1)) * q0[None, :]
-            cholesky = scale[:, None, None] * q_sqrtm[None, :, :]
-            treedef = self.shape_info.treedef
-            unravel_leaf = self.shape_info.leaf_unravel
-            noise = BlockDiagNormal(
-                mean, cholesky, treedef=treedef, unravel_leaf=unravel_leaf
-            )
-            p = np.ones((d, 1)) * p[None, :]
-            p_inv = np.ones((d, 1)) * p_inv[None, :]
-            return LatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
-
-        return discretise
-
-    def transition_exponential(self, vf_linear, base_scale):
-        del vf_linear
-        del base_scale
-        msg = "Isotropic IOUPs have not been implemented (yet.)."
-        msg += " If you need them, reach out."
-        raise NotImplementedError(msg)
-
     def preconditioner_apply(self, cond, /):
         A = cond.to_observed[:, :, None] * cond.A * cond.to_latent[:, None, :]
         mean = cond.to_observed * cond.noise.mean
@@ -1374,22 +1423,6 @@ class BlockDiagConditional(AbstractConditional):
         to_observed = np.ones_like(cond.to_observed)
         to_latent = np.ones_like(cond.to_latent)
         return LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
-
-    def to_derivative(self, i, std):
-
-        def select(a):
-            return np.asarray([a[i]])
-
-        (d,) = self.shape_info.single_flat.shape
-        n = self.shape_info.num_derivatives + 1
-        x = np.zeros((d, n))
-        linop = func.vmap(func.jacrev(select))(x)
-
-        u_like = tree.tree_unflatten(self.shape_info.treedef, x.T)
-        u_like = tree.tree_map(self.shape_info.leaf_unravel, u_like)
-        u_like = tree.tree_map(np.zeros_like, u_like[0])
-        noise = BlockDiagNormal.from_mean_and_std(u_like, std)
-        return LatentCond.from_linop_and_noise(linop, noise)
 
 
 def _transpose(matrix):

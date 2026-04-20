@@ -40,7 +40,7 @@ def create_random_variable(fact):
         stds = [np.ones((3,))] * 5
         _, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(tcoeffs, stds)
         output_scale = np.ones((3,))
-        discretize = ssm.conditional.transition_wiener_integrated(output_scale)
+        discretize = ssm.prior.transition_wiener_integrated(output_scale)
 
         output_scale = np.ones(())
         rv = discretize(0.1, output_scale)
@@ -48,7 +48,7 @@ def create_random_variable(fact):
         stds = [np.ones((3,))] * 5
         _, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_blockdiag(tcoeffs, stds)
         output_scale = np.ones((3,))
-        discretize = ssm.conditional.transition_wiener_integrated(output_scale)
+        discretize = ssm.prior.transition_wiener_integrated(output_scale)
 
         output_scale = np.ones((3,))
         rv = discretize(0.1, output_scale)
@@ -56,7 +56,7 @@ def create_random_variable(fact):
         stds = [np.ones(())] * 5
         _, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_isotropic(tcoeffs, stds)
         output_scale = np.ones(())
-        discretize = ssm.conditional.transition_wiener_integrated(output_scale)
+        discretize = ssm.prior.transition_wiener_integrated(output_scale)
 
         output_scale = np.ones(())
         rv = discretize(0.1, output_scale)
