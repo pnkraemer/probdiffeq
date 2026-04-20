@@ -4,7 +4,7 @@ Necessary because the implementation has been faulty in the past.
 """
 
 from probdiffeq import ssm_impl
-from probdiffeq.backend import func, np, random, stats, testing, tree
+from probdiffeq.backend import func, np, random, testing, tree
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
@@ -17,7 +17,7 @@ def test_logpdf(fact) -> None:
     u_dense = np.ones_like(mean_dense)
 
     pdf1 = rv.logpdf(u)
-    pdf2 = stats.multivariate_normal_logpdf(u_dense, mean_dense, cov_dense)
+    pdf2 = random.logpdf_multivariate_normal(u_dense, mean_dense, cov_dense)
     assert testing.allclose(pdf1, pdf2)
 
 
