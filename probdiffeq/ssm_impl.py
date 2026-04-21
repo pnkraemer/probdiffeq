@@ -1206,9 +1206,12 @@ class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
 class IsotropicConditional(AbstractConditional):
     """Construct an isotropic implementation of manipulating conditionals."""
 
-    def apply(self, x, cond, /):
+    def apply_tree(self, x, cond, /):
         leaves = tree.tree_leaves(x)
         x = np.stack(leaves)
+        return self.apply_flat(x, cond)
+
+    def apply_flat(self, x, cond, /):
         x = cond.to_latent[:, None] * x
         mean_new = cond.to_observed[:, None] * cond.A @ x + cond.noise.mean
         cholesky_new = cond.to_observed[:, None] * cond.noise.cholesky
@@ -1519,6 +1522,9 @@ class IsotropicNormal(AbstractTreeNormal):
 
         return tree.tree_unflatten(self.treedef, [*self.mean])
 
+    def mean_flat(self):
+        return self.mean
+
     def std_tree(self):
         if self.mean.ndim > 2:
             return func.vmap(IsotropicNormal.std_tree)(self)
@@ -1526,12 +1532,22 @@ class IsotropicNormal(AbstractTreeNormal):
         std = np.sqrt(diag)
         return tree.tree_unflatten(self.treedef, [*std])
 
+    def std_flat(self):
+        if self.mean.ndim > 2:
+            return func.vmap(IsotropicNormal.std_tree)(self)
+
+        diag = np.einsum("ij,ji->i", self.cholesky, self.cholesky)
+        return np.sqrt(diag)
+
     def residual_white_rms_tree(self, u):
         if self.cholesky.size > 1:
             raise ValueError
         u_leaves = tree.tree_leaves(u)
         u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
         u_latent = np.stack(u_flat)
+        return self.residual_white_rms_flat(u_latent)
+
+    def residual_white_rms_flat(self, u_latent, /):
         residual_white = (self.mean - u_latent) / self.cholesky
         residual_white_matrix = linalg.qr_r(residual_white.T)
         return np.reshape(np.abs(residual_white_matrix) / np.sqrt(self.mean.size), ())
@@ -1540,18 +1556,22 @@ class IsotropicNormal(AbstractTreeNormal):
         cholesky = factor[..., None, None] * self.cholesky
         return IsotropicNormal(self.mean, cholesky, treedef=self.treedef)
 
-    def logpdf(self, u, /):
+    def logpdf_tree(self, u, /):
         u_leaves = tree.tree_leaves(u)
         u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
         u_latent = np.stack(u_flat)
+        return self.logpdf_flat(u_latent)
 
+    def logpdf_flat(self, u_latent, /):
         # Batch in the "mean" dimension and sum the results.
         rv_batch = IsotropicNormal(1, None, treedef=self.treedef)
-        logpdf_vmap = func.vmap(IsotropicNormal.logpdf_scalar, in_axes=(rv_batch, 1))
+        logpdf_vmap = func.vmap(
+            IsotropicNormal.logpdf_scalar_flat, in_axes=(rv_batch, 1)
+        )
         logpdfs = logpdf_vmap(self, u_latent)
         return np.sum(logpdfs)
 
-    def logpdf_scalar(self, u, /):
+    def logpdf_scalar_flat(self, u, /):
         cholesky = linalg.qr_r(self.cholesky.T).T
 
         dx = u - self.mean
@@ -1575,13 +1595,14 @@ class IsotropicNormal(AbstractTreeNormal):
         mean = self.mean.reshape((-1,), order="F")
         return (mean, cov)
 
-    def sample(self, key):
-        n, _n = self.cholesky.shape
-
-        base = random.normal(key, shape=(n,))
-        sample_latent = self.mean + (self.cholesky @ base)[:, None]
-
+    def sample_tree(self, key):
+        sample_latent = self.sample_flat(key)
         return tree.tree_unflatten(self.treedef, [*sample_latent])
+
+    def sample_flat(self, key):
+        n, _n = self.cholesky.shape
+        base = random.normal(key, shape=(n,))
+        return self.mean + (self.cholesky @ base)[:, None]
 
     @staticmethod
     def register_pytree_node() -> None:
