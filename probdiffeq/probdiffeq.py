@@ -203,7 +203,7 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
         u = tree.tree_map(np.asarray, u)
 
         # TODO: this is the wrong shape! We should expect std.shape == u.shape...
-        std_expected = marginals.evaluate_std()[tcoeff_index]
+        std_expected = marginals.std_tree()[tcoeff_index]
         std = tree.tree_map(np.asarray, std)
         shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
         shapes_equal = tree.tree_all(shapes)
@@ -217,7 +217,7 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
 
         model = ssm.prior.to_derivative(tcoeff_index, std)
         marg = ssm.conditional.marginalise(marginals, model)
-        return marg.logpdf(u)
+        return marg.logpdf_tree(u)
 
     return loss
 
@@ -242,7 +242,7 @@ def loss_lml_timeseries(
 
         u = tree.tree_map(np.asarray, u)
 
-        std_expected = posterior.marginal.evaluate_std()[tcoeff_index]
+        std_expected = posterior.marginal.std_tree()[tcoeff_index]
         std = tree.tree_map(np.asarray, std)
         shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
         shapes_equal = tree.tree_all(shapes)
@@ -657,12 +657,12 @@ class TaylorCoeffTarget(Generic[N]):
     @property
     def mean(self):
         """A PyTree describing the standard deviation of the Taylor coefficient."""
-        return self.marginals.evaluate_mean()
+        return self.marginals.mean_tree()
 
     @property
     def std(self):
         """A PyTree describing the mean of the Taylor coefficient."""
-        return self.marginals.evaluate_std()
+        return self.marginals.std_tree()
 
 
 @tree.register_dataclass
@@ -741,7 +741,7 @@ class MarkovSequence(Generic[N]):
         # Process the terminal value
         u0 = tree.tree_map(lambda s: s[-1], u)
         model0 = tree.tree_map(lambda s: s[-1], model)
-        pdf0, updated = ssm.conditional.bayes_rule_and_logpdf(
+        pdf0, updated = ssm.conditional.bayes_rule_and_logpdf_tree(
             u0, self.marginal, model0, solve_triu=solve_triu
         )
 
@@ -752,7 +752,7 @@ class MarkovSequence(Generic[N]):
 
             predicted = ssm.conditional.marginalise(rv, prior)
 
-            logpdf_n, corrected = ssm.conditional.bayes_rule_and_logpdf(
+            logpdf_n, corrected = ssm.conditional.bayes_rule_and_logpdf_tree(
                 data, predicted, observation, solve_triu=solve_triu
             )
 
@@ -802,13 +802,13 @@ class MarkovSequence(Generic[N]):
 
         def body(smp0_and_key, cond):
             smp0, key = smp0_and_key
-            predicted = ssm.conditional.apply(smp0, cond)
+            predicted = ssm.conditional.apply_tree(smp0, cond)
             key, subkey = random.split(key, num=2)
-            smp1 = predicted.sample(subkey)
+            smp1 = predicted.sample_tree(subkey)
             return (smp1, key), smp1
 
         key, subkey = random.split(key, num=2)
-        smp = self.marginal.sample(subkey)
+        smp = self.marginal.sample_tree(subkey)
         _, smps = flow.scan(
             body, init=(smp, key), xs=self.conditional, reverse=self.reverse
         )
@@ -1890,8 +1890,8 @@ class solver_mle(ProbabilisticSolver):
             fx_init, _cstate = self.constraint_init.linearize(
                 u_pred.marginals, cstate_init, damp=damp, t=t
             )
-            zeros = tree.tree_map(np.zeros_like, fx_init.noise.evaluate_mean())
-            tmp = self.ssm.conditional.bayes_rule_and_mahalanobis(
+            zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean_tree())
+            tmp = self.ssm.conditional.bayes_rule_and_residual_white_rms_tree(
                 zeros, u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
             )
             output_scale_running, updates = tmp
@@ -1934,8 +1934,8 @@ class solver_mle(ProbabilisticSolver):
         )
 
         # Do the full correction step
-        zeros = tree.tree_map(np.zeros_like, fx.noise.evaluate_mean())
-        new_term, updates = self.ssm.conditional.bayes_rule_and_mahalanobis(
+        zeros = tree.tree_map(np.zeros_like, fx.noise.mean_tree())
+        new_term, updates = self.ssm.conditional.bayes_rule_and_residual_white_rms_tree(
             zeros, u.marginals, fx, solve_triu=linalg.solve_triu
         )
         u, posterior = self.strategy.apply_updates(
@@ -2037,8 +2037,8 @@ class solver_dynamic(ProbabilisticSolver):
             fx_init, _cstate = self.constraint_init.linearize(
                 u_pred.marginals, cstate_init, damp=damp, t=t
             )
-            zeros = tree.tree_map(np.zeros_like, fx_init.noise.evaluate_mean())
-            updates = self.ssm.conditional.bayes_rule(
+            zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean_tree())
+            updates = self.ssm.conditional.bayes_rule_tree(
                 zeros, u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
             )
             u, posterior = self.strategy.apply_updates(prediction, updates=updates)
@@ -2060,8 +2060,8 @@ class solver_dynamic(ProbabilisticSolver):
         # Calibrate the output scale
         ones = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         transition = self.prior(dt, ones)
-        mean = state.u.marginals.evaluate_mean()
-        u = self.ssm.conditional.apply(mean, transition)
+        mean = state.u.marginals.mean_tree()
+        u = self.ssm.conditional.apply_tree(mean, transition)
 
         # Linearize
 
@@ -2069,8 +2069,8 @@ class solver_dynamic(ProbabilisticSolver):
             u, state=lin_state, damp=damp, t=state.t + dt
         )
         observed = self.ssm.conditional.marginalise(u, fx)
-        zeros = tree.tree_map(np.zeros_like, fx.noise.evaluate_mean())
-        output_scale = observed.mahalanobis_norm_relative(zeros)
+        zeros = tree.tree_map(np.zeros_like, fx.noise.mean_tree())
+        output_scale = observed.residual_white_rms_tree(zeros)
 
         # Do the full extrapolation with the calibrated output scale
         # (Includes re-discretisation)
@@ -2173,8 +2173,8 @@ class solver(ProbabilisticSolver):
             fx_init, _cstate = self.constraint_init.linearize(
                 u_pred.marginals, cstate_init, damp=damp, t=t
             )
-            zeros = tree.tree_map(np.zeros_like, fx_init.noise.evaluate_mean())
-            updates = self.ssm.conditional.bayes_rule(
+            zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean_tree())
+            updates = self.ssm.conditional.bayes_rule_tree(
                 zeros, u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
             )
             u, posterior = self.strategy.apply_updates(prediction, updates=updates)
@@ -2216,8 +2216,8 @@ class solver(ProbabilisticSolver):
         )
 
         # Update
-        zeros = tree.tree_map(np.zeros_like, fx.noise.evaluate_mean())
-        updates = self.ssm.conditional.bayes_rule(
+        zeros = tree.tree_map(np.zeros_like, fx.noise.mean_tree())
+        updates = self.ssm.conditional.bayes_rule_tree(
             zeros, u_pred.marginals, fx, solve_triu=linalg.solve_triu
         )
         u, posterior = self.strategy.apply_updates(prediction, updates=updates)
@@ -2438,8 +2438,8 @@ class error_residual_std(ErrorEstimator):
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
-        mean = previous.u.marginals.evaluate_mean()
-        rv = self.ssm.conditional.apply(mean, transition)
+        mean = previous.u.marginals.mean_tree()
+        rv = self.ssm.conditional.apply_tree(mean, transition)
 
         # Optionally: re-linearize
         if self.re_linearize_before_error:
@@ -2451,10 +2451,10 @@ class error_residual_std(ErrorEstimator):
 
         # Extract the local residual std from the linearization
         observed = self.ssm.conditional.marginalise(rv, linearized)
-        zeros = tree.tree_map(np.zeros_like, linearized.noise.evaluate_mean())
-        output_scale = observed.mahalanobis_norm_relative(zeros)
+        zeros = tree.tree_map(np.zeros_like, linearized.noise.mean_tree())
+        output_scale = observed.residual_white_rms_tree(zeros)
         observed = observed.rescale_cholesky(output_scale)
-        error = observed.evaluate_std()
+        error = observed.std_tree()
         error, _ = tree.ravel_pytree(error)
 
         # Compute a reference
@@ -2538,11 +2538,12 @@ class error_state_std(ErrorEstimator):
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
-        mean = previous.u.marginals.evaluate_mean()
-        rv = self.ssm.conditional.apply(mean, transition)
+        mean = previous.u.marginals.mean_tree()
+        rv = self.ssm.conditional.apply_tree(mean, transition)
 
         mean_leaves = tree.tree_leaves(mean)
         error_contraction_rate = len(mean_leaves)
+
         # Optionally: re-linearize
         if self.re_linearize_before_error:
             linearized, state = self.constraint.linearize(
@@ -2552,9 +2553,11 @@ class error_state_std(ErrorEstimator):
             linearized = proposed.fun_evals
 
         # Extract the local residual std from the linearization
-        zeros = tree.tree_map(np.zeros_like, linearized.noise.evaluate_mean())
-        output_scale, conditional = self.ssm.conditional.bayes_rule_and_mahalanobis(
-            zeros, rv, linearized, solve_triu=linalg.solve_triu
+        zeros = tree.tree_map(np.zeros_like, linearized.noise.mean_tree())
+        output_scale, conditional = (
+            self.ssm.conditional.bayes_rule_and_residual_white_rms_tree(
+                zeros, rv, linearized, solve_triu=linalg.solve_triu
+            )
         )
 
         # Measure error on the n-th state (usually, n=0 because why not)
@@ -2564,7 +2567,7 @@ class error_state_std(ErrorEstimator):
             n += 1
 
         # *New:* Go back into solution space
-        std = conditional.evaluate_std()[n]
+        std = conditional.std_tree()[n]
         error, _ = tree.ravel_pytree(std)
         error = output_scale * error
         error, _ = tree.ravel_pytree(error)

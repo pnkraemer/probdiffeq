@@ -136,13 +136,33 @@ class AbstractTreeNormal(abc.ABC):
         self.cholesky = cholesky
 
     @abc.abstractmethod
-    def evaluate_mean(self):
+    def mean_tree(self):
         """Evaluate the mean."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def evaluate_std(self):
+    def mean_flat(self):
+        """Evaluate the mean."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def std_tree(self):
         """Evaluate the standard deviation."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def std_flat(self):
+        """Evaluate the standard deviation."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def sample_tree(self, key):
+        """Sample from a normal distribution."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def sample_flat(self, key):
+        """Sample from a normal distribution."""
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -151,8 +171,19 @@ class AbstractTreeNormal(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def sample(self, key):
-        """Sample from a normal distribution."""
+    def residual_white_rms_tree(self, u):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def residual_white_rms_flat(self, u):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def logpdf_tree(self, u):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def logpdf_flat(self, u):
         raise NotImplementedError
 
     @classmethod
@@ -171,20 +202,22 @@ class AbstractTreeNormal(abc.ABC):
 class AbstractConditional(abc.ABC):
     """Interface for implementations of manipulating conditionals."""
 
-    def bayes_rule(self, data, rv, conditional, /, *, solve_triu):
+    def bayes_rule_tree(self, data, rv, conditional, /, *, solve_triu):
         _, reverted = self.revert(rv, conditional, solve_triu=solve_triu)
-        return self.apply(data, reverted)
+        return self.apply_tree(data, reverted)
 
-    def bayes_rule_and_logpdf(self, data, rv, conditional, /, *, solve_triu):
+    def bayes_rule_and_logpdf_tree(self, data, rv, conditional, /, *, solve_triu):
         observed, reverted = self.revert(rv, conditional, solve_triu=solve_triu)
-        logpdf = observed.logpdf(data)
-        updated = self.apply(data, reverted)
+        logpdf = observed.logpdf_tree(data)
+        updated = self.apply_tree(data, reverted)
         return logpdf, updated
 
-    def bayes_rule_and_mahalanobis(self, data, rv, conditional, /, *, solve_triu):
+    def bayes_rule_and_residual_white_rms_tree(
+        self, data, rv, conditional, /, *, solve_triu
+    ):
         observed, reverted = self.revert(rv, conditional, solve_triu=solve_triu)
-        mahalanobis = observed.mahalanobis_norm_relative(data)
-        updated = self.apply(data, reverted)
+        mahalanobis = observed.residual_white_rms_tree(data)
+        updated = self.apply_tree(data, reverted)
         return mahalanobis, updated
 
     @abc.abstractmethod
@@ -198,7 +231,12 @@ class AbstractConditional(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def apply(self, x, conditional, /):
+    def apply_tree(self, x, conditional, /):
+        """Apply a conditional to a target."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def apply_flat(self, x, conditional, /):
         """Apply a conditional to a target."""
         raise NotImplementedError
 
@@ -678,26 +716,36 @@ class DenseNormal(AbstractTreeNormal):
         return cls(mean=mean_flat, cholesky=cholesky, unravel=unravel)
 
     def __repr__(self) -> str:
-        msg = f"DenseNormal(mean={self.mean}"
-        msg += f", cholesky={self.cholesky}"
-        msg += ", unravel=<...>)"
-        return msg
+        return f"DenseNormal(mean={self.mean}, cholesky={self.cholesky}, unravel=<...>)"
 
-    def evaluate_mean(self):
+    def mean_tree(self):
         if self.mean.ndim > 1:
-            return func.vmap(DenseNormal.evaluate_mean)(self)
+            return func.vmap(DenseNormal.mean_tree)(self)
         return self.unravel(self.mean)
 
-    def evaluate_std(self):
+    def mean_flat(self):
+        return self.mean
+
+    def std_tree(self):
         if self.mean.ndim > 1:
-            return func.vmap(DenseNormal.evaluate_std)(self)
+            return func.vmap(DenseNormal.std_tree)(self)
 
         diag = np.einsum("ij,ij->i", self.cholesky, self.cholesky)
         std = np.sqrt(diag)
         return self.unravel(std)
 
-    def mahalanobis_norm_relative(self, u):
+    def std_flat(self):
+        if self.mean.ndim > 1:
+            return func.vmap(DenseNormal.std_tree)(self)
+
+        diag = np.einsum("ij,ij->i", self.cholesky, self.cholesky)
+        return np.sqrt(diag)
+
+    def residual_white_rms_tree(self, u):
         u, _ = tree.ravel_pytree(u)
+        return self.residual_white_rms_flat(u)
+
+    def residual_white_rms_flat(self, u):
         dx = u - self.mean
         residual_white = linalg.solve_triu(self.cholesky.T, dx, trans="T")
         mahalanobis = linalg.qr_r(residual_white[:, None])
@@ -707,8 +755,11 @@ class DenseNormal(AbstractTreeNormal):
         cholesky = factor[..., None, None] * self.cholesky
         return DenseNormal(self.mean, cholesky, unravel=self.unravel)
 
-    def logpdf(self, u, /):
+    def logpdf_tree(self, u, /):
         u, _ = tree.ravel_pytree(u)
+        return self.logpdf_flat(u)
+
+    def logpdf_flat(self, u, /):
         cholesky = linalg.qr_r(self.cholesky.T).T
         diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
         slogdet = np.sum(np.log(np.abs(diagonal)))
@@ -726,10 +777,13 @@ class DenseNormal(AbstractTreeNormal):
 
         return self.mean, self.cholesky @ self.cholesky.T
 
-    def sample(self, key):
+    def sample_tree(self, key):
+        sample_flat = self.sample_flat(key)
+        return self.unravel(sample_flat)
+
+    def sample_flat(self, key):
         base = random.normal(key, shape=self.mean.shape)
-        sample_latent = self.mean + self.cholesky @ base
-        return self.unravel(sample_latent)
+        return self.mean + self.cholesky @ base
 
     @staticmethod
     def register_pytree_node() -> None:
@@ -767,10 +821,11 @@ class DenseLinearizationFactory(AbstractLinearizationFactory):
 class DenseConditional(AbstractConditional):
     """Construct a dense implementation of manipulating conditionals."""
 
-    def apply(self, x, cond, /):
-        # 'x' is expected to live in target-space,
-        # so we ravel it before applying the conditional
+    def apply_tree(self, x, cond, /):
         x, _ = tree.ravel_pytree(x)
+        return self.apply_flat(x, cond)
+
+    def apply_flat(self, x, cond, /):
         x = cond.to_latent * x
         mean = cond.to_observed * (cond.A @ x + cond.noise.mean)
         cholesky = cond.to_observed[:, None] * cond.noise.cholesky
@@ -864,7 +919,7 @@ class DenseLinearizationOdeTs0(AbstractLinearizationOde):
             m0 = rv.unravel(m)[self.ode_order]
             return tree.ravel_pytree(m0)[0]
 
-        Ms = rv.evaluate_mean()
+        Ms = rv.mean_tree()
         fm = fun(*Ms[: self.ode_order])
         fx, unravel = tree.ravel_pytree(fm)
         linop = func.jacrev(a1)(rv.mean)
@@ -1057,7 +1112,7 @@ class BlockDiagLinearizationOdeTs0(AbstractLinearizationOde):
     def linearize(self, rv, state: None, *, damp: float, t):
         del state
         fun = func.partial(self.vector_field, t=t)
-        mean = rv.evaluate_mean()
+        mean = rv.mean_tree()
         fx = fun(*(mean[: self.ode_order]))
         fx = tree.tree_map(lambda s: -s, fx)
         bias = BlockDiagNormal.from_dirac(fx, damp=damp)
@@ -1455,20 +1510,20 @@ class IsotropicNormal(AbstractTreeNormal):
         cholesky_flat = linalg.diagonal_matrix(scale_flat)
         return cls(loc_flat, cholesky_flat, treedef=treedef)
 
-    def evaluate_mean(self):
+    def mean_tree(self):
         if self.mean.ndim > 2:
-            return func.vmap(IsotropicNormal.evaluate_mean)(self)
+            return func.vmap(IsotropicNormal.mean_tree)(self)
 
         return tree.tree_unflatten(self.treedef, [*self.mean])
 
-    def evaluate_std(self):
+    def std_tree(self):
         if self.mean.ndim > 2:
-            return func.vmap(IsotropicNormal.evaluate_std)(self)
+            return func.vmap(IsotropicNormal.std_tree)(self)
         diag = np.einsum("ij,ji->i", self.cholesky, self.cholesky)
         std = np.sqrt(diag)
         return tree.tree_unflatten(self.treedef, [*std])
 
-    def mahalanobis_norm_relative(self, u):
+    def residual_white_rms_tree(self, u):
         if self.cholesky.size > 1:
             raise ValueError
         u_leaves = tree.tree_leaves(u)
@@ -1601,23 +1656,23 @@ class BlockDiagNormal(AbstractTreeNormal):
         cholesky_flat = scale_flat[..., None] * cholesky[None, ...]
         return cls(loc_flat, cholesky_flat, treedef=treedef, unravel_leaf=unravel_leaf)
 
-    def evaluate_mean(self):
+    def mean_tree(self):
         if self.mean.ndim > 2:
-            return func.vmap(BlockDiagNormal.evaluate_mean)(self)
+            return func.vmap(BlockDiagNormal.mean_tree)(self)
 
         mean_leaves = [*(self.mean.T)]
         mean_tree = tree.tree_unflatten(self.treedef, mean_leaves)
         return tree.tree_map(self.unravel_leaf, mean_tree)
 
-    def evaluate_std(self):
+    def std_tree(self):
         if self.mean.ndim > 2:
-            return func.vmap(BlockDiagNormal.evaluate_std)(self)
+            return func.vmap(BlockDiagNormal.std_tree)(self)
         diag = np.einsum("ijk,ikj->ij", self.cholesky, self.cholesky)
         std = np.sqrt(diag)
         std_tree = tree.tree_unflatten(self.treedef, [*(std.T)])
         return tree.tree_map(self.unravel_leaf, std_tree)
 
-    def mahalanobis_norm_relative(self, u, /):
+    def residual_white_rms_tree(self, u, /):
         # assumes rv.chol = (d,1,1)
         # return array of norms! See calibration
         u_leaves = tree.tree_leaves(u)
