@@ -1288,10 +1288,13 @@ class IsotropicConditional(AbstractConditional):
 class BlockDiagConditional(AbstractConditional):
     """Construct a block-diagonal implementation of manipulating conditionals."""
 
-    def apply(self, x, cond, /):
+    def apply_tree(self, x, cond, /):
         leaves = tree.tree_leaves(x)
         leaves_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], leaves)
         x = np.stack(leaves_flat).T
+        return self.apply_flat(x, cond)
+
+    def apply_flat(self, x, cond, /):
 
         def apply_unbatch(s, c):
             s = c.to_latent * s
@@ -1664,6 +1667,9 @@ class BlockDiagNormal(AbstractTreeNormal):
         mean_tree = tree.tree_unflatten(self.treedef, mean_leaves)
         return tree.tree_map(self.unravel_leaf, mean_tree)
 
+    def mean_flat(self):
+        return self.mean
+
     def std_tree(self):
         if self.mean.ndim > 2:
             return func.vmap(BlockDiagNormal.std_tree)(self)
@@ -1672,13 +1678,22 @@ class BlockDiagNormal(AbstractTreeNormal):
         std_tree = tree.tree_unflatten(self.treedef, [*(std.T)])
         return tree.tree_map(self.unravel_leaf, std_tree)
 
+    def std_flat(self):
+        diag = np.einsum("ijk,ikj->ij", self.cholesky, self.cholesky)
+        return np.sqrt(diag)
+
     def residual_white_rms_tree(self, u, /):
+        # todo: add sth like an "axis" argument to make it more obvious
+        # to a user that this one here is vector-valued?
+
         # assumes rv.chol = (d,1,1)
         # return array of norms! See calibration
         u_leaves = tree.tree_leaves(u)
         u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
         u_latent = np.stack(u_flat).T
+        return self.residual_white_rms_flat(u_latent)
 
+    def residual_white_rms_flat(self, u_latent, /):
         mean = np.reshape(self.mean - u_latent, (-1,))
         cholesky = np.reshape(self.cholesky, (-1,))
         return mean / cholesky / np.sqrt(mean.size)
@@ -1689,13 +1704,16 @@ class BlockDiagNormal(AbstractTreeNormal):
             self.mean, cholesky, treedef=self.treedef, unravel_leaf=self.unravel_leaf
         )
 
-    def logpdf(self, u, /):
+    def logpdf_tree(self, u, /):
         u_leaves = tree.tree_leaves(u)
         u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
         u_latent = np.stack(u_flat).T
-        return np.sum(func.vmap(BlockDiagNormal.logpdf_scalar)(self, u_latent))
+        return self.logpdf_flat(u_latent)
 
-    def logpdf_scalar(self, u):
+    def logpdf_flat(self, u_latent, /):
+        return np.sum(func.vmap(BlockDiagNormal.logpdf_scalar_flat)(self, u_latent))
+
+    def logpdf_scalar_flat(self, u):
         cholesky = linalg.qr_r(self.cholesky.T).T
 
         dx = u - self.mean
@@ -1718,18 +1736,25 @@ class BlockDiagNormal(AbstractTreeNormal):
             return func.vmap(BlockDiagNormal._cov_dense)(self)
         return self.cholesky @ self.cholesky.T
 
-    def sample(self, key):
+    def sample_tree(self, key):
         if self.cholesky.ndim > 3:
             d, *_ = self.cholesky.shape
             keys = random.split(key, num=d)
-            return func.vmap(BlockDiagNormal.sample)(self, keys)
+            return func.vmap(BlockDiagNormal.sample_tree)(self, keys)
+
+        sample_latent = self.sample_flat(key)
+        tree_sample = tree.tree_unflatten(self.treedef, [*(sample_latent.T)])
+        return tree.tree_map(self.unravel_leaf, tree_sample)
+
+    def sample_flat(self, key):
+        if self.cholesky.ndim > 3:
+            d, *_ = self.cholesky.shape
+            keys = random.split(key, num=d)
+            return func.vmap(BlockDiagNormal.sample_flat)(self, keys)
 
         d, _n, n = self.cholesky.shape
         base = random.normal(key, shape=(d, n))
-        sample_latent = self.mean + np.einsum("ijk,ij->ik", self.cholesky, base)
-
-        tree_sample = tree.tree_unflatten(self.treedef, [*(sample_latent.T)])
-        return tree.tree_map(self.unravel_leaf, tree_sample)
+        return self.mean + np.einsum("ijk,ij->ik", self.cholesky, base)
 
     @staticmethod
     def register_pytree_node() -> None:
