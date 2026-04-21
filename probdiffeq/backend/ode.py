@@ -18,13 +18,16 @@ def odeint_and_save_at(vf, y0: tuple, /, save_at, *, atol, rtol):
 def ivp_lotka_volterra():
     t1 = 2.0  # Short time-intervals are sufficient for this test.
     t0, t1 = (0.0, 2.0)
-    u0 = jnp.asarray([20.0, 20.0])
 
-    # Dictionary to ensure pytree compatibility
+    # Dictionary of matrices to ensure pytree compatibility
+    u0 = jnp.asarray([20.0, 20.0]).reshape((1, 2, 1))
+
     @jax.jit
     def vf(x, *, t):  # noqa: ARG001
         """Lotka--Volterra dynamics."""
-        return {"u": f(x["u"])}
+        u = x["u"][0, :, 0]
+        fu = f(u)
+        return {"u": fu[None, :, None]}
 
     def f(y, /):
         a, b, c, d = 0.5, 0.05, 0.5, 0.05

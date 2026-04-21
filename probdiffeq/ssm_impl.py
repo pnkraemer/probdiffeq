@@ -1143,7 +1143,7 @@ class BlockDiagLinearizationOdeTs1(AbstractLinearizationOde):
         fun = func.partial(self.vector_field, t=t)
         mean = rv.mean
 
-        mean_tree = tree.tree_unflatten(rv.treedef, [*(rv.mean.T)])
+        mean_tree = rv.mean_tree()
         m0_tree = mean_tree[0]
         rv0 = BlockDiagNormal.from_dirac(m0_tree, damp=0.0)
 
@@ -1154,6 +1154,7 @@ class BlockDiagLinearizationOdeTs1(AbstractLinearizationOde):
 
         def vf_flat(u):
             u_tree = tree.tree_unflatten(rv0.treedef, [u])
+            u_tree = tree.tree_map(rv0.unravel_leaf, u_tree)
             fu_tree = fun(u_tree)
             return tree.ravel_pytree(fu_tree)[0]
 
