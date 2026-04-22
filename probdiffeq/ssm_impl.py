@@ -742,11 +742,15 @@ class DenseNormal(AbstractTreeNormal[DenseTreeFlatten]):
 
     @classmethod
     def from_dirac(cls, mean, *, damp):
+        _verify_taylor_coefficient_pytree(mean)
         std = tree.tree_map(lambda x: np.ones_like(x) * damp, mean)
         return DenseNormal.from_mean_and_std(mean, std)
 
     @classmethod
     def from_mean_and_std(cls, mean, std):
+        _verify_taylor_coefficient_pytree(mean)
+        _verify_taylor_coefficient_pytree(std)
+
         tree_flatten = DenseTreeFlatten.from_tree(mean)
 
         mean_flat = tree_flatten.flatten_tree(mean)
@@ -1053,7 +1057,7 @@ class DenseRoot(AbstractRoot):
         # pytree structure.)
         m_tree = rv.mean_tree()
         relevant_tcoeffs = m_tree[: self.root_order]
-        root_eval = func.eval_shape(lambda s: self.root(*s, t=t), relevant_tcoeffs)
+        root_eval = func.eval_shape(lambda s: [self.root(*s, t=t)], relevant_tcoeffs)
 
         # Ensure that unravelling does not yield a ShapeDtypeStruct
         root_eval = tree.tree_map(np.zeros_like, root_eval)
@@ -1061,6 +1065,7 @@ class DenseRoot(AbstractRoot):
 
         # Turn the linearization into a conditional
         noise = DenseNormal.from_dirac(unravel(fx), damp=damp)
+
         cond = LatentCond.from_linop_and_noise(linop, noise)
         return cond, state
 
@@ -1114,11 +1119,11 @@ class IsotropicOdeTs1(AbstractOde):
 
         mean_tree = rv.mean_tree()
         m0_tree = mean_tree[0]
-        rv0 = IsotropicNormal.from_dirac(m0_tree, damp=0.0)
+        rv0 = IsotropicNormal.from_dirac([m0_tree], damp=0.0)
 
         def vf_ravel(s):
             s_tree = rv0.tree_flatten.unflatten_array(s[None])
-            fs = fun(s_tree)
+            fs = fun(*s_tree)
             return tree.ravel_pytree(fs)[0]
 
         # Estimate the trace using Hutchinson's estimator
@@ -1152,7 +1157,7 @@ class BlockDiagOdeTs0(AbstractOde):
         mean = rv.mean_tree()
         fx = self.vector_field(*(mean[: self.ode_order]), t=t)
         fx = tree.tree_map(lambda s: -s, fx)
-        bias = BlockDiagNormal.from_dirac(fx, damp=damp)
+        bias = BlockDiagNormal.from_dirac([fx], damp=damp)
 
         def a1(s):
             return s[[self.ode_order], ...]
@@ -1207,7 +1212,7 @@ class BlockDiagOdeTs1(AbstractOde):
         diff = func.vmap(lambda a, b: a @ b)(linop, rv.mean)
         fx = fx - diff
         fx = rv0.tree_flatten.unflatten_array(fx)
-        bias = BlockDiagNormal.from_dirac(fx, damp=damp)
+        bias = BlockDiagNormal.from_dirac([fx], damp=damp)
         cond = LatentCond.from_linop_and_noise(linop, bias)
         return cond, state
 
@@ -1515,11 +1520,36 @@ class IsotropicTreeFlatten(AbstractTreeFlatten):
         return IsotropicTreeFlatten(treedef, unravel_leaf)
 
 
+def _verify_taylor_coefficient_pytree(x, /):
+    if isinstance(x, Array):
+        msg = "Mean must be a pytree, not an array."
+        raise TypeError(msg)
+
+    try:
+        x_list = [*x]
+        shape0 = tree.tree_map(np.shape, x_list[0])
+    except Exception as error:
+        msg = "Mean must be a pytree of the form [M_1, ..., M_{num_coeffs}], "
+        msg += "where each M_i is a pytree of the same structure."
+        msg += f" Received: {x}."
+        raise ValueError(msg) from error
+
+    for i, x_i in enumerate(x_list):
+        xi_shape = tree.tree_map(np.shape, x_i)
+        if xi_shape != shape0:
+            msg = "All leaves of the mean must have the same shape."
+            msg += f" However, leaf {i} has shape {xi_shape}"
+            msg += f", while leaf 0 has shape {shape0}"
+            raise ValueError(msg)
+
+
 class IsotropicNormal(AbstractTreeNormal[IsotropicTreeFlatten]):
     """Construct an isotropic normal distribution."""
 
     @classmethod
     def from_dirac(cls, mean, *, damp):
+        _verify_taylor_coefficient_pytree(mean)
+
         leaves, structure = tree.tree_flatten(mean)
         leaves_ = [np.asarray(damp) for _ in leaves]
         std = tree.tree_unflatten(structure, leaves_)
@@ -1527,6 +1557,9 @@ class IsotropicNormal(AbstractTreeNormal[IsotropicTreeFlatten]):
 
     @classmethod
     def from_mean_and_std(cls, mean, std):
+        _verify_taylor_coefficient_pytree(mean)
+        _verify_taylor_coefficient_pytree(std)
+
         tree_flatten = IsotropicTreeFlatten.from_tree(mean)
         loc_flat = tree_flatten.flatten_tree(mean)
         scale_flat = tree_flatten.flatten_tree_scalar(std)
@@ -1676,39 +1709,36 @@ class BlockDiagTreeFlatten(AbstractTreeFlatten):
 
 
 class BlockDiagNormal(AbstractTreeNormal[BlockDiagTreeFlatten]):
-    """Construct a block-diagonal normal distribution."""
+    """Construct a block-diagonal normal distribution.
+
+    This assumes that the pytree is of the form [M_1, ..., M_{num_coeffs}],
+    where each M_i is a pytree of the same structure.
+
+    Shapes:
+    - mean: (d, num_coeffs)
+    - cholesky: (d, num_coeffs, num_coeffs)
+
+    where d is the number of elements in each M.
+
+    """
 
     @classmethod
     def from_dirac(cls, mean, *, damp):
+        _verify_taylor_coefficient_pytree(mean)
+
         std = tree.tree_map(lambda s: damp * np.ones_like(s), mean)
         return BlockDiagNormal.from_mean_and_std(mean, std)
 
     @classmethod
     def from_mean_and_std(cls, mean, std):
+        _verify_taylor_coefficient_pytree(mean)
+        _verify_taylor_coefficient_pytree(std)
 
         tree_flatten = BlockDiagTreeFlatten.from_tree(mean)
 
         loc_flat = tree_flatten.flatten_tree(mean)
         scale_flat = tree_flatten.flatten_tree(std)
         num_coeffs = len(mean)
-
-        # def ravel(s):
-        #     return tree.ravel_pytree(s)[0]
-
-        # # Flatten and reshape the mean
-        # loc_leaves, treedef = tree.tree_flatten(mean)
-        # loc_leaves_flat = tree.tree_map(ravel, loc_leaves)
-        # loc_flat = np.stack(loc_leaves_flat).T
-        # _, unravel_leaf = tree.ravel_pytree(loc_leaves[0])
-
-        # def unravel(z):
-        #     z1 = tree.tree_unflatten(treedef, z.T)
-        #     return tree.tree_map(unravel_leaf, z1)
-
-        # # Flatten and reshape the standard deviation
-        # scale_leaves, _ = tree.tree_flatten(std)
-        # scale_leaves_flat = tree.tree_map(ravel, scale_leaves)
-        # scale_flat = np.stack(scale_leaves_flat).T
 
         # Promote std into covariance matrix and apply damping
         num_coeffs = len(mean)
