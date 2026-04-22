@@ -795,28 +795,36 @@ class MarkovSequence(Generic[N]):
         if len(shape) > 0:
             n, *shape_remaining = shape
             keys = random.split(key, num=n)
-            sample_ = func.partial(self.sample, ssm=ssm, shape=shape_remaining)
-            return func.vmap(sample_)(keys)
+            sample_partial = func.partial(self.sample, ssm=ssm, shape=shape_remaining)
+            return func.vmap(sample_partial)(keys)
 
         # Compute a single sample from the Markov sequence
 
-        def body(smp0_and_key, cond):
-            smp0, key = smp0_and_key
-            predicted = ssm.conditional.apply_tree(smp0, cond)
+        def body(sample_and_key, cond):
+            smp_flat, key = sample_and_key
+
+            # Propagate the previous sample
+            predicted = ssm.conditional.apply_flat(smp_flat, cond)
+
+            # Sample the propagated variable
             key, subkey = random.split(key, num=2)
-            smp1 = predicted.sample_tree(subkey)
-            return (smp1, key), smp1
+            smp_flat = predicted.sample_flat(subkey)
 
+            # Unravel the sample
+            smp_tree = predicted.tree_flatten.unflatten_array(smp_flat)
+            return (smp_flat, key), smp_tree
+
+        # Loop over the conditionals
         key, subkey = random.split(key, num=2)
-        smp = self.marginal.sample_tree(subkey)
-        _, smps = flow.scan(
-            body, init=(smp, key), xs=self.conditional, reverse=self.reverse
-        )
+        sample0_flat = self.marginal.sample_flat(subkey)
+        init = (sample0_flat, key)
+        xs = self.conditional
+        _, samples = flow.scan(body, init=init, xs=xs, reverse=self.reverse)
 
-        # Currently, sampling is only implemented for reverse
+        sample0_tree = self.marginal.tree_flatten.unflatten_array(sample0_flat)
         if self.reverse:
-            return tree.tree_array_append(smps, smp)
-        return tree.tree_array_prepend(smp, smps)
+            return tree.tree_array_append(samples, sample0_tree)
+        return tree.tree_array_prepend(sample0_tree, samples)
 
 
 T = TypeVar("T", bound=MarkovSequence | ssm_impl.AbstractTreeNormal)
@@ -2060,8 +2068,8 @@ class solver_dynamic(ProbabilisticSolver):
         # Calibrate the output scale
         ones = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         transition = self.prior(dt, ones)
-        mean = state.u.marginals.mean_tree()
-        u = self.ssm.conditional.apply_tree(mean, transition)
+        mean = state.u.marginals.mean_flat()
+        u = self.ssm.conditional.apply_flat(mean, transition)
 
         # Linearize
 
@@ -2438,8 +2446,8 @@ class error_residual_std(ErrorEstimator):
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
-        mean = previous.u.marginals.mean_tree()
-        rv = self.ssm.conditional.apply_tree(mean, transition)
+        mean = previous.u.marginals.mean_flat()
+        rv = self.ssm.conditional.apply_flat(mean, transition)
 
         # Optionally: re-linearize
         if self.re_linearize_before_error:
@@ -2538,8 +2546,8 @@ class error_state_std(ErrorEstimator):
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
-        mean = previous.u.marginals.mean_tree()
-        rv = self.ssm.conditional.apply_tree(mean, transition)
+        mean = previous.u.marginals.mean_flat()
+        rv = self.ssm.conditional.apply_flat(mean, transition)
 
         mean_leaves = tree.tree_leaves(mean)
         error_contraction_rate = len(mean_leaves)
