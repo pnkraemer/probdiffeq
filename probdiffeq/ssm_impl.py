@@ -1,7 +1,7 @@
 """Implementations of (factorized) state-space models."""
 
 from probdiffeq.backend import abc, func, linalg, np, random, structs, tree
-from probdiffeq.backend.typing import Any, Array, Callable, Sequence, TypeVar
+from probdiffeq.backend.typing import Any, Array, Callable, Generic, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
 
 T = TypeVar("T", bound=Array)
@@ -86,7 +86,7 @@ class AbstractLinearization(abc.ABC):
         raise NotImplementedError
 
 
-class AbstractLinearizationRoot(AbstractLinearization):
+class AbstractRoot(AbstractLinearization):
     """Interface for linearizations of general roots."""
 
     def __init__(self, root, /, *, root_order) -> None:
@@ -94,7 +94,7 @@ class AbstractLinearizationRoot(AbstractLinearization):
         self.root_order = root_order
 
 
-class AbstractLinearizationOde(AbstractLinearization):
+class AbstractOde(AbstractLinearization):
     """Interface for linearizations of ODEs."""
 
     def __init__(self, vf, /, *, ode_order) -> None:
@@ -113,27 +113,23 @@ class AbstractLinearizationFactory(abc.ABC):
     @abc.abstractmethod
     def root(
         self, root, *, jacobian, root_order: int, nlstsq: Callable | None
-    ) -> AbstractLinearizationRoot:
+    ) -> AbstractRoot:
         """Construct an implementation of 1st-order Taylor-linearization for roots."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_taylor_0th(self, ode_order: int) -> AbstractLinearizationOde:
+    def ode_taylor_0th(self, ode_order: int) -> AbstractOde:
         """Construct an implementation of 0th-order Taylor-linearization for ODEs."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_taylor_1st(self, vf, *, ode_order: int) -> AbstractLinearizationOde:
+    def ode_taylor_1st(self, vf, *, ode_order: int) -> AbstractOde:
         """Construct an implementation of 1st-order Taylor-linearization for ODEs."""
         raise NotImplementedError
 
 
 class AbstractTreeFlatten(abc.ABC):
     """Abstract base class for flattening information of tree-structured random variables."""
-
-    def __repr__(self) -> str:
-        name = self.__name__
-        return f"{name}({self.mean}, {self.cholesky}, tree_flatten=<...>)"
 
     @abc.abstractmethod
     def flatten_tree(self, x):
@@ -146,13 +142,24 @@ class AbstractTreeFlatten(abc.ABC):
         pass
 
 
-class AbstractTreeNormal(abc.ABC):
+S = TypeVar("S", bound=AbstractTreeFlatten)
+"""A type-variable for tree-flattening types.
+
+Used to type normal distributions.
+"""
+
+
+class AbstractTreeNormal(abc.ABC, Generic[S]):
     """Interface for pytree-valued normal distributions."""
 
-    def __init__(self, mean: Array, cholesky: Array, tree_flatten: AbstractTreeFlatten):
+    def __init__(self, mean: Array, cholesky: Array, tree_flatten: S):
         self.mean = mean
         self.cholesky = cholesky
         self.tree_flatten = tree_flatten
+
+    def __repr__(self) -> str:
+        name = self.__class__.__name__
+        return f"{name}({self.mean}, {self.cholesky}, {self.tree_flatten})"
 
     @abc.abstractmethod
     def mean_tree(self):
@@ -531,8 +538,7 @@ class IsotropicPriorFactory(AbstractPriorFactory):
             tree_flatten = IsotropicTreeFlatten.from_shape_info(self.shape_info)
             noise = IsotropicNormal(q0, scale * q_sqrtm, tree_flatten)
 
-            cond = LatentCond(A, noise, to_latent=p_inv, to_observed=p)
-            return cond
+            return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
         return discretise
 
@@ -597,7 +603,6 @@ class DensePriorFactory(AbstractPriorFactory):
             p = np.repeat(p, d)
             p_inv = np.repeat(p_inv, d)
 
-            unravel = self.shape_info.all_unravel
             tree_flatten = DenseTreeFlatten.from_shape_info(self.shape_info)
             noise = DenseNormal(q0, output_scale * Q, tree_flatten)
             return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
@@ -635,20 +640,21 @@ class DensePriorFactory(AbstractPriorFactory):
     def transition_exponential(self, vf_linear: Array, base_scale: Array | None):
         Lambda = self._process_base_scale(base_scale)
 
-        # TODO: continue including the self.tree_flatten stuff here
-        # Good starting point: find the DenseNormal below and update there...
-        assert False
         # Turn the linear vector field into the bottom block of the IOUP
+        # by building the matrix-version of the vector field's Jacobian.
+
+        # First, set up a template variable
         leaf_like = np.ones_like(self.shape_info.single_flat)
         leaves = [leaf_like for _ in range(self.shape_info.num_derivatives + 1)]
+        tree_flatten = DenseTreeFlatten.from_tree(leaves)
 
-        def vf_flat(tcoeffs):
-            tcoeffs_tree = tree.tree_map(self.shape_info.single_unravel, tcoeffs)
+        def vf_flat(tcoeffs_flat):
+            tcoeffs_tree = tree_flatten.unflatten_array(tcoeffs_flat)
             fx = vf_linear(*tcoeffs_tree)
             return tree.ravel_pytree(fx)[0]
 
-        rate = func.jacfwd(vf_flat)(leaves)
-        bottom_block = np.concatenate(rate, axis=-1)
+        leaves_flat = tree_flatten.flatten_tree(leaves)
+        bottom_block = func.jacfwd(vf_flat)(leaves_flat)
 
         # Construct the SDE matrices
         (d,) = self.shape_info.single_flat.shape
@@ -688,8 +694,8 @@ class DensePriorFactory(AbstractPriorFactory):
             B_p = np.sqrt(dt) * p_inv[:, None] * B
 
             eA, L = exp_gram(A_p, B_p)
-            unravel = self.shape_info.all_unravel
-            noise = DenseNormal(q0, output_scale * L, unravel=unravel)
+            tree_flatten = DenseTreeFlatten.from_shape_info(self.shape_info)
+            noise = DenseNormal(q0, output_scale * L, tree_flatten)
             return LatentCond(eA, noise, to_latent=p_inv, to_observed=p)
 
         return discretise
@@ -709,7 +715,29 @@ class DensePriorFactory(AbstractPriorFactory):
         return np.ones(())
 
 
-class DenseNormal(AbstractTreeNormal):
+@structs.dataclass
+class DenseTreeFlatten(AbstractTreeFlatten):
+    """Implementation of flattening information for dense models."""
+
+    unravel: Callable
+
+    def flatten_tree(self, x):
+        return tree.ravel_pytree(x)[0]
+
+    def unflatten_array(self, x):
+        return self.unravel(x)
+
+    @classmethod
+    def from_tree(cls, x):
+        _, unravel = tree.ravel_pytree(x)
+        return cls(unravel)
+
+    @classmethod
+    def from_shape_info(cls, shape_info):
+        return cls(shape_info.all_unravel)
+
+
+class DenseNormal(AbstractTreeNormal[DenseTreeFlatten]):
     """Construct a dense implementation of a normal distribution."""
 
     @classmethod
@@ -814,18 +842,16 @@ class DenseLinearizationFactory(AbstractLinearizationFactory):
     """Construct a dense linearization factory."""
 
     def root(self, root, *, jacobian, root_order: int, nlstsq: bool):
-        return DenseLinearizationRoot(
-            root, jacobian=jacobian, root_order=root_order, nlstsq=nlstsq
-        )
+        return DenseRoot(root, jacobian=jacobian, root_order=root_order, nlstsq=nlstsq)
 
     def ode_taylor_0th(self, vf, *, ode_order):
-        return DenseLinearizationOdeTs0(vf, ode_order=ode_order)
+        return DenseOdeTs0(vf, ode_order=ode_order)
 
     def ode_taylor_1st(self, vf, *, ode_order, jacobian):
         if ode_order > 1:
             raise ValueError
 
-        return DenseLinearizationOdeTs1(vf, ode_order=ode_order, jacobian=jacobian)
+        return DenseOdeTs1(vf, ode_order=ode_order, jacobian=jacobian)
 
 
 class DenseConditional(AbstractConditional):
@@ -907,7 +933,7 @@ class DenseConditional(AbstractConditional):
         return LatentCond.from_linop_and_noise(A, noise)
 
 
-class DenseLinearizationOdeTs0(AbstractLinearizationOde):
+class DenseOdeTs0(AbstractOde):
     """Construct a dense implementation of ODE-TS0 linearization."""
 
     def __init__(self, vf, *, ode_order: int) -> None:
@@ -926,6 +952,7 @@ class DenseLinearizationOdeTs0(AbstractLinearizationOde):
             return tree.ravel_pytree(m0)[0]
 
         Ms = rv.mean_tree()
+
         fm = fun(*Ms[: self.ode_order])
         fx = tree.tree_map(lambda s: -s, fm)
         linop = func.jacrev(a1)(rv.mean)
@@ -934,7 +961,7 @@ class DenseLinearizationOdeTs0(AbstractLinearizationOde):
         return cond, None
 
 
-class DenseLinearizationOdeTs1(AbstractLinearizationOde):
+class DenseOdeTs1(AbstractOde):
     """Construct a dense implementation of ODE-TS1 linearization."""
 
     def __init__(self, vf: Callable, ode_order: int, jacobian: Any) -> None:
@@ -982,7 +1009,7 @@ class DenseLinearizationOdeTs1(AbstractLinearizationOde):
         return cond, state
 
 
-class DenseLinearizationRoot(AbstractLinearizationRoot):
+class DenseRoot(AbstractRoot):
     """Construct a dense implementation of root-TS1 linearization."""
 
     def __init__(self, root, *, root_order, jacobian, nlstsq) -> None:
@@ -993,10 +1020,10 @@ class DenseLinearizationRoot(AbstractLinearizationRoot):
     def init_linearization(self):
         return self.jacobian.init_jacobian_handler()
 
-    def constraint_flat(self, m: Array, *, t, unravel) -> Array:
+    def constraint_flat(self, m: Array, *, t, tree_flatten) -> Array:
         """Evaluate a flattened version of the root constraint."""
         # Unravel the location and extract derivatives
-        m_tree = unravel(m)
+        m_tree = tree_flatten.unflatten_array(m)
         relevant_tcoeffs = m_tree[: self.root_order]
 
         # Evaluate the root
@@ -1007,18 +1034,28 @@ class DenseLinearizationRoot(AbstractLinearizationRoot):
 
     def linearize(self, rv, state, *, damp: float, t):
 
+        # Fix all arguments except the Array ones
+        constraint_flat = func.partial(
+            self.constraint_flat, t=t, tree_flatten=rv.tree_flatten
+        )
+
+        # Initial guess for the linearization point
         mean = rv.mean
-        constraint_flat = func.partial(self.constraint_flat, t=t, unravel=rv.unravel)
+
         if self.nlstsq is not None:  # posterior linearization
             mean, _info = self.nlstsq(constraint_flat, mean, rv.mean, rv.cholesky)
 
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
         fx = fx - linop @ mean
 
-        # Understand how to unravel
-        m_tree = func.eval_shape(rv.unravel, rv.mean)
+        # Find the tree structure of the output constraint
+        # (So that we can unravel the bias term and always work in the correct
+        # pytree structure.)
+        m_tree = rv.mean_tree()
         relevant_tcoeffs = m_tree[: self.root_order]
         root_eval = func.eval_shape(lambda s: self.root(*s, t=t), relevant_tcoeffs)
+
+        # Ensure that unravelling does not yield a ShapeDtypeStruct
         root_eval = tree.tree_map(np.zeros_like, root_eval)
         _, unravel = tree.ravel_pytree(root_eval)
 
@@ -1028,7 +1065,7 @@ class DenseLinearizationRoot(AbstractLinearizationRoot):
         return cond, state
 
 
-class IsotropicLinearizationOdeTs0(AbstractLinearizationOde):
+class IsotropicOdeTs0(AbstractOde):
     """Construct an isotropic implementation of ODE-TS0 linearization."""
 
     def __init__(self, vf, *, ode_order) -> None:
@@ -1056,7 +1093,7 @@ class IsotropicLinearizationOdeTs0(AbstractLinearizationOde):
         return cond, None
 
 
-class IsotropicLinearizationOdeTs1(AbstractLinearizationOde):
+class IsotropicOdeTs1(AbstractOde):
     """Construct an isotropic implementation of ODE-TS1 linearization."""
 
     def __init__(self, vf, *, ode_order: int, jacobian: Any) -> None:
@@ -1101,7 +1138,7 @@ class IsotropicLinearizationOdeTs1(AbstractLinearizationOde):
         return cond, state
 
 
-class BlockDiagLinearizationOdeTs0(AbstractLinearizationOde):
+class BlockDiagOdeTs0(AbstractOde):
     """Construct a block-diagonal implementation of ODE-TS0 linearization."""
 
     def __init__(self, vf, *, ode_order: int) -> None:
@@ -1126,7 +1163,7 @@ class BlockDiagLinearizationOdeTs0(AbstractLinearizationOde):
         return cond, None
 
 
-class BlockDiagLinearizationOdeTs1(AbstractLinearizationOde):
+class BlockDiagOdeTs1(AbstractOde):
     """Construct a block-diagonal implementation of ODE-TS1 linearization."""
 
     def __init__(self, vf, *, ode_order: int, jacobian: Any) -> None:
@@ -1182,10 +1219,10 @@ class IsotropicLinearizationFactory(AbstractLinearizationFactory):
         raise NotImplementedError
 
     def ode_taylor_1st(self, vf, *, ode_order, jacobian):
-        return IsotropicLinearizationOdeTs1(vf, jacobian=jacobian, ode_order=ode_order)
+        return IsotropicOdeTs1(vf, jacobian=jacobian, ode_order=ode_order)
 
     def ode_taylor_0th(self, vf, *, ode_order):
-        return IsotropicLinearizationOdeTs0(vf, ode_order=ode_order)
+        return IsotropicOdeTs0(vf, ode_order=ode_order)
 
 
 class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
@@ -1195,10 +1232,10 @@ class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
         raise NotImplementedError
 
     def ode_taylor_0th(self, vf, *, ode_order):
-        return BlockDiagLinearizationOdeTs0(vf, ode_order=ode_order)
+        return BlockDiagOdeTs0(vf, ode_order=ode_order)
 
     def ode_taylor_1st(self, vf, *, ode_order, jacobian):
-        return BlockDiagLinearizationOdeTs1(vf, ode_order=ode_order, jacobian=jacobian)
+        return BlockDiagOdeTs1(vf, ode_order=ode_order, jacobian=jacobian)
 
 
 class IsotropicConditional(AbstractConditional):
@@ -1436,7 +1473,49 @@ def _binom(n, k):
     return np.factorial(n) / (np.factorial(n - k) * np.factorial(k))
 
 
-class IsotropicNormal(AbstractTreeNormal):
+@structs.dataclass
+class IsotropicTreeFlatten(AbstractTreeFlatten):
+    """Flattening information for isotropic random variables."""
+
+    # The treedef of the target
+    treedef: Any
+
+    # A map that unravels each leaf. Note that this is not the same
+    # as unravelling each Taylor coefficient, because the Taylor coefficients
+    # themselves can be pytrees, whereas the leaves are always arrays.
+    # The below function exclusively reshapes arrays
+    unravel_leaf: Any
+
+    def flatten_tree(self, x):
+        leaves = tree.tree_leaves(x)
+        leaves_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], leaves)
+        return np.stack(leaves_flat)
+
+    def flatten_tree_scalar(self, x):
+        leaves = tree.tree_leaves(x)
+        return np.stack(leaves)
+
+    def unflatten_array(self, x):
+        x_tree = tree.tree_unflatten(self.treedef, [*x])
+        return tree.tree_map(self.unravel_leaf, x_tree)
+
+    def unflatten_array_scalar(self, x):
+        return tree.tree_unflatten(self.treedef, [*x])
+
+    @classmethod
+    def from_tree(cls, x):
+        leaves, treedef = tree.tree_flatten(x)
+        _, unravel_leaf = tree.ravel_pytree(leaves[0])
+        return cls(treedef, unravel_leaf)
+
+    @classmethod
+    def from_shape_info(cls, shape_info):
+        treedef = shape_info.treedef
+        unravel_leaf = shape_info.leaf_unravel
+        return IsotropicTreeFlatten(treedef, unravel_leaf)
+
+
+class IsotropicNormal(AbstractTreeNormal[IsotropicTreeFlatten]):
     """Construct an isotropic normal distribution."""
 
     @classmethod
@@ -1596,70 +1675,7 @@ class BlockDiagTreeFlatten(AbstractTreeFlatten):
         return BlockDiagTreeFlatten(treedef, unravel_leaf)
 
 
-@structs.dataclass
-class DenseTreeFlatten(AbstractTreeFlatten):
-    unravel: Callable
-
-    def flatten_tree(self, x):
-        return tree.ravel_pytree(x)[0]
-
-    def unflatten_array(self, x):
-        return self.unravel(x)
-
-    @classmethod
-    def from_tree(cls, x):
-        _, unravel = tree.ravel_pytree(x)
-
-        return cls(unravel)
-
-    @classmethod
-    def from_shape_info(cls, shape_info):
-        return cls(shape_info.all_unravel)
-
-
-@structs.dataclass
-class IsotropicTreeFlatten(AbstractTreeFlatten):
-    """Flattening information for isotropic random variables."""
-
-    # The treedef of the target
-    treedef: Any
-
-    # A map that unravels each leaf. Note that this is not the same
-    # as unravelling each Taylor coefficient, because the Taylor coefficients
-    # themselves can be pytrees, whereas the leaves are always arrays.
-    # The below function exclusively reshapes arrays
-    unravel_leaf: Any
-
-    def flatten_tree(self, x):
-        leaves = tree.tree_leaves(x)
-        leaves_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], leaves)
-        return np.stack(leaves_flat)
-
-    def flatten_tree_scalar(self, x):
-        leaves = tree.tree_leaves(x)
-        return np.stack(leaves)
-
-    def unflatten_array(self, x):
-        x_tree = tree.tree_unflatten(self.treedef, [*x])
-        return tree.tree_map(self.unravel_leaf, x_tree)
-
-    def unflatten_array_scalar(self, x):
-        return tree.tree_unflatten(self.treedef, [*x])
-
-    @classmethod
-    def from_tree(cls, x):
-        leaves, treedef = tree.tree_flatten(x)
-        _, unravel_leaf = tree.ravel_pytree(leaves[0])
-        return cls(treedef, unravel_leaf)
-
-    @classmethod
-    def from_shape_info(cls, shape_info):
-        treedef = shape_info.treedef
-        unravel_leaf = shape_info.leaf_unravel
-        return IsotropicTreeFlatten(treedef, unravel_leaf)
-
-
-class BlockDiagNormal(AbstractTreeNormal):
+class BlockDiagNormal(AbstractTreeNormal[BlockDiagTreeFlatten]):
     """Construct a block-diagonal normal distribution."""
 
     @classmethod
