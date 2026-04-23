@@ -425,7 +425,8 @@ def constraint_jet(
         jacobian = jacobian_hutchinson_fwd()
 
     def root_jet(*tcoeffs_all, t):
-        unravel = tree.ravel_pytree(tcoeffs_all[0])[1]
+        _, unravel_one = tree.ravel_pytree(tcoeffs_all[0])
+
         if jet_order == "max":
             tcoeffs = tcoeffs_all
         else:
@@ -441,15 +442,20 @@ def constraint_jet(
 
         # Flatten the root because jax.jet is a bit high maintenance :)
         def jet_call(*y):
-            y_tree = [unravel(s) for s in y]
+            y_tree = [unravel_one(s) for s in y]
             fx = root(*y_tree, t=t)
             return tree.ravel_pytree(fx)[0]
 
         flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
+
         ps, ss = diffeqjet.jet_unpack_series(flat, root_order)
 
         if len(tree.tree_leaves(ss)) == 0:
             fx = jet_call(*ps)
+
+            # Return a sequence to be compatible with Taylor-coeff logic,
+            # but don't bother unflattening the content
+            # because the result will be compared to zero anyway
             return [fx]
 
         primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
@@ -638,7 +644,6 @@ def constraint_jet_dae(
         if len(tree.tree_leaves(ss)) == 0:
             fx = jet_call(*ps)
             return [fx]
-
         primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
         return [primals, *series]
 
@@ -2478,12 +2483,12 @@ class error_residual_std(ErrorEstimator):
         error, _ = tree.ravel_pytree(error)
 
         # Compute a reference
-        previous_leaves = tree.tree_leaves(previous.u.mean)
+        previous_leaves = tree.tree_leaves_depth_one(previous.u.mean)
+        proposed_leaves = tree.tree_leaves_depth_one(proposed.u.mean)
         error_contraction_rate = len(previous_leaves)
-        u0 = previous_leaves[0]
-        u1 = tree.tree_leaves(proposed.u.mean)[0]
+        u0, _ = tree.ravel_pytree(previous_leaves[0])
+        u1, _ = tree.ravel_pytree(proposed_leaves[0])
         reference = np.maximum(np.abs(u0), np.abs(u1))
-        reference, _ = tree.ravel_pytree(reference)
 
         # Turn the unscaled absolute error into a relative one.
         # This is a generalisation of the typical residual-based
@@ -2561,7 +2566,7 @@ class error_state_std(ErrorEstimator):
         mean = previous.u.marginals.mean_flat()
         rv = self.ssm.conditional.apply_flat(mean, transition)
 
-        mean_leaves = tree.tree_leaves(mean)
+        mean_leaves = tree.tree_leaves_depth_one(mean)
         error_contraction_rate = len(mean_leaves)
 
         # Optionally: re-linearize
@@ -2590,7 +2595,7 @@ class error_state_std(ErrorEstimator):
         std = conditional.std_tree()[n]
         error, _ = tree.ravel_pytree(std)
         error = output_scale * error
-        error, _ = tree.ravel_pytree(error)
+        error, _ = tree.ravel_pytree(error)  # TODO: this line is useless?
 
         # Compute a reference
         u0, _ = tree.ravel_pytree(previous.u.mean[n])

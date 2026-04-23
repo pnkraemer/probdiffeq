@@ -30,10 +30,6 @@ def ravel_pytree(tree, /):
     return jax.flatten_util.ravel_pytree(tree)
 
 
-def tree_flatten(tree, /):
-    return jax.tree_util.tree_flatten(tree)
-
-
 def tree_flatten_depth_one(tree, /):
     def is_leaf(x):
         return tree_structure(x) == tree_structure(tree[0])
@@ -45,16 +41,16 @@ def tree_unflatten(structure, leaves, /):
     return jax.tree_util.tree_unflatten(structure, leaves)
 
 
-def tree_leaves(tree, /):
-    return jax.tree_util.tree_leaves(tree)
-
-
 def tree_leaves_depth_one(tree, /):
 
     def is_leaf(x):
         return tree_structure(x) == tree_structure(tree[0])
 
     return jax.tree_util.tree_leaves(tree, is_leaf=is_leaf)
+
+
+def tree_leaves(tree, /):
+    return jax.tree_util.tree_leaves(tree)
 
 
 def tree_structure(tree, /):
