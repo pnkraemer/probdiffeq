@@ -37,6 +37,6 @@ def test_output_matches_reference(fact) -> None:
     assert testing.allclose(received.u.mean[0], expected)
 
     # Assert u and u_std have matching shapes (that was wrong before)
-    _, u_shape = tree.tree_flatten(received.u.mean)
-    _, u_std_shape = tree.tree_flatten(received.u.std)
+    _, u_shape = tree.tree_flatten_depth_one(received.u.mean)
+    _, u_std_shape = tree.tree_flatten_depth_one(received.u.std)
     assert u_shape == u_std_shape

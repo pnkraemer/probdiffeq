@@ -236,7 +236,6 @@ class AbstractConditional(abc.ABC):
     def bayes_rule_and_logpdf_tree(self, data, rv, conditional, /, *, solve_triu):
         observed, reverted = self.revert(rv, conditional, solve_triu=solve_triu)
         logpdf = observed.logpdf_tree(data)
-
         data_flat = observed.tree_flatten.flatten_tree(data)
         updated = self.apply_flat(data_flat, reverted)
         return logpdf, updated
@@ -301,9 +300,16 @@ class ShapeInfo:
         # This specific info is especially important for blockdiagonal models.
         # TODO: this somewhat duplicates the above,
         #       but not enough to prioritise refactoring...
-        leaves, self.treedef = tree.tree_flatten(tcoeffs)
+        def is_leaf(ell):
+            return tree.tree_structure(ell) == tree.tree_structure(tcoeffs[0])
+
+        leaves, self.treedef = tree.tree_flatten_depth_one(tcoeffs)
         _, self.leaf_unravel = tree.ravel_pytree(leaves[0])
-        self.leaves = [structs.ShapeDtypeStruct(s.shape, s.dtype) for s in leaves]
+
+        def create_dummy(s):
+            return structs.ShapeDtypeStruct(s.shape, s.dtype)
+
+        self.leaves = tree.tree_map(create_dummy, leaves)
 
     @property
     def num_derivatives(self):
@@ -473,6 +479,7 @@ class BlockDiagPriorFactory(AbstractPriorFactory):
         raise NotImplementedError(msg)
 
     def to_derivative(self, i, std):
+
         def select(a):
             return np.asarray([a[i]])
 
@@ -481,10 +488,9 @@ class BlockDiagPriorFactory(AbstractPriorFactory):
         x = np.zeros((d, n))
         linop = func.vmap(func.jacrev(select))(x)
 
-        u_like = tree.tree_unflatten(self.shape_info.treedef, x.T)
-        u_like = tree.tree_map(self.shape_info.leaf_unravel, u_like)
-        u_like = tree.tree_map(np.zeros_like, u_like[0])
-        noise = BlockDiagNormal.from_mean_and_std(u_like, std)
+        tree_flatten = BlockDiagTreeFlatten.from_shape_info(self.shape_info)
+        u_like = tree_flatten.unflatten_array(x)[0]
+        noise = BlockDiagNormal.from_mean_and_std([u_like], [std])
         return LatentCond.from_linop_and_noise(linop, noise)
 
     def prototype_output_scale_calibrated(self):
@@ -646,7 +652,7 @@ class DensePriorFactory(AbstractPriorFactory):
         # First, set up a template variable
         leaf_like = np.ones_like(self.shape_info.single_flat)
         leaves = [leaf_like for _ in range(self.shape_info.num_derivatives + 1)]
-        tree_flatten = DenseTreeFlatten.from_tree(leaves)
+        tree_flatten = DenseTreeFlatten.from_example(leaves)
 
         def vf_flat(tcoeffs_flat):
             tcoeffs_tree = tree_flatten.unflatten_array(tcoeffs_flat)
@@ -708,7 +714,7 @@ class DensePriorFactory(AbstractPriorFactory):
         linop = func.jacfwd(select)(x)
 
         data_like = self.shape_info.all_unravel(x)[0]
-        noise = DenseNormal.from_mean_and_std(data_like, std)
+        noise = DenseNormal.from_mean_and_std([data_like], [std])
         return LatentCond.from_linop_and_noise(linop, noise)
 
     def prototype_output_scale_calibrated(self):
@@ -728,7 +734,7 @@ class DenseTreeFlatten(AbstractTreeFlatten):
         return self.unravel(x)
 
     @classmethod
-    def from_tree(cls, x):
+    def from_example(cls, x):
         _, unravel = tree.ravel_pytree(x)
         return cls(unravel)
 
@@ -751,7 +757,7 @@ class DenseNormal(AbstractTreeNormal[DenseTreeFlatten]):
         _verify_taylor_coefficient_pytree(mean)
         _verify_taylor_coefficient_pytree(std)
 
-        tree_flatten = DenseTreeFlatten.from_tree(mean)
+        tree_flatten = DenseTreeFlatten.from_example(mean)
 
         mean_flat = tree_flatten.flatten_tree(mean)
         std_flat = tree_flatten.flatten_tree(std)
@@ -950,7 +956,7 @@ class DenseOdeTs0(AbstractOde):
         fun = func.partial(self.vector_field, t=t)
         del state
 
-        def a1(m):
+        def a1(m: Array) -> Array:
             """Select the 'n'-th derivative."""
             m0 = rv.tree_flatten.unflatten_array(m)[self.ode_order]
             return tree.ravel_pytree(m0)[0]
@@ -958,7 +964,7 @@ class DenseOdeTs0(AbstractOde):
         Ms = rv.mean_tree()
 
         fm = fun(*Ms[: self.ode_order])
-        fx = tree.tree_map(lambda s: -s, fm)
+        fx = tree.tree_map(lambda s: -s, [fm])
         linop = func.jacrev(a1)(rv.mean)
         noise = DenseNormal.from_dirac(fx, damp=damp)
         cond = LatentCond.from_linop_and_noise(linop, noise)
@@ -986,28 +992,28 @@ class DenseOdeTs1(AbstractOde):
         fun = func.partial(self.vector_field, t=t)
         m_tree = rv.mean_tree()
 
-        rv0 = DenseNormal.from_dirac(m_tree[0], damp=0.0)
-        m0 = rv0.mean_flat()
+        rv0 = DenseNormal.from_dirac([m_tree[0]], damp=0.0)
 
-        def vf_flat(s):
+        def vf_flat(s: Array) -> Array:
             s0 = rv0.tree_flatten.unflatten_array(s)
-            fs0 = fun(s0)
-            return rv0.tree_flatten.flatten_tree(fs0)
+            fs0 = fun(*s0)
+            return rv0.tree_flatten.flatten_tree([fs0])
 
-        def select_i(i):
-            def select(s):
+        def select_i(i) -> Callable[[Array], Array]:
+            def select(s: Array) -> Array:
                 s_tree = rv.tree_flatten.unflatten_array(s)
                 return rv0.tree_flatten.flatten_tree(s_tree[i])
 
             return select
 
-        E0 = func.jacfwd(select_i(i=0))(rv.mean)
-        E1 = func.jacfwd(select_i(i=1))(rv.mean)
+        E0 = func.jacfwd(select_i(i=0))(rv.mean_flat())
+        E1 = func.jacfwd(select_i(i=1))(rv.mean_flat())
 
+        m0 = rv0.mean_flat()
         fx, J, state = self.jacobian.materialize_dense(vf_flat, m0, state)
         linop = E1 - J @ E0
-        fx = fx - J @ m0
-        fx = rv0.tree_flatten.unflatten_array(-fx)
+        fx = -(fx - J @ m0)
+        fx = rv0.tree_flatten.unflatten_array(fx)
         noise = DenseNormal.from_dirac(fx, damp=damp)
         cond = LatentCond.from_linop_and_noise(linop, noise)
         return cond, state
@@ -1187,7 +1193,7 @@ class BlockDiagOdeTs1(AbstractOde):
 
         mean_tree = rv.mean_tree()
         m0_tree = mean_tree[0]
-        rv0 = BlockDiagNormal.from_dirac(m0_tree, damp=0.0)
+        rv0 = BlockDiagNormal.from_dirac([m0_tree], damp=0.0)
 
         def a1(s):
             return s[[1], ...]
@@ -1196,9 +1202,8 @@ class BlockDiagOdeTs1(AbstractOde):
 
         def vf_flat(u):
             u_tree = rv0.tree_flatten.unflatten_array(u[:, None])
-            fu_tree = fun(u_tree)
-            fu_flat = rv0.tree_flatten.flatten_tree(fu_tree)
-            return fu_flat.reshape(u.shape)
+            fu_tree = fun(*u_tree)
+            return rv0.tree_flatten.flatten_tree([fu_tree]).reshape((-1,))
 
         # Evaluate the linearisation
         m0 = rv.mean[:, 0]
@@ -1492,12 +1497,22 @@ class IsotropicTreeFlatten(AbstractTreeFlatten):
     unravel_leaf: Any
 
     def flatten_tree(self, x):
-        leaves = tree.tree_leaves(x)
-        leaves_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], leaves)
+
+        def is_leaf(s):
+            return tree.tree_structure(s) == tree.tree_structure(x[0])
+
+        leaves = tree.tree_leaves_depth_one(x)
+
+        leaves_flat = [tree.ravel_pytree(s)[0] for s in leaves]
+
         return np.stack(leaves_flat)
 
     def flatten_tree_scalar(self, x):
-        leaves = tree.tree_leaves(x)
+
+        def is_leaf(s):
+            return tree.tree_structure(s) == tree.tree_structure(x[0])
+
+        leaves = tree.tree_leaves_depth_one(x)
         return np.stack(leaves)
 
     def unflatten_array(self, x):
@@ -1508,8 +1523,11 @@ class IsotropicTreeFlatten(AbstractTreeFlatten):
         return tree.tree_unflatten(self.treedef, [*x])
 
     @classmethod
-    def from_tree(cls, x):
-        leaves, treedef = tree.tree_flatten(x)
+    def from_example(cls, x):
+        def is_leaf(s):
+            return tree.tree_structure(s) == tree.tree_structure(x[0])
+
+        leaves, treedef = tree.tree_flatten_depth_one(x)
         _, unravel_leaf = tree.ravel_pytree(leaves[0])
         return cls(treedef, unravel_leaf)
 
@@ -1550,7 +1568,10 @@ class IsotropicNormal(AbstractTreeNormal[IsotropicTreeFlatten]):
     def from_dirac(cls, mean, *, damp):
         _verify_taylor_coefficient_pytree(mean)
 
-        leaves, structure = tree.tree_flatten(mean)
+        def is_leaf(s):
+            return tree.tree_structure(s) == tree.tree_structure(mean[0])
+
+        leaves, structure = tree.tree_flatten_depth_one(mean)
         leaves_ = [np.asarray(damp) for _ in leaves]
         std = tree.tree_unflatten(structure, leaves_)
         return IsotropicNormal.from_mean_and_std(mean, std)
@@ -1560,7 +1581,7 @@ class IsotropicNormal(AbstractTreeNormal[IsotropicTreeFlatten]):
         _verify_taylor_coefficient_pytree(mean)
         _verify_taylor_coefficient_pytree(std)
 
-        tree_flatten = IsotropicTreeFlatten.from_tree(mean)
+        tree_flatten = IsotropicTreeFlatten.from_example(mean)
         loc_flat = tree_flatten.flatten_tree(mean)
         scale_flat = tree_flatten.flatten_tree_scalar(std)
 
@@ -1585,9 +1606,8 @@ class IsotropicNormal(AbstractTreeNormal[IsotropicTreeFlatten]):
     def std_tree(self):
         if self.mean.ndim > 2:
             return func.vmap(IsotropicNormal.std_tree)(self)
-        diag = np.einsum("ij,ji->i", self.cholesky, self.cholesky)
-        std = np.sqrt(diag)
-        return self.tree_flatten.unflatten_array_scalar(std)
+        std_flat = self.std_flat()
+        return self.tree_flatten.unflatten_array_scalar(std_flat)
 
     def std_flat(self):
         if self.mean.ndim > 2:
@@ -1599,9 +1619,7 @@ class IsotropicNormal(AbstractTreeNormal[IsotropicTreeFlatten]):
     def residual_white_rms_tree(self, u):
         if self.cholesky.size > 1:
             raise ValueError
-        u_leaves = tree.tree_leaves(u)
-        u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
-        u_latent = np.stack(u_flat)
+        u_latent = self.tree_flatten.flatten_tree(u)
         return self.residual_white_rms_flat(u_latent)
 
     def residual_white_rms_flat(self, u_latent, /):
@@ -1614,15 +1632,14 @@ class IsotropicNormal(AbstractTreeNormal[IsotropicTreeFlatten]):
         return IsotropicNormal(self.mean, cholesky, self.tree_flatten)
 
     def logpdf_tree(self, u, /):
-        u_leaves = tree.tree_leaves(u)
-        u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
-        u_latent = np.stack(u_flat)
+        u_latent = self.tree_flatten.flatten_tree(u)
         return self.logpdf_flat(u_latent)
 
     def logpdf_flat(self, u_latent, /):
         # Batch in the "mean" dimension and sum the results.
         in_axes = (IsotropicNormal(1, None, self.tree_flatten), 1)
         logpdf_vmap = func.vmap(IsotropicNormal.logpdf_scalar_flat, in_axes=in_axes)
+
         logpdfs = logpdf_vmap(self, u_latent)
         return np.sum(logpdfs)
 
@@ -1687,8 +1704,8 @@ class BlockDiagTreeFlatten(AbstractTreeFlatten):
     unravel_leaf: Any
 
     def flatten_tree(self, x):
-        leaves = tree.tree_leaves(x)
-        leaves_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], leaves)
+        leaves = tree.tree_leaves_depth_one(x)
+        leaves_flat = [tree.ravel_pytree(s)[0] for s in leaves]
         return np.stack(leaves_flat).T
 
     def unflatten_array(self, x):
@@ -1696,8 +1713,8 @@ class BlockDiagTreeFlatten(AbstractTreeFlatten):
         return tree.tree_map(self.unravel_leaf, x_tree)
 
     @classmethod
-    def from_tree(cls, x):
-        leaves, treedef = tree.tree_flatten(x)
+    def from_example(cls, x):
+        leaves, treedef = tree.tree_flatten_depth_one(x)
         _, unravel_leaf = tree.ravel_pytree(leaves[0])
         return cls(treedef, unravel_leaf)
 
@@ -1734,7 +1751,7 @@ class BlockDiagNormal(AbstractTreeNormal[BlockDiagTreeFlatten]):
         _verify_taylor_coefficient_pytree(mean)
         _verify_taylor_coefficient_pytree(std)
 
-        tree_flatten = BlockDiagTreeFlatten.from_tree(mean)
+        tree_flatten = BlockDiagTreeFlatten.from_example(mean)
 
         loc_flat = tree_flatten.flatten_tree(mean)
         scale_flat = tree_flatten.flatten_tree(std)
@@ -1774,9 +1791,7 @@ class BlockDiagNormal(AbstractTreeNormal[BlockDiagTreeFlatten]):
 
         # assumes rv.chol = (d,1,1)
         # return array of norms! See calibration
-        u_leaves = tree.tree_leaves(u)
-        u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
-        u_latent = np.stack(u_flat).T
+        u_latent = self.tree_flatten.flatten_tree(u)
         return self.residual_white_rms_flat(u_latent)
 
     def residual_white_rms_flat(self, u_latent, /):
@@ -1789,9 +1804,7 @@ class BlockDiagNormal(AbstractTreeNormal[BlockDiagTreeFlatten]):
         return BlockDiagNormal(self.mean, cholesky, self.tree_flatten)
 
     def logpdf_tree(self, u, /):
-        u_leaves = tree.tree_leaves(u)
-        u_flat = tree.tree_map(lambda s: tree.ravel_pytree(s)[0], u_leaves)
-        u_latent = np.stack(u_flat).T
+        u_latent = self.tree_flatten.flatten_tree(u)
         return self.logpdf_flat(u_latent)
 
     def logpdf_flat(self, u_latent, /):

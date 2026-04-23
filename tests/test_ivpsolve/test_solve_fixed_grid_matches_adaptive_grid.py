@@ -38,6 +38,6 @@ def test_fixed_grid_result_matches_adaptive_grid_result_when_reusing_grid(fact) 
     assert testing.allclose(solution_adaptive, solution_fixed)
 
     # Assert u and u_std have matching shapes (that was wrong before)
-    _, u_shape = tree.tree_flatten(solution_fixed.u.mean)
-    _, u_std_shape = tree.tree_flatten(solution_fixed.u.std)
+    _, u_shape = tree.tree_flatten_depth_one(solution_fixed.u.mean)
+    _, u_std_shape = tree.tree_flatten_depth_one(solution_fixed.u.std)
     assert u_shape == u_std_shape

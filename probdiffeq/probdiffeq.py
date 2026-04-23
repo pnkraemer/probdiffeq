@@ -201,23 +201,30 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
 
     def loss(u, /, *, marginals, std):
         u = tree.tree_map(np.asarray, u)
-
-        # TODO: this is the wrong shape! We should expect std.shape == u.shape...
-        std_expected = marginals.std_tree()[tcoeff_index]
         std = tree.tree_map(np.asarray, std)
-        shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
-        shapes_equal = tree.tree_all(shapes)
+        std_expected = marginals.std_tree()[tcoeff_index]
 
-        if not shapes_equal:
-            msg = "The standard deviation container differs from what was expected."
-            msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
-            msg += f" Received: shape={tree.tree_map(np.shape, std)}."
-            msg += f" For reference, data: shape={tree.tree_map(np.shape, u)}."
+        msg = "The standard deviation container differs from what was expected."
+        msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
+        msg += f" Received: shape={tree.tree_map(np.shape, std)}."
+        msg += f" For reference: data-shape={tree.tree_map(np.shape, u)}."
+
+        try:
+            shapes_equal = tree.tree_map(
+                lambda a, b: a.shape == b.shape, std, std_expected
+            )
+        except Exception as error:
+            raise ValueError(msg) from error
+
+        if not tree.tree_all(shapes_equal):
             raise ValueError(msg)
 
         model = ssm.prior.to_derivative(tcoeff_index, std)
         marg = ssm.conditional.marginalise(marginals, model)
-        return marg.logpdf_tree(u)
+
+        # Wrap into list because blockdiag & isotropic models
+        # expect sequences of states (even if the length is one)
+        return marg.logpdf_tree([u])
 
     return loss
 
@@ -237,21 +244,26 @@ def loss_lml_timeseries(
             msg += f" Expected: {MarkovSequence}."
             msg += f" Received: {type(posterior)}."
             msg += " Did you perhaps use a filter instead of a smoother"
-            msg += ", or did you perhaps intend to use a different loss?"
+            msg += ", or mean to use a different loss?"
             raise TypeError(msg)
 
         u = tree.tree_map(np.asarray, u)
-
-        std_expected = posterior.marginal.std_tree()[tcoeff_index]
         std = tree.tree_map(np.asarray, std)
-        shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
-        shapes_equal = tree.tree_all(shapes)
+        std_expected = posterior.marginal.std_tree()[tcoeff_index]
 
-        if not shapes_equal:
-            msg = "The standard deviation container differs from what was expected."
-            msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
-            msg += f" Received: shape={tree.tree_map(np.shape, std)}."
-            msg += f" For reference, data: shape={tree.tree_map(np.shape, u)}."
+        msg = "The standard deviation container differs from what was expected."
+        msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
+        msg += f" Received: shape={tree.tree_map(np.shape, std)}."
+        msg += f" For reference: data-shape={tree.tree_map(np.shape, u)}."
+
+        try:
+            shapes_equal = tree.tree_map(
+                lambda a, b: a.shape == b.shape, std, std_expected
+            )
+        except Exception as error:
+            raise ValueError(msg) from error
+
+        if not tree.tree_all(shapes_equal):
             raise ValueError(msg)
 
         def make_model(s):
@@ -263,7 +275,7 @@ def loss_lml_timeseries(
         # of the ODE solution tends to be noise-free,
         # which clashes and returns NaNs if we use exact solvers.
         return posterior.evaluate_lml(
-            u, model=model, ssm=ssm, average_pdfs=average_pdfs, solve_triu=solve_triu
+            [u], model=model, ssm=ssm, average_pdfs=average_pdfs, solve_triu=solve_triu
         )
 
     return loss
@@ -1211,10 +1223,10 @@ def ssm_taylor(
 def _tcoeffs_std_from_differential_variables(
     tcoeffs, *, ssm_fact, is_exact, inexact_eps
 ):
+
     # Decide the standard deviation template based on the factorisations
     if ssm_fact in ["dense", "blockdiag"]:
-        leaves = tree.tree_leaves(tcoeffs)
-        std_per_leaf = np.zeros_like(leaves[0])
+        std_per_leaf = tree.tree_map(np.zeros_like, tcoeffs[0])
     elif ssm_fact in ["isotropic"]:
         std_per_leaf = np.zeros(())
     else:
@@ -1222,7 +1234,7 @@ def _tcoeffs_std_from_differential_variables(
         raise ValueError(msg)
 
     # Infer the expected standard-deviation tree structure
-    leaves, structure = tree.tree_flatten(tcoeffs)
+    leaves, structure = tree.tree_flatten_depth_one(tcoeffs)
     std_template = tree.tree_unflatten(structure, [std_per_leaf for _ in leaves])
 
     # If 'is_exact' is a boolean, keep things simple
