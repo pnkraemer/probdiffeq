@@ -19,22 +19,26 @@ class Trafo:
     """Coordinate transformation to make the optimisation problem well-posed."""
 
     def __init__(self, scale):
-        self.scale = jnp.array(scale)  # e.g. jnp.array([1., 1e-5, 1e-3])
+        # e.g. jnp.array([1., 1e-5, 1e-3])
+        self.scale = jnp.array(scale)
 
     def observed_to_latent(self, x, eps=1e-6):
-        """Simplex ℝ³ → unconstrained ℝ²."""
-        x = x / self.scale  # rescale to O(1)
+        """Simplex R^3 -> unconstrained R^2."""
+        x = x / self.scale
         x = jnp.clip(x, eps, 1.0 - eps)
         x = x / x.sum()  # renormalise
         return jnp.log(x[:-1] / x[-1])
 
     def latent_to_observed(self, u):
-        """Unconstrained ℝ² → simplex ℝ³."""
+        """Unconstrained R^2 -> simplex R^3."""
         u_full = jnp.append(u, 0.0)
         u_full = u_full - jnp.max(u_full)
         e = jnp.exp(u_full)
         x = e / e.sum()
-        return x * self.scale / (x * self.scale).sum()  # rescale back & renormalise
+
+        # Rescale back
+        x *= self.scale
+        return x / x.sum()
 
 
 # try: std=0, std=1e-2, std=1e-4, etc. (smaller std -> "longer" gradient in the imshow, but also larger values)
@@ -43,12 +47,12 @@ def main(
     t0=1e-6,
     t1=1e5,
     num_data=20,
-    tol=1e-6,
+    tol=1e-8,
     std=1e2,
     seed=1,
-    epochs=500,
+    epochs=1000,
     temper_every=100,
-    temper_by=0.01,
+    temper_by=0.1,
     plot_loss=False,
 ) -> None:
     """Run the script."""
@@ -85,12 +89,15 @@ def main(
     output_scale = jnp.asarray([0.8, 2e-05, 0.2])
 
     # True condition
+    key = jax.random.PRNGKey(seed)
+    p_true = 10 * jax.random.uniform(key, shape=(2,)) - 5.0
+
     trafo = Trafo(output_scale)
-    p_true = trafo.observed_to_latent(jnp.array([1.0, 0.0, 0.0]))
+    # p_true = trafo.observed_to_latent(jnp.array([1.0, 0.0, 0.0]))
 
     # Initial guess: p0 ~ U(-5, 5)
-    key = jax.random.PRNGKey(seed)
-    p_guess = 10 * jax.random.uniform(key, shape=p_true.shape) - 5.0
+    key = jax.random.PRNGKey(seed + 1)
+    p_guess = 10 * jax.random.uniform(key, shape=(2,)) - 5.0
 
     # Create data
     solution_true = solve(p_true, save_at=save_at, output_scale=output_scale)
@@ -140,8 +147,9 @@ def main(
 
     # Initialise the optimiser
     # Since we temper hard, we can use large learning rates
-    optim = optax.adam(0.5)
+    optim = optax.adam(0.25)
     opt_state = optim.init(p_guess)
+
     for i in range(epochs):
         # Optimisation step:
         (_, solution_guess), gradient = value_and_grad(
@@ -150,9 +158,10 @@ def main(
 
         # Print the progress
         # Don't print the loss value because the tempering makes it uninformative
-        u0_guess = trafo.latent_to_observed(p_guess)
-        msg = f"u0={u0_guess}, std={std}"
-        if i % 50 == 0:
+        if i % 10 == 0:
+            u0_guess = trafo.latent_to_observed(p_guess)
+            u0_true = trafo.latent_to_observed(p_true)
+            msg = f"u0={u0_guess}, std={std}, target={u0_true}"
             print(f"Epoch {i:3d} | {msg}")
 
         # Update
@@ -165,7 +174,7 @@ def main(
         #   But we can temper by reducing the standard deviations
         if i > 0 and i % temper_every == 0:
             # The exact schedule is arbitrary tbh...
-            std = jnp.maximum(std * temper_by, 1e-16)
+            std = jnp.maximum(std * temper_by, 1e-12)
 
     # Plot the before-after
     fig, ax = plt.subplots(
