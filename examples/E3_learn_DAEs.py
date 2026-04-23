@@ -1,11 +1,12 @@
 """Learn a DAE."""
 
+import functools
+
 import equinox
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import optax
-import tqdm
 
 from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 from probdiffeq.util import nlstsq_util
@@ -13,14 +14,43 @@ from probdiffeq.util import nlstsq_util
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
 
-# TODO: move DAE constraint into initialisation
-# TODO: Make probdiffeq compatible with parametrised diffeqs
-# TODO: use EM for updating the initial condition
-# TODO: learn one of Robertson's differential parameters
-# TODO: Train a neural network to match the differential part?
+
+class Trafo:
+    """Coordinate transformation to make the optimisation problem well-posed."""
+
+    def __init__(self, scale):
+        self.scale = jnp.array(scale)  # e.g. jnp.array([1., 1e-5, 1e-3])
+
+    def observed_to_latent(self, x, eps=1e-6):
+        """Simplex ℝ³ → unconstrained ℝ²."""
+        x = x / self.scale  # rescale to O(1)
+        x = jnp.clip(x, eps, 1.0 - eps)
+        x = x / x.sum()  # renormalise
+        return jnp.log(x[:-1] / x[-1])
+
+    def latent_to_observed(self, u):
+        """Unconstrained ℝ² → simplex ℝ³."""
+        u_full = jnp.append(u, 0.0)
+        u_full = u_full - jnp.max(u_full)
+        e = jnp.exp(u_full)
+        x = e / e.sum()
+        return x * self.scale / (x * self.scale).sum()  # rescale back & renormalise
 
 
-def main(t0=1e-6, t1=1e5) -> None:
+# try: std=0, std=1e-2, std=1e-4, etc. (smaller std -> "longer" gradient in the imshow, but also larger values)
+# also try: tol=1e-2, 1e-4, etc. (larger tolerance, noisier gradients in the imshow)
+def main(
+    t0=1e-6,
+    t1=1e5,
+    num_data=20,
+    tol=1e-6,
+    std=1e2,
+    seed=1,
+    epochs=500,
+    temper_every=100,
+    temper_by=0.01,
+    plot_loss=False,
+) -> None:
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
@@ -46,20 +76,24 @@ def main(t0=1e-6, t1=1e5) -> None:
         )
 
     # Linear spacing on a log-scale
-    save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=150)
-    solve = solver(differential, algebraic, tol=1e-6, while_loop=while_loop)
+    save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=num_data)
+    solve = solver(differential, algebraic, tol=tol, while_loop=while_loop)
 
     # This base scale is critical to Robertson, because
     # the solutions live on vastly different scales
     # (but don't vary much within these scales).
     output_scale = jnp.asarray([0.8, 2e-05, 0.2])
 
-    # True condition and initial guess
-    y0_true = jnp.sqrt(jnp.array([1.0, 0.0, 0.0]) / output_scale)
-    y0_guess = jnp.sqrt(jnp.array([0.5 - 1e-5, 1e-5, 0.5]) / output_scale)
+    # True condition
+    trafo = Trafo(output_scale)
+    p_true = trafo.observed_to_latent(jnp.array([1.0, 0.0, 0.0]))
+
+    # Initial guess: p0 ~ U(-5, 5)
+    key = jax.random.PRNGKey(seed)
+    p_guess = 10 * jax.random.uniform(key, shape=p_true.shape) - 5.0
 
     # Create data
-    solution_true = solve(y0_true, save_at=save_at, output_scale=output_scale)
+    solution_true = solve(p_true, save_at=save_at, output_scale=output_scale)
     inputs = solution_true.t
     labels = solution_true.u.mean[0]
 
@@ -70,43 +104,73 @@ def main(t0=1e-6, t1=1e5) -> None:
     loss = loss_data_fit(solve, inputs, labels, ssm=ssm)
     value_and_grad = jax.jit(jax.value_and_grad(loss, has_aux=True))
 
-    # Initialise diffusion tempering
-    std = 1e0 * output_scale
+    if plot_loss:
+        # Build a parameter-space meshgrid
+        xs = jnp.linspace(-1, 12, num=10)
+        ys = jnp.linspace(-1, 12, num=10)
+        mesh = jnp.stack(jnp.meshgrid(xs, ys))
+
+        # Vectorise the loss
+        loss_p = functools.partial(loss, std=std, output_scale=output_scale)
+        for idx in [1, 2]:
+            loss_p = jax.vmap(loss_p, in_axes=idx, out_axes=-1)
+
+        # Call the vectorised loss
+        vals, _ = jax.jit(loss_p)(mesh)
+
+        # Plot
+        plt.title(f"Loss landscape (tol={tol}, std={std})", fontsize="medium")
+        plt.scatter(
+            p_true[0], p_true[1], marker="X", color="black", label="True", zorder=10
+        )
+        plt.scatter(
+            p_guess[0], p_guess[1], marker="X", color="black", label="True", zorder=10
+        )
+        img = plt.pcolormesh(mesh[0], mesh[1], vals, cmap="managua")
+        plt.colorbar(img)
+        plt.xlabel("p0")
+        plt.ylabel("p1")
+        plt.legend()
+        plt.show()
 
     # Evaluate the initial loss and gradient
     (_value0, solution_guess0), _gradient0 = value_and_grad(
-        y0_guess, std=std, output_scale=output_scale
+        p_guess, std=std, output_scale=output_scale
     )
 
     # Initialise the optimiser
-    optim = optax.adam(0.25)  # If we temper hard, we can use large LRs
-    opt_state = optim.init(y0_guess)
-    pbar = tqdm.tqdm(range(200))
-    for i in pbar:
+    # Since we temper hard, we can use large learning rates
+    optim = optax.adam(0.5)
+    opt_state = optim.init(p_guess)
+    for i in range(epochs):
         # Optimisation step:
-        (value, solution_guess), gradient = value_and_grad(
-            y0_guess, std=std, output_scale=output_scale
+        (_, solution_guess), gradient = value_and_grad(
+            p_guess, std=std, output_scale=output_scale
         )
-        pbar.set_description(f"{(value):.3f}, {y0_guess**2 * output_scale}, {std}")
 
+        # Print the progress
+        # Don't print the loss value because the tempering makes it uninformative
+        u0_guess = trafo.latent_to_observed(p_guess)
+        msg = f"u0={u0_guess}, std={std}"
+        if i % 50 == 0:
+            print(f"Epoch {i:3d} | {msg}")
+
+        # Update
         updates, opt_state = optim.update(gradient, opt_state)
-        y0_guess = optax.apply_updates(y0_guess, updates)
-
-        # Square, normalise (to satisfy the algebraic constraint),
-        # and go back to the square-root
-        y0_guess_square = y0_guess**2 * output_scale
-        y0_guess_square /= jnp.sum(y0_guess_square)
-        y0_guess = jnp.sqrt(y0_guess_square / output_scale)
+        p_guess = optax.apply_updates(p_guess, updates)
 
         # Our own version of diffusion tempering
         #   The output scale is set in stone because otherwise,
         #   Robertson is just too hard to solve.
         #   But we can temper by reducing the standard deviations
-        if i % 50 == 0:
+        if i > 0 and i % temper_every == 0:
             # The exact schedule is arbitrary tbh...
-            std = jnp.maximum(std / 2.0, 1e-8 * output_scale)
+            std = jnp.maximum(std * temper_by, 1e-16)
 
-    fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(5, 5), sharex=True)
+    # Plot the before-after
+    fig, ax = plt.subplots(
+        ncols=2, nrows=3, figsize=(5, 5), sharex=True, constrained_layout=True
+    )
     ax[0][0].set_title("Robertson solution", fontsize="medium")
     ax[0][1].set_title("Standard deviations", fontsize="medium")
 
@@ -133,7 +197,6 @@ def main(t0=1e-6, t1=1e5) -> None:
     ax[2][1].set_xlabel("Time $t$", fontsize="medium")
     ax[0][0].set_xlim((t0, t1))
 
-    plt.tight_layout()
     fig.align_ylabels()
     plt.show()
 
@@ -142,6 +205,7 @@ def loss_data_fit(solve, inputs, labels, *, ssm):
     """Create a loss that measures the data fit."""
 
     def loss(y0, std, output_scale):
+        std *= output_scale
         std_ts = jnp.ones_like(inputs)[:, None] * std[None, ...]
         loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
         sol = solve(y0, save_at=inputs, output_scale=output_scale)
@@ -155,9 +219,10 @@ def solver(differential, algebraic, tol, while_loop):
     """Create a reverse-mode differentiable probabilistic solver."""
 
     @jax.jit
-    def solve(y0_sqrt, save_at, output_scale):
+    def solve(p_sqrt, save_at, output_scale):
 
-        y0 = y0_sqrt**2 * output_scale
+        trafo = Trafo(output_scale)
+        y0 = trafo.latent_to_observed(p_sqrt)
         t0, _t1 = save_at[0], save_at[-1]
 
         def differential_auto(u, du):

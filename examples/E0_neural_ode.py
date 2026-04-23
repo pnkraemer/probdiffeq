@@ -73,7 +73,7 @@ def vf_neural_ode(*, hidden: tuple, t0: float, t1: float):
     def vf(y, /, *, t, p):
         """Evaluate the neural ODE vector field."""
         y_and_t = jnp.concatenate([y[None], t[None]])
-        return mlp(p, y_and_t)
+        return mlp(p, y_and_t).reshape(())
 
     return vf, (u0,), (t0, t1), f_args
 
@@ -128,6 +128,7 @@ def loss_log_marginal_likelihood(vf, *, t0):
         """Loss function: log-marginal likelihood of the data."""
         # Build a solver
         tcoeffs = (*u0, vf(*u0, t=t0, p=p))
+        print(tcoeffs)
         init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
         iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=output_scale)
 
