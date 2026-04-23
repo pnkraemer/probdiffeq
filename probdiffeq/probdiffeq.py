@@ -781,7 +781,7 @@ class MarkovSequence(Generic[N]):
             if average_pdfs:
                 logpdf1 = (logpdf * num_data + logpdf_n) / (num_data + 1)
             else:
-                logpdf = logpdf + logpdf_n
+                logpdf1 = logpdf + logpdf_n
 
             return (corrected, logpdf1, num_data + 1), ()
 

@@ -32,6 +32,10 @@ def amax(a, /):
     return jnp.amax(a)
 
 
+def amin(a, /):
+    return jnp.amin(a)
+
+
 def where(cond, /, if_true, if_false):
     return jnp.where(cond, if_true, if_false)
 

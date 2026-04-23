@@ -778,8 +778,14 @@ class DenseNormal(AbstractTreeNormal[DenseTreeFlatten]):
         if self.mean.ndim > 1:
             return func.vmap(DenseNormal.std_tree)(self)
 
-        diag = np.einsum("ij,ij->i", self.cholesky, self.cholesky)
-        std = np.sqrt(diag)
+        # diag = np.einsum("ij,ij->i", self.cholesky, self.cholesky)
+        # import jax
+
+        # jax.debug.print("{}", np.sqrt(diag), ordered=True)
+        # std = np.sqrt(diag)
+
+        std = np.abs(func.vmap(linalg.qr_r)(self.cholesky[..., None]).reshape((-1,)))
+
         return self.tree_flatten.unflatten_array(std)
 
     def std_flat(self):
@@ -1054,6 +1060,7 @@ class DenseRoot(AbstractRoot):
 
         if self.nlstsq is not None:  # posterior linearization
             mean, _info = self.nlstsq(constraint_flat, mean, rv.mean, rv.cholesky)
+            # mean = func.stop_gradient(mean)
 
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
         fx = fx - linop @ mean

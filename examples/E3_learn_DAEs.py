@@ -1,8 +1,5 @@
 """Learn a DAE."""
 
-import functools
-
-import equinox
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -41,19 +38,8 @@ class Trafo:
         return x / x.sum()
 
 
-# try: std=0, std=1e-2, std=1e-4, etc. (smaller std -> "longer" gradient in the imshow, but also larger values)
-# also try: tol=1e-2, 1e-4, etc. (larger tolerance, noisier gradients in the imshow)
 def main(
-    t0=1e-6,
-    t1=1e5,
-    num_data=20,
-    tol=1e-8,
-    std=1e2,
-    seed=1,
-    epochs=1000,
-    temper_every=100,
-    temper_by=0.1,
-    plot_loss=False,
+    t0=1e-6, t1=1e5, num_data=10, tol=1e-10, std_log=-1.0, seed=1, epochs=1000
 ) -> None:
     """Run the script."""
     # Set up all the configs
@@ -73,26 +59,29 @@ def main(
         del t
         return u[0] + u[1] + u[2] - 1
 
-    def while_loop(cond, body, init):
-        """Evaluate a bounded while loop."""
-        return equinox.internal.while_loop(
-            cond, body, init, kind="checkpointed", max_steps=256
-        )
+    # def while_loop(cond, body, init):
+    #     """Evaluate a bounded while loop."""
+    #     return equinox.internal.while_loop(
+    #         cond, body, init, kind="checkpointed", max_steps=256
+    #     )
 
-    # Linear spacing on a log-scale
-    save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=num_data)
-    solve = solver(differential, algebraic, tol=tol, while_loop=while_loop)
+    def while_loop(cond, body, init):
+        return jax.lax.while_loop(cond, body, init_val=init)
 
     # This base scale is critical to Robertson, because
     # the solutions live on vastly different scales
     # (but don't vary much within these scales).
     output_scale = jnp.asarray([0.8, 2e-05, 0.2])
+    trafo = Trafo(output_scale)
+
+    # Linear spacing on a log-scale
+    save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=num_data)
+    solve = solver(differential, algebraic, tol=tol, while_loop=while_loop, trafo=trafo)
 
     # True condition
     key = jax.random.PRNGKey(seed)
     p_true = 10 * jax.random.uniform(key, shape=(2,)) - 5.0
 
-    trafo = Trafo(output_scale)
     # p_true = trafo.observed_to_latent(jnp.array([1.0, 0.0, 0.0]))
 
     # Initial guess: p0 ~ U(-5, 5)
@@ -108,73 +97,91 @@ def main(
     _, ssm = probdiffeq.ssm_taylor([jnp.zeros((3,))], diffuse_derivatives=3)
 
     # Loss
-    loss = loss_data_fit(solve, inputs, labels, ssm=ssm)
-    value_and_grad = jax.jit(jax.value_and_grad(loss, has_aux=True))
+    loss = loss_data_fit(solve, ssm=ssm)
+    # value_and_grad = jax.jit(jax.value_and_grad(loss, argnums=0, has_aux=True))
 
-    if plot_loss:
-        # Build a parameter-space meshgrid
-        xs = jnp.linspace(-1, 12, num=10)
-        ys = jnp.linspace(-1, 12, num=10)
-        mesh = jnp.stack(jnp.meshgrid(xs, ys))
+    # xs = jnp.linspace(-5, 3, num=3)
+    # ys = jnp.linspace(-5, 3, num=3)
+    # mesh = jnp.stack(jnp.meshgrid(xs, ys))
 
-        # Vectorise the loss
-        loss_p = functools.partial(loss, std=std, output_scale=output_scale)
-        for idx in [1, 2]:
-            loss_p = jax.vmap(loss_p, in_axes=idx, out_axes=-1)
+    # loss_p = functools.partial(loss, std_log=std_log, output_scale=output_scale, inputs=inputs, labels=labels)
 
-        # Call the vectorised loss
-        vals, _ = jax.jit(loss_p)(mesh)
+    # loss_p = jax.vmap(loss_p, in_axes=1, out_axes=-1)
+    # loss_p = jax.vmap(loss_p, in_axes=2, out_axes=-1)
+    # loss_p = jax.jit(loss_p)
 
-        # Plot
-        plt.title(f"Loss landscape (tol={tol}, std={std})", fontsize="medium")
-        plt.scatter(
-            p_true[0], p_true[1], marker="X", color="black", label="True", zorder=10
-        )
-        plt.scatter(
-            p_guess[0], p_guess[1], marker="X", color="black", label="True", zorder=10
-        )
-        img = plt.pcolormesh(mesh[0], mesh[1], vals, cmap="managua")
-        plt.colorbar(img)
-        plt.xlabel("p0")
-        plt.ylabel("p1")
-        plt.legend()
-        plt.show()
+    # print(p_true)
+    # print(p_guess)
+
+    # values, _ = loss_p(mesh)
+
+    # print(jnp.amin(values))
+    # plt.pcolormesh(mesh[0], mesh[1], jnp.log(values))
+    # plt.colorbar()
+    # plt.show()
 
     # Evaluate the initial loss and gradient
-    (_value0, solution_guess0), _gradient0 = value_and_grad(
-        p_guess, std=std, output_scale=output_scale
+    # (_, solution_guess0), gradient0 = value_and_grad(
+    #     p_guess, std_log, output_scale=output_scale, inputs=inputs, labels=labels
+    # )
+    # print(solution_guess0)
+    raise RuntimeError(
+        "TODO: investigate which part of the ODE solver has terrible gradients... make a loss that is a function of the initialisation, then try fixed steps, then try adaptive steps in different configs..."
     )
+
+    print(
+        "Fwd:",
+        jax.jacfwd(loss, has_aux=True, argnums=0)(
+            p_guess, std_log, output_scale=output_scale, inputs=inputs, labels=labels
+        )[0],
+    )
+    gradient = jnp.zeros((2,))
+    eps = 1e-4
+    for i in [0, 1]:
+        p_guess = p_guess.at[i].add(-eps)
+        (value0, _) = loss(
+            p_guess, std_log, output_scale=output_scale, inputs=inputs, labels=labels
+        )
+        p_guess = p_guess.at[i].add(2 * eps)
+        (value1, _) = loss(
+            p_guess, std_log, output_scale=output_scale, inputs=inputs, labels=labels
+        )
+        p_guess = p_guess.at[i].add(-eps)
+
+        gradient = gradient.at[i].set((value1 - value0) / (2 * eps))
+
+    print("Finite differences", gradient)
+
+    assert False
 
     # Initialise the optimiser
     # Since we temper hard, we can use large learning rates
-    optim = optax.adam(0.25)
-    opt_state = optim.init(p_guess)
+    optim = optax.adam(0.5)
+    opt_state = optim.init((p_guess, std_log))
 
-    for i in range(epochs):
+    i = 0
+    while True:
+        i += 1
+        # Minibatch
+
         # Optimisation step:
-        (_, solution_guess), gradient = value_and_grad(
-            p_guess, std=std, output_scale=output_scale
+        (value, solution_guess), gradient = value_and_grad(
+            p_guess, std_log, output_scale=output_scale, inputs=inputs, labels=labels
         )
-
+        print(value)
+        print(gradient)
+        print()
         # Print the progress
         # Don't print the loss value because the tempering makes it uninformative
         if i % 10 == 0:
             u0_guess = trafo.latent_to_observed(p_guess)
             u0_true = trafo.latent_to_observed(p_true)
-            msg = f"u0={u0_guess}, std={std}, target={u0_true}"
+            msg = f"loss={value:.4e}, u0={u0_guess}, std={jnp.exp(std_log):.1e}, target={u0_true}"
             print(f"Epoch {i:3d} | {msg}")
 
         # Update
         updates, opt_state = optim.update(gradient, opt_state)
-        p_guess = optax.apply_updates(p_guess, updates)
-
-        # Our own version of diffusion tempering
-        #   The output scale is set in stone because otherwise,
-        #   Robertson is just too hard to solve.
-        #   But we can temper by reducing the standard deviations
-        if i > 0 and i % temper_every == 0:
-            # The exact schedule is arbitrary tbh...
-            std = jnp.maximum(std * temper_by, 1e-12)
+        p_guess, std_log = optax.apply_updates((p_guess, std_log), updates)
 
     # Plot the before-after
     fig, ax = plt.subplots(
@@ -190,13 +197,13 @@ def main(
         "Final": solution_guess,
     }
     for label, solution in results.items():
-        ax[0][0].semilogx(save_at, solution.u.mean[0][:, 0], label=label)
-        ax[1][0].semilogx(save_at, solution.u.mean[0][:, 1])
-        ax[2][0].semilogx(save_at, solution.u.mean[0][:, 2])
+        ax[0][0].semilogx(save_at, solution.u.mean[0][:, 0], label=label, alpha=0.75)
+        ax[1][0].semilogx(save_at, solution.u.mean[0][:, 1], alpha=0.75)
+        ax[2][0].semilogx(save_at, solution.u.mean[0][:, 2], alpha=0.75)
 
-        ax[0][1].loglog(save_at, solution.u.std[0][:, 0])
-        ax[1][1].loglog(save_at, solution.u.std[0][:, 1])
-        ax[2][1].loglog(save_at, solution.u.std[0][:, 2])
+        ax[0][1].loglog(save_at, solution.u.std[0][:, 0], alpha=0.75)
+        ax[1][1].loglog(save_at, solution.u.std[0][:, 1], alpha=0.75)
+        ax[2][1].loglog(save_at, solution.u.std[0][:, 2], alpha=0.75)
 
     ax[0][0].legend(fontsize="small")
     ax[0][0].set_ylabel("State $y_1$", fontsize="medium")
@@ -210,27 +217,31 @@ def main(
     plt.show()
 
 
-def loss_data_fit(solve, inputs, labels, *, ssm):
+def loss_data_fit(solve, *, ssm):
     """Create a loss that measures the data fit."""
 
-    def loss(y0, std, output_scale):
-        std *= output_scale
+    def loss(y0, std_log, output_scale, inputs, labels):
+        std = jnp.exp(std_log) * output_scale
         std_ts = jnp.ones_like(inputs)[:, None] * std[None, ...]
+
         loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
         sol = solve(y0, save_at=inputs, output_scale=output_scale)
+
+        # diff = sol.u.mean[0] - labels
+        # return jnp.mean(diff**2), sol
+
         lml = loss_lml(labels, std=std_ts, posterior=sol.solution_full)
         return -lml, sol
 
     return loss
 
 
-def solver(differential, algebraic, tol, while_loop):
+def solver(differential, algebraic, tol, while_loop, trafo):
     """Create a reverse-mode differentiable probabilistic solver."""
 
     @jax.jit
     def solve(p_sqrt, save_at, output_scale):
 
-        trafo = Trafo(output_scale)
         y0 = trafo.latent_to_observed(p_sqrt)
         t0, _t1 = save_at[0], save_at[-1]
 
