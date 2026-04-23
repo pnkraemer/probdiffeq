@@ -1,8 +1,9 @@
 """Learn a DAE."""
 
+import functools
+
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 import optax
 
 from probdiffeq import diffeqjet, ivpsolve, probdiffeq
@@ -39,7 +40,7 @@ class Trafo:
 
 
 def main(
-    t0=1e-6, t1=1e5, num_data=10, tol=1e-10, std_log=-1.0, seed=1, epochs=1000
+    t0=1e-6, t1=1e5, num_data=20, tol=1e-7, std_log=-5.0, seed=1412321, epochs=1000
 ) -> None:
     """Run the script."""
     # Set up all the configs
@@ -58,12 +59,6 @@ def main(
     def algebraic(u, *, t):
         del t
         return u[0] + u[1] + u[2] - 1
-
-    # def while_loop(cond, body, init):
-    #     """Evaluate a bounded while loop."""
-    #     return equinox.internal.while_loop(
-    #         cond, body, init, kind="checkpointed", max_steps=256
-    #     )
 
     def while_loop(cond, body, init):
         return jax.lax.while_loop(cond, body, init_val=init)
@@ -98,123 +93,36 @@ def main(
 
     # Loss
     loss = loss_data_fit(solve, ssm=ssm)
-    # value_and_grad = jax.jit(jax.value_and_grad(loss, argnums=0, has_aux=True))
 
-    # xs = jnp.linspace(-5, 3, num=3)
-    # ys = jnp.linspace(-5, 3, num=3)
-    # mesh = jnp.stack(jnp.meshgrid(xs, ys))
-
-    # loss_p = functools.partial(loss, std_log=std_log, output_scale=output_scale, inputs=inputs, labels=labels)
-
-    # loss_p = jax.vmap(loss_p, in_axes=1, out_axes=-1)
-    # loss_p = jax.vmap(loss_p, in_axes=2, out_axes=-1)
-    # loss_p = jax.jit(loss_p)
-
-    # print(p_true)
-    # print(p_guess)
-
-    # values, _ = loss_p(mesh)
-
-    # print(jnp.amin(values))
-    # plt.pcolormesh(mesh[0], mesh[1], jnp.log(values))
-    # plt.colorbar()
-    # plt.show()
-
-    # Evaluate the initial loss and gradient
-    # (_, solution_guess0), gradient0 = value_and_grad(
-    #     p_guess, std_log, output_scale=output_scale, inputs=inputs, labels=labels
-    # )
-    # print(solution_guess0)
-    raise RuntimeError(
-        "TODO: investigate which part of the ODE solver has terrible gradients... make a loss that is a function of the initialisation, then try fixed steps, then try adaptive steps in different configs..."
+    loss = functools.partial(
+        loss, std_log=std_log, output_scale=output_scale, inputs=inputs, labels=labels
     )
+    loss = jax.jit(loss)
 
-    print(
-        "Fwd:",
-        jax.jacfwd(loss, has_aux=True, argnums=0)(
-            p_guess, std_log, output_scale=output_scale, inputs=inputs, labels=labels
-        )[0],
-    )
-    gradient = jnp.zeros((2,))
-    eps = 1e-4
-    for i in [0, 1]:
-        p_guess = p_guess.at[i].add(-eps)
-        (value0, _) = loss(
-            p_guess, std_log, output_scale=output_scale, inputs=inputs, labels=labels
-        )
-        p_guess = p_guess.at[i].add(2 * eps)
-        (value1, _) = loss(
-            p_guess, std_log, output_scale=output_scale, inputs=inputs, labels=labels
-        )
-        p_guess = p_guess.at[i].add(-eps)
+    optim = optax.sgd(1.0)
+    opt_state = optim.init(p_guess)
 
-        gradient = gradient.at[i].set((value1 - value0) / (2 * eps))
+    for epoch in range(epochs):
+        # Finite difference gradient
+        # TODO: fix the autodiff gradients...
+        eps = 1e-4
+        grad = jnp.zeros_like(p_guess)
+        for i in [0, 1]:
+            p_guess = p_guess.at[i].add(-eps)
+            v0, _ = loss(p_guess)
+            p_guess = p_guess.at[i].add(2 * eps)
+            v1, _ = loss(p_guess)
+            grad = grad.at[i].set((v1 - v0) / (2 * eps))
 
-    print("Finite differences", gradient)
+        # Optimiser step
+        updates, opt_state = optim.update(grad, opt_state)
+        p_guess = optax.apply_updates(p_guess, updates)
 
-    assert False
-
-    # Initialise the optimiser
-    # Since we temper hard, we can use large learning rates
-    optim = optax.adam(0.5)
-    opt_state = optim.init((p_guess, std_log))
-
-    i = 0
-    while True:
-        i += 1
-        # Minibatch
-
-        # Optimisation step:
-        (value, solution_guess), gradient = value_and_grad(
-            p_guess, std_log, output_scale=output_scale, inputs=inputs, labels=labels
-        )
-        print(value)
-        print(gradient)
-        print()
-        # Print the progress
-        # Don't print the loss value because the tempering makes it uninformative
-        if i % 10 == 0:
-            u0_guess = trafo.latent_to_observed(p_guess)
-            u0_true = trafo.latent_to_observed(p_true)
-            msg = f"loss={value:.4e}, u0={u0_guess}, std={jnp.exp(std_log):.1e}, target={u0_true}"
-            print(f"Epoch {i:3d} | {msg}")
-
-        # Update
-        updates, opt_state = optim.update(gradient, opt_state)
-        p_guess, std_log = optax.apply_updates((p_guess, std_log), updates)
-
-    # Plot the before-after
-    fig, ax = plt.subplots(
-        ncols=2, nrows=3, figsize=(5, 5), sharex=True, constrained_layout=True
-    )
-    ax[0][0].set_title("Robertson solution", fontsize="medium")
-    ax[0][1].set_title("Standard deviations", fontsize="medium")
-
-    # Plot means and standard deviations of the true solution, initial guess, and final guess
-    results = {
-        "True": solution_true,
-        "Initial": solution_guess0,
-        "Final": solution_guess,
-    }
-    for label, solution in results.items():
-        ax[0][0].semilogx(save_at, solution.u.mean[0][:, 0], label=label, alpha=0.75)
-        ax[1][0].semilogx(save_at, solution.u.mean[0][:, 1], alpha=0.75)
-        ax[2][0].semilogx(save_at, solution.u.mean[0][:, 2], alpha=0.75)
-
-        ax[0][1].loglog(save_at, solution.u.std[0][:, 0], alpha=0.75)
-        ax[1][1].loglog(save_at, solution.u.std[0][:, 1], alpha=0.75)
-        ax[2][1].loglog(save_at, solution.u.std[0][:, 2], alpha=0.75)
-
-    ax[0][0].legend(fontsize="small")
-    ax[0][0].set_ylabel("State $y_1$", fontsize="medium")
-    ax[1][0].set_ylabel("State $y_2$", fontsize="medium")
-    ax[2][0].set_ylabel("State $y_3$", fontsize="medium")
-    ax[2][0].set_xlabel("Time $t$", fontsize="medium")
-    ax[2][1].set_xlabel("Time $t$", fontsize="medium")
-    ax[0][0].set_xlim((t0, t1))
-
-    fig.align_ylabels()
-    plt.show()
+        jnp.set_printoptions(3)
+        if epoch % 10 == 0:
+            y_guess = trafo.latent_to_observed(p_guess)
+            y_true = trafo.latent_to_observed(p_true)
+            print(f"Epoch={epoch:4d}, estim={y_guess}, true={y_true}")
 
 
 def loss_data_fit(solve, *, ssm):
@@ -227,8 +135,8 @@ def loss_data_fit(solve, *, ssm):
         loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
         sol = solve(y0, save_at=inputs, output_scale=output_scale)
 
-        # diff = sol.u.mean[0] - labels
-        # return jnp.mean(diff**2), sol
+        diff = sol.u.mean[0] - labels
+        return jnp.mean(diff**2), sol
 
         lml = loss_lml(labels, std=std_ts, posterior=sol.solution_full)
         return -lml, sol
