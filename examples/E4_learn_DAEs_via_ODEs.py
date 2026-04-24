@@ -80,46 +80,33 @@ def main(t0=0.0005, t1=0.0006, num_data=200) -> None:
 
     @functools.partial(jax.jacfwd, has_aux=True)
     def target(p):
-        Z1 = solve(p, output_scale=output_scale, save_at=save_at)
-        return Z1.u.mean[0], (Z1.t, Z1.u.mean[0])
+        p_ = jnp.asarray([p, p_true[1]])
+        Z1 = solve(p_, output_scale=output_scale, save_at=save_at)
+        return Z1.u.mean[0][:, 1], (Z1.t, Z1.u.mean[0][:, 1])
 
-    Js, (ts, ms) = target(p_true)
+    Js, (ts, ms) = target(p_true[0])
+    plt.semilogy(ts, jnp.abs(Js))
+    plt.ylim((1.1e-5, 1.3e-5))
+    plt.show()
     for t, m, J in zip(ts, ms, Js):
-        print(t)
-        print(m)
-        print(J)
+        print("t =", t)
+        print("m =", m)
+        print("J =", J)
         print()
 
+    # TODO: What if we solve the sensitivity ODE?
+    # TODO: does Diffra struggle just as much=
+    #  and then figure out why the gradients are so broken
     print()
-
-
-def loss_data_fit(solve, *, ssm, inputs, labels):
-    """Create a loss that measures the data fit."""
-
-    def loss(y0, std_log, output_scale):
-        std = jnp.exp(std_log) * output_scale
-        std_ts = jnp.ones_like(inputs)[:, None] * std[None, ...]
-
-        loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
-        sol = solve(y0, save_at=inputs, output_scale=output_scale)
-
-        diff = sol.u.mean[0] - labels
-        return jnp.mean(diff**2), sol
-
-        lml = loss_lml(labels, std=std_ts, posterior=sol.solution_full)
-        return -lml, sol
-
-    return loss
 
 
 def solver_fixed(vf, trafo):
     """Create a reverse-mode differentiable probabilistic solver."""
 
-    @jax.jit
     def solve(p_sqrt, save_at, output_scale):
 
         y0 = trafo.latent_to_observed(p_sqrt)
-        t0, _t1 = save_at[0], save_at[-1]
+        t0, t1 = save_at[0], save_at[-1]
 
         def vf_auto(u):
             return vf(u, t=t0)

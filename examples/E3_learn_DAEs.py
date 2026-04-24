@@ -1,7 +1,5 @@
 """Learn a DAE."""
 
-import functools
-
 import jax
 import jax.numpy as jnp
 import optax
@@ -40,7 +38,7 @@ class Trafo:
 
 
 def main(
-    t0=1e-6, t1=1e5, num_data=20, tol=1e-7, std_log=-5.0, seed=1412321, epochs=1000
+    t0=1e-6, t1=1e5, num_data=20, tol=1e-7, std_log=-5.0, seed=12, epochs=1_000
 ) -> None:
     """Run the script."""
     # Set up all the configs
@@ -92,14 +90,10 @@ def main(
     _, ssm = probdiffeq.ssm_taylor([jnp.zeros((3,))], diffuse_derivatives=3)
 
     # Loss
-    loss = loss_data_fit(solve, ssm=ssm)
-
-    loss = functools.partial(
-        loss, std_log=std_log, output_scale=output_scale, inputs=inputs, labels=labels
-    )
+    loss = loss_data_fit(solve, ssm=ssm, inputs=inputs, labels=labels)
     loss = jax.jit(loss)
 
-    optim = optax.sgd(1.0)
+    optim = optax.sgd(10.0)
     opt_state = optim.init(p_guess)
 
     for epoch in range(epochs):
@@ -109,9 +103,9 @@ def main(
         grad = jnp.zeros_like(p_guess)
         for i in [0, 1]:
             p_guess = p_guess.at[i].add(-eps)
-            v0, _ = loss(p_guess)
+            v0, _ = loss(p_guess, std_log=std_log, output_scale=output_scale)
             p_guess = p_guess.at[i].add(2 * eps)
-            v1, _ = loss(p_guess)
+            v1, _ = loss(p_guess, std_log=std_log, output_scale=output_scale)
             grad = grad.at[i].set((v1 - v0) / (2 * eps))
 
         # Optimiser step
@@ -125,10 +119,10 @@ def main(
             print(f"Epoch={epoch:4d}, estim={y_guess}, true={y_true}")
 
 
-def loss_data_fit(solve, *, ssm):
+def loss_data_fit(solve, *, ssm, inputs, labels):
     """Create a loss that measures the data fit."""
 
-    def loss(y0, std_log, output_scale, inputs, labels):
+    def loss(y0, std_log, output_scale):
         std = jnp.exp(std_log) * output_scale
         std_ts = jnp.ones_like(inputs)[:, None] * std[None, ...]
 
