@@ -41,7 +41,7 @@ class Trafo:
         return x / x.sum()
 
 
-def main(t0=1e-6, t1=1e5, num_data=2000) -> None:
+def main(t0=1e-6, t1=1e2, num_data=100) -> None:
     """Run the script."""
 
     def vf(y, *, t):
@@ -77,19 +77,23 @@ def main(t0=1e-6, t1=1e5, num_data=2000) -> None:
     labels = solution_true.u.mean[0]
     plt.semilogx(inputs, labels * jnp.asarray([[1.0, 1e5, 1.0]]))
     plt.show()
+    print()
+    print()
+    print()
+    print()
 
     @functools.partial(jax.jacfwd, has_aux=True)
     def target(p):
         p_ = jnp.asarray([p, p_true[1]])
         Z1 = solve(p_, output_scale=output_scale, save_at=save_at)
-        return Z1.u.mean[0][:, 1], (Z1.t, Z1.u.mean[0][:, 1])
+        return Z1.u.std[0][:, 0], (Z1.t, Z1.u.std[0][:, 0])
 
-    Js, (ts, ms) = target(p_true[0])
+    Js, (ts, ms) = target(p_true[0] - 10)
     plt.semilogy(ts, jnp.abs(Js))
     plt.show()
-    for t, m, J in zip(ts, ms, Js):
+    for t, s, J in zip(ts, ms, Js):
         print("t =", t)
-        print("m =", m)
+        print("s =", s)
         print("J =", J)
         print()
 
@@ -109,7 +113,7 @@ def solver_fixed(vf, trafo):
         def vf_auto(u):
             return vf(u, t=t0)
 
-        y0 = diffeqjet.odejet_unroll(vf_auto, [y0], num=3)
+        y0 = diffeqjet.odejet_unroll(vf_auto, [y0], num=2)
         init, ssm = probdiffeq.ssm_taylor(y0)
 
         prior = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=output_scale)

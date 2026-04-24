@@ -45,7 +45,7 @@ class Trafo:
 
 
 def main(
-    t0=1e-6, t1=1e5, num_data=20, tol=1e-5, std_log=-10.0, seed=1, epochs=500
+    t0=1e-6, t1=1e5, num_data=20, tol=1e-5, std_log=-2.0, seed=1, epochs=200
 ) -> None:
     """Run the script."""
 
@@ -94,18 +94,23 @@ def main(
     # Includes a "fake" SSM (to get the conditioning-functions to build a loss)
     _, ssm = probdiffeq.ssm_taylor([jnp.zeros((3,))], diffuse_derivatives=3)
     loss = loss_data_fit(solve, ssm=ssm, inputs=inputs, labels=labels)
-    gradient = jax.jit(jax.grad(loss, has_aux=True))
+    value_and_grad = jax.jit(jax.value_and_grad(loss, has_aux=True))
 
     # Initialise the optimiser
-    optim = optax.sgd(10.0)
+    optim = optax.sgd(0.01)
     opt_state = optim.init(p_guess)
 
-    (grad, _) = gradient(p_guess, std_log=std_log, output_scale=output_scale)
+    (value, _), grad = value_and_grad(
+        p_guess, std_log=std_log, output_scale=output_scale
+    )
+    print("Value:", value)
     print("Gradient:", grad)
 
     for epoch in range(epochs):
         # Compute the gradient
-        (grad, _) = gradient(p_guess, std_log=std_log, output_scale=output_scale)
+        (value, _), grad = value_and_grad(
+            p_guess, std_log=std_log, output_scale=output_scale
+        )
 
         # Optimiser step
         updates, opt_state = optim.update(grad, opt_state)
@@ -128,13 +133,8 @@ def loss_data_fit(solve, *, ssm, inputs, labels):
         loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
         sol = solve(y0, save_at=inputs, output_scale=output_scale)
 
-        # TODO: use LML here
-        #       (but investigate derivatives of STDs of stiff solvers first)
-        diff = sol.u.mean[0] - labels
-        return jnp.mean(diff**2), sol
-
-        # lml = loss_lml(labels, std=std_ts, posterior=sol.solution_full)
-        # return -lml, sol
+        lml = loss_lml(labels, std=std_ts, posterior=sol.solution_full)
+        return -lml, sol
 
     return loss
 
