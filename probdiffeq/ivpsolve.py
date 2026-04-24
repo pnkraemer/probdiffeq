@@ -388,12 +388,14 @@ class RejectionLoop:
         error: Any,
         control: Control,
         while_loop: Callable,
+        stop_gradient_through_dt: bool = True,
     ) -> None:
         self.solver = solver
         self.clip_dt = clip_dt
         self.error = error
         self.control = control
         self.while_loop = while_loop
+        self.stop_gradient_through_dt = stop_gradient_through_dt
 
     def init(self, state_solver, dt) -> TimeStepState:
         """Initialise the adaptive solver state."""
@@ -473,6 +475,8 @@ class RejectionLoop:
         propose a future time-step based on tolerances and error estimates.
         """
         dt = state.dt
+        if self.stop_gradient_through_dt:
+            dt = func.stop_gradient(dt)
 
         # Some controllers like to clip the terminal value instead of interpolating.
         # This must happen _before_ the step.
@@ -510,7 +514,7 @@ class RejectionLoop:
         """Extract a time-step-state after a successful rejection loop."""
         return TimeStepState(
             dt=state.dt,
-            step_from=state.proposed,
+            step_from=state.proposed,  # new!
             interp_from=state.step_from,
             control=state.control,
             error_step_from=state.error_proposed,
