@@ -2116,10 +2116,10 @@ class solver_dynamic(ProbabilisticSolver):
             )
 
         # Complete the update
-        _, reverted = self.ssm.conditional.revert(
-            u.marginals, fx, solve_triu=linalg.solve_triu
+        zeros = tree.tree_map(np.zeros_like, fx.noise.mean_tree())
+        updates = self.ssm.conditional.bayes_rule_tree(
+            zeros, u.marginals, fx, solve_triu=linalg.solve_triu
         )
-        updates = reverted.noise
         u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
         # Return solution
@@ -2244,7 +2244,6 @@ class solver(ProbabilisticSolver):
         fx, auxiliary = self.constraint.linearize(
             u.marginals, state.auxiliary, damp=damp, t=state.t + dt
         )
-
         # Update
         zeros = tree.tree_map(np.zeros_like, fx.noise.mean_tree())
         updates = self.ssm.conditional.bayes_rule_tree(

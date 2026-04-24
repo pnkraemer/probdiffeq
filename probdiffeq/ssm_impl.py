@@ -1054,7 +1054,6 @@ class DenseRoot(AbstractRoot):
 
         if self.nlstsq is not None:  # posterior linearization
             mean, _info = self.nlstsq(constraint_flat, mean, rv.mean, rv.cholesky)
-            # mean = func.stop_gradient(mean)
 
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
         fx = fx - linop @ mean

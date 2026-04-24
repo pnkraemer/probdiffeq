@@ -45,7 +45,7 @@ class Trafo:
 
 
 def main(
-    t0=1e-6, t1=1e5, num_data=10, tol=1e-5, std_log=-5.0, seed=1, epochs=500
+    t0=1e-6, t1=1e5, num_data=20, tol=1e-5, std_log=-10.0, seed=1, epochs=500
 ) -> None:
     """Run the script."""
 
@@ -97,8 +97,11 @@ def main(
     gradient = jax.jit(jax.grad(loss, has_aux=True))
 
     # Initialise the optimiser
-    optim = optax.sgd(1.0)
+    optim = optax.sgd(10.0)
     opt_state = optim.init(p_guess)
+
+    (grad, _) = gradient(p_guess, std_log=std_log, output_scale=output_scale)
+    print("Gradient:", grad)
 
     for epoch in range(epochs):
         # Compute the gradient
@@ -125,11 +128,13 @@ def loss_data_fit(solve, *, ssm, inputs, labels):
         loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
         sol = solve(y0, save_at=inputs, output_scale=output_scale)
 
+        # TODO: use LML here
+        #       (but investigate derivatives of STDs of stiff solvers first)
         diff = sol.u.mean[0] - labels
         return jnp.mean(diff**2), sol
 
-        lml = loss_lml(labels, std=std_ts, posterior=sol.solution_full)
-        return -lml, sol
+        # lml = loss_lml(labels, std=std_ts, posterior=sol.solution_full)
+        # return -lml, sol
 
     return loss
 
