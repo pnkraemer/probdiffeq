@@ -1142,6 +1142,9 @@ class IsotropicOdeTs1(AbstractOde):
         # Estimate the trace using Hutchinson's estimator
         fx, J_trace, state = self.jacobian.calculate_trace(vf_ravel, m0, state)
 
+        # Best Jacobian approximation: mean of diagonal = trace / len(diagonal)
+        J_trace /= len(fx)
+
         n, _d = rv.mean.shape
         eye = np.eye(n)
         E0, E1 = eye[np.asarray([0])], eye[np.asarray([1])]
