@@ -72,13 +72,15 @@ def main(p_latent):
         y0,
         saveat=saveat,
         stepsize_controller=stepsize_controller,
+        adjoint=diffrax.ForwardMode(),
     )
     return sol
 
 
 def fun(p0):
     sol = main(p0)
-    return sol.ys, sol.ts
+    # return sol.ys / jnp.asarray([0.8, 2e-05, 0.2])[None, :], sol.ts
+    return sol.ys / jnp.asarray([1.0, 1e-4, 1.0])[None, :], sol.ts
 
 
 if __name__ == "__main__":
@@ -88,7 +90,7 @@ if __name__ == "__main__":
     y, t = fun(p)
     plt.semilogx(t, y)
     plt.show()
-    Js, ts = jax.jit(jax.jacrev(fun, has_aux=True))(p)
+    Js, ts = jax.jit(jax.jacfwd(fun, has_aux=True))(p)
     for t, J in zip(ts, Js):
         print(t)
         print(J)

@@ -1,5 +1,6 @@
 """Learn a DAE."""
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optax
@@ -9,6 +10,12 @@ from probdiffeq.util import nlstsq_util
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
+
+# Double precision because adaptive steps with stiff DAEs
+jax.config.update("jax_enable_x64", True)
+
+# Make the prints more readable
+jnp.set_printoptions(3)
 
 
 class Trafo:
@@ -38,11 +45,9 @@ class Trafo:
 
 
 def main(
-    t0=1e-6, t1=1e5, num_data=20, tol=1e-7, std_log=-5.0, seed=12, epochs=1_000
+    t0=1e-6, t1=1e5, num_data=10, tol=1e-5, std_log=-5.0, seed=1, epochs=500
 ) -> None:
     """Run the script."""
-    # Set up all the configs
-    jax.config.update("jax_enable_x64", True)
 
     def differential(u, du, /, *, t):
         del t
@@ -59,7 +64,8 @@ def main(
         return u[0] + u[1] + u[2] - 1
 
     def while_loop(cond, body, init):
-        return jax.lax.while_loop(cond, body, init_val=init)
+        """Evaluate a bounded while loop."""
+        return eqx.internal.while_loop(cond, body, init, kind="bounded", max_steps=256)
 
     # This base scale is critical to Robertson, because
     # the solutions live on vastly different scales
@@ -75,8 +81,6 @@ def main(
     key = jax.random.PRNGKey(seed)
     p_true = 10 * jax.random.uniform(key, shape=(2,)) - 5.0
 
-    # p_true = trafo.observed_to_latent(jnp.array([1.0, 0.0, 0.0]))
-
     # Initial guess: p0 ~ U(-5, 5)
     key = jax.random.PRNGKey(seed + 1)
     p_guess = 10 * jax.random.uniform(key, shape=(2,)) - 5.0
@@ -86,33 +90,25 @@ def main(
     inputs = solution_true.t
     labels = solution_true.u.mean[0]
 
-    # Fake SSM (to get the conditioning-functions to build a loss)
+    # Build a loss
+    # Includes a "fake" SSM (to get the conditioning-functions to build a loss)
     _, ssm = probdiffeq.ssm_taylor([jnp.zeros((3,))], diffuse_derivatives=3)
-
-    # Loss
     loss = loss_data_fit(solve, ssm=ssm, inputs=inputs, labels=labels)
-    loss = jax.jit(loss)
+    gradient = jax.jit(jax.grad(loss, has_aux=True))
 
-    optim = optax.sgd(10.0)
+    # Initialise the optimiser
+    optim = optax.sgd(1.0)
     opt_state = optim.init(p_guess)
 
     for epoch in range(epochs):
-        # Finite difference gradient
-        # TODO: fix the autodiff gradients...
-        eps = 1e-4
-        grad = jnp.zeros_like(p_guess)
-        for i in [0, 1]:
-            p_guess = p_guess.at[i].add(-eps)
-            v0, _ = loss(p_guess, std_log=std_log, output_scale=output_scale)
-            p_guess = p_guess.at[i].add(2 * eps)
-            v1, _ = loss(p_guess, std_log=std_log, output_scale=output_scale)
-            grad = grad.at[i].set((v1 - v0) / (2 * eps))
+        # Compute the gradient
+        (grad, _) = gradient(p_guess, std_log=std_log, output_scale=output_scale)
 
         # Optimiser step
         updates, opt_state = optim.update(grad, opt_state)
         p_guess = optax.apply_updates(p_guess, updates)
 
-        jnp.set_printoptions(3)
+        # Display the progress
         if epoch % 10 == 0:
             y_guess = trafo.latent_to_observed(p_guess)
             y_true = trafo.latent_to_observed(p_true)

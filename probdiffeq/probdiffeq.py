@@ -2038,6 +2038,7 @@ class solver_dynamic(ProbabilisticSolver):
         ssm: ssm_impl.FactSsmImpl,
         constraint_init: Constraint | None = None,
         re_linearize_after_calibration=False,
+        stop_gradient_through_calibration=True,
     ) -> None:
         super().__init__(
             strategy=strategy,
@@ -2047,6 +2048,7 @@ class solver_dynamic(ProbabilisticSolver):
             constraint_init=constraint_init,
         )
         self.re_linearize_after_calibration = re_linearize_after_calibration
+        self.stop_gradient_through_calibration = stop_gradient_through_calibration
 
     def init(self, t, u, *, damp) -> ProbabilisticSolution:
         u_pred, prediction = self.strategy.init_posterior(u=u)
@@ -2096,6 +2098,9 @@ class solver_dynamic(ProbabilisticSolver):
         observed = self.ssm.conditional.marginalise(u, fx)
         zeros = tree.tree_map(np.zeros_like, fx.noise.mean_tree())
         output_scale = observed.residual_white_rms_tree(zeros)
+
+        if self.stop_gradient_through_calibration:
+            output_scale = func.stop_gradient(output_scale)
 
         # Do the full extrapolation with the calibrated output scale
         # (Includes re-discretisation)

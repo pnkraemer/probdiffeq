@@ -41,7 +41,7 @@ class Trafo:
         return x / x.sum()
 
 
-def main(t0=0.0005, t1=0.0006, num_data=200) -> None:
+def main(t0=1e-6, t1=1e5, num_data=2000) -> None:
     """Run the script."""
 
     def vf(y, *, t):
@@ -69,7 +69,7 @@ def main(t0=0.0005, t1=0.0006, num_data=200) -> None:
     # key = jax.random.PRNGKey(seed)
     # p_true = 10 * jax.random.uniform(key, shape=(2,)) - 5.0
 
-    p_true = trafo.observed_to_latent(jnp.array([1.0 - 1e-6 - 1e-5, 1e-5, 1e-6]))
+    p_true = trafo.observed_to_latent(jnp.array([1.0, 0.0, 0.0]))
 
     # Create data
     solution_true = solve(p_true, save_at=save_at, output_scale=output_scale)
@@ -86,7 +86,6 @@ def main(t0=0.0005, t1=0.0006, num_data=200) -> None:
 
     Js, (ts, ms) = target(p_true[0])
     plt.semilogy(ts, jnp.abs(Js))
-    plt.ylim((1.1e-5, 1.3e-5))
     plt.show()
     for t, m, J in zip(ts, ms, Js):
         print("t =", t)
@@ -95,8 +94,7 @@ def main(t0=0.0005, t1=0.0006, num_data=200) -> None:
         print()
 
     # TODO: What if we solve the sensitivity ODE?
-    # TODO: does Diffra struggle just as much=
-    #  and then figure out why the gradients are so broken
+    # TODO: Diffrax doesn't struggle. So somewhere, we are dividing by zero?
     print()
 
 

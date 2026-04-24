@@ -778,12 +778,6 @@ class DenseNormal(AbstractTreeNormal[DenseTreeFlatten]):
         if self.mean.ndim > 1:
             return func.vmap(DenseNormal.std_tree)(self)
 
-        # diag = np.einsum("ij,ij->i", self.cholesky, self.cholesky)
-        # import jax
-
-        # jax.debug.print("{}", np.sqrt(diag), ordered=True)
-        # std = np.sqrt(diag)
-
         std = np.abs(func.vmap(linalg.qr_r)(self.cholesky[..., None]).reshape((-1,)))
 
         return self.tree_flatten.unflatten_array(std)
