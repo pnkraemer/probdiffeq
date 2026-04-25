@@ -36,13 +36,6 @@ def qr_r_jvp(primals, tangents):
     return R, R_dot
 
 
-# All Cholesky factors are lower-triangular by default
-
-
-def cholesky_solve(arr, rhs, /):
-    return jax.scipy.linalg.cho_solve((arr, True), rhs)
-
-
 def vector_norm(arr, /, *, order=None):
     return jnp.linalg.norm(arr, ord=order)
 

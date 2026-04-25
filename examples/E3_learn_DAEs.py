@@ -1,11 +1,9 @@
 """Learn a DAE."""
 
-import equinox
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 import optax
-import tqdm
 
 from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 from probdiffeq.util import nlstsq_util
@@ -13,17 +11,43 @@ from probdiffeq.util import nlstsq_util
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
 
-# TODO: move DAE constraint into initialisation
-# TODO: Make probdiffeq compatible with parametrised diffeqs
-# TODO: use EM for updating the initial condition
-# TODO: learn one of Robertson's differential parameters
-# TODO: Train a neural network to match the differential part?
+# Double precision because adaptive steps with stiff DAEs
+jax.config.update("jax_enable_x64", True)
+
+# Make the prints more readable
+jnp.set_printoptions(3)
 
 
-def main(t0=1e-6, t1=1e5) -> None:
+class Trafo:
+    """Coordinate transformation to make the optimisation problem well-posed."""
+
+    def __init__(self, scale):
+        # e.g. jnp.array([1., 1e-5, 1e-3])
+        self.scale = jnp.array(scale)
+
+    def observed_to_latent(self, x, eps=1e-6):
+        """Simplex R^3 -> unconstrained R^2."""
+        x = x / self.scale
+        x = jnp.clip(x, eps, 1.0 - eps)
+        x = x / x.sum()  # renormalise
+        return jnp.log(x[:-1] / x[-1])
+
+    def latent_to_observed(self, u):
+        """Unconstrained R^2 -> simplex R^3."""
+        u_full = jnp.append(u, 0.0)
+        u_full = u_full - jnp.max(u_full)
+        e = jnp.exp(u_full)
+        x = e / e.sum()
+
+        # Rescale back
+        x *= self.scale
+        return x / x.sum()
+
+
+def main(
+    t0=1e-6, t1=1e5, num_data=20, tol=1e-5, std_log=-2.0, seed=1, epochs=200
+) -> None:
     """Run the script."""
-    # Set up all the configs
-    jax.config.update("jax_enable_x64", True)
 
     def differential(u, du, /, *, t):
         del t
@@ -41,123 +65,87 @@ def main(t0=1e-6, t1=1e5) -> None:
 
     def while_loop(cond, body, init):
         """Evaluate a bounded while loop."""
-        return equinox.internal.while_loop(
-            cond, body, init, kind="checkpointed", max_steps=256
-        )
-
-    # Linear spacing on a log-scale
-    save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=150)
-    solve = solver(differential, algebraic, tol=1e-6, while_loop=while_loop)
+        return eqx.internal.while_loop(cond, body, init, kind="bounded", max_steps=256)
 
     # This base scale is critical to Robertson, because
     # the solutions live on vastly different scales
     # (but don't vary much within these scales).
     output_scale = jnp.asarray([0.8, 2e-05, 0.2])
+    trafo = Trafo(output_scale)
 
-    # True condition and initial guess
-    y0_true = jnp.sqrt(jnp.array([1.0, 0.0, 0.0]) / output_scale)
-    y0_guess = jnp.sqrt(jnp.array([0.5 - 1e-5, 1e-5, 0.5]) / output_scale)
+    # Linear spacing on a log-scale
+    save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=num_data)
+    solve = solver(differential, algebraic, tol=tol, while_loop=while_loop, trafo=trafo)
+
+    # True condition
+    key = jax.random.PRNGKey(seed)
+    p_true = 10 * jax.random.uniform(key, shape=(2,)) - 5.0
+
+    # Initial guess: p0 ~ U(-5, 5)
+    key = jax.random.PRNGKey(seed + 1)
+    p_guess = 10 * jax.random.uniform(key, shape=(2,)) - 5.0
 
     # Create data
-    solution_true = solve(y0_true, save_at=save_at, output_scale=output_scale)
+    solution_true = solve(p_true, save_at=save_at, output_scale=output_scale)
     inputs = solution_true.t
     labels = solution_true.u.mean[0]
 
-    # Fake SSM (to get the conditioning-functions to build a loss)
+    # Build a loss
+    # Includes a "fake" SSM (to get the conditioning-functions to build a loss)
     _, ssm = probdiffeq.ssm_taylor([jnp.zeros((3,))], diffuse_derivatives=3)
-
-    # Loss
-    loss = loss_data_fit(solve, inputs, labels, ssm=ssm)
+    loss = loss_data_fit(solve, ssm=ssm, inputs=inputs, labels=labels)
     value_and_grad = jax.jit(jax.value_and_grad(loss, has_aux=True))
 
-    # Initialise diffusion tempering
-    std = 1e0 * output_scale
-
-    # Evaluate the initial loss and gradient
-    (_value0, solution_guess0), _gradient0 = value_and_grad(
-        y0_guess, std=std, output_scale=output_scale
-    )
-
     # Initialise the optimiser
-    optim = optax.adam(0.25)  # If we temper hard, we can use large LRs
-    opt_state = optim.init(y0_guess)
-    pbar = tqdm.tqdm(range(200))
-    for i in pbar:
-        # Optimisation step:
-        (value, solution_guess), gradient = value_and_grad(
-            y0_guess, std=std, output_scale=output_scale
+    optim = optax.sgd(0.01)
+    opt_state = optim.init(p_guess)
+
+    (value, _), grad = value_and_grad(
+        p_guess, std_log=std_log, output_scale=output_scale
+    )
+    print("Value:", value)
+    print("Gradient:", grad)
+
+    for epoch in range(epochs):
+        # Compute the gradient
+        (value, _), grad = value_and_grad(
+            p_guess, std_log=std_log, output_scale=output_scale
         )
-        pbar.set_description(f"{(value):.3f}, {y0_guess**2 * output_scale}, {std}")
 
-        updates, opt_state = optim.update(gradient, opt_state)
-        y0_guess = optax.apply_updates(y0_guess, updates)
+        # Optimiser step
+        updates, opt_state = optim.update(grad, opt_state)
+        p_guess = optax.apply_updates(p_guess, updates)
 
-        # Square, normalise (to satisfy the algebraic constraint),
-        # and go back to the square-root
-        y0_guess_square = y0_guess**2 * output_scale
-        y0_guess_square /= jnp.sum(y0_guess_square)
-        y0_guess = jnp.sqrt(y0_guess_square / output_scale)
-
-        # Our own version of diffusion tempering
-        #   The output scale is set in stone because otherwise,
-        #   Robertson is just too hard to solve.
-        #   But we can temper by reducing the standard deviations
-        if i % 50 == 0:
-            # The exact schedule is arbitrary tbh...
-            std = jnp.maximum(std / 2.0, 1e-8 * output_scale)
-
-    fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(5, 5), sharex=True)
-    ax[0][0].set_title("Robertson solution", fontsize="medium")
-    ax[0][1].set_title("Standard deviations", fontsize="medium")
-
-    # Plot means and standard deviations of the true solution, initial guess, and final guess
-    results = {
-        "True": solution_true,
-        "Initial": solution_guess0,
-        "Final": solution_guess,
-    }
-    for label, solution in results.items():
-        ax[0][0].semilogx(save_at, solution.u.mean[0][:, 0], label=label)
-        ax[1][0].semilogx(save_at, solution.u.mean[0][:, 1])
-        ax[2][0].semilogx(save_at, solution.u.mean[0][:, 2])
-
-        ax[0][1].loglog(save_at, solution.u.std[0][:, 0])
-        ax[1][1].loglog(save_at, solution.u.std[0][:, 1])
-        ax[2][1].loglog(save_at, solution.u.std[0][:, 2])
-
-    ax[0][0].legend(fontsize="small")
-    ax[0][0].set_ylabel("State $y_1$", fontsize="medium")
-    ax[1][0].set_ylabel("State $y_2$", fontsize="medium")
-    ax[2][0].set_ylabel("State $y_3$", fontsize="medium")
-    ax[2][0].set_xlabel("Time $t$", fontsize="medium")
-    ax[2][1].set_xlabel("Time $t$", fontsize="medium")
-    ax[0][0].set_xlim((t0, t1))
-
-    plt.tight_layout()
-    fig.align_ylabels()
-    plt.show()
+        # Display the progress
+        if epoch % 10 == 0:
+            y_guess = trafo.latent_to_observed(p_guess)
+            y_true = trafo.latent_to_observed(p_true)
+            print(f"Epoch={epoch:4d}, estim={y_guess}, true={y_true}")
 
 
-def loss_data_fit(solve, inputs, labels, *, ssm):
+def loss_data_fit(solve, *, ssm, inputs, labels):
     """Create a loss that measures the data fit."""
 
-    def loss(y0, std, output_scale):
+    def loss(y0, std_log, output_scale):
+        std = jnp.exp(std_log) * output_scale
         std_ts = jnp.ones_like(inputs)[:, None] * std[None, ...]
+
         loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
         sol = solve(y0, save_at=inputs, output_scale=output_scale)
+
         lml = loss_lml(labels, std=std_ts, posterior=sol.solution_full)
         return -lml, sol
 
     return loss
 
 
-def solver(differential, algebraic, tol, while_loop):
+def solver(differential, algebraic, tol, while_loop, trafo):
     """Create a reverse-mode differentiable probabilistic solver."""
 
     @jax.jit
-    def solve(y0_sqrt, save_at, output_scale):
+    def solve(p_sqrt, save_at, output_scale):
 
-        y0 = y0_sqrt**2 * output_scale
+        y0 = trafo.latent_to_observed(p_sqrt)
         t0, _t1 = save_at[0], save_at[-1]
 
         def differential_auto(u, du):

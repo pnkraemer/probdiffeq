@@ -40,7 +40,7 @@ def fixture_solution_and_loss_and_data(strategy_func, fact):
     std = (
         tree.tree_map(np.ones_like, data)
         if fact in ["dense", "blockdiag"]
-        else tree.tree_map(lambda _s: np.ones(()), data)
+        else np.ones(())
     )
     return sol, loss, data, std
 

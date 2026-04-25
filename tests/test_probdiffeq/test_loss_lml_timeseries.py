@@ -19,7 +19,7 @@ def fixture_solution(fact):
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
     error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
 
-    save_at = np.linspace(t0, t1, endpoint=True, num=4)
+    save_at = np.linspace(t0, t1, endpoint=True, num=13)
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
     sol = func.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
 
@@ -28,7 +28,7 @@ def fixture_solution(fact):
     std = (
         tree.tree_map(np.ones_like, data)
         if fact in ["dense", "blockdiag"]
-        else tree.tree_map(lambda s: np.ones((len(s),)), data)
+        else np.ones_like(save_at)
     )
     return sol, loss, data, std
 

@@ -45,8 +45,8 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact) -> None:
     assert np.all(are_close)
 
     # Assert u and u_std have matching shapes (that was wrong before)
-    _, u_shape = tree.tree_flatten(u_save_at.mean)
-    _, u_std_shape = tree.tree_flatten(u_save_at.std)
+    _, u_shape = tree.tree_flatten_depth_one(u_save_at.mean)
+    _, u_std_shape = tree.tree_flatten_depth_one(u_save_at.std)
     match = tree.tree_map(lambda a, b: a == b, u_shape, u_std_shape)
     assert tree.tree_all(match)
 

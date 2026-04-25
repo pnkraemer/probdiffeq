@@ -201,23 +201,30 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
 
     def loss(u, /, *, marginals, std):
         u = tree.tree_map(np.asarray, u)
-
-        # TODO: this is the wrong shape! We should expect std.shape == u.shape...
-        std_expected = tree.tree_map(lambda _s: ssm.prototypes.std(), u)
         std = tree.tree_map(np.asarray, std)
-        shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
-        shapes_equal = tree.tree_all(shapes)
+        std_expected = marginals.std_tree()[tcoeff_index]
 
-        if not shapes_equal:
-            msg = "The standard deviation container differs from what was expected."
-            msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
-            msg += f" Received: shape={tree.tree_map(np.shape, std)}."
-            msg += f" For reference, data: shape={tree.tree_map(np.shape, u)}."
+        msg = "The standard deviation container differs from what was expected."
+        msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
+        msg += f" Received: shape={tree.tree_map(np.shape, std)}."
+        msg += f" For reference: data-shape={tree.tree_map(np.shape, u)}."
+
+        try:
+            shapes_equal = tree.tree_map(
+                lambda a, b: a.shape == b.shape, std, std_expected
+            )
+        except Exception as error:
+            raise ValueError(msg) from error
+
+        if not tree.tree_all(shapes_equal):
             raise ValueError(msg)
 
-        model = ssm.conditional.to_derivative(tcoeff_index, std)
+        model = ssm.prior.to_derivative(tcoeff_index, std)
         marg = ssm.conditional.marginalise(marginals, model)
-        return marg.logpdf(u)
+
+        # Wrap into list because blockdiag & isotropic models
+        # expect sequences of states (even if the length is one)
+        return marg.logpdf_tree([u])
 
     return loss
 
@@ -237,28 +244,30 @@ def loss_lml_timeseries(
             msg += f" Expected: {MarkovSequence}."
             msg += f" Received: {type(posterior)}."
             msg += " Did you perhaps use a filter instead of a smoother"
-            msg += ", or did you perhaps intend to use a different loss?"
+            msg += ", or mean to use a different loss?"
             raise TypeError(msg)
 
         u = tree.tree_map(np.asarray, u)
-
-        def batch_std(s):
-            return func.vmap(lambda _s: ssm.prototypes.std())(s)
-
-        std_expected = tree.tree_map(batch_std, u)
         std = tree.tree_map(np.asarray, std)
-        shapes = tree.tree_map(lambda a, b: a.shape == b.shape, std, std_expected)
-        shapes_equal = tree.tree_all(shapes)
+        std_expected = posterior.marginal.std_tree()[tcoeff_index]
 
-        if not shapes_equal:
-            msg = "The standard deviation container differs from what was expected."
-            msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
-            msg += f" Received: shape={tree.tree_map(np.shape, std)}."
-            msg += f" For reference, data: shape={tree.tree_map(np.shape, u)}."
+        msg = "The standard deviation container differs from what was expected."
+        msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
+        msg += f" Received: shape={tree.tree_map(np.shape, std)}."
+        msg += f" For reference: data-shape={tree.tree_map(np.shape, u)}."
+
+        try:
+            shapes_equal = tree.tree_map(
+                lambda a, b: a.shape == b.shape, std, std_expected
+            )
+        except Exception as error:
+            raise ValueError(msg) from error
+
+        if not tree.tree_all(shapes_equal):
             raise ValueError(msg)
 
         def make_model(s):
-            return ssm.conditional.to_derivative(tcoeff_index, s)
+            return ssm.prior.to_derivative(tcoeff_index, s)
 
         model = func.vmap(make_model)(std)
 
@@ -266,7 +275,7 @@ def loss_lml_timeseries(
         # of the ODE solution tends to be noise-free,
         # which clashes and returns NaNs if we use exact solvers.
         return posterior.evaluate_lml(
-            u, model=model, ssm=ssm, average_pdfs=average_pdfs, solve_triu=solve_triu
+            [u], model=model, ssm=ssm, average_pdfs=average_pdfs, solve_triu=solve_triu
         )
 
     return loss
@@ -416,7 +425,8 @@ def constraint_jet(
         jacobian = jacobian_hutchinson_fwd()
 
     def root_jet(*tcoeffs_all, t):
-        unravel = tree.ravel_pytree(tcoeffs_all[0])[1]
+        _, unravel_one = tree.ravel_pytree(tcoeffs_all[0])
+
         if jet_order == "max":
             tcoeffs = tcoeffs_all
         else:
@@ -432,22 +442,27 @@ def constraint_jet(
 
         # Flatten the root because jax.jet is a bit high maintenance :)
         def jet_call(*y):
-            y_tree = [unravel(s) for s in y]
+            y_tree = [unravel_one(s) for s in y]
             fx = root(*y_tree, t=t)
             return tree.ravel_pytree(fx)[0]
 
         flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
+
         ps, ss = diffeqjet.jet_unpack_series(flat, root_order)
 
         if len(tree.tree_leaves(ss)) == 0:
             fx = jet_call(*ps)
+
+            # Return a sequence to be compatible with Taylor-coeff logic,
+            # but don't bother unflattening the content
+            # because the result will be compared to zero anyway
             return [fx]
 
         primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
         return [primals, *series]
 
     order = (
-        ssm.shape_info.num_derivatives + 1
+        ssm.prior.shape_info.num_derivatives + 1
         if jet_order == "max"
         else jet_order + root_order
     )
@@ -544,7 +559,7 @@ def constraint_jet_imex(
         return [primals1, *series1]
 
     if jet_order_explicit == "max" or jet_order_implicit == "max":
-        order = ssm.shape_info.num_derivatives + 1
+        order = ssm.prior.shape_info.num_derivatives + 1
     else:
         order_ex = root_order_ex + jet_order_explicit
         order_im = root_order_im + jet_order_implicit
@@ -629,12 +644,11 @@ def constraint_jet_dae(
         if len(tree.tree_leaves(ss)) == 0:
             fx = jet_call(*ps)
             return [fx]
-
         primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
         return [primals, *series]
 
     if jet_order_differential == "max" or jet_order_algebraic == "max":
-        order = ssm.shape_info.num_derivatives + 1
+        order = ssm.prior.shape_info.num_derivatives + 1
     else:
         order_diff = root_order_diff + jet_order_differential
         order_alg = root_order_alg + jet_order_algebraic
@@ -660,12 +674,12 @@ class TaylorCoeffTarget(Generic[N]):
     @property
     def mean(self):
         """A PyTree describing the standard deviation of the Taylor coefficient."""
-        return self.marginals.evaluate_mean()
+        return self.marginals.mean_tree()
 
     @property
     def std(self):
         """A PyTree describing the mean of the Taylor coefficient."""
-        return self.marginals.evaluate_std()
+        return self.marginals.std_tree()
 
 
 @tree.register_dataclass
@@ -744,7 +758,7 @@ class MarkovSequence(Generic[N]):
         # Process the terminal value
         u0 = tree.tree_map(lambda s: s[-1], u)
         model0 = tree.tree_map(lambda s: s[-1], model)
-        pdf0, updated = ssm.conditional.bayes_rule_and_logpdf(
+        pdf0, updated = ssm.conditional.bayes_rule_and_logpdf_tree(
             u0, self.marginal, model0, solve_triu=solve_triu
         )
 
@@ -755,7 +769,7 @@ class MarkovSequence(Generic[N]):
 
             predicted = ssm.conditional.marginalise(rv, prior)
 
-            logpdf_n, corrected = ssm.conditional.bayes_rule_and_logpdf(
+            logpdf_n, corrected = ssm.conditional.bayes_rule_and_logpdf_tree(
                 data, predicted, observation, solve_triu=solve_triu
             )
 
@@ -767,7 +781,7 @@ class MarkovSequence(Generic[N]):
             if average_pdfs:
                 logpdf1 = (logpdf * num_data + logpdf_n) / (num_data + 1)
             else:
-                logpdf = logpdf + logpdf_n
+                logpdf1 = logpdf + logpdf_n
 
             return (corrected, logpdf1, num_data + 1), ()
 
@@ -798,28 +812,36 @@ class MarkovSequence(Generic[N]):
         if len(shape) > 0:
             n, *shape_remaining = shape
             keys = random.split(key, num=n)
-            sample_ = func.partial(self.sample, ssm=ssm, shape=shape_remaining)
-            return func.vmap(sample_)(keys)
+            sample_partial = func.partial(self.sample, ssm=ssm, shape=shape_remaining)
+            return func.vmap(sample_partial)(keys)
 
         # Compute a single sample from the Markov sequence
 
-        def body(smp0_and_key, cond):
-            smp0, key = smp0_and_key
-            predicted = ssm.conditional.apply(smp0, cond)
+        def body(sample_and_key, cond):
+            smp_flat, key = sample_and_key
+
+            # Propagate the previous sample
+            predicted = ssm.conditional.apply_flat(smp_flat, cond)
+
+            # Sample the propagated variable
             key, subkey = random.split(key, num=2)
-            smp1 = predicted.sample(subkey)
-            return (smp1, key), smp1
+            smp_flat = predicted.sample_flat(subkey)
 
+            # Unravel the sample
+            smp_tree = predicted.tree_flatten.unflatten_array(smp_flat)
+            return (smp_flat, key), smp_tree
+
+        # Loop over the conditionals
         key, subkey = random.split(key, num=2)
-        smp = self.marginal.sample(subkey)
-        _, smps = flow.scan(
-            body, init=(smp, key), xs=self.conditional, reverse=self.reverse
-        )
+        sample0_flat = self.marginal.sample_flat(subkey)
+        init = (sample0_flat, key)
+        xs = self.conditional
+        _, samples = flow.scan(body, init=init, xs=xs, reverse=self.reverse)
 
-        # Currently, sampling is only implemented for reverse
+        sample0_tree = self.marginal.tree_flatten.unflatten_array(sample0_flat)
         if self.reverse:
-            return tree.tree_array_append(smps, smp)
-        return tree.tree_array_prepend(smp, smps)
+            return tree.tree_array_append(samples, sample0_tree)
+        return tree.tree_array_prepend(sample0_tree, samples)
 
 
 T = TypeVar("T", bound=MarkovSequence | ssm_impl.AbstractTreeNormal)
@@ -1206,10 +1228,10 @@ def ssm_taylor(
 def _tcoeffs_std_from_differential_variables(
     tcoeffs, *, ssm_fact, is_exact, inexact_eps
 ):
+
     # Decide the standard deviation template based on the factorisations
     if ssm_fact in ["dense", "blockdiag"]:
-        leaves = tree.tree_leaves(tcoeffs)
-        std_per_leaf = np.zeros_like(leaves[0])
+        std_per_leaf = tree.tree_map(np.zeros_like, tcoeffs[0])
     elif ssm_fact in ["isotropic"]:
         std_per_leaf = np.zeros(())
     else:
@@ -1217,7 +1239,7 @@ def _tcoeffs_std_from_differential_variables(
         raise ValueError(msg)
 
     # Infer the expected standard-deviation tree structure
-    leaves, structure = tree.tree_flatten(tcoeffs)
+    leaves, structure = tree.tree_flatten_depth_one(tcoeffs)
     std_template = tree.tree_unflatten(structure, [std_per_leaf for _ in leaves])
 
     # If 'is_exact' is a boolean, keep things simple
@@ -1322,7 +1344,7 @@ def prior_wiener_integrated(
     *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
 ):
     """Construct an integrated Wiener process prior."""
-    return ssm.conditional.transition_wiener_integrated(base_scale=output_scale)
+    return ssm.prior.transition_wiener_integrated(base_scale=output_scale)
 
 
 def prior_ornstein_uhlenbeck_integrated(
@@ -1333,7 +1355,7 @@ def prior_ornstein_uhlenbeck_integrated(
     def vf_linear(*tcoeffs):
         return linop(tcoeffs[-1])
 
-    return ssm.conditional.transition_exponential(
+    return ssm.prior.transition_exponential(
         vf_linear=vf_linear, base_scale=output_scale
     )
 
@@ -1352,7 +1374,7 @@ def prior_exponential(
     """
     # TODO: offer a "jacobian" option to enable isotropic and blockdiag implementations?
     prior_order = _verify_ioup_signature_and_parse_order(vf_linear)
-    if prior_order != ssm.shape_info.num_derivatives + 1:
+    if prior_order != ssm.prior.shape_info.num_derivatives + 1:
         msg = f"""The exponential prior does not match the Taylor coefficients in the SSM.
 
         Concretely:
@@ -1362,12 +1384,12 @@ def prior_exponential(
         - For two Taylor coefficients, we expect `f(u, du, ddu, dddu, /)`.
 
         and so on. The passed dynamics correspond to **{prior_order}** Taylor
-        coefficients, whereas the state-space model includes **{ssm.shape_info.num_derivatives + 1}**
+        coefficients, whereas the state-space model includes **{ssm.prior.shape_info.num_derivatives + 1}**
         Taylor coeffients.
         """
         raise TypeError(msg)
 
-    return ssm.conditional.transition_exponential(
+    return ssm.prior.transition_exponential(
         vf_linear=vf_linear, base_scale=output_scale
     )
 
@@ -1446,7 +1468,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         )
 
     def init_posterior(self, *, u: TaylorCoeffTarget):
-        cond = self.ssm.conditional.identity()
+        cond = self.ssm.prior.identity()
         posterior = MarkovSequence(marginal=u.marginals, conditional=cond, reverse=True)
         return u, posterior
 
@@ -1474,7 +1496,8 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
     ):
-        assert output_scale.shape == self.ssm.prototypes.output_scale_calibrated().shape
+        prototype = self.ssm.prior.prototype_output_scale_calibrated()
+        assert output_scale.shape == prototype.shape
         posterior0 = posterior0.rescale_cholesky(output_scale)
         posterior = posterior.rescale_cholesky(output_scale)
 
@@ -1594,7 +1617,8 @@ class strategy_filter(MarkovStrategy):
         return estimate, marginals
 
     def finalize(self, *, posterior0, posterior, output_scale):
-        assert output_scale.shape == self.ssm.prototypes.output_scale_calibrated().shape
+        expected = self.ssm.prior.prototype_output_scale_calibrated()
+        assert output_scale.shape == expected.shape
 
         # No rescaling because no calibration at the initial step
         posterior0 = posterior0.rescale_cholesky(output_scale)
@@ -1684,7 +1708,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         )
 
     def init_posterior(self, *, u):
-        cond = self.ssm.conditional.identity()
+        cond = self.ssm.prior.identity()
         posterior = MarkovSequence(u.marginals, cond, reverse=True)
         return u, posterior
 
@@ -1713,7 +1737,8 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
     ):
-        assert output_scale.shape == self.ssm.prototypes.output_scale_calibrated().shape
+        expected = self.ssm.prior.prototype_output_scale_calibrated()
+        assert output_scale.shape == expected.shape
         posterior0 = posterior0.rescale_cholesky(output_scale)
         posterior = posterior.rescale_cholesky(output_scale)
 
@@ -1731,7 +1756,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         return estimate, posterior
 
     def interpolate_at_t1(self, *, posterior_t1: MarkovSequence):
-        cond_identity = self.ssm.conditional.identity()
+        cond_identity = self.ssm.prior.identity()
         resume_from = MarkovSequence(
             posterior_t1.marginal,
             conditional=cond_identity,
@@ -1817,7 +1842,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         _, extrapolated_t = self.predict(
             posterior=posterior_t0, transition=transition_t0_t
         )
-        conditional_id = self.ssm.conditional.identity()
+        conditional_id = self.ssm.prior.identity()
         previous_new = MarkovSequence(
             extrapolated_t.marginal, conditional_id, reverse=extrapolated_t.reverse
         )
@@ -1877,7 +1902,8 @@ class solver_mle(ProbabilisticSolver):
         u_pred, prediction = self.strategy.init_posterior(u=u)
         cstate = self.constraint.init_linearization()
 
-        output_scale_prior = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+        prototype = self.ssm.prior.prototype_output_scale_calibrated()
+        output_scale_prior = np.ones_like(prototype)
 
         # Update
         lin_fun = func.partial(self.constraint.linearize, damp=damp, t=t)
@@ -1889,8 +1915,8 @@ class solver_mle(ProbabilisticSolver):
             fx_init, _cstate = self.constraint_init.linearize(
                 u_pred.marginals, cstate_init, damp=damp, t=t
             )
-            zeros = tree.tree_map(np.zeros_like, fx_init.noise.evaluate_mean())
-            tmp = self.ssm.conditional.bayes_rule_and_mahalanobis(
+            zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean_tree())
+            tmp = self.ssm.conditional.bayes_rule_and_residual_white_rms_tree(
                 zeros, u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
             )
             output_scale_running, updates = tmp
@@ -1918,7 +1944,7 @@ class solver_mle(ProbabilisticSolver):
 
     def step(self, state, *, dt: float, damp: float):
         # Discretize
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+        output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         transition = self.prior(dt, output_scale)
 
         # Predict
@@ -1933,8 +1959,8 @@ class solver_mle(ProbabilisticSolver):
         )
 
         # Do the full correction step
-        zeros = tree.tree_map(np.zeros_like, fx.noise.evaluate_mean())
-        new_term, updates = self.ssm.conditional.bayes_rule_and_mahalanobis(
+        zeros = tree.tree_map(np.zeros_like, fx.noise.mean_tree())
+        new_term, updates = self.ssm.conditional.bayes_rule_and_residual_white_rms_tree(
             zeros, u.marginals, fx, solve_triu=linalg.solve_triu
         )
         u, posterior = self.strategy.apply_updates(
@@ -2012,6 +2038,7 @@ class solver_dynamic(ProbabilisticSolver):
         ssm: ssm_impl.FactSsmImpl,
         constraint_init: Constraint | None = None,
         re_linearize_after_calibration=False,
+        stop_gradient_through_calibration=True,
     ) -> None:
         super().__init__(
             strategy=strategy,
@@ -2021,12 +2048,13 @@ class solver_dynamic(ProbabilisticSolver):
             constraint_init=constraint_init,
         )
         self.re_linearize_after_calibration = re_linearize_after_calibration
+        self.stop_gradient_through_calibration = stop_gradient_through_calibration
 
     def init(self, t, u, *, damp) -> ProbabilisticSolution:
         u_pred, prediction = self.strategy.init_posterior(u=u)
         lin_state = self.constraint.init_linearization()
 
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+        output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         lin_fun = func.partial(self.constraint.linearize, damp=damp, t=t)
         fx, _lin_state = func.eval_shape(lin_fun, u_pred.marginals, lin_state)
         fx = tree.tree_map(np.zeros_like, fx)
@@ -2036,8 +2064,8 @@ class solver_dynamic(ProbabilisticSolver):
             fx_init, _cstate = self.constraint_init.linearize(
                 u_pred.marginals, cstate_init, damp=damp, t=t
             )
-            zeros = tree.tree_map(np.zeros_like, fx_init.noise.evaluate_mean())
-            updates = self.ssm.conditional.bayes_rule(
+            zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean_tree())
+            updates = self.ssm.conditional.bayes_rule_tree(
                 zeros, u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
             )
             u, posterior = self.strategy.apply_updates(prediction, updates=updates)
@@ -2057,10 +2085,10 @@ class solver_dynamic(ProbabilisticSolver):
         lin_state = state.auxiliary
 
         # Calibrate the output scale
-        ones = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+        ones = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         transition = self.prior(dt, ones)
-        mean = state.u.marginals.evaluate_mean()
-        u = self.ssm.conditional.apply(mean, transition)
+        mean = state.u.marginals.mean_flat()
+        u = self.ssm.conditional.apply_flat(mean, transition)
 
         # Linearize
 
@@ -2068,8 +2096,11 @@ class solver_dynamic(ProbabilisticSolver):
             u, state=lin_state, damp=damp, t=state.t + dt
         )
         observed = self.ssm.conditional.marginalise(u, fx)
-        zeros = tree.tree_map(np.zeros_like, fx.noise.evaluate_mean())
-        output_scale = observed.mahalanobis_norm_relative(zeros)
+        zeros = tree.tree_map(np.zeros_like, fx.noise.mean_tree())
+        output_scale = observed.residual_white_rms_tree(zeros)
+
+        if self.stop_gradient_through_calibration:
+            output_scale = func.stop_gradient(output_scale)
 
         # Do the full extrapolation with the calibrated output scale
         # (Includes re-discretisation)
@@ -2085,10 +2116,10 @@ class solver_dynamic(ProbabilisticSolver):
             )
 
         # Complete the update
-        _, reverted = self.ssm.conditional.revert(
-            u.marginals, fx, solve_triu=linalg.solve_triu
+        zeros = tree.tree_map(np.zeros_like, fx.noise.mean_tree())
+        updates = self.ssm.conditional.bayes_rule_tree(
+            zeros, u.marginals, fx, solve_triu=linalg.solve_triu
         )
-        updates = reverted.noise
         u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
         # Return solution
@@ -2172,8 +2203,8 @@ class solver(ProbabilisticSolver):
             fx_init, _cstate = self.constraint_init.linearize(
                 u_pred.marginals, cstate_init, damp=damp, t=t
             )
-            zeros = tree.tree_map(np.zeros_like, fx_init.noise.evaluate_mean())
-            updates = self.ssm.conditional.bayes_rule(
+            zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean_tree())
+            updates = self.ssm.conditional.bayes_rule_tree(
                 zeros, u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
             )
             u, posterior = self.strategy.apply_updates(prediction, updates=updates)
@@ -2186,7 +2217,7 @@ class solver(ProbabilisticSolver):
         fx, _cstate = func.eval_shape(lin_fun, u_pred.marginals, cstate)
         fx = tree.tree_map(np.zeros_like, fx)
 
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+        output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         return ProbabilisticSolution(
             t=t,
             u=u,
@@ -2213,10 +2244,9 @@ class solver(ProbabilisticSolver):
         fx, auxiliary = self.constraint.linearize(
             u.marginals, state.auxiliary, damp=damp, t=state.t + dt
         )
-
         # Update
-        zeros = tree.tree_map(np.zeros_like, fx.noise.evaluate_mean())
-        updates = self.ssm.conditional.bayes_rule(
+        zeros = tree.tree_map(np.zeros_like, fx.noise.mean_tree())
+        updates = self.ssm.conditional.bayes_rule_tree(
             zeros, u_pred.marginals, fx, solve_triu=linalg.solve_triu
         )
         u, posterior = self.strategy.apply_updates(prediction, updates=updates)
@@ -2433,12 +2463,12 @@ class error_residual_std(ErrorEstimator):
     ) -> tuple[float, tuple]:
         # Discretize; The output scale is set to one
         # since the error is multiplied with a local scale estimate anyway
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+        output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
-        mean = previous.u.marginals.evaluate_mean()
-        rv = self.ssm.conditional.apply(mean, transition)
+        mean = previous.u.marginals.mean_flat()
+        rv = self.ssm.conditional.apply_flat(mean, transition)
 
         # Optionally: re-linearize
         if self.re_linearize_before_error:
@@ -2450,19 +2480,19 @@ class error_residual_std(ErrorEstimator):
 
         # Extract the local residual std from the linearization
         observed = self.ssm.conditional.marginalise(rv, linearized)
-        zeros = tree.tree_map(np.zeros_like, linearized.noise.evaluate_mean())
-        output_scale = observed.mahalanobis_norm_relative(zeros)
+        zeros = tree.tree_map(np.zeros_like, linearized.noise.mean_tree())
+        output_scale = observed.residual_white_rms_tree(zeros)
         observed = observed.rescale_cholesky(output_scale)
-        error = observed.evaluate_std()
+        error = observed.std_tree()
         error, _ = tree.ravel_pytree(error)
 
         # Compute a reference
-        previous_leaves = tree.tree_leaves(previous.u.mean)
+        previous_leaves = tree.tree_leaves_depth_one(previous.u.mean)
+        proposed_leaves = tree.tree_leaves_depth_one(proposed.u.mean)
         error_contraction_rate = len(previous_leaves)
-        u0 = previous_leaves[0]
-        u1 = tree.tree_leaves(proposed.u.mean)[0]
+        u0, _ = tree.ravel_pytree(previous_leaves[0])
+        u1, _ = tree.ravel_pytree(proposed_leaves[0])
         reference = np.maximum(np.abs(u0), np.abs(u1))
-        reference, _ = tree.ravel_pytree(reference)
 
         # Turn the unscaled absolute error into a relative one.
         # This is a generalisation of the typical residual-based
@@ -2533,15 +2563,17 @@ class error_state_std(ErrorEstimator):
     ) -> tuple[float, tuple]:
         # Discretize; The output scale is set to one
         # since the error is multiplied with a local scale estimate anyway
-        output_scale = np.ones_like(self.ssm.prototypes.output_scale_calibrated())
+        output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
-        mean = previous.u.marginals.evaluate_mean()
-        rv = self.ssm.conditional.apply(mean, transition)
+        mean = previous.u.marginals.mean_flat()
+        rv = self.ssm.conditional.apply_flat(mean, transition)
 
-        mean_leaves = tree.tree_leaves(mean)
+        mean_tree = previous.u.marginals.mean_tree()
+        mean_leaves = tree.tree_leaves_depth_one(mean_tree)
         error_contraction_rate = len(mean_leaves)
+
         # Optionally: re-linearize
         if self.re_linearize_before_error:
             linearized, state = self.constraint.linearize(
@@ -2551,27 +2583,30 @@ class error_state_std(ErrorEstimator):
             linearized = proposed.fun_evals
 
         # Extract the local residual std from the linearization
-        zeros = tree.tree_map(np.zeros_like, linearized.noise.evaluate_mean())
-        output_scale, conditional = self.ssm.conditional.bayes_rule_and_mahalanobis(
-            zeros, rv, linearized, solve_triu=linalg.solve_triu
+        zeros = tree.tree_map(np.zeros_like, linearized.noise.mean_tree())
+        output_scale, conditional = (
+            self.ssm.conditional.bayes_rule_and_residual_white_rms_tree(
+                zeros, rv, linearized, solve_triu=linalg.solve_triu
+            )
         )
 
         # Measure error on the n-th state (usually, n=0 because why not)
         n = self.derivative_idx
 
-        if self.error_per_unit_step:
-            n += 1
-
         # *New:* Go back into solution space
-        std = conditional.evaluate_std()[n]
+        std = conditional.std_tree()[n]
         error, _ = tree.ravel_pytree(std)
         error = output_scale * error
-        error, _ = tree.ravel_pytree(error)
+        error, _ = tree.ravel_pytree(error)  # TODO: this line is useless?
 
         # Compute a reference
         u0, _ = tree.ravel_pytree(previous.u.mean[n])
         u1, _ = tree.ravel_pytree(proposed.u.mean[n])
         reference = np.maximum(np.abs(u0), np.abs(u1))
+
+        # Increase the order (after selecting the states)
+        if self.error_per_unit_step:
+            n += 1
 
         # Turn the unscaled absolute error into a relative one.
         error_abs = error * dt**n / np.factorial(n)
