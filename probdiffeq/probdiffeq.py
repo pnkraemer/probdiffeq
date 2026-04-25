@@ -2570,7 +2570,8 @@ class error_state_std(ErrorEstimator):
         mean = previous.u.marginals.mean_flat()
         rv = self.ssm.conditional.apply_flat(mean, transition)
 
-        mean_leaves = tree.tree_leaves_depth_one(mean)
+        mean_tree = previous.u.marginals.mean_tree()
+        mean_leaves = tree.tree_leaves_depth_one(mean_tree)
         error_contraction_rate = len(mean_leaves)
 
         # Optionally: re-linearize
@@ -2592,9 +2593,6 @@ class error_state_std(ErrorEstimator):
         # Measure error on the n-th state (usually, n=0 because why not)
         n = self.derivative_idx
 
-        if self.error_per_unit_step:
-            n += 1
-
         # *New:* Go back into solution space
         std = conditional.std_tree()[n]
         error, _ = tree.ravel_pytree(std)
@@ -2605,6 +2603,10 @@ class error_state_std(ErrorEstimator):
         u0, _ = tree.ravel_pytree(previous.u.mean[n])
         u1, _ = tree.ravel_pytree(proposed.u.mean[n])
         reference = np.maximum(np.abs(u0), np.abs(u1))
+
+        # Increase the order (after selecting the states)
+        if self.error_per_unit_step:
+            n += 1
 
         # Turn the unscaled absolute error into a relative one.
         error_abs = error * dt**n / np.factorial(n)
