@@ -53,7 +53,7 @@ def test_fixedpoint_smoother_equivalent_same_grid(
     assert testing.allclose(sol_fp.t, sol_sm.t)
     assert testing.allclose(sol_fp.u.mean, sol_sm.u.mean)
     assert testing.allclose(sol_fp.u.std, sol_sm.u.std)
-    assert testing.allclose(sol_fp.u.marginals, sol_sm.u.marginals)
+    assert testing.allclose(sol_fp.u, sol_sm.u)
     assert testing.allclose(sol_fp.num_steps, sol_sm.num_steps)
     assert testing.allclose(
         sol_fp.solution_full.marginal, sol_sm.solution_full.marginal
@@ -110,13 +110,11 @@ def test_fixedpoint_smoother_equivalent_different_grid(
     # (because only there is the interpolated solution defined)
     u_fixedpoint = tree.tree_map(lambda s: s[1:-1], solution_fixedpoint.u.mean)
     u_std_fixedpoint = tree.tree_map(lambda s: s[1:-1], solution_fixedpoint.u.std)
-    marginals_fixedpoint = tree.tree_map(
-        lambda s: s[1:-1], solution_fixedpoint.u.marginals
-    )
+    marginals_fixedpoint = tree.tree_map(lambda s: s[1:-1], solution_fixedpoint.u)
 
     assert testing.allclose(u_fixedpoint, interpolated.mean)
     assert testing.allclose(u_std_fixedpoint, interpolated.std)
 
     # Compare QOI and marginals
     marginals_allclose_func = func.vmap(testing.marginals_allclose)
-    assert np.all(marginals_allclose_func(marginals_fixedpoint, interpolated.marginals))
+    assert np.all(marginals_allclose_func(marginals_fixedpoint, interpolated))

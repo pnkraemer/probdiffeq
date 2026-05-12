@@ -149,11 +149,9 @@ def test_posterior_linearisation_matches_closed_form_recursion(
     constraint = jet_factory(ssm=ssm, jet_order=jet_order)
 
     cstate = constraint.init_linearization()
-    fx, cstate = constraint.linearize(init.marginals, cstate, damp=0.0, t=root.t0)
+    fx, cstate = constraint.linearize(init, cstate, damp=0.0, t=root.t0)
 
-    _observed, reverted = ssm.conditional.revert(
-        init.marginals, fx, solve_triu=linalg.lstsq_svd
-    )
+    _observed, reverted = ssm.conditional.revert(init, fx, solve_triu=linalg.lstsq_svd)
 
     updated = ssm.conditional.apply_flat(0.0, reverted)
     received = updated.mean
@@ -174,7 +172,7 @@ def test_wrong_jet_order_raises_error(
 
     cstate = constraint.init_linearization()
     with testing.raises(ValueError, match="Received"):
-        _ = constraint.linearize(init.marginals, cstate, damp=0.0, t=root.t0)
+        _ = constraint.linearize(init, cstate, damp=0.0, t=root.t0)
 
 
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
@@ -182,14 +180,14 @@ def test_max_jet_order_is_tight(root: Root, jet_factory: Callable):
     init, ssm = probdiffeq.ssm_taylor([root.u0], diffuse_derivatives=4)
     c1 = jet_factory(ssm=ssm, jet_order="max")
     cstate = c1.init_linearization()
-    output1 = c1.linearize(init.marginals, cstate, damp=0.0, t=root.t0)
+    output1 = c1.linearize(init, cstate, damp=0.0, t=root.t0)
 
     # 5 Taylor coefficients (u, du, ddu, dddu)
     # and a root-order of 2 (constraints depend on u and du)
     # implies the max feasible jet order is 3
     c2 = jet_factory(ssm=ssm, jet_order=3)
     cstate = c2.init_linearization()
-    output2 = c2.linearize(init.marginals, cstate, damp=0.0, t=root.t0)
+    output2 = c2.linearize(init, cstate, damp=0.0, t=root.t0)
 
     # The outputs should be identical
     assert testing.allclose(output1, output2)
