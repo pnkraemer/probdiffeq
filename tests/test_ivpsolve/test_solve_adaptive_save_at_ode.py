@@ -199,7 +199,7 @@ def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
     # Assert u and u_std have matching treedefs (that was wrong before)
     # but the shapes of the leaves may be different, e.g. STDs in isotropic
     # models are always scalar
-    _, mean_treedef = tree.tree_flatten_depth_one(received.u.mean)
-    _, std_treedef = tree.tree_flatten_depth_one(received.u.std)
-    match = tree.tree_map(lambda a, b: a == b, mean_treedef, std_treedef)
+    _, meandef = tree.tree_flatten_depth_one(received.u.mean)
+    _, stddef = tree.tree_flatten_depth_one(received.u.std)
+    match = tree.tree_map(lambda a, b: a == b, meandef, stddef)
     assert tree.tree_all(match)

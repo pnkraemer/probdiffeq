@@ -52,8 +52,8 @@ def main():
         samples_prior = sample_fun(key, ssm=ssm, shape=(num_samples,))
 
         margs = mseq.evaluate_marginals(ssm=ssm)
-        means = margs.mean_tree
-        stds = margs.std_tree
+        means = margs.mean
+        stds = margs.std
 
         # Use the docstring as a title (but remove the period at the final character)
         ax_col[0].set_title(vf_prior.__doc__[:-1], fontsize="medium")  # type: ignore
