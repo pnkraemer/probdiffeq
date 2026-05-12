@@ -161,6 +161,7 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
         name = self.__class__.__name__
         return f"{name}({self.mean_flat}, {self.cholesky_flat}, {self.tree_flatten})"
 
+    @property
     @abc.abstractmethod
     def mean_tree(self):
         """Evaluate the mean."""
@@ -756,9 +757,13 @@ class DenseNormal(AbstractTreeNormal[DenseTreeFlatten]):
         cholesky = linalg.diagonal_matrix(std_flat)
         return cls(mean_flat, cholesky, tree_flatten)
 
+    @property
     def mean_tree(self):
+        return self._mean_tree_batched()
+
+    def _mean_tree_batched(self):
         if self.mean_flat.ndim > 1:
-            return func.vmap(DenseNormal.mean_tree)(self)
+            return func.vmap(DenseNormal._mean_tree_batched)(self)
         return self.tree_flatten.unflatten_array(self.mean_flat)
 
     def std_tree(self):
@@ -941,7 +946,7 @@ class DenseOdeTs0(AbstractOde):
             m0 = rv.tree_flatten.unflatten_array(m)[self.ode_order]
             return tree.ravel_pytree(m0)[0]
 
-        Ms = rv.mean_tree()
+        Ms = rv.mean_tree
 
         fm = fun(*Ms[: self.ode_order])
         fx = tree.tree_map(lambda s: -s, [fm])
@@ -970,7 +975,7 @@ class DenseOdeTs1(AbstractOde):
 
     def linearize(self, rv, state: None, *, damp: float, t):
         fun = func.partial(self.vector_field, t=t)
-        m_tree = rv.mean_tree()
+        m_tree = rv.mean_tree
 
         rv0 = DenseNormal.from_dirac([m_tree[0]], damp=0.0)
 
@@ -1043,7 +1048,7 @@ class DenseRoot(AbstractRoot):
         # Find the tree structure of the output constraint
         # (So that we can unravel the bias term and always work in the correct
         # pytree structure.)
-        m_tree = rv.mean_tree()
+        m_tree = rv.mean_tree
         relevant_tcoeffs = m_tree[: self.root_order]
         root_eval = func.eval_shape(lambda s: [self.root(*s, t=t)], relevant_tcoeffs)
 
@@ -1075,7 +1080,7 @@ class IsotropicOdeTs0(AbstractOde):
         del state
         fun = func.partial(self.vector_field, t=t)
         mean = rv.mean_flat
-        Ms = rv.mean_tree()
+        Ms = rv.mean_tree
         fx_tree = fun(*(Ms[: self.ode_order]))
         fx = tree.tree_map(lambda s: -s, fx_tree)
 
@@ -1105,7 +1110,7 @@ class IsotropicOdeTs1(AbstractOde):
         # Evaluate the linearisation
         m0 = rv.mean_flat[0]
 
-        mean_tree = rv.mean_tree()
+        mean_tree = rv.mean_tree
         m0_tree = mean_tree[0]
         rv0 = IsotropicNormal.from_dirac([m0_tree], damp=0.0)
 
@@ -1145,7 +1150,7 @@ class BlockDiagOdeTs0(AbstractOde):
 
     def linearize(self, rv, state: None, *, damp: float, t):
         del state
-        mean = rv.mean_tree()
+        mean = rv.mean_tree
         fx = self.vector_field(*(mean[: self.ode_order]), t=t)
         fx = tree.tree_map(lambda s: -s, fx)
         bias = BlockDiagNormal.from_dirac([fx], damp=damp)
@@ -1176,7 +1181,7 @@ class BlockDiagOdeTs1(AbstractOde):
         fun = func.partial(self.vector_field, t=t)
         mean = rv.mean_flat
 
-        mean_tree = rv.mean_tree()
+        mean_tree = rv.mean_tree
         m0_tree = mean_tree[0]
         rv0 = BlockDiagNormal.from_dirac([m0_tree], damp=0.0)
 
@@ -1576,9 +1581,13 @@ class IsotropicNormal(AbstractTreeNormal[IsotropicTreeFlatten]):
         cholesky_flat = linalg.diagonal_matrix(scale_flat)
         return cls(loc_flat, cholesky_flat, tree_flatten)
 
+    @property
     def mean_tree(self):
+        return self._mean_tree_batched()
+
+    def _mean_tree_batched(self):
         if self.mean_flat.ndim > 2:
-            return func.vmap(IsotropicNormal.mean_tree)(self)
+            return func.vmap(IsotropicNormal._mean_tree_batched)(self)
         return self.tree_flatten.unflatten_array(self.mean_flat)
 
     def std_tree(self):
@@ -1739,9 +1748,13 @@ class BlockDiagNormal(AbstractTreeNormal[BlockDiagTreeFlatten]):
         cholesky_flat = scale_flat[..., None] * cholesky[None, ...]
         return cls(loc_flat, cholesky_flat, tree_flatten)
 
+    @property
     def mean_tree(self):
+        return self._mean_tree_batched()
+
+    def _mean_tree_batched(self):
         if self.mean_flat.ndim > 2:
-            return func.vmap(BlockDiagNormal.mean_tree)(self)
+            return func.vmap(BlockDiagNormal._mean_tree_batched)(self)
 
         return self.tree_flatten.unflatten_array(self.mean_flat)
 
