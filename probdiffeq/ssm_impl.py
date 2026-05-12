@@ -172,11 +172,6 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def std_flat(self):
-        """Evaluate the standard deviation."""
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def sample_tree(self, key):
         """Sample from a normal distribution."""
         raise NotImplementedError
@@ -770,18 +765,9 @@ class DenseNormal(AbstractTreeNormal[DenseTreeFlatten]):
         if self.mean_flat.ndim > 1:
             return func.vmap(DenseNormal.std_tree)(self)
 
-        std = np.abs(
-            func.vmap(linalg.qr_r)(self.cholesky_flat[..., None]).reshape((-1,))
-        )
-
-        return self.tree_flatten.unflatten_array(std)
-
-    def std_flat(self):
-        if self.mean_flat.ndim > 1:
-            return func.vmap(DenseNormal.std_tree)(self)
-
-        diag = np.einsum("ij,ij->i", self.cholesky_flat, self.cholesky_flat)
-        return np.sqrt(diag)
+        std_flat = func.vmap(linalg.qr_r)(self.cholesky_flat[..., None])
+        std_flat = np.abs(std_flat.reshape((-1,)))
+        return self.tree_flatten.unflatten_array(std_flat)
 
     def residual_white_rms_tree(self, u):
         u, _ = tree.ravel_pytree(u)
@@ -1598,15 +1584,9 @@ class IsotropicNormal(AbstractTreeNormal[IsotropicTreeFlatten]):
     def std_tree(self):
         if self.mean_flat.ndim > 2:
             return func.vmap(IsotropicNormal.std_tree)(self)
-        std_flat = self.std_flat()
-        return self.tree_flatten.unflatten_array_scalar(std_flat)
-
-    def std_flat(self):
-        if self.mean_flat.ndim > 2:
-            return func.vmap(IsotropicNormal.std_flat)(self)
-
         diag = np.einsum("ij,ji->i", self.cholesky_flat, self.cholesky_flat)
-        return np.sqrt(diag)
+        std_flat = np.sqrt(diag)
+        return self.tree_flatten.unflatten_array_scalar(std_flat)
 
     def residual_white_rms_tree(self, u):
         if self.cholesky_flat.size > 1:
@@ -1771,10 +1751,6 @@ class BlockDiagNormal(AbstractTreeNormal[BlockDiagTreeFlatten]):
         diag = np.einsum("ijk,ikj->ij", self.cholesky_flat, self.cholesky_flat)
         std = np.sqrt(diag)
         return self.tree_flatten.unflatten_array(std)
-
-    def std_flat(self):
-        diag = np.einsum("ijk,ikj->ij", self.cholesky_flat, self.cholesky_flat)
-        return np.sqrt(diag)
 
     def residual_white_rms_tree(self, u, /):
         # todo: add sth like an "axis" argument to make it more obvious
