@@ -716,7 +716,7 @@ class MarkovSequence(Generic[N]):
 
         This is only needed in combination with smoothing-based strategies.
         """
-        if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
+        if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
             markov_seq = self._select_terminal()
             return markov_seq.evaluate_marginals(ssm=ssm)
 
@@ -745,7 +745,7 @@ class MarkovSequence(Generic[N]):
     ):
         assert self.reverse
 
-        if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
+        if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
             markov_seq = self._select_terminal()
             return markov_seq.evaluate_lml(
                 u,
@@ -804,7 +804,7 @@ class MarkovSequence(Generic[N]):
     def sample(self, key, *, ssm: ssm_impl.FactSsmImpl, shape: tuple = ()):
         """Sample from a Markov sequence."""
         # If the MarkovSequence carries unnecessary filtering marginals, remove them
-        if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
+        if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
             markov_seq = self._select_terminal()
             return markov_seq.sample(key, ssm=ssm, shape=shape)
 
@@ -2087,7 +2087,7 @@ class solver_dynamic(ProbabilisticSolver):
         # Calibrate the output scale
         ones = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         transition = self.prior(dt, ones)
-        mean = state.u.marginals.mean_flat()
+        mean = state.u.marginals.mean_flat
         u = self.ssm.conditional.apply_flat(mean, transition)
 
         # Linearize
@@ -2467,7 +2467,7 @@ class error_residual_std(ErrorEstimator):
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
-        mean = previous.u.marginals.mean_flat()
+        mean = previous.u.marginals.mean_flat
         rv = self.ssm.conditional.apply_flat(mean, transition)
 
         # Optionally: re-linearize
@@ -2567,7 +2567,7 @@ class error_state_std(ErrorEstimator):
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
-        mean = previous.u.marginals.mean_flat()
+        mean = previous.u.marginals.mean_flat
         rv = self.ssm.conditional.apply_flat(mean, transition)
 
         mean_tree = previous.u.marginals.mean_tree()
