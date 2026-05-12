@@ -167,6 +167,7 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
         """Evaluate the mean."""
         raise NotImplementedError
 
+    @property
     @abc.abstractmethod
     def std_tree(self):
         """Evaluate the standard deviation."""
@@ -766,9 +767,13 @@ class DenseNormal(AbstractTreeNormal[DenseTreeFlatten]):
             return func.vmap(DenseNormal._mean_tree_batched)(self)
         return self.tree_flatten.unflatten_array(self.mean_flat)
 
+    @property
     def std_tree(self):
+        return self._std_tree_batched()
+
+    def _std_tree_batched(self):
         if self.mean_flat.ndim > 1:
-            return func.vmap(DenseNormal.std_tree)(self)
+            return func.vmap(DenseNormal._std_tree_batched)(self)
 
         std_flat = func.vmap(linalg.qr_r)(self.cholesky_flat[..., None])
         std_flat = np.abs(std_flat.reshape((-1,)))
@@ -1590,9 +1595,13 @@ class IsotropicNormal(AbstractTreeNormal[IsotropicTreeFlatten]):
             return func.vmap(IsotropicNormal._mean_tree_batched)(self)
         return self.tree_flatten.unflatten_array(self.mean_flat)
 
+    @property
     def std_tree(self):
+        return self._std_tree_batched()
+
+    def _std_tree_batched(self):
         if self.mean_flat.ndim > 2:
-            return func.vmap(IsotropicNormal.std_tree)(self)
+            return func.vmap(IsotropicNormal._std_tree_batched)(self)
         diag = np.einsum("ij,ji->i", self.cholesky_flat, self.cholesky_flat)
         std_flat = np.sqrt(diag)
         return self.tree_flatten.unflatten_array_scalar(std_flat)
@@ -1758,9 +1767,13 @@ class BlockDiagNormal(AbstractTreeNormal[BlockDiagTreeFlatten]):
 
         return self.tree_flatten.unflatten_array(self.mean_flat)
 
+    @property
     def std_tree(self):
+        return self._std_tree_batched()
+
+    def _std_tree_batched(self):
         if self.mean_flat.ndim > 2:
-            return func.vmap(BlockDiagNormal.std_tree)(self)
+            return func.vmap(BlockDiagNormal._std_tree_batched)(self)
         diag = np.einsum("ijk,ikj->ij", self.cholesky_flat, self.cholesky_flat)
         std = np.sqrt(diag)
         return self.tree_flatten.unflatten_array(std)

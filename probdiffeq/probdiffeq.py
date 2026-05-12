@@ -202,7 +202,7 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
     def loss(u, /, *, marginals, std):
         u = tree.tree_map(np.asarray, u)
         std = tree.tree_map(np.asarray, std)
-        std_expected = marginals.std_tree()[tcoeff_index]
+        std_expected = marginals.std_tree[tcoeff_index]
 
         msg = "The standard deviation container differs from what was expected."
         msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
@@ -249,7 +249,7 @@ def loss_lml_timeseries(
 
         u = tree.tree_map(np.asarray, u)
         std = tree.tree_map(np.asarray, std)
-        std_expected = posterior.marginal.std_tree()[tcoeff_index]
+        std_expected = posterior.marginal.std_tree[tcoeff_index]
 
         msg = "The standard deviation container differs from what was expected."
         msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
@@ -679,7 +679,7 @@ class TaylorCoeffTarget(Generic[N]):
     @property
     def std(self):
         """A PyTree describing the mean of the Taylor coefficient."""
-        return self.marginals.std_tree()
+        return self.marginals.std_tree
 
 
 @tree.register_dataclass
@@ -2483,7 +2483,7 @@ class error_residual_std(ErrorEstimator):
         zeros = tree.tree_map(np.zeros_like, linearized.noise.mean_tree)
         output_scale = observed.residual_white_rms_tree(zeros)
         observed = observed.rescale_cholesky(output_scale)
-        error = observed.std_tree()
+        error = observed.std_tree
         error, _ = tree.ravel_pytree(error)
 
         # Compute a reference
@@ -2594,7 +2594,7 @@ class error_state_std(ErrorEstimator):
         n = self.derivative_idx
 
         # *New:* Go back into solution space
-        std = conditional.std_tree()[n]
+        std = conditional.std_tree[n]
         error, _ = tree.ravel_pytree(std)
         error = output_scale * error
         error, _ = tree.ravel_pytree(error)  # TODO: this line is useless?

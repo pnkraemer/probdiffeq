@@ -156,7 +156,7 @@ def test_posterior_linearisation_matches_closed_form_recursion(
     )
 
     updated = ssm.conditional.apply_flat(0.0, reverted)
-    received = updated.mean_tree()
+    received = updated.mean_tree
     if jet_order == "max":
         assert testing.allclose(received, expected)
     else:
