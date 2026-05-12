@@ -371,7 +371,7 @@ def daejet_nlstsq(
         fx = [primals1, *series1, primals2, *series2]
         return tree.ravel_pytree(fx)[0]
 
-    x1, info = nlstsq(root_jet, x0, rv.mean, rv.cholesky)
+    x1, info = nlstsq(root_jet, x0, rv.mean_flat, rv.cholesky_flat)
     return unravel(x1), info
 
 

@@ -28,7 +28,9 @@ def test_transitions_are_correct_in_1d(ssm_fact) -> None:
         ]
     )
     assert testing.allclose(cond.A, A_expected)
-    assert testing.allclose(cond.noise.cholesky @ cond.noise.cholesky.T, Q_expected)
+    assert testing.allclose(
+        cond.noise.cholesky_flat @ cond.noise.cholesky_flat.T, Q_expected
+    )
 
 
 # Separate test because conditional shapes differ
@@ -55,5 +57,5 @@ def test_transitions_are_correct_in_1d_blockdiag() -> None:
         ]
     )
     assert testing.allclose(cond.A, A_expected[None, ...])
-    cov = np.einsum("ijk,ilk->ijl", cond.noise.cholesky, cond.noise.cholesky)
+    cov = np.einsum("ijk,ilk->ijl", cond.noise.cholesky_flat, cond.noise.cholesky_flat)
     assert testing.allclose(cov, Q_expected[None, ...])

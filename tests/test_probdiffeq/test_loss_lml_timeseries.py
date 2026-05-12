@@ -65,4 +65,4 @@ def test_raises_error_if_terminal_values_were_intended(solution) -> None:
 
     # Call with marginals to pretend we're a filter
     with testing.raises(TypeError, match="datatype"):
-        _ = loss(data, posterior=sol.u.marginals, std=std)
+        _ = loss(data, posterior=sol.u, std=std)

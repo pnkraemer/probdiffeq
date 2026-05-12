@@ -202,7 +202,7 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
     def loss(u, /, *, marginals, std):
         u = tree.tree_map(np.asarray, u)
         std = tree.tree_map(np.asarray, std)
-        std_expected = marginals.std_tree()[tcoeff_index]
+        std_expected = marginals.std[tcoeff_index]
 
         msg = "The standard deviation container differs from what was expected."
         msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
@@ -249,7 +249,7 @@ def loss_lml_timeseries(
 
         u = tree.tree_map(np.asarray, u)
         std = tree.tree_map(np.asarray, std)
-        std_expected = posterior.marginal.std_tree()[tcoeff_index]
+        std_expected = posterior.marginal.std[tcoeff_index]
 
         msg = "The standard deviation container differs from what was expected."
         msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
@@ -660,30 +660,6 @@ def constraint_jet_dae(
 
 @tree.register_dataclass
 @structs.dataclass
-class TaylorCoeffTarget(Generic[N]):
-    """A probabilistic description of Taylor coefficients.
-
-    Includes means, standard deviations, and marginals.
-    Taylor coefficients are common solution targets
-    for probabilistic differential equation solvers.
-    """
-
-    marginals: N
-    """The full marginal distribution of the Taylor coefficient."""
-
-    @property
-    def mean(self):
-        """A PyTree describing the standard deviation of the Taylor coefficient."""
-        return self.marginals.mean_tree()
-
-    @property
-    def std(self):
-        """A PyTree describing the mean of the Taylor coefficient."""
-        return self.marginals.std_tree()
-
-
-@tree.register_dataclass
-@structs.dataclass
 class MarkovSequence(Generic[N]):
     """A datastructure for Markov sequences as batches of joint distributions.
 
@@ -702,7 +678,7 @@ class MarkovSequence(Generic[N]):
 
     @classmethod
     def from_grid(cls, init, discretize, *, grid, reverse: bool):
-        marginal = init.marginals
+        marginal = init
         conditional = func.vmap(discretize)(np.diff(grid))
         return cls(marginal, conditional, reverse=reverse)
 
@@ -716,7 +692,7 @@ class MarkovSequence(Generic[N]):
 
         This is only needed in combination with smoothing-based strategies.
         """
-        if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
+        if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
             markov_seq = self._select_terminal()
             return markov_seq.evaluate_marginals(ssm=ssm)
 
@@ -745,7 +721,7 @@ class MarkovSequence(Generic[N]):
     ):
         assert self.reverse
 
-        if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
+        if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
             markov_seq = self._select_terminal()
             return markov_seq.evaluate_lml(
                 u,
@@ -804,7 +780,7 @@ class MarkovSequence(Generic[N]):
     def sample(self, key, *, ssm: ssm_impl.FactSsmImpl, shape: tuple = ()):
         """Sample from a Markov sequence."""
         # If the MarkovSequence carries unnecessary filtering marginals, remove them
-        if self.marginal.mean.ndim == self.conditional.noise.mean.ndim:
+        if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
             markov_seq = self._select_terminal()
             return markov_seq.sample(key, ssm=ssm, shape=shape)
 
@@ -856,7 +832,7 @@ class ProbabilisticSolution(Generic[N, T]):
     t: Array
     """The current time-step."""
 
-    u: TaylorCoeffTarget[N]
+    u: N
     """The current ODE solution estimate."""
 
     solution_full: T
@@ -950,27 +926,25 @@ class MarkovStrategy(Generic[T]):
         self.is_suitable_for_save_every_step = is_suitable_for_save_every_step
         self.is_suitable_for_offgrid_marginals = is_suitable_for_offgrid_marginals
 
-    def init_posterior(self, *, u: TaylorCoeffTarget) -> T:
+    def init_posterior(self, *, u) -> T:
         """Initialize a posterior distribution."""
         raise NotImplementedError
 
-    def predict(self, posterior: T, *, transition) -> tuple[TaylorCoeffTarget, T]:
+    def predict(self, posterior: T, *, transition) -> tuple:
         """Make a prediction."""
         raise NotImplementedError
 
-    def apply_updates(self, prediction: T, *, updates) -> tuple[TaylorCoeffTarget, T]:
+    def apply_updates(self, prediction: T, *, updates) -> tuple:
         """Apply updates to a prediction."""
         raise NotImplementedError
 
     def interpolate(
         self, *, posterior_t0: T, posterior_t1: T, transition_t0_t, transition_t_t1
-    ) -> tuple[tuple[TaylorCoeffTarget, T], InterpResult[T]]:
+    ) -> tuple[tuple, InterpResult[T]]:
         """Interpolate between two points."""
         raise NotImplementedError
 
-    def interpolate_at_t1(
-        self, *, posterior_t1: T
-    ) -> tuple[tuple[TaylorCoeffTarget, T], InterpResult[T]]:
+    def interpolate_at_t1(self, *, posterior_t1: T) -> tuple[tuple, InterpResult[T]]:
         """Interpolate at a checkpoint."""
         raise NotImplementedError
 
@@ -1028,7 +1002,7 @@ class ProbabilisticSolver:
         """
         return self.strategy.is_suitable_for_save_every_step
 
-    def init(self, t, init: TaylorCoeffTarget, *, damp: float) -> ProbabilisticSolution:
+    def init(self, t, init, *, damp: float) -> ProbabilisticSolution:
         """Initialize the probabilistic solution."""
         raise NotImplementedError
 
@@ -1325,8 +1299,7 @@ def ssm_taylor_diffuse(
             raise ValueError(msg)
 
     # Return the target
-    target = TaylorCoeffTarget(marginal)
-    return target, ssm
+    return marginal, ssm
 
 
 def _add_diffuse_derivatives(
@@ -1467,14 +1440,12 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
             is_suitable_for_offgrid_marginals=True,
         )
 
-    def init_posterior(self, *, u: TaylorCoeffTarget):
+    def init_posterior(self, *, u):
         cond = self.ssm.prior.identity()
-        posterior = MarkovSequence(marginal=u.marginals, conditional=cond, reverse=True)
+        posterior = MarkovSequence(marginal=u, conditional=cond, reverse=True)
         return u, posterior
 
-    def predict(
-        self, posterior: MarkovSequence, *, transition
-    ) -> tuple[TaylorCoeffTarget, MarkovSequence]:
+    def predict(self, posterior: MarkovSequence, *, transition) -> tuple:
         marginals, cond = self.ssm.conditional.revert(
             posterior.marginal, transition, solve_triu=linalg.solve_triu
         )
@@ -1482,16 +1453,14 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
             marginal=marginals, conditional=cond, reverse=posterior.reverse
         )
 
-        estimate = TaylorCoeffTarget(marginals)
-        return estimate, posterior
+        return marginals, posterior
 
     def apply_updates(self, prediction, *, updates):
         posterior = MarkovSequence(
             updates, prediction.conditional, reverse=prediction.reverse
         )
         marginals = updates
-        estimate = TaylorCoeffTarget(marginals)
-        return estimate, posterior
+        return marginals, posterior
 
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
@@ -1511,8 +1480,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         )
 
         # Extract targets
-        estimate = TaylorCoeffTarget(marginals)
-        return estimate, posterior
+        return marginals, posterior
 
     def interpolate(
         self,
@@ -1569,15 +1537,13 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
 
         # Extract targets
         marginals = solution_at_t.marginal
-        estimate = TaylorCoeffTarget(marginals)
-        return (estimate, solution_at_t), interp_res
+        return (marginals, solution_at_t), interp_res
 
     def interpolate_at_t1(self, posterior_t1):
         marginals = posterior_t1.marginal
-        estimate = TaylorCoeffTarget(marginals)
 
         interp_res = InterpResult(step_from=posterior_t1, interp_from=posterior_t1)
-        return (estimate, posterior_t1), interp_res
+        return (marginals, posterior_t1), interp_res
 
 
 class strategy_filter(MarkovStrategy):
@@ -1602,19 +1568,17 @@ class strategy_filter(MarkovStrategy):
             is_suitable_for_offgrid_marginals=True,
         )
 
-    def init_posterior(self, *, u: TaylorCoeffTarget):
-        return u, u.marginals
+    def init_posterior(self, *, u):
+        return u, u
 
-    def predict(self, posterior: T, *, transition) -> tuple[TaylorCoeffTarget, T]:
+    def predict(self, posterior: T, *, transition) -> tuple:
         marginals = self.ssm.conditional.marginalise(posterior, transition)
-        estimate = TaylorCoeffTarget(marginals)
-        return estimate, marginals
+        return marginals, marginals
 
     def apply_updates(self, prediction, *, updates):
         del prediction
         marginals = updates
-        estimate = TaylorCoeffTarget(marginals)
-        return estimate, marginals
+        return marginals, marginals
 
     def finalize(self, *, posterior0, posterior, output_scale):
         expected = self.ssm.prior.prototype_output_scale_calibrated()
@@ -1630,8 +1594,7 @@ class strategy_filter(MarkovStrategy):
         posterior = tree.tree_array_prepend(posterior0, posterior)
 
         marginals = posterior
-        estimate = TaylorCoeffTarget(marginals)
-        return estimate, posterior
+        return marginals, posterior
 
     def interpolate(
         self, *, posterior_t0, posterior_t1, transition_t0_t, transition_t_t1
@@ -1641,16 +1604,13 @@ class strategy_filter(MarkovStrategy):
             posterior=posterior_t0, transition=transition_t0_t
         )
         marginals = interpolated
-        estimate = TaylorCoeffTarget(marginals)
         interp_res = InterpResult(step_from=posterior_t1, interp_from=interpolated)
-        return (estimate, interpolated), interp_res
+        return (marginals, interpolated), interp_res
 
     def interpolate_at_t1(self, *, posterior_t1):
         marginals = posterior_t1
-        estimate = TaylorCoeffTarget(marginals)
-
         interp_res = InterpResult(step_from=posterior_t1, interp_from=posterior_t1)
-        return (estimate, posterior_t1), interp_res
+        return (marginals, posterior_t1), interp_res
 
 
 class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
@@ -1709,12 +1669,10 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
 
     def init_posterior(self, *, u):
         cond = self.ssm.prior.identity()
-        posterior = MarkovSequence(u.marginals, cond, reverse=True)
+        posterior = MarkovSequence(u, cond, reverse=True)
         return u, posterior
 
-    def predict(
-        self, posterior: MarkovSequence, *, transition
-    ) -> tuple[TaylorCoeffTarget, MarkovSequence]:
+    def predict(self, posterior: MarkovSequence, *, transition) -> tuple:
         rv = posterior.marginal
         bw0 = posterior.conditional
         marginals, cond = self.ssm.conditional.revert(
@@ -1723,16 +1681,14 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         cond = self.ssm.conditional.merge(bw0, cond)
         predicted = MarkovSequence(marginals, cond, reverse=posterior.reverse)
 
-        estimate = TaylorCoeffTarget(marginals)
-        return estimate, predicted
+        return marginals, predicted
 
     def apply_updates(self, prediction: MarkovSequence, *, updates):
         posterior = MarkovSequence(
             updates, prediction.conditional, reverse=prediction.reverse
         )
         marginals = updates
-        estimate = TaylorCoeffTarget(marginals)
-        return estimate, posterior
+        return marginals, posterior
 
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
@@ -1752,8 +1708,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         )
 
         # Extract targets
-        estimate = TaylorCoeffTarget(marginals)
-        return estimate, posterior
+        return marginals, posterior
 
     def interpolate_at_t1(self, *, posterior_t1: MarkovSequence):
         cond_identity = self.ssm.prior.identity()
@@ -1766,8 +1721,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
 
         interpolated = posterior_t1
         marginals = interpolated.marginal
-        estimate = TaylorCoeffTarget(marginals)
-        return (estimate, interpolated), interp_res
+        return (marginals, interpolated), interp_res
 
     def interpolate(
         self,
@@ -1867,8 +1821,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         interp_res = InterpResult(step_from=step_from, interp_from=previous_new)
 
         marginals = interpolated.marginal
-        estimate = TaylorCoeffTarget(marginals)
-        return (estimate, interpolated), interp_res
+        return (marginals, interpolated), interp_res
 
 
 class solver_mle(ProbabilisticSolver):
@@ -1898,7 +1851,7 @@ class solver_mle(ProbabilisticSolver):
         )
         self.correct_asymptotic_underconfidence = correct_asymptotic_underconfidence
 
-    def init(self, t, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
+    def init(self, t, u, *, damp) -> ProbabilisticSolution:
         u_pred, prediction = self.strategy.init_posterior(u=u)
         cstate = self.constraint.init_linearization()
 
@@ -1907,17 +1860,17 @@ class solver_mle(ProbabilisticSolver):
 
         # Update
         lin_fun = func.partial(self.constraint.linearize, damp=damp, t=t)
-        fx, _cstate = func.eval_shape(lin_fun, u_pred.marginals, cstate)
+        fx, _cstate = func.eval_shape(lin_fun, u_pred, cstate)
         fx = tree.tree_map(np.zeros_like, fx)
 
         if self.constraint_init is not None:
             cstate_init = self.constraint_init.init_linearization()
             fx_init, _cstate = self.constraint_init.linearize(
-                u_pred.marginals, cstate_init, damp=damp, t=t
+                u_pred, cstate_init, damp=damp, t=t
             )
-            zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean_tree())
+            zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean)
             tmp = self.ssm.conditional.bayes_rule_and_residual_white_rms_tree(
-                zeros, u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
+                zeros, u_pred, fx_init, solve_triu=linalg.lstsq_svd
             )
             output_scale_running, updates = tmp
 
@@ -1955,13 +1908,13 @@ class solver_mle(ProbabilisticSolver):
         # Linearize
         (lin_state, output_scale_running, num_data) = state.auxiliary
         fx, cstate = self.constraint.linearize(
-            u.marginals, state=lin_state, damp=damp, t=state.t + dt
+            u, state=lin_state, damp=damp, t=state.t + dt
         )
 
         # Do the full correction step
-        zeros = tree.tree_map(np.zeros_like, fx.noise.mean_tree())
+        zeros = tree.tree_map(np.zeros_like, fx.noise.mean)
         new_term, updates = self.ssm.conditional.bayes_rule_and_residual_white_rms_tree(
-            zeros, u.marginals, fx, solve_triu=linalg.solve_triu
+            zeros, u, fx, solve_triu=linalg.solve_triu
         )
         u, posterior = self.strategy.apply_updates(
             prediction=prediction, updates=updates
@@ -2056,17 +2009,17 @@ class solver_dynamic(ProbabilisticSolver):
 
         output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         lin_fun = func.partial(self.constraint.linearize, damp=damp, t=t)
-        fx, _lin_state = func.eval_shape(lin_fun, u_pred.marginals, lin_state)
+        fx, _lin_state = func.eval_shape(lin_fun, u_pred, lin_state)
         fx = tree.tree_map(np.zeros_like, fx)
 
         if self.constraint_init is not None:
             cstate_init = self.constraint_init.init_linearization()
             fx_init, _cstate = self.constraint_init.linearize(
-                u_pred.marginals, cstate_init, damp=damp, t=t
+                u_pred, cstate_init, damp=damp, t=t
             )
-            zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean_tree())
+            zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean)
             updates = self.ssm.conditional.bayes_rule_tree(
-                zeros, u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
+                zeros, u_pred, fx_init, solve_triu=linalg.lstsq_svd
             )
             u, posterior = self.strategy.apply_updates(prediction, updates=updates)
         else:
@@ -2087,7 +2040,7 @@ class solver_dynamic(ProbabilisticSolver):
         # Calibrate the output scale
         ones = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
         transition = self.prior(dt, ones)
-        mean = state.u.marginals.mean_flat()
+        mean = state.u.mean_flat
         u = self.ssm.conditional.apply_flat(mean, transition)
 
         # Linearize
@@ -2096,7 +2049,7 @@ class solver_dynamic(ProbabilisticSolver):
             u, state=lin_state, damp=damp, t=state.t + dt
         )
         observed = self.ssm.conditional.marginalise(u, fx)
-        zeros = tree.tree_map(np.zeros_like, fx.noise.mean_tree())
+        zeros = tree.tree_map(np.zeros_like, fx.noise.mean)
         output_scale = observed.residual_white_rms_tree(zeros)
 
         if self.stop_gradient_through_calibration:
@@ -2112,13 +2065,13 @@ class solver_dynamic(ProbabilisticSolver):
         # Relinearize
         if self.re_linearize_after_calibration:
             fx, lin_state = self.constraint.linearize(
-                u.marginals, state=lin_state, damp=damp, t=state.t + dt
+                u, state=lin_state, damp=damp, t=state.t + dt
             )
 
         # Complete the update
-        zeros = tree.tree_map(np.zeros_like, fx.noise.mean_tree())
+        zeros = tree.tree_map(np.zeros_like, fx.noise.mean)
         updates = self.ssm.conditional.bayes_rule_tree(
-            zeros, u.marginals, fx, solve_triu=linalg.solve_triu
+            zeros, u, fx, solve_triu=linalg.solve_triu
         )
         u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
@@ -2195,17 +2148,17 @@ class solver(ProbabilisticSolver):
             constraint_init=constraint_init,
         )
 
-    def init(self, t: Array, u: TaylorCoeffTarget, *, damp) -> ProbabilisticSolution:
+    def init(self, t: Array, u, *, damp) -> ProbabilisticSolution:
         u_pred, prediction = self.strategy.init_posterior(u=u)
 
         if self.constraint_init is not None:
             cstate_init = self.constraint_init.init_linearization()
             fx_init, _cstate = self.constraint_init.linearize(
-                u_pred.marginals, cstate_init, damp=damp, t=t
+                u_pred, cstate_init, damp=damp, t=t
             )
-            zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean_tree())
+            zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean)
             updates = self.ssm.conditional.bayes_rule_tree(
-                zeros, u_pred.marginals, fx_init, solve_triu=linalg.lstsq_svd
+                zeros, u_pred, fx_init, solve_triu=linalg.lstsq_svd
             )
             u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
@@ -2214,7 +2167,7 @@ class solver(ProbabilisticSolver):
 
         cstate = self.constraint.init_linearization()
         lin_fun = func.partial(self.constraint.linearize, damp=damp, t=t)
-        fx, _cstate = func.eval_shape(lin_fun, u_pred.marginals, cstate)
+        fx, _cstate = func.eval_shape(lin_fun, u_pred, cstate)
         fx = tree.tree_map(np.zeros_like, fx)
 
         output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
@@ -2242,12 +2195,12 @@ class solver(ProbabilisticSolver):
 
         # Linearize
         fx, auxiliary = self.constraint.linearize(
-            u.marginals, state.auxiliary, damp=damp, t=state.t + dt
+            u, state.auxiliary, damp=damp, t=state.t + dt
         )
         # Update
-        zeros = tree.tree_map(np.zeros_like, fx.noise.mean_tree())
+        zeros = tree.tree_map(np.zeros_like, fx.noise.mean)
         updates = self.ssm.conditional.bayes_rule_tree(
-            zeros, u_pred.marginals, fx, solve_triu=linalg.solve_triu
+            zeros, u_pred, fx, solve_triu=linalg.solve_triu
         )
         u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
@@ -2467,7 +2420,7 @@ class error_residual_std(ErrorEstimator):
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
-        mean = previous.u.marginals.mean_flat()
+        mean = previous.u.mean_flat
         rv = self.ssm.conditional.apply_flat(mean, transition)
 
         # Optionally: re-linearize
@@ -2480,10 +2433,10 @@ class error_residual_std(ErrorEstimator):
 
         # Extract the local residual std from the linearization
         observed = self.ssm.conditional.marginalise(rv, linearized)
-        zeros = tree.tree_map(np.zeros_like, linearized.noise.mean_tree())
+        zeros = tree.tree_map(np.zeros_like, linearized.noise.mean)
         output_scale = observed.residual_white_rms_tree(zeros)
         observed = observed.rescale_cholesky(output_scale)
-        error = observed.std_tree()
+        error = observed.std
         error, _ = tree.ravel_pytree(error)
 
         # Compute a reference
@@ -2567,11 +2520,11 @@ class error_state_std(ErrorEstimator):
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
-        mean = previous.u.marginals.mean_flat()
+        mean = previous.u.mean_flat
         rv = self.ssm.conditional.apply_flat(mean, transition)
 
-        mean_tree = previous.u.marginals.mean_tree()
-        mean_leaves = tree.tree_leaves_depth_one(mean_tree)
+        mean = previous.u.mean
+        mean_leaves = tree.tree_leaves_depth_one(mean)
         error_contraction_rate = len(mean_leaves)
 
         # Optionally: re-linearize
@@ -2583,7 +2536,7 @@ class error_state_std(ErrorEstimator):
             linearized = proposed.fun_evals
 
         # Extract the local residual std from the linearization
-        zeros = tree.tree_map(np.zeros_like, linearized.noise.mean_tree())
+        zeros = tree.tree_map(np.zeros_like, linearized.noise.mean)
         output_scale, conditional = (
             self.ssm.conditional.bayes_rule_and_residual_white_rms_tree(
                 zeros, rv, linearized, solve_triu=linalg.solve_triu
@@ -2594,7 +2547,7 @@ class error_state_std(ErrorEstimator):
         n = self.derivative_idx
 
         # *New:* Go back into solution space
-        std = conditional.std_tree()[n]
+        std = conditional.std[n]
         error, _ = tree.ravel_pytree(std)
         error = output_scale * error
         error, _ = tree.ravel_pytree(error)  # TODO: this line is useless?
