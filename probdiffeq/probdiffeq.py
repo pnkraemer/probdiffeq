@@ -678,7 +678,7 @@ class MarkovSequence(Generic[N]):
 
     @classmethod
     def from_grid(cls, init, discretize, *, grid, reverse: bool):
-        marginal = init.marginals
+        marginal = init
         conditional = func.vmap(discretize)(np.diff(grid))
         return cls(marginal, conditional, reverse=reverse)
 
