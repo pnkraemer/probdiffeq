@@ -1191,7 +1191,7 @@ def prior_wiener_integrated(
     output_scale: Array | None = None,
 ):
     """Construct an integrated Wiener process prior."""
-    return ssm.prior.wiener_integrated_diffuse(
+    return ssm.prior.wiener_integrated(
         tcoeffs,
         is_exact=is_exact,
         inexact_eps=inexact_eps,
@@ -1202,15 +1202,31 @@ def prior_wiener_integrated(
 
 
 def prior_ornstein_uhlenbeck_integrated(
-    linop: Callable, /, *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
+    linop: Callable,
+    tcoeffs: C,
+    /,
+    *,
+    ssm: ssm_impl.FactSsmImpl,  # Which of the Taylor coefficients are exact
+    is_exact: C | bool = True,
+    inexact_eps: float = 1e-6,  # a small value
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value,
+    output_scale: Array | None = None,
 ):
     """Construct an integrated Ornstein-Uhlenbeck prior."""
 
     def vf_linear(*tcoeffs):
         return linop(tcoeffs[-1])
 
-    return ssm.prior.transition_exponential(
-        vf_linear=vf_linear, base_scale=output_scale
+    return ssm.prior.exponential(
+        tcoeffs,
+        is_exact=is_exact,
+        inexact_eps=inexact_eps,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+        vf_linear=vf_linear,
+        base_scale=output_scale,
     )
 
 

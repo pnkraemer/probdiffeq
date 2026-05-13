@@ -37,13 +37,15 @@ def case_factory_prior_wiener_integrated():
 @testing.case
 def case_factory_prior_ioup():
 
-    def prior(ssm):
+    def prior(*args, **kwargs):
         try:
 
             def linop(u, /):
                 return tree.tree_map(lambda s: 0.01 * np.flip(s), u)
 
-            return probdiffeq.prior_ornstein_uhlenbeck_integrated(linop, ssm=ssm)
+            return probdiffeq.prior_ornstein_uhlenbeck_integrated(
+                linop, *args, **kwargs
+            )
         except NotImplementedError:
             reason = "This prior is not implemented"
             reason += ", likely due to the selected state-space factorisation."
@@ -172,8 +174,8 @@ def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
 
     # Build a solver
     tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
-    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=ssm_fact)
-    prior = factory.prior(ssm=ssm)
+    ssm = probdiffeq.ssm_taylor(ssm_fact=ssm_fact)
+    init, prior = factory.prior(tcoeffs, ssm=ssm)
     strategy = factory.strategy(ssm=ssm)
     constraint = factory.constraint(vf, ssm=ssm)
     solver = factory.solver(
