@@ -1,6 +1,6 @@
 r"""Evaluate jet-recursions in differential equations."""
 
-from probdiffeq import ssm_impl
+from probdiffeq import probdiffeq
 from probdiffeq.backend import flow, func, inspect, np, tree
 from probdiffeq.backend.typing import Array, ArrayLike, Callable, Sequence
 
@@ -342,17 +342,10 @@ def daejet_nlstsq(
 
     # Determine degrees of freedom ("dof") and initialse all others diffusely
     # Concretely: The provided 'inits' are not DOFs, all added ones are.
-    zeros = tree.tree_map(np.zeros_like, inits[0])
-    ones = tree.tree_map(np.ones_like, inits[0])
-    inits_std = [*[zeros for _ in inits], *[ones for _ in range(num)]]
+    ssm = probdiffeq.ssm_taylor()
+    rv, _ = probdiffeq.prior_wiener_integrated(inits, diffuse_derivatives=num, ssm=ssm)
 
-    # Pad the initial values to the desired size
-    zeros = tree.tree_map(np.zeros_like, inits[0])
-    inits_mean = [*inits, *[zeros for _ in range(num)]]
-
-    rv, _ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(inits_mean, inits_std)
-
-    x0, unravel = tree.ravel_pytree(inits_mean)
+    x0, unravel = tree.ravel_pytree(rv.mean)
 
     def root_jet(tcoeffs_flat):
         tcoeffs_all = unravel(tcoeffs_flat)

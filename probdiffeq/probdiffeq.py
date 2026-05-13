@@ -647,11 +647,12 @@ def constraint_jet_dae(
         return [primals, *series]
 
     if jet_order_differential == "max" or jet_order_algebraic == "max":
-        order = "max"
-    else:
-        order_diff = root_order_diff + jet_order_differential
-        order_alg = root_order_alg + jet_order_algebraic
-        order = max(order_diff, order_alg)
+        return ssm.linearize.root(
+            root_jet, root_order="max", jacobian=jacobian, nlstsq=nlstsq
+        )
+    order_diff = root_order_diff + jet_order_differential
+    order_alg = root_order_alg + jet_order_algebraic
+    order = max(order_diff, order_alg)
     return ssm.linearize.root(
         root_jet, root_order=order, jacobian=jacobian, nlstsq=nlstsq
     )
@@ -720,16 +721,6 @@ class MarkovSequence(Generic[N]):
         solve_triu: Callable,
     ):
         assert self.reverse
-
-        if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
-            markov_seq = self._select_terminal()
-            return markov_seq.evaluate_lml(
-                u,
-                model=model,
-                ssm=ssm,
-                average_pdfs=average_pdfs,
-                solve_triu=solve_triu,
-            )
 
         # Process the terminal value
         u0 = tree.tree_map(lambda s: s[-1], u)
@@ -1178,7 +1169,16 @@ class ProbabilisticSolver:
 
 
 def ssm_taylor(ssm_fact="dense"):
-    return ssm_impl.FactSsmImpl.from_name(ssm_fact)
+    """Construct an implementation of a factorised state-space model."""
+    if ssm_fact == "dense":
+        return ssm_impl.FactSsmImpl.from_dense()
+
+    if ssm_fact == "blockdiag":
+        return ssm_impl.FactSsmImpl.from_blockdiag()
+
+    if ssm_fact == "isotropic":
+        return ssm_impl.FactSsmImpl.from_isotropic()
+    raise ValueError(ssm_fact)
 
 
 def prior_wiener_integrated(

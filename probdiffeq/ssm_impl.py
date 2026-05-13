@@ -384,75 +384,35 @@ class AbstractPriorFactory:
 class FactSsmImpl:
     """Implementation of factorized Markovian state-space models."""
 
-    # Linearization and priors: construct RVs and conditionals
-
     linearize: AbstractLinearizationFactory
     """An implementation of linearization constructors."""
 
     prior: AbstractPriorFactory
     """An implementation of constructing prior distributions."""
 
-    # Manipulate RVs and conditionals
-
     conditional: AbstractConditional
     """An implementation of manipulating conditionals."""
 
     @classmethod
-    def from_name(cls, name, /):
-        if name == "dense":
-            prior = DensePriorFactory()
-            linearize = DenseLinearizationFactory()
-            conditional = DenseConditional()
-            return cls(linearize=linearize, conditional=conditional, prior=prior)
-        if name == "isotropic":
-            prior = IsotropicPriorFactory()
-            linearize = IsotropicLinearizationFactory()
-            conditional = IsotropicConditional()
-            return cls(linearize=linearize, prior=prior, conditional=conditional)
-        if name == "blockdiag":
-            prior = BlockDiagPriorFactory()
-            linearize = BlockDiagLinearizationFactory()
-            conditional = BlockDiagConditional()
-            return cls(linearize=linearize, prior=prior, conditional=conditional)
+    def from_dense(cls, /):
+        prior = DensePriorFactory()
+        linearize = DenseLinearizationFactory()
+        conditional = DenseConditional()
+        return cls(linearize=linearize, conditional=conditional, prior=prior)
 
-        raise ValueError(name)
+    @classmethod
+    def from_isotropic(cls, /):
+        prior = IsotropicPriorFactory()
+        linearize = IsotropicLinearizationFactory()
+        conditional = IsotropicConditional()
+        return cls(linearize=linearize, conditional=conditional, prior=prior)
 
-    # @classmethod
-    # def from_tcoeffs_dense(cls, tcoeffs_mean, tcoeffs_std, /):
-    #     """Construct a factorised state-space model implementation."""
-    #     shape_info = ShapeInfo(tcoeffs_mean)
-    #     marginal = DenseNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
-
-    #     prior = DensePriorFactory()
-
-    #     linearize = DenseLinearizationFactory()
-    #     conditional = DenseConditional()
-    #     ssm = cls(linearize=linearize, conditional=conditional, prior=prior)
-    #     return marginal, ssm
-
-    # @classmethod
-    # def from_tcoeffs_isotropic(cls, tcoeffs_mean, tcoeffs_std, /):
-    #     """Construct a factorised state-space model implementation."""
-    #     shape_info = ShapeInfo(tcoeffs_mean)
-    #     marginal = IsotropicNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
-
-    #     prior = IsotropicPriorFactory(shape_info=shape_info)
-    #     linearize = IsotropicLinearizationFactory()
-    #     conditional = IsotropicConditional()
-    #     ssm = cls(linearize=linearize, prior=prior, conditional=conditional)
-    #     return marginal, ssm
-
-    # @classmethod
-    # def from_tcoeffs_blockdiag(cls, tcoeffs_mean, tcoeffs_std, /):
-    #     """Construct a factorised state-space model implementation."""
-    #     shape_info = ShapeInfo(tcoeffs_mean)
-    #     marginal = BlockDiagNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
-
-    #     prior = BlockDiagPriorFactory(shape_info=shape_info)
-    #     linearize = BlockDiagLinearizationFactory()
-    #     conditional = BlockDiagConditional()
-    #     ssm = cls(linearize=linearize, prior=prior, conditional=conditional)
-    #     return marginal, ssm
+    @classmethod
+    def from_blockdiag(cls, /):
+        prior = BlockDiagPriorFactory()
+        linearize = BlockDiagLinearizationFactory()
+        conditional = BlockDiagConditional()
+        return cls(linearize=linearize, conditional=conditional, prior=prior)
 
 
 class BlockDiagPriorFactory(AbstractPriorFactory):
@@ -756,7 +716,7 @@ class IsotropicPriorFactory(AbstractPriorFactory):
                 def eps_like(s):
                     return inexact_eps * np.ones_like(s)
 
-                tcoeffs_std = tree.tree_map(eps_like, tcoeffs_mean)
+                tcoeffs_std = tree.tree_map(eps_like, std_template)
         else:
             if not tree.tree_all(shape_equal(is_exact, std_template)):
                 msg = "Input 'is_exact' has the wrong PyTree structure."
@@ -1942,7 +1902,7 @@ class IsotropicNormal(AbstractTreeNormal[IsotropicTreeFlatten]):
         num_coeffs = len(mean)
         if scale_flat.shape != (num_coeffs,):
             msg = "'std' must have the same pytree structure as mean, "
-            msg += "but each leaf must be a scalar instead of an array"
+            msg += "but each leaf must be a scalar instead of an array. "
             msg += f"Received: {std}"
             raise ValueError(msg)
 

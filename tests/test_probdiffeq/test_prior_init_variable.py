@@ -8,7 +8,7 @@ def test_init_diffuse_derivatives() -> None:
     ssm = probdiffeq.ssm_taylor()
     tcoeffs = [2.0, 3.0]
     init, _prior = probdiffeq.prior_wiener_integrated(
-        tcoeffs, diffuse_derivatives=3, diffuse_eps=123.0
+        tcoeffs, diffuse_derivatives=3, diffuse_eps=123.0, ssm=ssm
     )
     assert testing.allclose(init.mean, [2.0, 3.0, 0.0, 0.0, 0.0])
     assert testing.allclose(init.std, [0.0, 0.0, 123.0, 123.0, 123.0])
