@@ -281,52 +281,8 @@ class AbstractConditional(abc.ABC):
         raise NotImplementedError
 
 
-# class ShapeInfo:
-#     """Information about shapes of Taylor coefficients (lengths, sizes, etc.)."""
-
-#     def __init__(self, tcoeffs: Sequence, /):
-#         # Ensure everything has shapes and dtypes
-#         tcoeffs = tree.tree_map(np.asarray, tcoeffs)
-
-#         # TODO: assert that the tree is a tree of Taylor coefficients
-#         #       (which means each leaf has the same tree structure)
-
-#         # A flattened representation of the Taylor coefficients
-#         flat, self.all_unravel = tree.ravel_pytree(tcoeffs)
-#         self.all_flat = structs.ShapeDtypeStruct(flat.shape, flat.dtype)
-
-#         # A flattened representation of each Taylor coefficient
-#         flat, self.single_unravel = tree.ravel_pytree(tcoeffs[0])
-#         self.single_flat = structs.ShapeDtypeStruct(flat.shape, flat.dtype)
-
-#         # The leaves in the Taylor coefficients.
-#         # Note how each Taylor coefficient can itself be a PyTree,
-#         # but the leaves must always be arrays.
-#         # This specific info is especially important for blockdiagonal models.
-#         # TODO: this somewhat duplicates the above,
-#         #       but not enough to prioritise refactoring...
-#         def is_leaf(ell):
-#             return tree.tree_structure(ell) == tree.tree_structure(tcoeffs[0])
-
-#         leaves, self.treedef = tree.tree_flatten_depth_one(tcoeffs)
-#         _, self.leaf_unravel = tree.ravel_pytree(leaves[0])
-
-#         def create_dummy(s):
-#             return structs.ShapeDtypeStruct(s.shape, s.dtype)
-
-#         self.leaves = tree.tree_map(create_dummy, leaves)
-
-#     @property
-#     def num_derivatives(self):
-#         """The number of derivatives in the SSM."""
-#         return len(self.leaves) - 1
-
-
 class AbstractPriorFactory(abc.ABC):
     """Interface for prior constructions."""
-
-    # def __init__(self, shape_info) -> None:
-    #     self.shape_info = shape_info
 
     @abc.abstractmethod
     def identity(self, /):
@@ -847,7 +803,6 @@ class IsotropicPriorFactory(AbstractPriorFactory):
         m = np.zeros((ndim,))
         linop = func.jacfwd(lambda s: np.asarray([s[i]]))(m)
 
-        # u_like = tree.tree_unflatten(self.shape_info.treedef, m)[0]
         u_like = tree.tree_map(np.zeros_like, template.mean[0])
 
         # Wrap u_like and std into a list because the random variable
@@ -1164,10 +1119,6 @@ class DenseTreeFlatten(AbstractTreeFlatten):
     def from_example(cls, x):
         _, unravel = tree.ravel_pytree(x)
         return cls(unravel)
-
-    @classmethod
-    def from_shape_info(cls, shape_info):
-        return cls(shape_info.all_unravel)
 
 
 class DenseNormal(AbstractTreeNormal[DenseTreeFlatten]):
@@ -1972,12 +1923,6 @@ class IsotropicTreeFlatten(AbstractTreeFlatten):
         _, unravel_leaf = tree.ravel_pytree(leaves[0])
         return cls(treedef, unravel_leaf)
 
-    @classmethod
-    def from_shape_info(cls, shape_info):
-        treedef = shape_info.treedef
-        unravel_leaf = shape_info.leaf_unravel
-        return IsotropicTreeFlatten(treedef, unravel_leaf)
-
 
 def _verify_taylor_coefficient_pytree(x, /):
     if isinstance(x, Array):
@@ -2160,12 +2105,6 @@ class BlockDiagTreeFlatten(AbstractTreeFlatten):
         leaves, treedef = tree.tree_flatten_depth_one(x)
         _, unravel_leaf = tree.ravel_pytree(leaves[0])
         return cls(treedef, unravel_leaf)
-
-    @classmethod
-    def from_shape_info(cls, shape_info):
-        treedef = shape_info.treedef
-        unravel_leaf = shape_info.leaf_unravel
-        return BlockDiagTreeFlatten(treedef, unravel_leaf)
 
 
 class BlockDiagNormal(AbstractTreeNormal[BlockDiagTreeFlatten]):
