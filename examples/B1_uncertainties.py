@@ -33,7 +33,7 @@ def main():
     # To all users: Try replacing the fixedpoint-smoother with a filter!
 
     tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
-    ssm = probdiffeq.ssm_taylor(ssm_fact="blockdiag")
+    ssm = probdiffeq.state_space_model(ssm_fact="blockdiag")
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)

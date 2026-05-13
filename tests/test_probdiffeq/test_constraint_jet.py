@@ -150,7 +150,7 @@ def test_posterior_linearisation_matches_closed_form_recursion(
     ssm_fact,
 ):
     derivatives = len(expected) - 1
-    ssm = probdiffeq.ssm_taylor(ssm_fact=ssm_fact)
+    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
     init, _iwp = probdiffeq.prior_wiener_integrated(
         [root.u0], diffuse_derivatives=derivatives, ssm=ssm
     )
@@ -176,7 +176,7 @@ def test_wrong_jet_order_raises_error(
     root: Root, jet_factory: Callable, wrong_jet_order, ssm_fact
 ):
     # 5 Taylor coefficients + root-orders of 2 (constraints depend on u and du).
-    ssm = probdiffeq.ssm_taylor(ssm_fact=ssm_fact)
+    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
     init, _ = probdiffeq.prior_wiener_integrated(
         [root.u0], diffuse_derivatives=4, ssm=ssm
     )
@@ -190,7 +190,7 @@ def test_wrong_jet_order_raises_error(
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
 @testing.parametrize("ssm_fact", ["dense"])
 def test_max_jet_order_is_tight(root: Root, jet_factory: Callable, ssm_fact):
-    ssm = probdiffeq.ssm_taylor(ssm_fact=ssm_fact)
+    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
     init, _ = probdiffeq.prior_wiener_integrated(
         [root.u0], diffuse_derivatives=4, ssm=ssm
     )

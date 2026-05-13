@@ -11,7 +11,7 @@ def test_output_matches_reference(fact) -> None:
     # Don't try all solvers because they're tested in a different file.
     # This test here is only to assert that terminal-value simulation works.
     tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
-    ssm = probdiffeq.ssm_taylor(ssm_fact=fact)
+    ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
 
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)

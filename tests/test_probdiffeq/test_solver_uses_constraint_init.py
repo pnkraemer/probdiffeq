@@ -48,7 +48,7 @@ def test_output_matches_reference(ivp, solver_factory, derivatives, ssm_fact) ->
     # Build an SSM (no ODE-jets, so that we can test the update at init)
     # Only use the dense factorisation because this test uses JET constraints
     # and they have not been implemented for isotropic or blockdiagonal models
-    ssm = probdiffeq.ssm_taylor(ssm_fact=ssm_fact)
+    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
     init, prior = probdiffeq.prior_wiener_integrated(
         [u0], diffuse_derivatives=derivatives, ssm=ssm
     )

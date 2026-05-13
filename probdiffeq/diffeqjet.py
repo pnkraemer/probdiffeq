@@ -342,7 +342,7 @@ def daejet_nlstsq(
 
     # Determine degrees of freedom ("dof") and initialse all others diffusely
     # Concretely: The provided 'inits' are not DOFs, all added ones are.
-    ssm = probdiffeq.ssm_taylor()
+    ssm = probdiffeq.state_space_model()
     rv, _ = probdiffeq.prior_wiener_integrated(inits, diffuse_derivatives=num, ssm=ssm)
 
     x0, unravel = tree.ravel_pytree(rv.mean)

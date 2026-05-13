@@ -51,7 +51,7 @@ def solution_routine(while_loop):
     u0 = jnp.asarray([0.1])
 
     tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
-    ssm = probdiffeq.ssm_taylor(ssm_fact="isotropic")
+    ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
 

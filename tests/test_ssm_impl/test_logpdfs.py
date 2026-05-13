@@ -35,7 +35,7 @@ def test_grad_not_none(fact) -> None:
 
 def create_random_variable(fact):
     tcoeffs = [np.ones((3,))] * 5  # values irrelevant
-    ssm = probdiffeq.ssm_taylor(fact)
+    ssm = probdiffeq.state_space_model(fact)
     _, discretize = probdiffeq.prior_wiener_integrated(
         tcoeffs, is_exact=False, inexact_eps=1.0, ssm=ssm
     )

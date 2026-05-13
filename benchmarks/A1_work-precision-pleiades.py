@@ -175,7 +175,7 @@ def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = diffeqjet.odejet_unroll(vf_auto, (u0, du0), num=num_derivatives - 1)
 
-        ssm = probdiffeq.ssm_taylor(ssm_fact="isotropic")
+        ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
         init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
         ts = constraint_ode_fun(vf_probdiffeq, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)

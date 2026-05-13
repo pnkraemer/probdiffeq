@@ -59,7 +59,7 @@ def main():
 
     # Set up the first-order solver (for illustration).
     tcoeffs = [u0_1st]
-    ssm = probdiffeq.ssm_taylor()
+    ssm = probdiffeq.state_space_model()
     init, iwp = probdiffeq.prior_wiener_integrated(
         tcoeffs, diffuse_derivatives=2, ssm=ssm
     )
@@ -89,7 +89,7 @@ def main():
     # But for low-order solvers, custom roots work well.
     u0, du0 = jnp.split(u0_1st, 2)
     tcoeffs = [u0, du0]
-    ssm = probdiffeq.ssm_taylor()
+    ssm = probdiffeq.state_space_model()
     init, iwp = probdiffeq.prior_wiener_integrated(
         tcoeffs, diffuse_derivatives=1, ssm=ssm
     )

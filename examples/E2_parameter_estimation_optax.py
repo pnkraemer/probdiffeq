@@ -89,7 +89,7 @@ def main():
 
 def solver(vf, u0, *, grid):
     """Construct a solver."""
-    ssm = probdiffeq.ssm_taylor(ssm_fact="isotropic")
+    ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
 
     def solve(p):
         """Evaluate the parameter-to-solution map."""

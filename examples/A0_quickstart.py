@@ -27,7 +27,7 @@ def main():
 
     # Set up a state-space model over Taylor coefficients
 
-    ssm = probdiffeq.ssm_taylor()
+    ssm = probdiffeq.state_space_model()
 
     # Build a solver
     tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)

@@ -49,7 +49,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     def algebraic_auto(u):
         return algebraic(u, t=t0)
 
-    ssm = probdiffeq.ssm_taylor()
+    ssm = probdiffeq.state_space_model()
 
     y0 = [jnp.array([1.0, 0.0, 0.0])]
     nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=10, tol=1e-8)

@@ -71,7 +71,7 @@ def case_scale_rules_iwp_isotropic() -> ScaleShapeRules:
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_covariances_scaled_correctly_default(rules: ScaleShapeRules):
     # Test that the transition covariances are scaled correctly
-    ssm = probdiffeq.ssm_taylor(ssm_fact=rules.ssm_fact)
+    ssm = probdiffeq.state_space_model(ssm_fact=rules.ssm_fact)
 
     # 1d problem, but "unusual" shapes. Values don't matter.
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
@@ -85,7 +85,7 @@ def test_output_scales_covariances_scaled_correctly_default(rules: ScaleShapeRul
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_covariances_scaled_correctly_custom(rules: ScaleShapeRules):
     # Test that the transition covariances are scaled correctly
-    ssm = probdiffeq.ssm_taylor(ssm_fact=rules.ssm_fact)
+    ssm = probdiffeq.state_space_model(ssm_fact=rules.ssm_fact)
 
     # 1d problem, but "unusual" shapes. Values don't matter.
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
@@ -100,7 +100,7 @@ def test_output_scales_covariances_scaled_correctly_custom(rules: ScaleShapeRule
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_wrong_shape_raises_error_at_construction(rules: ScaleShapeRules):
-    ssm = probdiffeq.ssm_taylor(ssm_fact=rules.ssm_fact)
+    ssm = probdiffeq.state_space_model(ssm_fact=rules.ssm_fact)
 
     # Sanity check: assert that the same error does not happen with the correct shape
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
@@ -115,7 +115,7 @@ def test_output_scales_wrong_shape_raises_error_at_construction(rules: ScaleShap
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_wrong_shape_raises_error_at_calling(rules: ScaleShapeRules):
-    ssm = probdiffeq.ssm_taylor(ssm_fact=rules.ssm_fact)
+    ssm = probdiffeq.state_space_model(ssm_fact=rules.ssm_fact)
 
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
     _init, iwp = rules.prior(tcoeffs, ssm=ssm)

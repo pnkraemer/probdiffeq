@@ -174,7 +174,7 @@ def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
 
     # Build a solver
     tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
-    ssm = probdiffeq.ssm_taylor(ssm_fact=ssm_fact)
+    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
     init, prior = factory.prior(tcoeffs, ssm=ssm)
     strategy = factory.strategy(ssm=ssm)
     constraint = factory.constraint(vf, ssm=ssm)

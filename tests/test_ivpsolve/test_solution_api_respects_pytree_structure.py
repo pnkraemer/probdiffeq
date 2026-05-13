@@ -20,7 +20,7 @@ def fixture_pn_solution(fact):
 
     # Generate a solver
     tcoeffs = Taylor(*diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=2))
-    ssm = probdiffeq.ssm_taylor(ssm_fact=fact)
+    ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
 
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)

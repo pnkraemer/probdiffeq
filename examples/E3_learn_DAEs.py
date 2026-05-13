@@ -92,7 +92,7 @@ def main(
 
     # Build a loss
     # Includes a "fake" SSM (to get the conditioning-functions to build a loss)
-    ssm = probdiffeq.ssm_taylor()
+    ssm = probdiffeq.state_space_model()
     loss = loss_data_fit(solve, ssm=ssm, inputs=inputs, labels=labels)
     value_and_grad = jax.jit(jax.value_and_grad(loss, has_aux=True))
 
@@ -160,7 +160,7 @@ def solver(differential, algebraic, tol, while_loop, trafo):
         y0, _info = diffeqjet.daejet_nlstsq(
             differential_auto, algebraic_auto, [y0], num=3, nlstsq=nlstsq
         )
-        ssm = probdiffeq.ssm_taylor()
+        ssm = probdiffeq.state_space_model()
 
         init, prior = probdiffeq.prior_wiener_integrated(
             y0, ssm=ssm, output_scale=output_scale

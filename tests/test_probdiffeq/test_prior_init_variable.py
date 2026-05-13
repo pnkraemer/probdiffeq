@@ -5,7 +5,7 @@ from probdiffeq.backend import np, testing
 
 
 def test_init_diffuse_derivatives() -> None:
-    ssm = probdiffeq.ssm_taylor()
+    ssm = probdiffeq.state_space_model()
     tcoeffs = [2.0, 3.0]
     init, _prior = probdiffeq.prior_wiener_integrated(
         tcoeffs, diffuse_derivatives=3, diffuse_eps=123.0, ssm=ssm
@@ -15,7 +15,7 @@ def test_init_diffuse_derivatives() -> None:
 
 
 def test_init_is_exact_dense() -> None:
-    ssm = probdiffeq.ssm_taylor()
+    ssm = probdiffeq.state_space_model()
     tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray([True, False, True])]
     init, _prior = probdiffeq.prior_wiener_integrated(
@@ -35,7 +35,7 @@ def test_init_is_exact_dense() -> None:
 def test_init_is_exact_blockdiag() -> None:
     tcoeffs = [np.asarray([1.0, 2.0, 3.0]), np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray([True, False, True]), np.asarray([False, False, True])]
-    ssm = probdiffeq.ssm_taylor(ssm_fact="blockdiag")
+    ssm = probdiffeq.state_space_model(ssm_fact="blockdiag")
     init, _iwp = probdiffeq.prior_wiener_integrated(
         tcoeffs, is_exact=isdiff, inexact_eps=0.123, ssm=ssm
     )
@@ -55,7 +55,7 @@ def test_init_is_exact_blockdiag() -> None:
 def test_init_is_exact_isotropic() -> None:
     tcoeffs = [np.asarray([1.0, 2.0, 3.0]), np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray(True), np.asarray(False)]
-    ssm = probdiffeq.ssm_taylor(ssm_fact="isotropic")
+    ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
     init, _ssm = probdiffeq.prior_wiener_integrated(
         tcoeffs, is_exact=isdiff, inexact_eps=0.123, ssm=ssm
     )

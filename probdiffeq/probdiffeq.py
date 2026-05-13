@@ -1168,7 +1168,7 @@ class ProbabilisticSolver:
         return sol, InterpResult(step_from=acc, interp_from=prev)
 
 
-def ssm_taylor(ssm_fact="dense"):
+def state_space_model(ssm_fact="dense"):
     """Construct an implementation of a factorised state-space model."""
     if ssm_fact == "dense":
         return ssm_impl.FactSsmImpl.from_dense()
