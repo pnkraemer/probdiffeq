@@ -92,7 +92,7 @@ def main(
 
     # Build a loss
     # Includes a "fake" SSM (to get the conditioning-functions to build a loss)
-    _, ssm = probdiffeq.ssm_taylor([jnp.zeros((3,))], diffuse_derivatives=3)
+    ssm = probdiffeq.ssm_taylor()
     loss = loss_data_fit(solve, ssm=ssm, inputs=inputs, labels=labels)
     value_and_grad = jax.jit(jax.value_and_grad(loss, has_aux=True))
 
@@ -120,7 +120,7 @@ def main(
         if epoch % 10 == 0:
             y_guess = trafo.latent_to_observed(p_guess)
             y_true = trafo.latent_to_observed(p_true)
-            print(f"Epoch={epoch:4d}, estim={y_guess}, true={y_true}")
+            print(f"Epoch={epoch:4d} /{epochs:4d}, estim={y_guess}, true={y_true}")
 
 
 def loss_data_fit(solve, *, ssm, inputs, labels):
@@ -160,9 +160,11 @@ def solver(differential, algebraic, tol, while_loop, trafo):
         y0, _info = diffeqjet.daejet_nlstsq(
             differential_auto, algebraic_auto, [y0], num=3, nlstsq=nlstsq
         )
-        init, ssm = probdiffeq.ssm_taylor(y0)
+        ssm = probdiffeq.ssm_taylor()
 
-        prior = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=output_scale)
+        init, prior = probdiffeq.prior_wiener_integrated(
+            y0, ssm=ssm, output_scale=output_scale
+        )
 
         # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
         jet = probdiffeq.constraint_jet_dae(

@@ -38,8 +38,8 @@ def main():
 
     # Construct solvers
     tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (theta_guess,), num=2)
-    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
-    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=10.0)
+    ssm = probdiffeq.ssm_taylor(ssm_fact="isotropic")
+    _init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=10.0)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
@@ -160,7 +160,8 @@ def solve_adaptive(vf, *, solver, error, save_at):
         tcoeffs = diffeqjet.odejet_padded_scan(
             lambda y: vf(y, t=save_at[0]), (theta,), num=2
         )
-        init, _ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
+        ssm = probdiffeq.ssm_taylor(ssm_fact="isotropic")
+        init, _iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
         solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
         return solve(init, save_at=save_at, dt0=0.1, atol=1e-4, rtol=1e-2)
 
@@ -181,7 +182,8 @@ def log_posterior(vf, theta_true, *, solver, ts, mean, cov, obs_std=0.1):
     tcoeffs = diffeqjet.odejet_padded_scan(
         lambda y: vf(y, t=ts[0]), (theta_true,), num=2
     )
-    init, _ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
+    ssm = probdiffeq.ssm_taylor(ssm_fact="isotropic")
+    init, _iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
     sol = solve(init, grid=ts)
     data = sol.u.mean[0][-1]
@@ -192,7 +194,7 @@ def log_posterior(vf, theta_true, *, solver, ts, mean, cov, obs_std=0.1):
         tcoeffs = diffeqjet.odejet_padded_scan(
             lambda y: vf(y, t=ts[0]), (theta,), num=2
         )
-        init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
+        init, _iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
         solve = ivpsolve.solve_fixed_grid(solver=solver)
         solution = solve(init, grid=ts)
         y_T = jax.tree.map(lambda s: s[-1], solution.u)

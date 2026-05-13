@@ -38,13 +38,15 @@ def main():
     A = jnp.asarray([[-0.5, 20], [0, -20]])
 
     # Set up a state-space model over Taylor coefficients
-    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
-    init, ssm = probdiffeq.ssm_taylor(tcoeffs)
+    ssm = probdiffeq.ssm_taylor()
 
     # Build a solver
+    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
+    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
-    ioup = probdiffeq.prior_ornstein_uhlenbeck_integrated(lambda s: A @ s, ssm=ssm)
+    _init, ioup = probdiffeq.prior_ornstein_uhlenbeck_integrated(
+        lambda s: A @ s, tcoeffs, ssm=ssm
+    )
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     ts1 = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
 

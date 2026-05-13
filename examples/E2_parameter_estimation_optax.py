@@ -89,13 +89,14 @@ def main():
 
 def solver(vf, u0, *, grid):
     """Construct a solver."""
-    _init, ssm = probdiffeq.ssm_taylor([u0, u0], ssm_fact="isotropic")
+    ssm = probdiffeq.ssm_taylor(ssm_fact="isotropic")
 
     def solve(p):
         """Evaluate the parameter-to-solution map."""
         tcoeffs = (u0, vf(u0, grid[0], p=p))
-        init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
-        iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=10.0)
+        init, iwp = probdiffeq.prior_wiener_integrated(
+            tcoeffs, ssm=ssm, output_scale=10.0
+        )
 
         def vf_p(y, /, *, t):
             return vf(y, t=t, p=p)

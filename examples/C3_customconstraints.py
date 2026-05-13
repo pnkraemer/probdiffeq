@@ -59,8 +59,10 @@ def main():
 
     # Set up the first-order solver (for illustration).
     tcoeffs = [u0_1st]
-    init, ssm = probdiffeq.ssm_taylor(tcoeffs, diffuse_derivatives=2)
-    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
+    ssm = probdiffeq.ssm_taylor()
+    init, iwp = probdiffeq.prior_wiener_integrated(
+        tcoeffs, diffuse_derivatives=2, ssm=ssm
+    )
     ts1 = probdiffeq.constraint_ode_ts1(vf_1st, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver_1st = probdiffeq.solver_mle(
@@ -87,8 +89,10 @@ def main():
     # But for low-order solvers, custom roots work well.
     u0, du0 = jnp.split(u0_1st, 2)
     tcoeffs = [u0, du0]
-    init, ssm = probdiffeq.ssm_taylor(tcoeffs, diffuse_derivatives=1)
-    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
+    ssm = probdiffeq.ssm_taylor()
+    init, iwp = probdiffeq.prior_wiener_integrated(
+        tcoeffs, diffuse_derivatives=1, ssm=ssm
+    )
 
     # Use this constraint function for custom roots:
     ts1 = probdiffeq.constraint_jet(root, ssm=ssm, jet_order=0)
