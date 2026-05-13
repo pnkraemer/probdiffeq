@@ -140,9 +140,9 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         # Build a solver
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
         tcoeffs = diffeqjet.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
-        init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
+        ssm = probdiffeq.ssm_taylor(ssm_fact="dense")
 
-        iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
+        init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
         ts1 = probdiffeq.constraint_ode_ts1(vf_probdiffeq, ssm=ssm)
 
         strategy = probdiffeq.strategy_filter(ssm=ssm)

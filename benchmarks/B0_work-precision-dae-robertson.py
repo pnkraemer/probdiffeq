@@ -161,10 +161,12 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
         # Build a solver
         vf_auto = functools.partial(vf, t=t0)
         tcoeffs = diffeqjet.odejet_padded_scan(vf_auto, (y0,), num=num_derivatives - 1)
-        init, ssm = probdiffeq.ssm_taylor(tcoeffs)
+        ssm = probdiffeq.ssm_taylor()
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
-        iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=base_scale)
+        init, iwp = probdiffeq.prior_wiener_integrated(
+            tcoeffs, ssm=ssm, output_scale=base_scale
+        )
         ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
@@ -215,10 +217,12 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
         tcoeffs, _info = diffeqjet.daejet_nlstsq(
             differential_auto, algebraic_auto, y0, num=num_derivatives, nlstsq=nlstsq
         )
-        init, ssm = probdiffeq.ssm_taylor(tcoeffs)
+        ssm = probdiffeq.ssm_taylor()
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
-        iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=base_scale)
+        init, iwp = probdiffeq.prior_wiener_integrated(
+            tcoeffs, ssm=ssm, output_scale=base_scale
+        )
 
         # We build a Jet constraint
         jet = probdiffeq.constraint_jet_dae(
