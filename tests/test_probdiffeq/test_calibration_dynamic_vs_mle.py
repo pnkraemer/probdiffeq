@@ -14,8 +14,8 @@ def test_exponential_approximated_well(fact) -> None:
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = (*u0, vf(*u0, t=t0))
-    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
-    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
+    ssm = probdiffeq.state_space_model(ssm_fact=fact)
+    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver_dynamic(

@@ -29,8 +29,8 @@ def main():
         return f(y, *f_args)
 
     tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf_1(y, t=t0), (u0,), num=4)
-    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
-    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=1.0)
+    ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
+    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=1.0)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf_1, ssm=ssm)
     solver_1st = probdiffeq.solver_mle(
@@ -59,8 +59,8 @@ def main():
     tcoeffs = diffeqjet.odejet_padded_scan(
         lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3
     )
-    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="isotropic")
-    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=1.0)
+    ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
+    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=1.0)
     ts0 = probdiffeq.constraint_ode_ts0(vf_2, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver_2nd = probdiffeq.solver_mle(

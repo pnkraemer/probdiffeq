@@ -61,7 +61,7 @@ def main():
     # For example, the standard deviation or samples from the solution object:
 
     key = jax.random.PRNGKey(seed=15)
-    _, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
+    ssm = probdiffeq.state_space_model(ssm_fact="dense")
     posterior = solution.solution_full
     sample_one = posterior.sample(key, ssm=ssm)
     sample_many = posterior.sample(key, ssm=ssm, shape=(1, 2, 3))
@@ -76,8 +76,8 @@ def main():
 
 def solve(vf, tc, *, t0, t1):
     """Solve the ODE."""
-    init, ssm = probdiffeq.ssm_taylor(tc, ssm_fact="dense")
-    prior = probdiffeq.prior_wiener_integrated(ssm=ssm)
+    ssm = probdiffeq.state_space_model(ssm_fact="dense")
+    init, prior = probdiffeq.prior_wiener_integrated(tc, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_mle(

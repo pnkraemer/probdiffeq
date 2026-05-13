@@ -141,11 +141,19 @@ def case_jet_iterated(root):
 
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
 @testing.parametrize("jet_order", [0, "max"])
+@testing.parametrize("ssm_fact", ["dense"])
 def test_posterior_linearisation_matches_closed_form_recursion(
-    root: Root, jet_factory: Callable, expected: list, jet_order: int | Literal["max"]
+    root: Root,
+    jet_factory: Callable,
+    expected: list,
+    jet_order: int | Literal["max"],
+    ssm_fact,
 ):
     derivatives = len(expected) - 1
-    init, ssm = probdiffeq.ssm_taylor([root.u0], diffuse_derivatives=derivatives)
+    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
+    init, _iwp = probdiffeq.prior_wiener_integrated(
+        [root.u0], diffuse_derivatives=derivatives, ssm=ssm
+    )
     constraint = jet_factory(ssm=ssm, jet_order=jet_order)
 
     cstate = constraint.init_linearization()
@@ -163,11 +171,15 @@ def test_posterior_linearisation_matches_closed_form_recursion(
 
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
 @testing.parametrize("wrong_jet_order", [-1, 4, 100])
+@testing.parametrize("ssm_fact", ["dense"])
 def test_wrong_jet_order_raises_error(
-    root: Root, jet_factory: Callable, wrong_jet_order
+    root: Root, jet_factory: Callable, wrong_jet_order, ssm_fact
 ):
     # 5 Taylor coefficients + root-orders of 2 (constraints depend on u and du).
-    init, ssm = probdiffeq.ssm_taylor([root.u0], diffuse_derivatives=4)
+    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
+    init, _ = probdiffeq.prior_wiener_integrated(
+        [root.u0], diffuse_derivatives=4, ssm=ssm
+    )
     constraint = jet_factory(ssm=ssm, jet_order=wrong_jet_order)
 
     cstate = constraint.init_linearization()
@@ -176,8 +188,12 @@ def test_wrong_jet_order_raises_error(
 
 
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
-def test_max_jet_order_is_tight(root: Root, jet_factory: Callable):
-    init, ssm = probdiffeq.ssm_taylor([root.u0], diffuse_derivatives=4)
+@testing.parametrize("ssm_fact", ["dense"])
+def test_max_jet_order_is_tight(root: Root, jet_factory: Callable, ssm_fact):
+    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
+    init, _ = probdiffeq.prior_wiener_integrated(
+        [root.u0], diffuse_derivatives=4, ssm=ssm
+    )
     c1 = jet_factory(ssm=ssm, jet_order="max")
     cstate = c1.init_linearization()
     output1 = c1.linearize(init, cstate, damp=0.0, t=root.t0)

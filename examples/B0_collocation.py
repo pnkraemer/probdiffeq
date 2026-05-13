@@ -30,15 +30,17 @@ def main():
     ts = jnp.linspace(t0, t1, num=500, endpoint=True)
 
     # "Bad" prior (no Taylor coefficients)
-    init, ssm = probdiffeq.ssm_taylor([u0], diffuse_derivatives=2)
-    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=10.0)
+    ssm = probdiffeq.state_space_model()
+    init, iwp = probdiffeq.prior_wiener_integrated(
+        [u0], diffuse_derivatives=2, ssm=ssm, output_scale=10.0
+    )
     mseq_prior = probdiffeq.MarkovSequence.from_grid(init, iwp, grid=ts, reverse=False)
 
     # "Good" prior (Taylor coefficients)
     tcoeffs = diffeqjet.odejet_padded_scan(
         lambda y: vector_field(y, t=t0), (u0,), num=2
     )
-    init, ssm = probdiffeq.ssm_taylor(tcoeffs)
+    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=10.0)
     mseq_tcoeffs = probdiffeq.MarkovSequence.from_grid(
         init, iwp, grid=ts, reverse=False
     )

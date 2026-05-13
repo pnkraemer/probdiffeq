@@ -3,7 +3,7 @@
 Necessary because the implementation has been faulty in the past.
 """
 
-from probdiffeq import ssm_impl
+from probdiffeq import probdiffeq
 from probdiffeq.backend import func, np, random, testing, tree
 
 
@@ -35,29 +35,18 @@ def test_grad_not_none(fact) -> None:
 
 def create_random_variable(fact):
     tcoeffs = [np.ones((3,))] * 5  # values irrelevant
+    ssm = probdiffeq.state_space_model(fact)
+    _, discretize = probdiffeq.prior_wiener_integrated(
+        tcoeffs, is_exact=False, inexact_eps=1.0, ssm=ssm
+    )
 
     if fact == "dense":
-        stds = [np.ones((3,))] * 5
-        _, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(tcoeffs, stds)
-        output_scale = np.ones((3,))
-        discretize = ssm.prior.transition_wiener_integrated(output_scale)
-
         output_scale = np.ones(())
         rv = discretize(0.1, output_scale)
     elif fact == "blockdiag":
-        stds = [np.ones((3,))] * 5
-        _, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_blockdiag(tcoeffs, stds)
-        output_scale = np.ones((3,))
-        discretize = ssm.prior.transition_wiener_integrated(output_scale)
-
         output_scale = np.ones((3,))
         rv = discretize(0.1, output_scale)
     elif fact == "isotropic":
-        stds = [np.ones(())] * 5
-        _, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_isotropic(tcoeffs, stds)
-        output_scale = np.ones(())
-        discretize = ssm.prior.transition_wiener_integrated(output_scale)
-
         output_scale = np.ones(())
         rv = discretize(0.1, output_scale)
     else:

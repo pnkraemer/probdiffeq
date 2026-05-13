@@ -219,7 +219,7 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
         if not tree.tree_all(shapes_equal):
             raise ValueError(msg)
 
-        model = ssm.prior.to_derivative(tcoeff_index, std)
+        model = ssm.prior.to_derivative(tcoeff_index, std, template=marginals)
         marg = ssm.conditional.marginalise(marginals, model)
 
         # Wrap into list because blockdiag & isotropic models
@@ -266,8 +266,11 @@ def loss_lml_timeseries(
         if not tree.tree_all(shapes_equal):
             raise ValueError(msg)
 
+        # Remove the filtering distributions from the posterior
+        posterior = posterior.remove_filtering_distributions()
+
         def make_model(s):
-            return ssm.prior.to_derivative(tcoeff_index, s)
+            return ssm.prior.to_derivative(tcoeff_index, s, template=posterior.marginal)
 
         model = func.vmap(make_model)(std)
 
@@ -461,11 +464,7 @@ def constraint_jet(
         primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
         return [primals, *series]
 
-    order = (
-        ssm.prior.shape_info.num_derivatives + 1
-        if jet_order == "max"
-        else jet_order + root_order
-    )
+    order = "max" if jet_order == "max" else jet_order + root_order
     return ssm.linearize.root(
         root_jet, root_order=order, jacobian=jacobian, nlstsq=nlstsq
     )
@@ -559,7 +558,7 @@ def constraint_jet_imex(
         return [primals1, *series1]
 
     if jet_order_explicit == "max" or jet_order_implicit == "max":
-        order = ssm.prior.shape_info.num_derivatives + 1
+        order = "max"
     else:
         order_ex = root_order_ex + jet_order_explicit
         order_im = root_order_im + jet_order_implicit
@@ -648,11 +647,12 @@ def constraint_jet_dae(
         return [primals, *series]
 
     if jet_order_differential == "max" or jet_order_algebraic == "max":
-        order = ssm.prior.shape_info.num_derivatives + 1
-    else:
-        order_diff = root_order_diff + jet_order_differential
-        order_alg = root_order_alg + jet_order_algebraic
-        order = max(order_diff, order_alg)
+        return ssm.linearize.root(
+            root_jet, root_order="max", jacobian=jacobian, nlstsq=nlstsq
+        )
+    order_diff = root_order_diff + jet_order_differential
+    order_alg = root_order_alg + jet_order_algebraic
+    order = max(order_diff, order_alg)
     return ssm.linearize.root(
         root_jet, root_order=order, jacobian=jacobian, nlstsq=nlstsq
     )
@@ -693,7 +693,8 @@ class MarkovSequence(Generic[N]):
         This is only needed in combination with smoothing-based strategies.
         """
         if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
-            markov_seq = self._select_terminal()
+            # TODO: do this in the postprocessing of the solver...
+            markov_seq = self.remove_filtering_distributions()
             return markov_seq.evaluate_marginals(ssm=ssm)
 
         def step(x, cond):
@@ -720,16 +721,6 @@ class MarkovSequence(Generic[N]):
         solve_triu: Callable,
     ):
         assert self.reverse
-
-        if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
-            markov_seq = self._select_terminal()
-            return markov_seq.evaluate_lml(
-                u,
-                model=model,
-                ssm=ssm,
-                average_pdfs=average_pdfs,
-                solve_triu=solve_triu,
-            )
 
         # Process the terminal value
         u0 = tree.tree_map(lambda s: s[-1], u)
@@ -768,20 +759,24 @@ class MarkovSequence(Generic[N]):
         (_, pdf, _), _ = flow.scan(body, init=init, xs=xs, reverse=self.reverse)
         return pdf
 
-    def _select_terminal(self):
+    def remove_filtering_distributions(self):
         """Discard all intermediate filtering solutions from a Markov sequence.
 
         This function is useful to convert a smoothing-solution into a Markov sequence
         that is compatible with sampling or marginalisation.
         """
-        init = tree.tree_map(lambda x: x[-1, ...], self.marginal)
-        return MarkovSequence(init, self.conditional, reverse=self.reverse)
+        # There should be one marginal and many conditionals. If not, remove marginals
+        if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
+            marginal_idx = -1 if self.reverse else 0
+            init = tree.tree_map(lambda x: x[marginal_idx, ...], self.marginal)
+            return MarkovSequence(init, self.conditional, reverse=self.reverse)
+        return self
 
     def sample(self, key, *, ssm: ssm_impl.FactSsmImpl, shape: tuple = ()):
         """Sample from a Markov sequence."""
         # If the MarkovSequence carries unnecessary filtering marginals, remove them
         if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
-            markov_seq = self._select_terminal()
+            markov_seq = self.remove_filtering_distributions()
             return markov_seq.sample(key, ssm=ssm, shape=shape)
 
         # If many samples are required, vmap over recursive calls to sample()
@@ -1173,171 +1168,131 @@ class ProbabilisticSolver:
         return sol, InterpResult(step_from=acc, interp_from=prev)
 
 
-def ssm_taylor(
-    tcoeffs: C,
-    *,
-    # Which of the Taylor coefficients are exact
-    is_exact: C | bool = True,
-    inexact_eps: float = 1e-6,  # a small value
-    # The state-space model factorisation
-    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    # How many extra derivatives to model in the state-space
-    diffuse_derivatives: int = 0,
-    diffuse_eps: float = 1.0,  # a large value
-):
-    """Initialize a state-space model over Taylor coefficients."""
-    tcoeffs_std = _tcoeffs_std_from_differential_variables(
-        tcoeffs, is_exact=is_exact, inexact_eps=inexact_eps, ssm_fact=ssm_fact
-    )
+def state_space_model(ssm_fact="dense"):
+    """Construct an implementation of a factorised state-space model."""
+    if ssm_fact == "dense":
+        return ssm_impl.FactSsmImpl.from_dense()
 
-    return ssm_taylor_diffuse(
-        tcoeffs,
-        tcoeffs_std,
-        ssm_fact=ssm_fact,
-        diffuse_derivatives=diffuse_derivatives,
-        diffuse_eps=diffuse_eps,
-    )
+    if ssm_fact == "blockdiag":
+        return ssm_impl.FactSsmImpl.from_blockdiag()
 
-
-def _tcoeffs_std_from_differential_variables(
-    tcoeffs, *, ssm_fact, is_exact, inexact_eps
-):
-
-    # Decide the standard deviation template based on the factorisations
-    if ssm_fact in ["dense", "blockdiag"]:
-        std_per_leaf = tree.tree_map(np.zeros_like, tcoeffs[0])
-    elif ssm_fact in ["isotropic"]:
-        std_per_leaf = np.zeros(())
-    else:
-        msg = f"ssm_fact={ssm_fact} is unknown."
-        raise ValueError(msg)
-
-    # Infer the expected standard-deviation tree structure
-    leaves, structure = tree.tree_flatten_depth_one(tcoeffs)
-    std_template = tree.tree_unflatten(structure, [std_per_leaf for _ in leaves])
-
-    # If 'is_exact' is a boolean, keep things simple
-    if isinstance(is_exact, bool):
-        if is_exact:
-            return tree.tree_map(np.zeros_like, std_template)
-        return tree.tree_map(lambda s: inexact_eps * np.ones_like(s), std_template)
-
-    is_exact = tree.tree_map(np.asarray, is_exact)
-
-    # Before using is_exact, verify it has the correct structure and shape
-    try:
-
-        def shape_equal(A, B):
-            return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
-
-        assert tree.tree_all(shape_equal(is_exact, std_template))
-    except (ValueError, AssertionError) as err:
-        msg = "Input 'is_exact' has the wrong PyTree structure."
-        msg += f" Expected: {tree.tree_map(np.shape, std_template)}."
-        msg += f" Received: {tree.tree_map(np.shape, is_exact)}."
-        raise ValueError(msg) from err
-
-    # Wherever is_exact is True, initialize with zeros.
-    # Elsewhere, initialize with a small positivec value.
-
-    def std_init(s: Array) -> Array:
-        if s.dtype != np.dtype(bool):
-            msg = "Boolean entries expected in `is_exact`."
-            msg += f" Received: dtype={np.dtype(s)}"
-            raise TypeError(msg)
-        return np.where(s, 0.0, inexact_eps)
-
-    return tree.tree_map(std_init, is_exact)
-
-
-def ssm_taylor_diffuse(
-    tcoeffs_mean: C,
-    tcoeffs_std: C,
-    *,
-    # The state-space model factorisation
-    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    # How many extra derivatives to model in the state-space
-    diffuse_derivatives: int = 0,
-    diffuse_eps: float = 1.0,
-):
-    """Initialize a diffuse state-space model for Taylor coefficients.
-
-    The diffuse process has a nonzero initial standard deviation.
-    This is typically used to get more visually-pleasing uncertainties and gain
-    numerical robustness for high-order solvers in low precision arithmetic.
-
-    Outside of these cases, use the usual Taylor-state-space-model process.
-    """
-    # Add derivatives to the Taylor coefficients.
-    # Warning: This destroys pytree structure in the tcoeffs and the
-    # resulting pytree will always be a list (for now at least)
-    if diffuse_derivatives > 0:
-        tcoeffs_mean, tcoeffs_std = _add_diffuse_derivatives(
-            tcoeffs_mean,
-            tcoeffs_std,
-            diffuse_derivatives=diffuse_derivatives,
-            diffuse_eps=diffuse_eps,
-        )
-
-    # Choose a state-space model factorisation
-    match ssm_fact:
-        case "dense":
-            marginal, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(
-                tcoeffs_mean, tcoeffs_std
-            )
-        case "blockdiag":
-            marginal, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_blockdiag(
-                tcoeffs_mean, tcoeffs_std
-            )
-        case "isotropic":
-            marginal, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_isotropic(
-                tcoeffs_mean, tcoeffs_std
-            )
-        case _:
-            msg = f"Factorisation ssm_fact='{ssm_fact}' unknown. "
-            msg += "Choose one out of {'dense', 'isotropic', 'blockdiag'}."
-            raise ValueError(msg)
-
-    # Return the target
-    return marginal, ssm
-
-
-def _add_diffuse_derivatives(
-    tcoeffs_mean, tcoeffs_std, *, diffuse_eps, diffuse_derivatives
-):
-    zeros = tree.tree_map(np.zeros_like, tcoeffs_mean[0])
-    tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(diffuse_derivatives)]]
-
-    unknowns = tree.tree_map(lambda s: diffuse_eps * np.ones_like(s), tcoeffs_std[0])
-    tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
-    return tcoeffs_mean, tcoeffs_std
+    if ssm_fact == "isotropic":
+        return ssm_impl.FactSsmImpl.from_isotropic()
+    raise ValueError(ssm_fact)
 
 
 def prior_wiener_integrated(
-    *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
+    tcoeffs: C,
+    /,
+    *,
+    ssm: ssm_impl.FactSsmImpl,
+    # Which of the Taylor coefficients are exact
+    is_exact: C | bool = True,
+    inexact_eps: float = 1e-6,  # a small value
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value,
+    output_scale: Array | None = None,
 ):
     """Construct an integrated Wiener process prior."""
-    return ssm.prior.transition_wiener_integrated(base_scale=output_scale)
+    return ssm.prior.wiener_integrated(
+        tcoeffs,
+        is_exact=is_exact,
+        inexact_eps=inexact_eps,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+        base_scale=output_scale,
+    )
+
+
+def prior_wiener_integrated_diffuse(
+    tcoeffs_mean: C,
+    tcoeffs_std: C,
+    /,
+    *,
+    ssm: ssm_impl.FactSsmImpl,
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value,
+    output_scale: Array | None = None,
+):
+    """Construct a diffuse integrated Wiener process prior."""
+    return ssm.prior.wiener_integrated_diffuse(
+        tcoeffs_mean,
+        tcoeffs_std,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+        base_scale=output_scale,
+    )
 
 
 def prior_ornstein_uhlenbeck_integrated(
-    linop: Callable, /, *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
+    linop: Callable,
+    tcoeffs: C,
+    /,
+    *,
+    ssm: ssm_impl.FactSsmImpl,  # Which of the Taylor coefficients are exact
+    is_exact: C | bool = True,
+    inexact_eps: float = 1e-6,  # a small value
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value,
+    output_scale: Array | None = None,
 ):
     """Construct an integrated Ornstein-Uhlenbeck prior."""
 
     def vf_linear(*tcoeffs):
         return linop(tcoeffs[-1])
 
-    return ssm.prior.transition_exponential(
-        vf_linear=vf_linear, base_scale=output_scale
+    return ssm.prior.exponential(
+        tcoeffs,
+        is_exact=is_exact,
+        inexact_eps=inexact_eps,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+        vf_linear=vf_linear,
+        base_scale=output_scale,
+    )
+
+
+def prior_ornstein_uhlenbeck_integrated_diffuse(
+    linop: Callable,
+    tcoeffs_mean: C,
+    tcoeffs_std: C,
+    /,
+    *,
+    ssm: ssm_impl.FactSsmImpl,
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value,
+    output_scale: Array | None = None,
+):
+    """Construct an integrated Ornstein-Uhlenbeck prior."""
+
+    def vf_linear(*tcoeffs):
+        return linop(tcoeffs[-1])
+
+    return ssm.prior.exponential_diffuse(
+        tcoeffs_mean,
+        tcoeffs_std,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+        vf_linear=vf_linear,
+        base_scale=output_scale,
     )
 
 
 def prior_exponential(
     vf_linear: Callable,
+    tcoeffs: C,
     /,
     *,
     ssm: ssm_impl.FactSsmImpl,
+    is_exact: C | bool = True,
+    inexact_eps: float = 1e-6,  # a small value
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value,
     output_scale: Array | None = None,
 ):
     """Construct an exponential integrator prior.
@@ -1347,7 +1302,7 @@ def prior_exponential(
     """
     # TODO: offer a "jacobian" option to enable isotropic and blockdiag implementations?
     prior_order = _verify_ioup_signature_and_parse_order(vf_linear)
-    if prior_order != ssm.prior.shape_info.num_derivatives + 1:
+    if prior_order != len(tcoeffs):
         msg = f"""The exponential prior does not match the Taylor coefficients in the SSM.
 
         Concretely:
@@ -1357,13 +1312,63 @@ def prior_exponential(
         - For two Taylor coefficients, we expect `f(u, du, ddu, dddu, /)`.
 
         and so on. The passed dynamics correspond to **{prior_order}** Taylor
-        coefficients, whereas the state-space model includes **{ssm.prior.shape_info.num_derivatives + 1}**
+        coefficients, whereas the state-space model includes **{len(tcoeffs)}**
         Taylor coeffients.
         """
         raise TypeError(msg)
 
-    return ssm.prior.transition_exponential(
-        vf_linear=vf_linear, base_scale=output_scale
+    return ssm.prior.exponential(
+        tcoeffs,
+        is_exact=is_exact,
+        inexact_eps=inexact_eps,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+        vf_linear=vf_linear,
+        base_scale=output_scale,
+    )
+
+
+def prior_exponential_diffuse(
+    vf_linear: Callable,
+    tcoeffs_mean: C,
+    tcoeffs_std: C,
+    /,
+    *,
+    ssm: ssm_impl.FactSsmImpl,
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value,
+    output_scale: Array | None = None,
+):
+    """Construct a diffuse exponential integrator prior.
+
+    According to https://arxiv.org/abs/2305.14978, but following the numerical
+    methods from https://arxiv.org/abs/2310.13462.
+    """
+    # TODO: offer a "jacobian" option to enable isotropic and blockdiag implementations?
+    prior_order = _verify_ioup_signature_and_parse_order(vf_linear)
+    if prior_order != len(tcoeffs_mean):
+        msg = f"""The exponential prior does not match the Taylor coefficients in the SSM.
+
+        Concretely:
+
+        - For two Taylor coefficients, we expect `f(u, du, /)`.
+        - For three Taylor coefficients, we expect `f(u, du, ddu, /)`.
+        - For two Taylor coefficients, we expect `f(u, du, ddu, dddu, /)`.
+
+        and so on. The passed dynamics correspond to **{prior_order}** Taylor
+        coefficients, whereas the state-space model includes **{len(tcoeffs_mean)}**
+        Taylor coeffients.
+        """
+        raise TypeError(msg)
+
+    return ssm.prior.exponential_diffuse(
+        tcoeffs_mean,
+        tcoeffs_std,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+        vf_linear=vf_linear,
+        base_scale=output_scale,
     )
 
 
@@ -1441,7 +1446,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         )
 
     def init_posterior(self, *, u):
-        cond = self.ssm.prior.identity()
+        cond = self.ssm.prior.identity(template=u)
         posterior = MarkovSequence(marginal=u, conditional=cond, reverse=True)
         return u, posterior
 
@@ -1465,7 +1470,9 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
     ):
-        prototype = self.ssm.prior.prototype_output_scale_calibrated()
+        prototype = self.ssm.prior.prototype_output_scale_calibrated(
+            template=posterior0.marginal
+        )
         assert output_scale.shape == prototype.shape
         posterior0 = posterior0.rescale_cholesky(output_scale)
         posterior = posterior.rescale_cholesky(output_scale)
@@ -1581,7 +1588,7 @@ class strategy_filter(MarkovStrategy):
         return marginals, marginals
 
     def finalize(self, *, posterior0, posterior, output_scale):
-        expected = self.ssm.prior.prototype_output_scale_calibrated()
+        expected = self.ssm.prior.prototype_output_scale_calibrated(template=posterior0)
         assert output_scale.shape == expected.shape
 
         # No rescaling because no calibration at the initial step
@@ -1668,7 +1675,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         )
 
     def init_posterior(self, *, u):
-        cond = self.ssm.prior.identity()
+        cond = self.ssm.prior.identity(template=u)
         posterior = MarkovSequence(u, cond, reverse=True)
         return u, posterior
 
@@ -1693,7 +1700,9 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
     ):
-        expected = self.ssm.prior.prototype_output_scale_calibrated()
+        expected = self.ssm.prior.prototype_output_scale_calibrated(
+            template=posterior0.marginal
+        )
         assert output_scale.shape == expected.shape
         posterior0 = posterior0.rescale_cholesky(output_scale)
         posterior = posterior.rescale_cholesky(output_scale)
@@ -1711,7 +1720,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         return marginals, posterior
 
     def interpolate_at_t1(self, *, posterior_t1: MarkovSequence):
-        cond_identity = self.ssm.prior.identity()
+        cond_identity = self.ssm.prior.identity(template=posterior_t1.marginal)
         resume_from = MarkovSequence(
             posterior_t1.marginal,
             conditional=cond_identity,
@@ -1796,7 +1805,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         _, extrapolated_t = self.predict(
             posterior=posterior_t0, transition=transition_t0_t
         )
-        conditional_id = self.ssm.prior.identity()
+        conditional_id = self.ssm.prior.identity(template=posterior_t0.marginal)
         previous_new = MarkovSequence(
             extrapolated_t.marginal, conditional_id, reverse=extrapolated_t.reverse
         )
@@ -1855,7 +1864,7 @@ class solver_mle(ProbabilisticSolver):
         u_pred, prediction = self.strategy.init_posterior(u=u)
         cstate = self.constraint.init_linearization()
 
-        prototype = self.ssm.prior.prototype_output_scale_calibrated()
+        prototype = self.ssm.prior.prototype_output_scale_calibrated(template=u)
         output_scale_prior = np.ones_like(prototype)
 
         # Update
@@ -1897,7 +1906,8 @@ class solver_mle(ProbabilisticSolver):
 
     def step(self, state, *, dt: float, damp: float):
         # Discretize
-        output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
+        prototype = self.ssm.prior.prototype_output_scale_calibrated(state.u)
+        output_scale = np.ones_like(prototype)
         transition = self.prior(dt, output_scale)
 
         # Predict
@@ -2007,7 +2017,8 @@ class solver_dynamic(ProbabilisticSolver):
         u_pred, prediction = self.strategy.init_posterior(u=u)
         lin_state = self.constraint.init_linearization()
 
-        output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
+        prototype = self.ssm.prior.prototype_output_scale_calibrated(template=u_pred)
+        output_scale = np.ones_like(prototype)
         lin_fun = func.partial(self.constraint.linearize, damp=damp, t=t)
         fx, _lin_state = func.eval_shape(lin_fun, u_pred, lin_state)
         fx = tree.tree_map(np.zeros_like, fx)
@@ -2038,7 +2049,8 @@ class solver_dynamic(ProbabilisticSolver):
         lin_state = state.auxiliary
 
         # Calibrate the output scale
-        ones = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
+        prototype = self.ssm.prior.prototype_output_scale_calibrated(template=state.u)
+        ones = np.ones_like(prototype)
         transition = self.prior(dt, ones)
         mean = state.u.mean_flat
         u = self.ssm.conditional.apply_flat(mean, transition)
@@ -2170,7 +2182,8 @@ class solver(ProbabilisticSolver):
         fx, _cstate = func.eval_shape(lin_fun, u_pred, cstate)
         fx = tree.tree_map(np.zeros_like, fx)
 
-        output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
+        prototype = self.ssm.prior.prototype_output_scale_calibrated(template=u)
+        output_scale = np.ones_like(prototype)
         return ProbabilisticSolution(
             t=t,
             u=u,
@@ -2416,7 +2429,8 @@ class error_residual_std(ErrorEstimator):
     ) -> tuple[float, tuple]:
         # Discretize; The output scale is set to one
         # since the error is multiplied with a local scale estimate anyway
-        output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
+        prototype = self.ssm.prior.prototype_output_scale_calibrated(proposed.u)
+        output_scale = np.ones_like(prototype)
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
@@ -2516,7 +2530,10 @@ class error_state_std(ErrorEstimator):
     ) -> tuple[float, tuple]:
         # Discretize; The output scale is set to one
         # since the error is multiplied with a local scale estimate anyway
-        output_scale = np.ones_like(self.ssm.prior.prototype_output_scale_calibrated())
+        prototype = self.ssm.prior.prototype_output_scale_calibrated(
+            template=proposed.u
+        )
+        output_scale = np.ones_like(prototype)
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state

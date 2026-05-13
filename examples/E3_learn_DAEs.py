@@ -23,14 +23,7 @@ class Trafo:
 
     def __init__(self, scale):
         # e.g. jnp.array([1., 1e-5, 1e-3])
-        self.scale = jnp.array(scale)
-
-    def observed_to_latent(self, x, eps=1e-6):
-        """Simplex R^3 -> unconstrained R^2."""
-        x = x / self.scale
-        x = jnp.clip(x, eps, 1.0 - eps)
-        x = x / x.sum()  # renormalise
-        return jnp.log(x[:-1] / x[-1])
+        self.scale = jnp.asarray(scale)
 
     def latent_to_observed(self, u):
         """Unconstrained R^2 -> simplex R^3."""
@@ -45,7 +38,7 @@ class Trafo:
 
 
 def main(
-    t0=1e-6, t1=1e5, num_data=20, tol=1e-5, std_log=-2.0, seed=1, epochs=200
+    t0=1e-6, t1=1e5, num_data=20, tol=1e-5, std_log=-1.0, seed=1, epochs=100
 ) -> None:
     """Run the script."""
 
@@ -79,11 +72,11 @@ def main(
 
     # True condition
     key = jax.random.PRNGKey(seed)
-    p_true = 10 * jax.random.uniform(key, shape=(2,)) - 5.0
+    p_true = jax.random.uniform(key, shape=(2,))
 
     # Initial guess: p0 ~ U(-5, 5)
     key = jax.random.PRNGKey(seed + 1)
-    p_guess = 10 * jax.random.uniform(key, shape=(2,)) - 5.0
+    p_guess = jax.random.uniform(key, shape=(2,))
 
     # Create data
     solution_true = solve(p_true, save_at=save_at, output_scale=output_scale)
@@ -92,12 +85,12 @@ def main(
 
     # Build a loss
     # Includes a "fake" SSM (to get the conditioning-functions to build a loss)
-    _, ssm = probdiffeq.ssm_taylor([jnp.zeros((3,))], diffuse_derivatives=3)
+    ssm = probdiffeq.state_space_model()
     loss = loss_data_fit(solve, ssm=ssm, inputs=inputs, labels=labels)
     value_and_grad = jax.jit(jax.value_and_grad(loss, has_aux=True))
 
     # Initialise the optimiser
-    optim = optax.sgd(0.01)
+    optim = optax.sgd(0.05)
     opt_state = optim.init(p_guess)
 
     (value, _), grad = value_and_grad(
@@ -120,7 +113,14 @@ def main(
         if epoch % 10 == 0:
             y_guess = trafo.latent_to_observed(p_guess)
             y_true = trafo.latent_to_observed(p_true)
-            print(f"Epoch={epoch:4d}, estim={y_guess}, true={y_true}")
+            print(
+                f"Epoch={epoch:4d} /{epochs:4d}, value={value:3.3e}, estim={y_guess}, true={y_true}"
+            )
+
+    # For the CI: fail the notebook if the estimates are off
+    y_guess = trafo.latent_to_observed(p_guess)
+    y_true = trafo.latent_to_observed(p_true)
+    assert jnp.allclose(y_guess, y_true, atol=1e-4, rtol=1e-4)
 
 
 def loss_data_fit(solve, *, ssm, inputs, labels):
@@ -160,9 +160,11 @@ def solver(differential, algebraic, tol, while_loop, trafo):
         y0, _info = diffeqjet.daejet_nlstsq(
             differential_auto, algebraic_auto, [y0], num=3, nlstsq=nlstsq
         )
-        init, ssm = probdiffeq.ssm_taylor(y0)
+        ssm = probdiffeq.state_space_model()
 
-        prior = probdiffeq.prior_wiener_integrated(ssm=ssm, output_scale=output_scale)
+        init, prior = probdiffeq.prior_wiener_integrated(
+            y0, ssm=ssm, output_scale=output_scale
+        )
 
         # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
         jet = probdiffeq.constraint_jet_dae(

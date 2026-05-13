@@ -20,8 +20,8 @@ def fixture_solver_setup(fact):
 @testing.fixture(name="solution_smoother")
 def fixture_solution_smoother(solver_setup):
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
-    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
+    ssm = probdiffeq.state_space_model(ssm_fact=fact)
+    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
@@ -36,8 +36,8 @@ def test_fixedpoint_smoother_equivalent_same_grid(
 ) -> None:
     """Test that with save_at=smoother_solution.t, the results should be identical."""
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
-    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
+    ssm = probdiffeq.state_space_model(ssm_fact=fact)
+    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
@@ -78,8 +78,8 @@ def test_fixedpoint_smoother_equivalent_different_grid(
 
     # Re-generate the smoothing solver
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
-    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
+    ssm = probdiffeq.state_space_model(ssm_fact=fact)
+    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
     strategy_sm = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
     solver_smoother = probdiffeq.solver(
@@ -95,8 +95,8 @@ def test_fixedpoint_smoother_equivalent_different_grid(
 
     # Generate a fixedpoint solver and solve (saving at the interpolation points)
     tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=fact)
-    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
+    ssm = probdiffeq.state_space_model(ssm_fact=fact)
+    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
     strategy_fp = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy_fp, prior=iwp, constraint=ts0, ssm=ssm)
