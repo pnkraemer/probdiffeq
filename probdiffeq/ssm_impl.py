@@ -768,7 +768,7 @@ class DensePriorFactory(AbstractPriorFactory):
             tcoeffs_std = tree.tree_map(std_init, is_exact)
 
         def shape_equal(A, B):
-            return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
+            return tree.tree_map(lambda a, b: np.shape(a) == np.shape(b), A, B)
 
         if not tree.tree_all(shape_equal(tcoeffs_mean, tcoeffs_std)):
             msg = "Input 'is_exact' has the wrong PyTree structure."

@@ -1236,9 +1236,15 @@ def prior_ornstein_uhlenbeck_integrated(
 
 def prior_exponential(
     vf_linear: Callable,
+    tcoeffs: C,
     /,
     *,
-    ssm: ssm_impl.FactSsmImpl,
+    ssm: ssm_impl.FactSsmImpl,  # Which of the Taylor coefficients are exact
+    is_exact: C | bool = True,
+    inexact_eps: float = 1e-6,  # a small value
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value,
     output_scale: Array | None = None,
 ):
     """Construct an exponential integrator prior.
@@ -1248,7 +1254,7 @@ def prior_exponential(
     """
     # TODO: offer a "jacobian" option to enable isotropic and blockdiag implementations?
     prior_order = _verify_ioup_signature_and_parse_order(vf_linear)
-    if prior_order != ssm.prior.shape_info.num_derivatives + 1:
+    if prior_order != len(tcoeffs):
         msg = f"""The exponential prior does not match the Taylor coefficients in the SSM.
 
         Concretely:
@@ -1258,13 +1264,19 @@ def prior_exponential(
         - For two Taylor coefficients, we expect `f(u, du, ddu, dddu, /)`.
 
         and so on. The passed dynamics correspond to **{prior_order}** Taylor
-        coefficients, whereas the state-space model includes **{ssm.prior.shape_info.num_derivatives + 1}**
+        coefficients, whereas the state-space model includes **{len(tcoeffs)}**
         Taylor coeffients.
         """
         raise TypeError(msg)
 
-    return ssm.prior.transition_exponential(
-        vf_linear=vf_linear, base_scale=output_scale
+    return ssm.prior.exponential(
+        tcoeffs,
+        is_exact=is_exact,
+        inexact_eps=inexact_eps,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+        vf_linear=vf_linear,
+        base_scale=output_scale,
     )
 
 
