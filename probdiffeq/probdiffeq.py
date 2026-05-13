@@ -1173,151 +1173,32 @@ class ProbabilisticSolver:
         return sol, InterpResult(step_from=acc, interp_from=prev)
 
 
-def ssm_taylor(
-    tcoeffs: C,
-    *,
-    # Which of the Taylor coefficients are exact
-    is_exact: C | bool = True,
-    inexact_eps: float = 1e-6,  # a small value
-    # The state-space model factorisation
-    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    # How many extra derivatives to model in the state-space
-    diffuse_derivatives: int = 0,
-    diffuse_eps: float = 1.0,  # a large value
-):
-    """Initialize a state-space model over Taylor coefficients."""
-    tcoeffs_std = _tcoeffs_std_from_differential_variables(
-        tcoeffs, is_exact=is_exact, inexact_eps=inexact_eps, ssm_fact=ssm_fact
-    )
-
-    return ssm_taylor_diffuse(
-        tcoeffs,
-        tcoeffs_std,
-        ssm_fact=ssm_fact,
-        diffuse_derivatives=diffuse_derivatives,
-        diffuse_eps=diffuse_eps,
-    )
-
-
-def _tcoeffs_std_from_differential_variables(
-    tcoeffs, *, ssm_fact, is_exact, inexact_eps
-):
-
-    # Decide the standard deviation template based on the factorisations
-    if ssm_fact in ["dense", "blockdiag"]:
-        std_per_leaf = tree.tree_map(np.zeros_like, tcoeffs[0])
-    elif ssm_fact in ["isotropic"]:
-        std_per_leaf = np.zeros(())
-    else:
-        msg = f"ssm_fact={ssm_fact} is unknown."
-        raise ValueError(msg)
-
-    # Infer the expected standard-deviation tree structure
-    leaves, structure = tree.tree_flatten_depth_one(tcoeffs)
-    std_template = tree.tree_unflatten(structure, [std_per_leaf for _ in leaves])
-
-    # If 'is_exact' is a boolean, keep things simple
-    if isinstance(is_exact, bool):
-        if is_exact:
-            return tree.tree_map(np.zeros_like, std_template)
-        return tree.tree_map(lambda s: inexact_eps * np.ones_like(s), std_template)
-
-    is_exact = tree.tree_map(np.asarray, is_exact)
-
-    # Before using is_exact, verify it has the correct structure and shape
-    try:
-
-        def shape_equal(A, B):
-            return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
-
-        assert tree.tree_all(shape_equal(is_exact, std_template))
-    except (ValueError, AssertionError) as err:
-        msg = "Input 'is_exact' has the wrong PyTree structure."
-        msg += f" Expected: {tree.tree_map(np.shape, std_template)}."
-        msg += f" Received: {tree.tree_map(np.shape, is_exact)}."
-        raise ValueError(msg) from err
-
-    # Wherever is_exact is True, initialize with zeros.
-    # Elsewhere, initialize with a small positivec value.
-
-    def std_init(s: Array) -> Array:
-        if s.dtype != np.dtype(bool):
-            msg = "Boolean entries expected in `is_exact`."
-            msg += f" Received: dtype={np.dtype(s)}"
-            raise TypeError(msg)
-        return np.where(s, 0.0, inexact_eps)
-
-    return tree.tree_map(std_init, is_exact)
-
-
-def ssm_taylor_diffuse(
-    tcoeffs_mean: C,
-    tcoeffs_std: C,
-    *,
-    # The state-space model factorisation
-    ssm_fact: Literal["dense", "isotropic", "blockdiag"] = "dense",  # noqa: F821
-    # How many extra derivatives to model in the state-space
-    diffuse_derivatives: int = 0,
-    diffuse_eps: float = 1.0,
-):
-    """Initialize a diffuse state-space model for Taylor coefficients.
-
-    The diffuse process has a nonzero initial standard deviation.
-    This is typically used to get more visually-pleasing uncertainties and gain
-    numerical robustness for high-order solvers in low precision arithmetic.
-
-    Outside of these cases, use the usual Taylor-state-space-model process.
-    """
-    # Add derivatives to the Taylor coefficients.
-    # Warning: This destroys pytree structure in the tcoeffs and the
-    # resulting pytree will always be a list (for now at least)
-    if diffuse_derivatives > 0:
-        tcoeffs_mean, tcoeffs_std = _add_diffuse_derivatives(
-            tcoeffs_mean,
-            tcoeffs_std,
-            diffuse_derivatives=diffuse_derivatives,
-            diffuse_eps=diffuse_eps,
-        )
-
-    # Choose a state-space model factorisation
-    match ssm_fact:
-        case "dense":
-            marginal, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_dense(
-                tcoeffs_mean, tcoeffs_std
-            )
-        case "blockdiag":
-            marginal, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_blockdiag(
-                tcoeffs_mean, tcoeffs_std
-            )
-        case "isotropic":
-            marginal, ssm = ssm_impl.FactSsmImpl.from_tcoeffs_isotropic(
-                tcoeffs_mean, tcoeffs_std
-            )
-        case _:
-            msg = f"Factorisation ssm_fact='{ssm_fact}' unknown. "
-            msg += "Choose one out of {'dense', 'isotropic', 'blockdiag'}."
-            raise ValueError(msg)
-
-    # Return the target
-    return marginal, ssm
-
-
-def _add_diffuse_derivatives(
-    tcoeffs_mean, tcoeffs_std, *, diffuse_eps, diffuse_derivatives
-):
-    zeros = tree.tree_map(np.zeros_like, tcoeffs_mean[0])
-    tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(diffuse_derivatives)]]
-
-    unknowns = tree.tree_map(lambda s: diffuse_eps * np.ones_like(s), tcoeffs_std[0])
-    tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
-    return tcoeffs_mean, tcoeffs_std
+def ssm_taylor(ssm_fact):
+    return ssm_impl.FactSsmImpl.from_name(ssm_fact)
 
 
 def prior_wiener_integrated(
-    *, ssm: ssm_impl.FactSsmImpl, output_scale: Array | None = None
+    tcoeffs: C,
+    /,
+    *,
+    ssm: ssm_impl.FactSsmImpl,
+    # Which of the Taylor coefficients are exact
+    is_exact: C | bool = True,
+    inexact_eps: float = 1e-6,  # a small value
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value,
+    output_scale: Array | None = None,
 ):
     """Construct an integrated Wiener process prior."""
-    return ssm.prior.transition_wiener_integrated(base_scale=output_scale)
+    return ssm.prior.wiener_integrated_diffuse(
+        tcoeffs,
+        is_exact=is_exact,
+        inexact_eps=inexact_eps,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+        base_scale=output_scale,
+    )
 
 
 def prior_ornstein_uhlenbeck_integrated(
@@ -1419,6 +1300,94 @@ def _verify_ioup_signature_and_parse_order(vf) -> int:
         raise TypeError(msg)
 
     return len(state_args)
+
+
+# def _init_from_tcoeffs(
+#     tcoeffs_mean: C,
+#     *,
+#     # Which of the Taylor coefficients are exact
+#     is_exact: C | bool = True,
+#     inexact_eps: float = 1e-6,  # a small value
+#     # How many extra derivatives to model in the state-space
+#     diffuse_derivatives: int = 0,
+#     diffuse_eps: float = 1.0,  # a large value
+# ):
+#     """Initialize a state-space model over Taylor coefficients."""
+#     tcoeffs_std = _tcoeffs_std_from_differential_variables(
+#         tcoeffs_mean, is_exact=is_exact, inexact_eps=inexact_eps
+#     )
+
+#     if diffuse_derivatives > 0:
+#         tcoeffs_mean, tcoeffs_std = _add_diffuse_derivatives(
+#             tcoeffs_mean,
+#             tcoeffs_std,
+#             diffuse_derivatives=diffuse_derivatives,
+#             diffuse_eps=diffuse_eps,
+#         )
+
+#     return tcoeffs_mean, tcoeffs_std
+
+
+# def _tcoeffs_std_from_differential_variables(
+#     tcoeffs, *, ssm_fact, is_exact, inexact_eps
+# ):
+
+#     # Decide the standard deviation template based on the factorisations
+#     if ssm_fact in ["dense", "blockdiag"]:
+#         std_per_leaf = tree.tree_map(np.zeros_like, tcoeffs[0])
+#     elif ssm_fact in ["isotropic"]:
+#         std_per_leaf = np.zeros(())
+#     else:
+#         msg = f"ssm_fact={ssm_fact} is unknown."
+#         raise ValueError(msg)
+
+#     # Infer the expected standard-deviation tree structure
+#     leaves, structure = tree.tree_flatten_depth_one(tcoeffs)
+#     std_template = tree.tree_unflatten(structure, [std_per_leaf for _ in leaves])
+
+#     # If 'is_exact' is a boolean, keep things simple
+#     if isinstance(is_exact, bool):
+#         if is_exact:
+#             return tree.tree_map(np.zeros_like, std_template)
+#         return tree.tree_map(lambda s: inexact_eps * np.ones_like(s), std_template)
+
+#     is_exact = tree.tree_map(np.asarray, is_exact)
+
+#     # Before using is_exact, verify it has the correct structure and shape
+#     try:
+
+#         def shape_equal(A, B):
+#             return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
+
+#         assert tree.tree_all(shape_equal(is_exact, std_template))
+#     except (ValueError, AssertionError) as err:
+#         msg = "Input 'is_exact' has the wrong PyTree structure."
+#         msg += f" Expected: {tree.tree_map(np.shape, std_template)}."
+#         msg += f" Received: {tree.tree_map(np.shape, is_exact)}."
+#         raise ValueError(msg) from err
+
+#     # Wherever is_exact is True, initialize with zeros.
+#     # Elsewhere, initialize with a small positivec value.
+
+#     def std_init(s: Array) -> Array:
+#         if s.dtype != np.dtype(bool):
+#             msg = "Boolean entries expected in `is_exact`."
+#             msg += f" Received: dtype={np.dtype(s)}"
+#             raise TypeError(msg)
+#         return np.where(s, 0.0, inexact_eps)
+
+#     return tree.tree_map(std_init, is_exact)
+
+
+# def _add_diffuse_derivatives(
+#     tcoeffs_mean, tcoeffs_std, *, diffuse_eps, diffuse_derivatives
+# ):
+#     zeros = tree.tree_map(np.zeros_like, tcoeffs_mean[0])
+#     tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(diffuse_derivatives)]]
+
+#     unknowns = tree.tree_map(lambda s: diffuse_eps * np.ones_like(s), tcoeffs_std[0])
+#     tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
+#     return tcoeffs_mean, tcoeffs_std
 
 
 class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):

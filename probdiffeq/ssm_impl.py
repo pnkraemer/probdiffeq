@@ -312,8 +312,8 @@ class ShapeInfo:
 class AbstractPriorFactory:
     """Interface for prior constructions."""
 
-    def __init__(self, shape_info) -> None:
-        self.shape_info = shape_info
+    # def __init__(self, shape_info) -> None:
+    #     self.shape_info = shape_info
 
     @abc.abstractmethod
     def identity(self, /):
@@ -364,12 +364,21 @@ class FactSsmImpl:
     """An implementation of manipulating conditionals."""
 
     @classmethod
+    def from_name(cls, name, /):
+        if name == "dense":
+            prior = DensePriorFactory()
+            linearize = DenseLinearizationFactory()
+            conditional = DenseConditional()
+            return cls(linearize=linearize, conditional=conditional, prior=prior)
+        raise ValueError(name)
+
+    @classmethod
     def from_tcoeffs_dense(cls, tcoeffs_mean, tcoeffs_std, /):
         """Construct a factorised state-space model implementation."""
         shape_info = ShapeInfo(tcoeffs_mean)
         marginal = DenseNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
 
-        prior = DensePriorFactory(shape_info=shape_info)
+        prior = DensePriorFactory()
 
         linearize = DenseLinearizationFactory()
         conditional = DenseConditional()
@@ -578,21 +587,69 @@ class DensePriorFactory(AbstractPriorFactory):
         noise = DenseNormal(m, C, tree_flatten)
         return LatentCond.from_linop_and_noise(A, noise)
 
-    def transition_wiener_integrated(self, base_scale: Array | None):
-        Lambda = self._process_base_scale(base_scale)
+    def wiener_integrated_diffuse(
+        self,
+        tcoeffs_mean: C,
+        /,
+        *,
+        is_exact: C,
+        inexact_eps: float,
+        diffuse_derivatives: int,
+        diffuse_eps: float,
+        base_scale: Array | None,
+    ):
+
+        # Construct the initial std
+        if isinstance(is_exact, bool):
+            if is_exact:
+                tcoeffs_std = tree.tree_map(np.zeros_like, tcoeffs_mean)
+            else:
+
+                def eps_like(s):
+                    return inexact_eps * np.ones_like(s)
+
+                tcoeffs_std = tree.tree_map(eps_like, tcoeffs_mean)
+        else:
+
+            def std_init(s: Array) -> Array:
+                if s.dtype != np.dtype(bool):
+                    msg = "Boolean entries expected in `is_exact`."
+                    msg += f" Received: dtype={np.dtype(s)}"
+                    raise TypeError(msg)
+                return np.where(s, 0.0, inexact_eps)
+
+            tcoeffs_std = tree.tree_map(std_init, is_exact)
+
+        # Add diffuse derivatives
+        if diffuse_derivatives > 0:
+            zeros = tree.tree_map(np.zeros_like, tcoeffs_mean[0])
+            tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(diffuse_derivatives)]]
+
+            unknowns = tree.tree_map(
+                lambda s: diffuse_eps * np.ones_like(s), tcoeffs_std[0]
+            )
+            tcoeffs_std = [
+                *tcoeffs_std,
+                *[unknowns for _ in range(diffuse_derivatives)],
+            ]
+
+        # Construct the initial variable
+        init = DenseNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
+
+        # Process the base-scale
+        single_flat, single_unravel = tree.ravel_pytree(tcoeffs_mean[0])
+        Lambda = self._process_base_scale(base_scale, single_flat, single_unravel)
 
         # Construct the transitions
-        a, q_sqrtm = system_matrices_1d_iwp(self.shape_info.num_derivatives)
-        (d,) = self.shape_info.single_flat.shape
-
+        num_derivatives = len(tcoeffs_mean) - 1
+        a, q_sqrtm = system_matrices_1d_iwp(num_derivatives)
+        (d,) = single_flat.shape
         eye_d = np.eye(d)
         A = np.kron(a, eye_d)
         Q = np.kron(q_sqrtm, Lambda)
 
-        q0 = np.zeros(self.shape_info.all_flat.shape)
-        precon_fun = preconditioner_taylor(
-            num_derivatives=self.shape_info.num_derivatives
-        )
+        q0 = np.zeros(((num_derivatives + 1) * d,))
+        precon_fun = preconditioner_taylor(num_derivatives=num_derivatives)
 
         def discretise(dt, output_scale=1.0):
             output_scale = self._process_calibrated_scale(output_scale)
@@ -601,16 +658,17 @@ class DensePriorFactory(AbstractPriorFactory):
             p = np.repeat(p, d)
             p_inv = np.repeat(p_inv, d)
 
-            tree_flatten = DenseTreeFlatten.from_shape_info(self.shape_info)
+            tree_flatten = DenseTreeFlatten.from_example(tcoeffs_mean)
             noise = DenseNormal(q0, output_scale * Q, tree_flatten)
             return LatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
-        return discretise
+        # Return the initial variable and the discretisation
+        return init, discretise
 
-    def _process_base_scale(self, base_scale):
+    def _process_base_scale(self, base_scale, single_flat, single_unravel):
         # Process the expected shape of the base-scale
-        ones_like = np.ones_like(self.shape_info.single_flat)
-        base_scale_expected = self.shape_info.single_unravel(ones_like)
+        ones_like = np.ones_like(single_flat)
+        base_scale_expected = single_unravel(ones_like)
 
         if base_scale is None:
             base_scale = base_scale_expected
