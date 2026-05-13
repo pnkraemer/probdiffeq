@@ -28,8 +28,8 @@ def main() -> None:
 
     # Set up a state-space model
     tcoeffs = [u0, vf(u0, t=t0)]
-    init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="blockdiag")
-    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
+    ssm = probdiffeq.ssm_taylor(ssm_fact="blockdiag")
+    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
 
     # Build a solver
     ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)

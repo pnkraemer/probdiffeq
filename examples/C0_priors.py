@@ -41,9 +41,11 @@ def main():
         zip([vf_oscillator, vf_matern, vf_ioup, vf_iwp], axes.T)
     ):
         # Match initial distribution to stationary distribution of Matern
-        init, ssm = probdiffeq.ssm_taylor_diffuse([0.0, 0.0, 0.0], [2.5, 0.7, 0.6])
+        ssm = probdiffeq.ssm_taylor()
 
-        prior = probdiffeq.prior_exponential(vf_prior, ssm=ssm, output_scale=1.0)
+        init, prior = probdiffeq.prior_exponential_diffuse(
+            vf_prior, [0.0, 0.0, 0.0], [2.5, 0.7, 0.6], ssm=ssm, output_scale=1.0
+        )
         mseq = probdiffeq.MarkovSequence.from_grid(init, prior, grid=ts, reverse=False)
 
         num_samples = 3

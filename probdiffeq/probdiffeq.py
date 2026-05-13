@@ -1205,6 +1205,27 @@ def prior_wiener_integrated(
     )
 
 
+def prior_wiener_integrated_diffuse(
+    tcoeffs_mean: C,
+    tcoeffs_std: C,
+    /,
+    *,
+    ssm: ssm_impl.FactSsmImpl,
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value,
+    output_scale: Array | None = None,
+):
+    """Construct a diffuse integrated Wiener process prior."""
+    return ssm.prior.wiener_integrated_diffuse(
+        tcoeffs_mean,
+        tcoeffs_std,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+        base_scale=output_scale,
+    )
+
+
 def prior_ornstein_uhlenbeck_integrated(
     linop: Callable,
     tcoeffs: C,
@@ -1234,12 +1255,39 @@ def prior_ornstein_uhlenbeck_integrated(
     )
 
 
+def prior_ornstein_uhlenbeck_integrated_diffuse(
+    linop: Callable,
+    tcoeffs_mean: C,
+    tcoeffs_std: C,
+    /,
+    *,
+    ssm: ssm_impl.FactSsmImpl,
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value,
+    output_scale: Array | None = None,
+):
+    """Construct an integrated Ornstein-Uhlenbeck prior."""
+
+    def vf_linear(*tcoeffs):
+        return linop(tcoeffs[-1])
+
+    return ssm.prior.exponential_diffuse(
+        tcoeffs_mean,
+        tcoeffs_std,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+        vf_linear=vf_linear,
+        base_scale=output_scale,
+    )
+
+
 def prior_exponential(
     vf_linear: Callable,
     tcoeffs: C,
     /,
     *,
-    ssm: ssm_impl.FactSsmImpl,  # Which of the Taylor coefficients are exact
+    ssm: ssm_impl.FactSsmImpl,
     is_exact: C | bool = True,
     inexact_eps: float = 1e-6,  # a small value
     # How many extra derivatives to model in the state-space
@@ -1273,6 +1321,50 @@ def prior_exponential(
         tcoeffs,
         is_exact=is_exact,
         inexact_eps=inexact_eps,
+        diffuse_derivatives=diffuse_derivatives,
+        diffuse_eps=diffuse_eps,
+        vf_linear=vf_linear,
+        base_scale=output_scale,
+    )
+
+
+def prior_exponential_diffuse(
+    vf_linear: Callable,
+    tcoeffs_mean: C,
+    tcoeffs_std: C,
+    /,
+    *,
+    ssm: ssm_impl.FactSsmImpl,
+    # How many extra derivatives to model in the state-space
+    diffuse_derivatives: int = 0,
+    diffuse_eps: float = 1.0,  # a large value,
+    output_scale: Array | None = None,
+):
+    """Construct a diffuse exponential integrator prior.
+
+    According to https://arxiv.org/abs/2305.14978, but following the numerical
+    methods from https://arxiv.org/abs/2310.13462.
+    """
+    # TODO: offer a "jacobian" option to enable isotropic and blockdiag implementations?
+    prior_order = _verify_ioup_signature_and_parse_order(vf_linear)
+    if prior_order != len(tcoeffs_mean):
+        msg = f"""The exponential prior does not match the Taylor coefficients in the SSM.
+
+        Concretely:
+
+        - For two Taylor coefficients, we expect `f(u, du, /)`.
+        - For three Taylor coefficients, we expect `f(u, du, ddu, /)`.
+        - For two Taylor coefficients, we expect `f(u, du, ddu, dddu, /)`.
+
+        and so on. The passed dynamics correspond to **{prior_order}** Taylor
+        coefficients, whereas the state-space model includes **{len(tcoeffs_mean)}**
+        Taylor coeffients.
+        """
+        raise TypeError(msg)
+
+    return ssm.prior.exponential_diffuse(
+        tcoeffs_mean,
+        tcoeffs_std,
         diffuse_derivatives=diffuse_derivatives,
         diffuse_eps=diffuse_eps,
         vf_linear=vf_linear,

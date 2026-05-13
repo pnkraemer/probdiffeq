@@ -322,7 +322,7 @@ class AbstractConditional(abc.ABC):
 #         return len(self.leaves) - 1
 
 
-class AbstractPriorFactory:
+class AbstractPriorFactory(abc.ABC):
     """Interface for prior constructions."""
 
     # def __init__(self, shape_info) -> None:
@@ -349,6 +349,20 @@ class AbstractPriorFactory:
         raise NotImplementedError
 
     @abc.abstractmethod
+    def wiener_integrated_diffuse(
+        self,
+        tcoeffs_mean: C,
+        tcoeffs_std: C,
+        /,
+        *,
+        diffuse_derivatives: int,
+        diffuse_eps: float,
+        base_scale: Array | None,
+    ):
+        """Construct the transitions for an integrated Wiener process."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def exponential(
         self,
         tcoeffs_mean: C,
@@ -357,6 +371,20 @@ class AbstractPriorFactory:
         vf_linear: Array,
         is_exact: C | bool,
         inexact_eps: float,
+        diffuse_derivatives: int,
+        diffuse_eps: float,
+        base_scale: Array | None,
+    ):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def exponential_diffuse(
+        self,
+        tcoeffs_mean: C,
+        tcoeffs_std: C,
+        /,
+        *,
+        vf_linear: Array,
         diffuse_derivatives: int,
         diffuse_eps: float,
         base_scale: Array | None,
@@ -437,13 +465,34 @@ class BlockDiagPriorFactory(AbstractPriorFactory):
         diffuse_eps: float,
         base_scale: Array | None,
     ):
-        tcoeffs_mean, tcoeffs_std = self._process_tcoeffs(
+        tcoeffs_std = self._tcoeffs_standard_deviation(
+            tcoeffs_mean, is_exact=is_exact, inexact_eps=inexact_eps
+        )
+        return self.wiener_integrated_diffuse(
             tcoeffs_mean,
-            is_exact=is_exact,
-            inexact_eps=inexact_eps,
+            tcoeffs_std,
             diffuse_derivatives=diffuse_derivatives,
             diffuse_eps=diffuse_eps,
+            base_scale=base_scale,
         )
+
+    def wiener_integrated_diffuse(
+        self,
+        tcoeffs_mean: C,
+        tcoeffs_std: C,
+        /,
+        *,
+        diffuse_derivatives: int,
+        diffuse_eps: float,
+        base_scale: Array | None,
+    ):
+        if diffuse_derivatives > 0:
+            tcoeffs_mean, tcoeffs_std = self._add_diffuse_derivatives(
+                tcoeffs_mean,
+                tcoeffs_std,
+                diffuse_derivatives=diffuse_derivatives,
+                diffuse_eps=diffuse_eps,
+            )
 
         # Construct the initial variable from the mean and std
         init = BlockDiagNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
@@ -519,16 +568,28 @@ class BlockDiagPriorFactory(AbstractPriorFactory):
         msg += " If you need them, reach out."
         raise NotImplementedError(msg)
 
-    def _process_tcoeffs(
+    def exponential_diffuse(
         self,
-        tcoeffs_mean,
+        tcoeffs_mean: C,
+        tcoeffs_std: C,
         /,
         *,
-        is_exact,
-        inexact_eps,
-        diffuse_derivatives,
-        diffuse_eps,
+        vf_linear,
+        diffuse_derivatives: int,
+        diffuse_eps: float,
+        base_scale: Array | None,
     ):
+        del tcoeffs_mean
+        del tcoeffs_std
+        del vf_linear
+        del diffuse_derivatives
+        del diffuse_eps
+        del base_scale
+        msg = "Block-diagonal exponential priors have not been implemented (yet.)."
+        msg += " If you need them, reach out."
+        raise NotImplementedError(msg)
+
+    def _tcoeffs_standard_deviation(self, tcoeffs_mean, /, *, is_exact, inexact_eps):
 
         # Construct the initial std.
         # If is_exact is a boolean, copy the pytree structure from the mean
@@ -562,19 +623,19 @@ class BlockDiagPriorFactory(AbstractPriorFactory):
             msg += f" Received: {tree.tree_map(np.shape, is_exact)}."
             raise ValueError(msg)
 
-        # Add diffuse derivatives if required.
-        # Always set the mean to zero (for now at least).
-        if diffuse_derivatives > 0:
-            zeros = tree.tree_map(np.zeros_like, tcoeffs_mean[0])
-            tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(diffuse_derivatives)]]
+        return tcoeffs_std
 
-            unknowns = tree.tree_map(
-                lambda s: diffuse_eps * np.ones_like(s), tcoeffs_std[0]
-            )
-            tcoeffs_std = [
-                *tcoeffs_std,
-                *[unknowns for _ in range(diffuse_derivatives)],
-            ]
+    def _add_diffuse_derivatives(
+        self, tcoeffs_mean, tcoeffs_std, /, *, diffuse_derivatives, diffuse_eps
+    ):
+        # Always set the mean to zero (for now at least).
+        zeros = tree.tree_map(np.zeros_like, tcoeffs_mean[0])
+        tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(diffuse_derivatives)]]
+
+        unknowns = tree.tree_map(
+            lambda s: diffuse_eps * np.ones_like(s), tcoeffs_std[0]
+        )
+        tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
         return tcoeffs_mean, tcoeffs_std
 
     def to_derivative(self, i, std, template):
@@ -620,13 +681,34 @@ class IsotropicPriorFactory(AbstractPriorFactory):
         diffuse_eps: float,
         base_scale: Array | None,
     ):
-        tcoeffs_mean, tcoeffs_std = self._process_tcoeffs(
+        tcoeffs_std = self._tcoeffs_standard_deviation(
+            tcoeffs_mean, is_exact=is_exact, inexact_eps=inexact_eps
+        )
+        return self.wiener_integrated_diffuse(
             tcoeffs_mean,
-            is_exact=is_exact,
-            inexact_eps=inexact_eps,
+            tcoeffs_std,
             diffuse_derivatives=diffuse_derivatives,
             diffuse_eps=diffuse_eps,
+            base_scale=base_scale,
         )
+
+    def wiener_integrated_diffuse(
+        self,
+        tcoeffs_mean: C,
+        tcoeffs_std: C,
+        /,
+        *,
+        diffuse_derivatives: int,
+        diffuse_eps: float,
+        base_scale: Array | None,
+    ):
+        if diffuse_derivatives > 0:
+            tcoeffs_mean, tcoeffs_std = self._add_diffuse_derivatives(
+                tcoeffs_mean,
+                tcoeffs_std,
+                diffuse_derivatives=diffuse_derivatives,
+                diffuse_eps=diffuse_eps,
+            )
 
         # Construct the initial variable from the mean and std
         init = IsotropicNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
@@ -688,16 +770,28 @@ class IsotropicPriorFactory(AbstractPriorFactory):
         msg += " If you need them, reach out."
         raise NotImplementedError(msg)
 
-    def _process_tcoeffs(
+    def exponential_diffuse(
         self,
-        tcoeffs_mean,
+        tcoeffs_mean: C,
+        tcoeffs_std: C,
         /,
         *,
-        is_exact,
-        inexact_eps,
-        diffuse_derivatives,
-        diffuse_eps,
+        vf_linear,
+        diffuse_derivatives: int,
+        diffuse_eps: float,
+        base_scale: Array | None,
     ):
+        del tcoeffs_mean
+        del tcoeffs_std
+        del vf_linear
+        del diffuse_derivatives
+        del diffuse_eps
+        del base_scale
+        msg = "Isotropic exponential priors have not been implemented (yet.)."
+        msg += " If you need them, reach out."
+        raise NotImplementedError(msg)
+
+    def _tcoeffs_standard_deviation(self, tcoeffs_mean, /, *, is_exact, inexact_eps):
 
         leaves, structure = tree.tree_flatten_depth_one(tcoeffs_mean)
         std_template = tree.tree_unflatten(structure, [np.zeros(()) for _ in leaves])
@@ -732,20 +826,19 @@ class IsotropicPriorFactory(AbstractPriorFactory):
                 return np.where(s, 0.0, inexact_eps)
 
             tcoeffs_std = tree.tree_map(std_init, is_exact)
+        return tcoeffs_std
 
-        # Add diffuse derivatives if required.
+    def _add_diffuse_derivatives(
+        self, tcoeffs_mean, tcoeffs_std, /, *, diffuse_derivatives, diffuse_eps
+    ):
         # Always set the mean to zero (for now at least).
-        if diffuse_derivatives > 0:
-            zeros = tree.tree_map(np.zeros_like, tcoeffs_mean[0])
-            tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(diffuse_derivatives)]]
+        zeros = tree.tree_map(np.zeros_like, tcoeffs_mean[0])
+        tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(diffuse_derivatives)]]
 
-            unknowns = tree.tree_map(
-                lambda s: diffuse_eps * np.ones_like(s), tcoeffs_std[0]
-            )
-            tcoeffs_std = [
-                *tcoeffs_std,
-                *[unknowns for _ in range(diffuse_derivatives)],
-            ]
+        unknowns = tree.tree_map(
+            lambda s: diffuse_eps * np.ones_like(s), tcoeffs_std[0]
+        )
+        tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
         return tcoeffs_mean, tcoeffs_std
 
     def to_derivative(self, i, std, template):
@@ -789,13 +882,34 @@ class DensePriorFactory(AbstractPriorFactory):
         diffuse_eps: float,
         base_scale: Array | None,
     ):
-        tcoeffs_mean, tcoeffs_std = self._process_tcoeffs(
+        tcoeffs_std = self._tcoeffs_standard_deviation(
+            tcoeffs_mean, is_exact=is_exact, inexact_eps=inexact_eps
+        )
+        return self.wiener_integrated_diffuse(
             tcoeffs_mean,
-            is_exact=is_exact,
-            inexact_eps=inexact_eps,
+            tcoeffs_std,
             diffuse_derivatives=diffuse_derivatives,
             diffuse_eps=diffuse_eps,
+            base_scale=base_scale,
         )
+
+    def wiener_integrated_diffuse(
+        self,
+        tcoeffs_mean: C,
+        tcoeffs_std: C,
+        /,
+        *,
+        diffuse_derivatives: int,
+        diffuse_eps: float,
+        base_scale: Array | None,
+    ):
+        if diffuse_derivatives > 0:
+            tcoeffs_mean, tcoeffs_std = self._add_diffuse_derivatives(
+                tcoeffs_mean,
+                tcoeffs_std,
+                diffuse_derivatives=diffuse_derivatives,
+                diffuse_eps=diffuse_eps,
+            )
 
         # Construct the initial variable from the mean and std
         init = DenseNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
@@ -841,13 +955,36 @@ class DensePriorFactory(AbstractPriorFactory):
         diffuse_eps: float,
         base_scale: Array | None,
     ):
-        tcoeffs_mean, tcoeffs_std = self._process_tcoeffs(
+        tcoeffs_std = self._tcoeffs_standard_deviation(
+            tcoeffs_mean, is_exact=is_exact, inexact_eps=inexact_eps
+        )
+        return self.exponential_diffuse(
             tcoeffs_mean,
-            is_exact=is_exact,
-            inexact_eps=inexact_eps,
+            tcoeffs_std,
             diffuse_derivatives=diffuse_derivatives,
             diffuse_eps=diffuse_eps,
+            base_scale=base_scale,
+            vf_linear=vf_linear,
         )
+
+    def exponential_diffuse(
+        self,
+        tcoeffs_mean: C,
+        tcoeffs_std: C,
+        /,
+        *,
+        vf_linear: Array,
+        diffuse_derivatives: int,
+        diffuse_eps: float,
+        base_scale: Array | None,
+    ):
+        if diffuse_derivatives > 0:
+            tcoeffs_mean, tcoeffs_std = self._add_diffuse_derivatives(
+                tcoeffs_mean,
+                tcoeffs_std,
+                diffuse_derivatives=diffuse_derivatives,
+                diffuse_eps=diffuse_eps,
+            )
 
         # Construct the initial variable from the mean and std
         init = DenseNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
@@ -915,16 +1052,7 @@ class DensePriorFactory(AbstractPriorFactory):
 
         return init, discretise
 
-    def _process_tcoeffs(
-        self,
-        tcoeffs_mean,
-        /,
-        *,
-        is_exact,
-        inexact_eps,
-        diffuse_derivatives,
-        diffuse_eps,
-    ):
+    def _tcoeffs_standard_deviation(self, tcoeffs_mean, /, *, is_exact, inexact_eps):
 
         # Construct the initial std.
         # If is_exact is a boolean, copy the pytree structure from the mean
@@ -957,20 +1085,19 @@ class DensePriorFactory(AbstractPriorFactory):
             msg += f" Expected: {tree.tree_map(np.shape, tcoeffs_mean)}."
             msg += f" Received: {tree.tree_map(np.shape, is_exact)}."
             raise ValueError(msg)
+        return tcoeffs_std
 
-        # Add diffuse derivatives if required.
+    def _add_diffuse_derivatives(
+        self, tcoeffs_mean, tcoeffs_std, /, *, diffuse_derivatives, diffuse_eps
+    ):
         # Always set the mean to zero (for now at least).
-        if diffuse_derivatives > 0:
-            zeros = tree.tree_map(np.zeros_like, tcoeffs_mean[0])
-            tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(diffuse_derivatives)]]
+        zeros = tree.tree_map(np.zeros_like, tcoeffs_mean[0])
+        tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(diffuse_derivatives)]]
 
-            unknowns = tree.tree_map(
-                lambda s: diffuse_eps * np.ones_like(s), tcoeffs_std[0]
-            )
-            tcoeffs_std = [
-                *tcoeffs_std,
-                *[unknowns for _ in range(diffuse_derivatives)],
-            ]
+        unknowns = tree.tree_map(
+            lambda s: diffuse_eps * np.ones_like(s), tcoeffs_std[0]
+        )
+        tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
         return tcoeffs_mean, tcoeffs_std
 
     def _process_base_scale(self, base_scale, single_flat, single_unravel):
