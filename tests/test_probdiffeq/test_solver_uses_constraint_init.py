@@ -23,8 +23,9 @@ def case_solver_dynamic():
 
 
 @testing.parametrize("derivatives", [1, 4])
+@testing.parametrize("ssm_fact", ["dense"])
 @testing.parametrize_with_cases("solver_factory", cases=".", prefix="case_solver_")
-def test_output_matches_reference(ivp, solver_factory, derivatives) -> None:
+def test_output_matches_reference(ivp, solver_factory, derivatives, ssm_fact) -> None:
     vf, (u0,), (t0, t1) = ivp
 
     def root(u, du, *, t):
@@ -47,11 +48,13 @@ def test_output_matches_reference(ivp, solver_factory, derivatives) -> None:
     # Build an SSM (no ODE-jets, so that we can test the update at init)
     # Only use the dense factorisation because this test uses JET constraints
     # and they have not been implemented for isotropic or blockdiagonal models
-    init, ssm = probdiffeq.ssm_taylor([u0], diffuse_derivatives=derivatives)
+    ssm = probdiffeq.ssm_taylor(ssm_fact=ssm_fact)
+    init, prior = probdiffeq.prior_wiener_integrated(
+        [u0], diffuse_derivatives=derivatives, ssm=ssm
+    )
 
     # Build a solver
     nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=50, tol=1e-10)
-    prior = probdiffeq.prior_wiener_integrated(ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     constraint = probdiffeq.constraint_jet(root, ssm=ssm, nlstsq=nlstsq)
     solver = solver_factory(

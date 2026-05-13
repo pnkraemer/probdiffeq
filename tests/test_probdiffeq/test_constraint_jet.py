@@ -141,11 +141,19 @@ def case_jet_iterated(root):
 
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
 @testing.parametrize("jet_order", [0, "max"])
+@testing.parametrize("ssm_fact", ["dense"])
 def test_posterior_linearisation_matches_closed_form_recursion(
-    root: Root, jet_factory: Callable, expected: list, jet_order: int | Literal["max"]
+    root: Root,
+    jet_factory: Callable,
+    expected: list,
+    jet_order: int | Literal["max"],
+    ssm_fact,
 ):
     derivatives = len(expected) - 1
-    init, ssm = probdiffeq.ssm_taylor([root.u0], diffuse_derivatives=derivatives)
+    ssm = probdiffeq.ssm_taylor(ssm_fact=ssm_fact)
+    init, _iwp = probdiffeq.prior_wiener_integrated(
+        [root.u0], diffuse_derivatives=derivatives, ssm=ssm
+    )
     constraint = jet_factory(ssm=ssm, jet_order=jet_order)
 
     cstate = constraint.init_linearization()

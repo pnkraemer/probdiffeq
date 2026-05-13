@@ -4,20 +4,22 @@ from probdiffeq import probdiffeq
 from probdiffeq.backend import np, testing
 
 
-def test_diffuse_derivatives() -> None:
+def test_init_diffuse_derivatives() -> None:
+    ssm = probdiffeq.ssm_taylor()
     tcoeffs = [2.0, 3.0]
-    init, _ssm = probdiffeq.ssm_taylor(
+    init, _prior = probdiffeq.prior_wiener_integrated(
         tcoeffs, diffuse_derivatives=3, diffuse_eps=123.0
     )
     assert testing.allclose(init.mean, [2.0, 3.0, 0.0, 0.0, 0.0])
     assert testing.allclose(init.std, [0.0, 0.0, 123.0, 123.0, 123.0])
 
 
-def test_differential_variables_dense() -> None:
+def test_init_is_exact_dense() -> None:
+    ssm = probdiffeq.ssm_taylor()
     tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray([True, False, True])]
-    init, _ssm = probdiffeq.ssm_taylor(
-        tcoeffs, is_exact=isdiff, inexact_eps=0.123, ssm_fact="dense"
+    init, _prior = probdiffeq.prior_wiener_integrated(
+        tcoeffs, is_exact=isdiff, inexact_eps=0.123, ssm=ssm
     )
 
     [m], [s] = init.mean, init.std
@@ -27,10 +29,10 @@ def test_differential_variables_dense() -> None:
     with testing.raises(ValueError, match="wrong PyTree structure"):
         tcoeffs = [np.asarray([1.0, 2.0, 3.0])]
         isdiff = [np.asarray(False)]  # wrong shape
-        _ = probdiffeq.ssm_taylor(tcoeffs, is_exact=isdiff)
+        _ = probdiffeq.prior_wiener_integrated(tcoeffs, is_exact=isdiff, ssm=ssm)
 
 
-def test_differential_variables_blockdiag() -> None:
+def test_init_is_exact_blockdiag() -> None:
     tcoeffs = [np.asarray([1.0, 2.0, 3.0]), np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray([True, False, True]), np.asarray([False, False, True])]
     init, _ssm = probdiffeq.ssm_taylor(
@@ -49,7 +51,7 @@ def test_differential_variables_blockdiag() -> None:
         _ = probdiffeq.ssm_taylor(tcoeffs, is_exact=isdiff, ssm_fact="blockdiag")
 
 
-def test_differential_variables_isotropic() -> None:
+def test_init_is_exact_isotropic() -> None:
     tcoeffs = [np.asarray([1.0, 2.0, 3.0]), np.asarray([1.0, 2.0, 3.0])]
     isdiff = [np.asarray(True), np.asarray(False)]
     init, _ssm = probdiffeq.ssm_taylor(

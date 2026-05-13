@@ -219,7 +219,7 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
         if not tree.tree_all(shapes_equal):
             raise ValueError(msg)
 
-        model = ssm.prior.to_derivative(tcoeff_index, std)
+        model = ssm.prior.to_derivative(tcoeff_index, std, template=marginals)
         marg = ssm.conditional.marginalise(marginals, model)
 
         # Wrap into list because blockdiag & isotropic models
@@ -266,8 +266,11 @@ def loss_lml_timeseries(
         if not tree.tree_all(shapes_equal):
             raise ValueError(msg)
 
+        # Remove the filtering distributions from the posterior
+        posterior = posterior.remove_filtering_distributions()
+
         def make_model(s):
-            return ssm.prior.to_derivative(tcoeff_index, s)
+            return ssm.prior.to_derivative(tcoeff_index, s, template=posterior.marginal)
 
         model = func.vmap(make_model)(std)
 
@@ -461,11 +464,7 @@ def constraint_jet(
         primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
         return [primals, *series]
 
-    order = (
-        ssm.prior.shape_info.num_derivatives + 1
-        if jet_order == "max"
-        else jet_order + root_order
-    )
+    order = "max" if jet_order == "max" else jet_order + root_order
     return ssm.linearize.root(
         root_jet, root_order=order, jacobian=jacobian, nlstsq=nlstsq
     )
@@ -559,7 +558,7 @@ def constraint_jet_imex(
         return [primals1, *series1]
 
     if jet_order_explicit == "max" or jet_order_implicit == "max":
-        order = ssm.prior.shape_info.num_derivatives + 1
+        order = "max"
     else:
         order_ex = root_order_ex + jet_order_explicit
         order_im = root_order_im + jet_order_implicit
@@ -648,7 +647,7 @@ def constraint_jet_dae(
         return [primals, *series]
 
     if jet_order_differential == "max" or jet_order_algebraic == "max":
-        order = ssm.prior.shape_info.num_derivatives + 1
+        order = "max"
     else:
         order_diff = root_order_diff + jet_order_differential
         order_alg = root_order_alg + jet_order_algebraic
@@ -693,7 +692,8 @@ class MarkovSequence(Generic[N]):
         This is only needed in combination with smoothing-based strategies.
         """
         if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
-            markov_seq = self._select_terminal()
+            # TODO: do this in the postprocessing of the solver...
+            markov_seq = self.remove_filtering_distributions()
             return markov_seq.evaluate_marginals(ssm=ssm)
 
         def step(x, cond):
@@ -768,20 +768,24 @@ class MarkovSequence(Generic[N]):
         (_, pdf, _), _ = flow.scan(body, init=init, xs=xs, reverse=self.reverse)
         return pdf
 
-    def _select_terminal(self):
+    def remove_filtering_distributions(self):
         """Discard all intermediate filtering solutions from a Markov sequence.
 
         This function is useful to convert a smoothing-solution into a Markov sequence
         that is compatible with sampling or marginalisation.
         """
-        init = tree.tree_map(lambda x: x[-1, ...], self.marginal)
-        return MarkovSequence(init, self.conditional, reverse=self.reverse)
+        # There should be one marginal and many conditionals. If not, remove marginals
+        if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
+            marginal_idx = -1 if self.reverse else 0
+            init = tree.tree_map(lambda x: x[marginal_idx, ...], self.marginal)
+            return MarkovSequence(init, self.conditional, reverse=self.reverse)
+        return self
 
     def sample(self, key, *, ssm: ssm_impl.FactSsmImpl, shape: tuple = ()):
         """Sample from a Markov sequence."""
         # If the MarkovSequence carries unnecessary filtering marginals, remove them
         if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
-            markov_seq = self._select_terminal()
+            markov_seq = self.remove_filtering_distributions()
             return markov_seq.sample(key, ssm=ssm, shape=shape)
 
         # If many samples are required, vmap over recursive calls to sample()
@@ -1173,7 +1177,7 @@ class ProbabilisticSolver:
         return sol, InterpResult(step_from=acc, interp_from=prev)
 
 
-def ssm_taylor(ssm_fact):
+def ssm_taylor(ssm_fact="dense"):
     return ssm_impl.FactSsmImpl.from_name(ssm_fact)
 
 
@@ -1426,7 +1430,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         )
 
     def init_posterior(self, *, u):
-        cond = self.ssm.prior.identity()
+        cond = self.ssm.prior.identity(template=u)
         posterior = MarkovSequence(marginal=u, conditional=cond, reverse=True)
         return u, posterior
 
@@ -1653,7 +1657,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         )
 
     def init_posterior(self, *, u):
-        cond = self.ssm.prior.identity()
+        cond = self.ssm.prior.identity(template=u)
         posterior = MarkovSequence(u, cond, reverse=True)
         return u, posterior
 
@@ -1696,7 +1700,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         return marginals, posterior
 
     def interpolate_at_t1(self, *, posterior_t1: MarkovSequence):
-        cond_identity = self.ssm.prior.identity()
+        cond_identity = self.ssm.prior.identity(template=posterior_t1.marginal)
         resume_from = MarkovSequence(
             posterior_t1.marginal,
             conditional=cond_identity,
@@ -1781,7 +1785,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         _, extrapolated_t = self.predict(
             posterior=posterior_t0, transition=transition_t0_t
         )
-        conditional_id = self.ssm.prior.identity()
+        conditional_id = self.ssm.prior.identity(template=posterior_t0.marginal)
         previous_new = MarkovSequence(
             extrapolated_t.marginal, conditional_id, reverse=extrapolated_t.reverse
         )

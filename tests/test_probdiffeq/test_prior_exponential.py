@@ -73,7 +73,8 @@ def test_exponential_raises_error_if_vf_linear_is_bad():
 
 
 @testing.parametrize("ode_shape", [(), (3,), (3, 3)])
-def test_exponential_transition_as_expected(ode_shape):
+@testing.parametrize("ssm_fact", ["dense"])
+def test_exponential_transition_as_expected(ode_shape, ssm_fact):
     """Follow Proposition 1 in https://arxiv.org/abs/2305.14978."""
     u = np.ones(ode_shape)
     M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
@@ -84,7 +85,7 @@ def test_exponential_transition_as_expected(ode_shape):
         del du
         return M @ ddu.ravel()
 
-    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="dense")
+    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=ssm_fact)
     exponential = probdiffeq.prior_exponential(vf_linear, ssm=ssm)
 
     dt = 0.123456

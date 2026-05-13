@@ -1,7 +1,15 @@
 """Implementations of (factorized) state-space models."""
 
 from probdiffeq.backend import abc, func, linalg, np, random, structs, tree
-from probdiffeq.backend.typing import Any, Array, Callable, Generic, Sequence, TypeVar
+from probdiffeq.backend.typing import (
+    Any,
+    Array,
+    Callable,
+    Generic,
+    Literal,
+    Sequence,
+    TypeVar,
+)
 from probdiffeq.util import cholesky_util, gram_util
 
 T = TypeVar("T", bound=Array)
@@ -89,7 +97,7 @@ class AbstractLinearization(abc.ABC):
 class AbstractRoot(AbstractLinearization):
     """Interface for linearizations of general roots."""
 
-    def __init__(self, root, /, *, root_order) -> None:
+    def __init__(self, root, /, *, root_order: int | Literal["max"]) -> None:
         self.root = root
         self.root_order = root_order
 
@@ -112,7 +120,12 @@ class AbstractLinearizationFactory(abc.ABC):
 
     @abc.abstractmethod
     def root(
-        self, root, *, jacobian, root_order: int, nlstsq: Callable | None
+        self,
+        root,
+        *,
+        jacobian,
+        root_order: int | Literal["max"],
+        nlstsq: Callable | None,
     ) -> AbstractRoot:
         """Construct an implementation of 1st-order Taylor-linearization for roots."""
         raise NotImplementedError
@@ -575,16 +588,12 @@ class IsotropicPriorFactory(AbstractPriorFactory):
 class DensePriorFactory(AbstractPriorFactory):
     """Implementation of dense prior constructors."""
 
-    def identity(self, /) -> LatentCond:
-        ndim = self.shape_info.num_derivatives + 1
-        (d,) = self.shape_info.single_flat.shape
-        n = ndim * d
-
+    def identity(self, template) -> LatentCond:
+        (n,) = template.mean_flat.shape
         A = np.eye(n)
         m = np.zeros((n,))
         C = np.zeros((n, n))
-        tree_flatten = DenseTreeFlatten.from_shape_info(self.shape_info)
-        noise = DenseNormal(m, C, tree_flatten)
+        noise = DenseNormal(m, C, template.tree_flatten)
         return LatentCond.from_linop_and_noise(A, noise)
 
     def wiener_integrated(
@@ -758,6 +767,15 @@ class DensePriorFactory(AbstractPriorFactory):
 
             tcoeffs_std = tree.tree_map(std_init, is_exact)
 
+        def shape_equal(A, B):
+            return tree.tree_map(lambda a, b: a.shape == b.shape, A, B)
+
+        if not tree.tree_all(shape_equal(tcoeffs_mean, tcoeffs_std)):
+            msg = "Input 'is_exact' has the wrong PyTree structure."
+            msg += f" Expected: {tree.tree_map(np.shape, tcoeffs_mean)}."
+            msg += f" Received: {tree.tree_map(np.shape, is_exact)}."
+            raise ValueError(msg)
+
         # Add diffuse derivatives if required.
         # Always set the mean to zero (for now at least).
         if diffuse_derivatives > 0:
@@ -803,14 +821,16 @@ class DensePriorFactory(AbstractPriorFactory):
             raise ValueError(msg)
         return output_scale
 
-    def to_derivative(self, i, std):
-        def select(a):
-            return tree.ravel_pytree(self.shape_info.all_unravel(a)[i])[0]
+    def to_derivative(self, i, std, template):
+        all_flat, all_unravel = tree.ravel_pytree(template.mean)
 
-        x = np.zeros(self.shape_info.all_flat.shape)
+        def select(a):
+            return tree.ravel_pytree(all_unravel(a)[i])[0]
+
+        x = np.zeros(all_flat.shape)
         linop = func.jacfwd(select)(x)
 
-        data_like = self.shape_info.all_unravel(x)[0]
+        data_like = all_unravel(x)[0]
         noise = DenseNormal.from_mean_and_std([data_like], [std])
         return LatentCond.from_linop_and_noise(linop, noise)
 
@@ -946,7 +966,7 @@ class DenseNormal(AbstractTreeNormal[DenseTreeFlatten]):
 class DenseLinearizationFactory(AbstractLinearizationFactory):
     """Construct a dense linearization factory."""
 
-    def root(self, root, *, jacobian, root_order: int, nlstsq: bool):
+    def root(self, root, *, jacobian, root_order: int | Literal["max"], nlstsq: bool):
         return DenseRoot(root, jacobian=jacobian, root_order=root_order, nlstsq=nlstsq)
 
     def ode_taylor_0th(self, vf, *, ode_order):
@@ -1117,7 +1137,9 @@ class DenseOdeTs1(AbstractOde):
 class DenseRoot(AbstractRoot):
     """Construct a dense implementation of root-TS1 linearization."""
 
-    def __init__(self, root, *, root_order, jacobian, nlstsq) -> None:
+    def __init__(
+        self, root, *, root_order: int | Literal["max"], jacobian, nlstsq
+    ) -> None:
         super().__init__(root, root_order=root_order)
         self.jacobian = jacobian
         self.nlstsq = nlstsq
@@ -1129,7 +1151,9 @@ class DenseRoot(AbstractRoot):
         """Evaluate a flattened version of the root constraint."""
         # Unravel the location and extract derivatives
         m_tree = tree_flatten.unflatten_array(m)
-        relevant_tcoeffs = m_tree[: self.root_order]
+        relevant_tcoeffs = (
+            m_tree if self.root_order == "max" else m_tree[: self.root_order]
+        )
 
         # Evaluate the root
         root_eval = self.root(*relevant_tcoeffs, t=t)
@@ -1159,7 +1183,9 @@ class DenseRoot(AbstractRoot):
         # (So that we can unravel the bias term and always work in the correct
         # pytree structure.)
         m_tree = rv.mean
-        relevant_tcoeffs = m_tree[: self.root_order]
+        relevant_tcoeffs = (
+            m_tree if self.root_order == "max" else m_tree[: self.root_order]
+        )
         root_eval = func.eval_shape(lambda s: [self.root(*s, t=t)], relevant_tcoeffs)
 
         # Ensure that unravelling does not yield a ShapeDtypeStruct
@@ -1320,7 +1346,14 @@ class BlockDiagOdeTs1(AbstractOde):
 class IsotropicLinearizationFactory(AbstractLinearizationFactory):
     """Construct an isotropic linearization-factory."""
 
-    def root(self, root, *, jacobian, root_order: int, nlstsq: Callable | None):
+    def root(
+        self,
+        root,
+        *,
+        jacobian,
+        root_order: int | Literal["max"],
+        nlstsq: Callable | None,
+    ):
         raise NotImplementedError
 
     def ode_taylor_1st(self, vf, *, ode_order, jacobian):
@@ -1333,7 +1366,14 @@ class IsotropicLinearizationFactory(AbstractLinearizationFactory):
 class BlockDiagLinearizationFactory(AbstractLinearizationFactory):
     """Construct a block-diagonal linearization-factory."""
 
-    def root(self, root, *, jacobian, root_order: int, nlstsq: Callable | None):
+    def root(
+        self,
+        root,
+        *,
+        jacobian,
+        root_order: int | Literal["max"],
+        nlstsq: Callable | None,
+    ):
         raise NotImplementedError
 
     def ode_taylor_0th(self, vf, *, ode_order):

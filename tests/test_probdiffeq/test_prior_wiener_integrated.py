@@ -7,8 +7,8 @@ from probdiffeq.backend import np, testing
 @testing.parametrize("ssm_fact", ["isotropic", "dense"])
 def test_transitions_are_correct_in_1d(ssm_fact) -> None:
     tcoeffs = [2.0, 3.0, 4.0, 5.0]
-    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=ssm_fact)
-    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
+    ssm = probdiffeq.ssm_taylor(ssm_fact=ssm_fact)
+    _init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
 
     cond = iwp(1.0, 1.0)
     A_expected = np.asarray(
@@ -36,8 +36,8 @@ def test_transitions_are_correct_in_1d(ssm_fact) -> None:
 # Separate test because conditional shapes differ
 def test_transitions_are_correct_in_1d_blockdiag() -> None:
     tcoeffs = [2.0, 3.0, 4.0, 5.0]
-    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact="blockdiag")
-    iwp = probdiffeq.prior_wiener_integrated(ssm=ssm)
+    ssm = probdiffeq.ssm_taylor(ssm_fact="blockdiag")
+    _init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
 
     cond = iwp(1.0, np.ones((1,)))
     A_expected = np.asarray(

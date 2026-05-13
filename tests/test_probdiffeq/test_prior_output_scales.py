@@ -70,13 +70,12 @@ def case_scale_rules_iwp_isotropic() -> ScaleShapeRules:
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_covariances_scaled_correctly_default(rules: ScaleShapeRules):
+    # Test that the transition covariances are scaled correctly
+    ssm = probdiffeq.ssm_taylor(ssm_fact=rules.ssm_fact)
 
     # 1d problem, but "unusual" shapes. Values don't matter.
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
-
-    # Test that the transition covariances are scaled correctly
-    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=rules.ssm_fact)
-    iwp = rules.prior(ssm=ssm)
+    _init, iwp = rules.prior(tcoeffs, ssm=ssm)
     cond = iwp(1.0)
     Q_expected = 1.0 / np.asarray([[3.0, 2.0], [2.0, 1.0]])
     _, cov = cond.noise.to_multivariate_normal()
@@ -85,13 +84,13 @@ def test_output_scales_covariances_scaled_correctly_default(rules: ScaleShapeRul
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_covariances_scaled_correctly_custom(rules: ScaleShapeRules):
+    # Test that the transition covariances are scaled correctly
+    ssm = probdiffeq.ssm_taylor(ssm_fact=rules.ssm_fact)
+
     # 1d problem, but "unusual" shapes. Values don't matter.
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
     scale = 123.45 * np.ones(rules.base)
-
-    # Test that the transition covariances are scaled correctly
-    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=rules.ssm_fact)
-    iwp = rules.prior(ssm=ssm, output_scale=scale)
+    _init, iwp = rules.prior(tcoeffs, ssm=ssm, output_scale=scale)
 
     cond = iwp(1.0, 9.876 * np.ones(rules.calibrated))
     Q_expected = (9.876 * 123.45) ** 2.0 * 1.0 / np.asarray([[3.0, 2.0], [2.0, 1.0]])
@@ -101,24 +100,25 @@ def test_output_scales_covariances_scaled_correctly_custom(rules: ScaleShapeRule
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_wrong_shape_raises_error_at_construction(rules: ScaleShapeRules):
-    tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
-    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=rules.ssm_fact)
+    ssm = probdiffeq.ssm_taylor(ssm_fact=rules.ssm_fact)
 
     # Sanity check: assert that the same error does not happen with the correct shape
-    _ = rules.prior(output_scale=np.ones(rules.base), ssm=ssm)
+    tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
+    _ = rules.prior(tcoeffs, output_scale=np.ones(rules.base), ssm=ssm)
 
     # Test that for the wrong shape or type, an error is raised during construction
     for shapes in rules.base_baddies:
         scale = 123.45 * np.ones(shapes)
         with testing.raises(ValueError, match="wrong shape"):
-            _ = rules.prior(output_scale=scale, ssm=ssm)
+            _ = rules.prior(tcoeffs, output_scale=scale, ssm=ssm)
 
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_wrong_shape_raises_error_at_calling(rules: ScaleShapeRules):
+    ssm = probdiffeq.ssm_taylor(ssm_fact=rules.ssm_fact)
+
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
-    _init, ssm = probdiffeq.ssm_taylor(tcoeffs, ssm_fact=rules.ssm_fact)
-    iwp = rules.prior(ssm=ssm)
+    _init, iwp = rules.prior(tcoeffs, ssm=ssm)
 
     # Sanity check: assert that the same error does not happen with the correct shape
     _ = iwp(1.0, np.ones(rules.calibrated))
