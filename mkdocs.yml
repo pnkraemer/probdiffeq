@@ -1,12 +1,7 @@
 ---
 theme:
   name: material
-  features:
-    - navigation.sections
-    - navigation.path
-    - navigation.indexes
-    - search.suggest
-    - search.highlight
+  features: [navigation.indexes, search.suggest, search.highlight]
   palette:
     - scheme: default
       primary: white
@@ -63,12 +58,14 @@ plugins:
             show_source: false
             inherited_members: false
             show_if_no_docstring: true
+            show_root_heading: false
+            show_root_toc_entry: false
             merge_init_into_class: true
             members_order: alphabetical
             group_by_category: false
   - mkdocs-jupyter:
       include: ['*.py']
-      execute: true
+      execute: false
       allow_errors: false
 extra:
   social:

@@ -6,7 +6,7 @@ import pathlib
 def main(
     src="probdiffeq",
     target="docs/API_documentation/",
-    path_skip=("backend/*", "util/*"),
+    path_skip=("backend/*", "util/*", "probdiffeq.py", "_probdiffeq/*"),
 ):
     """Create an automatic API documentation.
 
@@ -32,6 +32,21 @@ def main(
             with open(f"{path_target}/{p_as_markdown}.md", "w") as file:
                 content = f"# {p_as_module} \n\n:::{p_as_module}"
                 file.write(content)
+
+    # Loop over the probdiffeq directory
+    content = "# probdiffeq.probdiffeq"
+    content += "\n\n:::probdiffeq.probdiffeq"
+    for path in path_source.rglob("_probdiffeq/*.py"):
+        if path.name[0] != "_":
+            header = path.name.replace(".py", "")
+            header = header.replace("_", " ").title()
+            p_as_module = path_as_module(path)
+            content += f"\n\n## {header}"
+            content += f"\n\n:::{p_as_module}"
+
+    # Open the markdown file and write content
+    with open(f"{path_target}/probdiffeq.md", "w") as file:
+        file.write(content)
 
 
 def path_as_module(p: pathlib.Path) -> str:
