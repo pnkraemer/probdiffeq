@@ -1,16 +1,9 @@
 """Utilities for probabilistic ODE solver implementations."""
 
-from probdiffeq import ssm_impl
-from probdiffeq._probdiffeq import markov_processes, solvers
 from probdiffeq.backend import structs, tree
 from probdiffeq.backend.typing import Generic, TypeVar
 
-S = TypeVar(
-    "S",
-    bound=solvers.ProbabilisticSolution
-    | markov_processes.MarkovSequence
-    | ssm_impl.AbstractTreeNormal,
-)
+S = TypeVar("S")
 """A type-variable to describe interpolation results."""
 
 
