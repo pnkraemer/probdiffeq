@@ -10,7 +10,7 @@ FactSsmImpl(linearize=DenseLinearizationFactory(), prior=DensePriorFactory(), co
 
 Switching to a different factorisation is easy via the `ssm_fact` argument:
 
->>> ssm = probdiffeq.state_space_model(probdiffeq.SsmFact.BLOCKDIAG)
+>>> ssm = probdiffeq.state_space_model(probdiffeq.SsmFactName.BLOCKDIAG)
 >>> print(ssm)
 FactSsmImpl(linearize=BlockDiagLinearizationFactory(), prior=BlockDiagPriorFactory(), conditional=BlockDiagConditional())
 
