@@ -143,6 +143,8 @@ ignore = [
     "A005",
     # Line-too-long is handled by the formatter, not the linter
     "E501",
+    # Star imports are acceptable
+    "F403",
 ]
 
 [tool.ruff.lint.isort]

@@ -48,10 +48,12 @@ def main(
     # Read all submodules automatically and add them to the content
     for path in path_source.rglob("*.py"):
         if path.name[0] != "_":
-            header = path.name.replace(".py", "")
-            header = header.replace("_", " ").upper()
+            header = path.name.lower()
+            header = header.replace(".py", "")
+            header = header.replace("_and_", " & ")
+            header = header.replace("_", " ")
             p_as_module = path_as_module(path)
-            content += f"\n\n## \n\n## {header}"
+            content += f"\n\n## \n\n## {header.upper()}"
             content += f"\n\n:::{p_as_module}"
 
     with open(f"{path_target}/probdiffeq.md", "w") as file:

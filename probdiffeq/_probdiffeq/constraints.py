@@ -1,7 +1,7 @@
 """Constraint functions."""
 
 from probdiffeq import diffeqjet, ssm_impl
-from probdiffeq._probdiffeq import jacobian_handlers
+from probdiffeq._probdiffeq import jacobians
 from probdiffeq.backend import func, inspect, tree
 from probdiffeq.backend.typing import Callable, Literal, Protocol, Sequence, TypeVar
 
@@ -70,7 +70,7 @@ def constraint_ode_ts1(
     /,
     *,
     ssm: ssm_impl.FactSsmImpl,
-    jacobian: jacobian_handlers.JacobianHandler | None = None,
+    jacobian: jacobians.JacobianHandler | None = None,
 ):
     """Create an ODE constraint with first-order Taylor linearisation.
 
@@ -87,7 +87,7 @@ def constraint_ode_ts1(
     ode_order = _verify_vector_field_signature_and_parse_order(vf)
     if jacobian is None:
         # Use Hutchinson-Jacobian handling for backward compatibility.
-        jacobian = jacobian_handlers.jacobian_hutchinson_fwd()
+        jacobian = jacobians.jacobian_hutchinson_fwd()
     return ssm.linearize.ode_taylor_1st(vf, ode_order=ode_order, jacobian=jacobian)
 
 
@@ -171,7 +171,7 @@ def constraint_jet(
     root_order = _verify_vector_field_signature_and_parse_order(root)
 
     if jacobian is None:
-        jacobian = jacobian_handlers.jacobian_hutchinson_fwd()
+        jacobian = jacobians.jacobian_hutchinson_fwd()
 
     def root_jet(*tcoeffs_all, t):
         _, unravel_one = tree.ravel_pytree(tcoeffs_all[0])
@@ -244,7 +244,7 @@ def constraint_jet_imex(
     root_order_ex = _verify_vector_field_signature_and_parse_order(explicit)
 
     if jacobian is None:
-        jacobian = jacobian_handlers.jacobian_hutchinson_fwd()
+        jacobian = jacobians.jacobian_hutchinson_fwd()
 
     def root_jet(*tcoeffs_all, t):
         _, unravel = tree.ravel_pytree(tcoeffs_all[0])
@@ -339,7 +339,7 @@ def constraint_jet_dae(
     root_order_alg = _verify_vector_field_signature_and_parse_order(algebraic)
 
     if jacobian is None:
-        jacobian = jacobian_handlers.jacobian_hutchinson_fwd()
+        jacobian = jacobians.jacobian_hutchinson_fwd()
 
     def root_jet(*tcoeffs_all, t):
         unravel = tree.ravel_pytree(tcoeffs_all[0])[1]
