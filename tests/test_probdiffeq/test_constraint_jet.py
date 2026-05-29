@@ -92,7 +92,7 @@ def fixture_expected(root, derivatives):
 
 
 def case_jet_iterated_dae(root):
-    nlstsq = probdiffeq.nlstsq_gauss_newton_weighted_constrained(maxiter=50, tol=1e-10)
+    nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     linearization = probdiffeq.linearization_map(nlstsq)
 
     def constraint(ssm, jet_order):
@@ -109,7 +109,7 @@ def case_jet_iterated_dae(root):
 
 
 def case_jet_iterated(root):
-    nlstsq = probdiffeq.nlstsq_gauss_newton_weighted_constrained(maxiter=50, tol=1e-10)
+    nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     linearization = probdiffeq.linearization_map(nlstsq)
 
     def constraint(ssm, jet_order):

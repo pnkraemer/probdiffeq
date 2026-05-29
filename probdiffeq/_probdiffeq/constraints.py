@@ -61,6 +61,17 @@ def constraint_ode_ts0(vf: Callable, /, *, ssm: ssm_impl.FactSsmImpl) -> Constra
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
+
+    Parameters
+    ----------
+    vf
+        The vector field of the ODE. The ODE vector field is assumed to be one of ``f(u, *, t)``, ``f(u, du, *, t)``, etc.
+        The order of the ODE is read off the number of positional arguments before t.
+        That is, for first-order ODEs, pass ``f(u, *, t)``,
+        for second-order ODEs, pass ``f(u, du, *, t)``,
+        for third-order ODEs ``f(u, du, ddu, *, t)``, and so on.
+    ssm
+        The state-space model to use for the constraint.
     """
     ode_order = _verify_vector_field_signature_and_parse_order(vf)
     return ssm.linearize.ode_taylor_0th(vf, ode_order=ode_order)
@@ -78,12 +89,20 @@ def constraint_ode_ts1(
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
 
-    The ODE vector field is assumed to be one of ``f(u, *, t)``, ``f(u, du, *, t)``, etc.
-    The order of the ODE is read off the number of positional arguments before t.
-    That is, for first-order ODEs, pass ``f(u, *, t)``,
-    for second-order ODEs, pass ``f(u, du, *, t)``,
-    for third-order ODEs ``f(u, du, ddu, *, t)``, and so on.
-
+    Parameters
+    ----------
+    vf
+        The vector field of the ODE. The ODE vector field is assumed to be one of ``f(u, *, t)``, ``f(u, du, *, t)``, etc.
+        The order of the ODE is read off the number of positional arguments before t.
+        That is, for first-order ODEs, pass ``f(u, *, t)``,
+        for second-order ODEs, pass ``f(u, du, *, t)``,
+        for third-order ODEs ``f(u, du, ddu, *, t)``, and so on.
+    ssm
+        The state-space model to use for the constraint.
+    jacobian
+        The Jacobian handler to use for the linearization.
+        If None, a Jacobians are materialized at every stage in dense factorisations
+        and Hutchinson-approximated in isotropic or blockdiagonal models.
     """
     ode_order = _verify_vector_field_signature_and_parse_order(vf)
     if jacobian is None:
@@ -153,7 +172,7 @@ def constraint(
     *,
     ssm: ssm_impl.FactSsmImpl,
     jacobian: jacobians.JacobianHandler | None = None,
-    linearization: Callable | None = None,
+    linearization: linearizations.Linearization | None = None,
     jet_order: int | Literal["max"] = "max",
 ):
     """Construct a constraint that implements Jet-linearization.
@@ -166,6 +185,22 @@ def constraint(
         This function is highly experimental and not safe to use.
         There is no guarantee that it works correctly (or at all).
         It might be deleted tomorrow and without any deprecation policy.
+
+
+    Parameters
+    ----------
+    root
+        The root constraint to linearize. The root constraint is expected to have a signature like ``f(*y, t)`` where the number of positional arguments specifies the order of the problem.
+    ssm
+        The state-space model to use for the constraint.
+    jacobian
+        The Jacobian handler to use for the linearization.
+        If None, a Jacobians are materialized at every stage in dense factorisations
+        and Hutchinson-approximated in isotropic or blockdiagonal models.
+    linearization
+        The strategy to use for finding the linearization point. If None, the prior mean is used as the linearization point.
+    jet_order
+        The order of the jet linearization. If "max", the jet order is as large as possible given the number of Taylor coefficients provided by the solver. Otherwise, the jet order is an integer specifying the order of the jet linearization. For instance, if the solver provides Taylor coefficients
 
     """
     root_order = _verify_vector_field_signature_and_parse_order(root)
@@ -220,12 +255,12 @@ def constraint(
 
 
 def constraint_dae(
-    differential,
-    algebraic,
+    differential: Callable,
+    algebraic: Callable,
     *,
     ssm: ssm_impl.FactSsmImpl,
     jacobian: jacobians.JacobianHandler | None = None,
-    linearization: Callable | None = None,
+    linearization: linearizations.Linearization | None = None,
     jet_order_differential: int | Literal["max"] = "max",
     jet_order_algebraic: int | Literal["max"] = "max",
 ):
@@ -239,6 +274,24 @@ def constraint_dae(
         There is no guarantee that it works correctly (or at all).
         It might be deleted tomorrow and without any deprecation policy.
 
+    Parameters
+    ----------
+    differential
+        The root corresponding to the differential part of the DAE. The root is expected to have a signature like ``f(*y, t)`` where the number of positional arguments specifies the order of the problem.
+    algebraic
+        The root corresponding to the algebraic part of the DAE. The root is expected to        have a signature like ``f(*y, t)`` where the number of positional arguments specifies the order of the problem.
+    ssm
+        The state-space model to use for the constraint.
+    jacobian
+        The Jacobian handler to use for the linearization.
+        If None, a Jacobians are materialized at every stage in dense factorisations
+        and Hutchinson-approximated in isotropic or blockdiagonal models.
+    linearization
+        The strategy to use for finding the linearization point. If None, the prior mean is used as the linearization point.
+    jet_order_differential
+        The order of the jet linearization for the differential root. If "max", the jet order is as large as possible given the number of Taylor coefficients provided by the solver. Otherwise, the jet order is an integer specifying the order of the jet linearization. For instance, if the solver provides Taylor coefficients up to order 5 and the differential root is of order 2, then the jet order can be at most 3.
+    jet_order_algebraic
+        The order of the jet linearization for the algebraic root. If "max", the jet order is as large as possible given the number of Taylor coefficients provided by the solver. Otherwise, the jet order is an integer specifying the order of the jet linearization. For instance, if the solver provides Taylor coefficients up to order 5 and the algebraic root is of order 1, then the jet order can be at most 4.
     """
     root_order_diff = _verify_vector_field_signature_and_parse_order(differential)
     root_order_alg = _verify_vector_field_signature_and_parse_order(algebraic)

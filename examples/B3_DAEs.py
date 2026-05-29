@@ -51,7 +51,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     ssm = probdiffeq.state_space_model()
 
     y0 = [jnp.array([1.0, 0.0, 0.0])]
-    nlstsq = probdiffeq.nlstsq_gauss_newton_weighted_constrained(maxiter=10, tol=1e-8)
+    nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=10, tol=1e-8)
     y0, _info = diffeqjet.daejet_nlstsq(
         differential_auto, algebraic_auto, y0, num=4, nlstsq=nlstsq
     )

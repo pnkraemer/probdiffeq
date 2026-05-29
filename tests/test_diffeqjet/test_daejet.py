@@ -40,7 +40,7 @@ def test_daejet_matches_expectation_on_sir_model(num):
     expected = diffeqjet.odejet_unroll(vf_ode, y0, num=num)
 
     eps = np.finfo_eps(y0[0].dtype)
-    nlstsq = probdiffeq.nlstsq_gauss_newton_weighted_constrained(maxiter=10, tol=eps)
+    nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=10, tol=eps)
 
     @func.jit
     def initialize(inits):
@@ -89,7 +89,7 @@ def test_daejet_recursive_matches_expectation_on_sir_model(num_strides, stride):
     y0 = [np.asarray([0.99, 0.01, 0.0])]
     expected = diffeqjet.odejet_unroll(vf_ode, y0, num=num_strides * stride)
     eps = np.finfo_eps(y0[0].dtype)
-    nlstsq = probdiffeq.nlstsq_gauss_newton_weighted_constrained(maxiter=3, tol=eps)
+    nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=3, tol=eps)
 
     @func.jit
     def initialize(inits):

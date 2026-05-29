@@ -1,5 +1,3 @@
-"""Interact with Jacobians (traces, diagonals, materialisation, ...)."""
-
 from probdiffeq.backend import func, linalg, random
 
 __all__ = [

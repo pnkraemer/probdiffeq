@@ -210,7 +210,7 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
             return algebraic(u, t=t0)
 
         y0 = [jnp.array([1.0, 0.0, 0.0])]
-        nlstsq = probdiffeq.nlstsq_gauss_newton_weighted_constrained(
+        nlstsq = probdiffeq.wlstsq_nc_gauss_newton(
             maxiter=10, tol=jnp.finfo(y0[0].dtype).eps ** 0.5
         )
         tcoeffs, _info = diffeqjet.daejet_nlstsq(

@@ -611,7 +611,7 @@ class DenseRoot(api.AbstractRoot):
     ) -> None:
         super().__init__(root, root_order=root_order)
         self.jacobian = jacobian
-        self.linearization = linearization
+        self.linearization_point = linearization
 
     def init_linearization(self):
         return self.jacobian.init_jacobian_handler()
@@ -638,7 +638,7 @@ class DenseRoot(api.AbstractRoot):
         )
 
         # Get the linearization point (eg prior or posterior linearisation)
-        mean = self.linearization(constraint_flat, rv)
+        mean = self.linearization_point(constraint_flat, rv)
 
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
         fx = fx - linop @ mean

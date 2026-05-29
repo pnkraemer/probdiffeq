@@ -53,7 +53,7 @@ def test_output_matches_reference(ivp, solver_factory, derivatives, ssm_fact) ->
     )
 
     # Build a solver
-    nlstsq = probdiffeq.nlstsq_gauss_newton_weighted_constrained(maxiter=50, tol=1e-10)
+    nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     linearization = probdiffeq.linearization_map(nlstsq)
     constraint = probdiffeq.constraint(root, ssm=ssm, linearization=linearization)

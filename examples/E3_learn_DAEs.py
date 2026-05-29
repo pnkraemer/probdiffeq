@@ -153,7 +153,7 @@ def solver(differential, algebraic, tol, while_loop, trafo):
         def algebraic_auto(u):
             return algebraic(u, t=t0)
 
-        nlstsq = probdiffeq.nlstsq_gauss_newton_weighted_constrained(
+        nlstsq = probdiffeq.wlstsq_nc_gauss_newton(
             maxiter=10, tol=tol, while_loop=while_loop
         )
         y0, _info = diffeqjet.daejet_nlstsq(
