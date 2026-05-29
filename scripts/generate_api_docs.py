@@ -6,14 +6,8 @@ import pathlib
 def main(
     src="probdiffeq",
     target="docs/API_documentation/",
-    path_skip=(
-        "backend/*",
-        "util/*",
-        "probdiffeq.py",
-        "_probdiffeq/*",
-        "ssm_impl.py",
-        "_ssm_impl/*",
-    ),
+    path_skip=("backend/*", "util/*"),
+    nested_modules=("probdiffeq", "ssm_impl", "ivpsolve"),
 ):
     """Create an automatic API documentation.
 
@@ -24,6 +18,11 @@ def main(
     path_source = pathlib.Path(src)
     path_target = pathlib.Path(target)
 
+    path_skip = [
+        *path_skip,
+        *[f"{nest}.py" for nest in nested_modules],
+        *[f"_{nest}/*" for nest in nested_modules],
+    ]
     # Make the target directory unless it exists
     path_target.mkdir(parents=True, exist_ok=True)
 
@@ -42,7 +41,7 @@ def main(
 
     # Loop over the probdiffeq directory
 
-    for nested in ["probdiffeq", "ssm_impl"]:
+    for nested in nested_modules:
         path_source = pathlib.Path(src) / f"_{nested}"
 
         # Write the header for the probdiffeq file
