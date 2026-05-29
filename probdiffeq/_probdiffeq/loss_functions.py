@@ -1,6 +1,7 @@
 """Loss functions, including log-marginal likelihoods."""
 
 from probdiffeq import ssm_impl
+from probdiffeq._probdiffeq import markov_processes
 from probdiffeq.backend import func, linalg, np, tree
 from probdiffeq.backend.typing import Sequence, TypeVar
 
@@ -62,9 +63,9 @@ def loss_lml_timeseries(
     """Construct a log-marginal-likelihood loss for a time-series."""
 
     def loss(u, /, *, posterior, std):
-        if not isinstance(posterior, MarkovSequence):
+        if not isinstance(posterior, markov_processes.MarkovSequence):
             msg = "The datatype of the posterior is not as expected."
-            msg += f" Expected: {MarkovSequence}."
+            msg += f" Expected: {markov_processes.MarkovSequence}."
             msg += f" Received: {type(posterior)}."
             msg += " Did you perhaps use a filter instead of a smoother"
             msg += ", or mean to use a different loss?"

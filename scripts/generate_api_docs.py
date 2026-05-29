@@ -37,8 +37,7 @@ def main(
     path_target = pathlib.Path(target)
     path_source = pathlib.Path(src) / "_probdiffeq"
 
-    # # Make the target directory unless it exists
-    # path_target.mkdir(parents=True, exist_ok=True)
+    # Write the header for the probdiffeq file
     content = """
 # probdiffeq.probdiffeq
 
@@ -46,7 +45,7 @@ def main(
     options:
         members: false
 """
-
+    # Read all submodules automatically and add them to the content
     for path in path_source.rglob("*.py"):
         if path.name[0] != "_":
             header = path.name.replace(".py", "")
