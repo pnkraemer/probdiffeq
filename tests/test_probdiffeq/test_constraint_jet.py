@@ -3,7 +3,6 @@
 from probdiffeq import diffeqjet, probdiffeq
 from probdiffeq.backend import linalg, np, structs, testing
 from probdiffeq.backend.typing import Array, Callable, Literal
-from probdiffeq.util import nlstsq_util
 
 
 @structs.dataclass
@@ -15,8 +14,6 @@ class Root:
     """
 
     root: Callable
-    root_imex_linear: Callable
-    root_imex_nonlinear: Callable
     root_dae_algebraic: Callable
     root_dae_differential: Callable
     ode_vf: Callable
@@ -77,8 +74,6 @@ def fixture_root_sir():
     t0 = 0.0
     return Root(
         root=root,
-        root_imex_linear=imex_linear,
-        root_imex_nonlinear=imex_nonlinear,
         root_dae_differential=dae_differential,
         root_dae_algebraic=dae_algebraic,
         ode_vf=vf,
@@ -97,14 +92,15 @@ def fixture_expected(root, derivatives):
 
 
 def case_jet_iterated_dae(root):
-    nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=50, tol=1e-10)
+    nlstsq = probdiffeq.nlstsq_gauss_newton_weighted_constrained(maxiter=50, tol=1e-10)
+    linearization = probdiffeq.linearization_map(nlstsq)
 
     def constraint(ssm, jet_order):
-        return probdiffeq.constraint_jet_dae(
+        return probdiffeq.constraint_dae(
             differential=root.root_dae_differential,
             algebraic=root.root_dae_algebraic,
             ssm=ssm,
-            nlstsq=nlstsq,
+            linearization=linearization,
             jet_order_differential=jet_order,
             jet_order_algebraic=jet_order + 1 if jet_order != "max" else "max",
         )
@@ -112,28 +108,13 @@ def case_jet_iterated_dae(root):
     return constraint
 
 
-def case_jet_iterated_imex(root):
-    nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=50, tol=1e-10)
-
-    def constraint(ssm, jet_order):
-        return probdiffeq.constraint_jet_imex(
-            implicit=root.root_imex_linear,
-            explicit=root.root_imex_nonlinear,
-            ssm=ssm,
-            nlstsq=nlstsq,
-            jet_order_implicit=jet_order,
-            jet_order_explicit=jet_order,
-        )
-
-    return constraint
-
-
 def case_jet_iterated(root):
-    nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=50, tol=1e-10)
+    nlstsq = probdiffeq.nlstsq_gauss_newton_weighted_constrained(maxiter=50, tol=1e-10)
+    linearization = probdiffeq.linearization_map(nlstsq)
 
     def constraint(ssm, jet_order):
-        return probdiffeq.constraint_jet(
-            root.root, ssm=ssm, nlstsq=nlstsq, jet_order=jet_order
+        return probdiffeq.constraint(
+            root.root, ssm=ssm, linearization=linearization, jet_order=jet_order
         )
 
     return constraint

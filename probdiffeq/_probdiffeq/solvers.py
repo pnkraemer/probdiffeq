@@ -5,7 +5,13 @@ from probdiffeq._probdiffeq import constraints, markov_strategies, utilities
 from probdiffeq.backend import func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, TypeVar
 
-__all__ = ["ProbabilisticSolver", "solver", "solver_dynamic", "solver_mle"]
+__all__ = [
+    "ProbabilisticSolution",
+    "ProbabilisticSolver",
+    "solver",
+    "solver_dynamic",
+    "solver_mle",
+]
 
 N = TypeVar("N", bound=ssm_impl.AbstractTreeNormal)
 """A type-variable to describe normal distributions.

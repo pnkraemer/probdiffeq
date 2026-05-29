@@ -13,7 +13,6 @@ import scipy.integrate
 import tqdm
 
 from probdiffeq import diffeqjet, ivpsolve, probdiffeq
-from probdiffeq.util import nlstsq_util
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -211,7 +210,7 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
             return algebraic(u, t=t0)
 
         y0 = [jnp.array([1.0, 0.0, 0.0])]
-        nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(
+        nlstsq = probdiffeq.nlstsq_gauss_newton_weighted_constrained(
             maxiter=10, tol=jnp.finfo(y0[0].dtype).eps ** 0.5
         )
         tcoeffs, _info = diffeqjet.daejet_nlstsq(
@@ -225,8 +224,9 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
         )
 
         # We build a Jet constraint
-        jet = probdiffeq.constraint_jet_dae(
-            differential, algebraic, ssm=ssm, nlstsq=nlstsq
+        linearization = probdiffeq.linearization_map(nlstsq)
+        jet = probdiffeq.constraint_dae(
+            differential, algebraic, ssm=ssm, linearization=linearization
         )
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 

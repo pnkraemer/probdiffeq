@@ -18,7 +18,6 @@ import matplotlib.pyplot as plt
 import scipy.integrate
 
 from probdiffeq import diffeqjet, ivpsolve, probdiffeq
-from probdiffeq.util import nlstsq_util
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -52,7 +51,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     ssm = probdiffeq.state_space_model()
 
     y0 = [jnp.array([1.0, 0.0, 0.0])]
-    nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=10, tol=1e-8)
+    nlstsq = probdiffeq.nlstsq_gauss_newton_weighted_constrained(maxiter=10, tol=1e-8)
     y0, _info = diffeqjet.daejet_nlstsq(
         differential_auto, algebraic_auto, y0, num=4, nlstsq=nlstsq
     )
@@ -66,7 +65,10 @@ def main(t0=1e-6, t1=1e5) -> None:
     )
 
     # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
-    jet = probdiffeq.constraint_jet_dae(differential, algebraic, ssm=ssm, nlstsq=nlstsq)
+    linearization = probdiffeq.linearization_map(nlstsq)
+    jet = probdiffeq.constraint_dae(
+        differential, algebraic, ssm=ssm, linearization=linearization
+    )
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_dynamic(
         strategy=strategy, prior=ioup, constraint=jet, ssm=ssm

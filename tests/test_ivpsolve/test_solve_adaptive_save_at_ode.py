@@ -127,9 +127,7 @@ def case_factory_constraint_root_ts1(ivp):
     def root(u, du, /, *, t):
         return tree.tree_map(lambda a, b: a - b, du, vf(u, t=t))
 
-    constraint_fn = func.partial(
-        probdiffeq.constraint_jet, jacobian=jacobian, jet_order=0
-    )
+    constraint_fn = func.partial(probdiffeq.constraint, jacobian=jacobian, jet_order=0)
 
     def constraint(vf, **kwargs):
         try:

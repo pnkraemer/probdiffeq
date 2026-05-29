@@ -1,10 +1,37 @@
-"""Utilities for nonlinear (and constrained) least-squares."""
+"""Posterior linearization API."""
 
 from probdiffeq.backend import flow, func, linalg, np, structs, tree
-from probdiffeq.backend.typing import Array
+from probdiffeq.backend.typing import Array, Callable
+
+__all__ = [
+    "linearization_map",
+    "linearization_prior_mean",
+    "nlstsq_gauss_newton_weighted_constrained",
+]
 
 
-def nlstsq_constrained_gauss_newton(
+def linearization_prior_mean() -> Callable:
+    """Linearization point is the prior mean."""
+
+    def linearization_point(constraint_flat: Callable, rv) -> Array:
+        del constraint_flat
+        return rv.mean_flat
+
+    return linearization_point
+
+
+def linearization_map(nlstsq: Callable) -> Callable:
+    """Linearization point is the posterior mean."""
+
+    def linearization_point(constraint_flat: Callable, rv) -> Array:
+        mean = rv.mean_flat
+        mean, _info = nlstsq(constraint_flat, mean, rv.mean_flat, rv.cholesky_flat)
+        return mean
+
+    return linearization_point
+
+
+def nlstsq_gauss_newton_weighted_constrained(
     *, maxiter, tol, lstsq=linalg.lstsq_svd, while_loop=flow.while_loop
 ):
     r"""Solve nonlinearly constrained least-squares problems.
