@@ -175,11 +175,7 @@ def constraint(
     linearization: linearizations.Linearization | None = None,
     jet_order: int | Literal["max"] = "max",
 ):
-    """Construct a constraint that implements Jet-linearization.
-
-    (What is Jet-linearisation? Stay tuned!).
-
-    To use posterior linearisation, pass a `linearization` implementation.
+    """Construct a general constraint.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
         This function is highly experimental and not safe to use.
@@ -199,8 +195,10 @@ def constraint(
         and Hutchinson-approximated in isotropic or blockdiagonal models.
     linearization
         The strategy to use for finding the linearization point. If None, the prior mean is used as the linearization point.
+        Adjust this variable to use posterior linearization (also known as iterated filtering).
     jet_order
         The order of the jet linearization. If "max", the jet order is as large as possible given the number of Taylor coefficients provided by the solver. Otherwise, the jet order is an integer specifying the order of the jet linearization. For instance, if the solver provides Taylor coefficients
+        (What is Jet-linearisation? Stay tuned!).
 
     """
     root_order = _verify_vector_field_signature_and_parse_order(root)
