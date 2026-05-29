@@ -152,6 +152,11 @@ class jacobian_hutchinson_rev(JacobianHandler):
         self.seed = seed
         self.num_probes = num_probes
 
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(seed={self.seed}, num_probes={self.num_probes})"
+        )
+
     def init_jacobian_handler(self):
         return random.prng_key(seed=self.seed)
 

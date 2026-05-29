@@ -20,7 +20,6 @@ Implement high-order ODEs by passing a vector field with additional arguments as
 >>> def vf(u, du, ddu, /, *, t):
 ...     return -ddu
 >>>
-
 >>> ssm = probdiffeq.state_space_model("isotropic")
 >>> constraint = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
 >>> print(constraint)
