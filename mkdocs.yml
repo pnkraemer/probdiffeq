@@ -70,7 +70,7 @@ plugins:
             group_by_category: false
   - mkdocs-jupyter:
       include: ['*.py']
-      execute: true
+      execute: false
       allow_errors: false
 extra:
   social:

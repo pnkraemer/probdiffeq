@@ -127,6 +127,9 @@ class AbstractOde(AbstractLinearization):
 class AbstractLinearizationFactory(abc.ABC):
     """Interface for linearization factories."""
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}()"
+
     @abc.abstractmethod
     def root(
         self,
@@ -242,6 +245,9 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
 class AbstractConditional(abc.ABC):
     """Interface for implementations of manipulating conditionals."""
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}()"
+
     def bayes_rule_tree(self, data, rv, conditional, /, *, solve_triu):
         _, reverted = self.revert(rv, conditional, solve_triu=solve_triu)
         data_flat = conditional.noise.tree_flatten.flatten_tree(data)
@@ -292,6 +298,9 @@ class AbstractConditional(abc.ABC):
 
 class AbstractPriorFactory(abc.ABC):
     """Interface for prior constructions."""
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}()"
 
     @abc.abstractmethod
     def identity(self, /):

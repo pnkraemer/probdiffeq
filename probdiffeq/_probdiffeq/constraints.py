@@ -57,7 +57,16 @@ class Constraint(Protocol):
 
 
 def constraint_ode_ts0(vf: Callable, /, *, ssm: ssm_impl.FactSsmImpl) -> Constraint:
-    """Create an ODE constraint with zeroth-order Taylor linearisation.
+    r"""Create an ODE constraint with zeroth-order Taylor linearisation.
+
+    This constraint handles ODEs of the form
+
+    $$
+    \frac{d^k}{dt^k} u(t) = f\left(u(t), \frac{du}{dt}(t), \frac{d^2u}{dt^2}(t), ..., t\right)
+    $$
+
+    where $k$ is the order of the ODE, which is read off the number of positional arguments in the vector field $f$ (argument `vf`).
+
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
@@ -84,7 +93,17 @@ def constraint_ode_ts1(
     ssm: ssm_impl.FactSsmImpl,
     jacobian: jacobians.JacobianHandler | None = None,
 ):
-    """Create an ODE constraint with first-order Taylor linearisation.
+    r"""Create an ODE constraint and linearise with a first-order Taylor approximation.
+
+    This constraint handles ODEs of the form
+
+    $$
+    \frac{d^k}{dt^k} u(t) = f\left(u(t), \frac{du}{dt}(t), \frac{d^2u}{dt^2}(t), ..., t\right)
+    $$
+
+    where $k$ is the order of the ODE, which is read off the number of positional arguments in the vector field $f$ (argument `vf`).
+
+
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
@@ -175,7 +194,16 @@ def constraint(
     linearization: linearizations.Linearization | None = None,
     jet_order: int | Literal["max"] = "max",
 ):
-    """Construct a general constraint.
+    r"""Construct a general constraint.
+
+    This constraint handles problems of the form
+
+    $$
+    f\left(u(t), \frac{du}{dt}(t), ..., \frac{d^k u}{dt^k}(t), t\right) = 0
+    $$
+
+    where $k$ is the order of the problem, which is read off the number of positional arguments in the root function $f$ (argument `root`).
+
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
         This function is highly experimental and not safe to use.
@@ -262,10 +290,21 @@ def constraint_dae(
     jet_order_differential: int | Literal["max"] = "max",
     jet_order_algebraic: int | Literal["max"] = "max",
 ):
-    """Like `constraint`, but for DAEs.
+    r"""Like `constraint`, but for DAEs.
 
     The advantage of a dedicated DAE constraint is that algebraic and differential
     roots can enjoy different jet-orders, which increases accuracy.
+
+    This constraint handles problems of the form
+
+    $$
+    f\left(u(t), \frac{du}{dt}(t), ..., \frac{d^k u}{dt^k}(t), t\right) = 0,
+    ~~~
+    g\left(u(t), \frac{du}{dt}(t), ..., \frac{d^{k-1} u}{dt^{k-1}}(t), t\right) = 0
+    $$
+
+    where $f$ is the differential part and $g$ the algebraic part of the DAE. The order of the problem is read off the number of positional arguments in the algebraic root $g$ (argument `algebraic`), plus one. For instance, if the algebraic root has two positional arguments, then the problem is a second-order DAE. The differential root (argument `differential`) is expected to have one positional argument more than the algebraic root; in the previous example, the differential root would be expected to have three positional arguments.
+
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
         This function is highly experimental and not safe to use.

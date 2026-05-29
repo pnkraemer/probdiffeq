@@ -2,6 +2,7 @@ format-and-lint:
 	pre-commit run --all-files
 
 test:
+	python -m doctest probdiffeq/_probdiffeq/state_space_models.py
 	pytest -n auto -v -Werror		# parallelise, verbose output, warnings as errors
 
 quickstart:
