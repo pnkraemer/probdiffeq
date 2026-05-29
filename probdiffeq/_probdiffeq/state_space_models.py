@@ -52,9 +52,16 @@ class SsmFactName(structs.Enum):
 
 
 def state_space_model(
-    ssm_fact: SsmFactName = SsmFactName.DENSE,
+    ssm_fact: SsmFactName | str = SsmFactName.DENSE,
 ) -> ssm_impl.FactSsmImpl:
-    """Construct an implementation of a factorised state-space model."""
+    """Construct an implementation of a factorised state-space model.
+
+    Parameters
+    ----------
+    ssm_fact:
+        Either an `SsmFactName` or one of:
+        `"dense"`, `"blockdiag"`, `"isotropic"`.
+    """
     ssm_fact = SsmFactName(ssm_fact)
 
     if ssm_fact == SsmFactName.DENSE:

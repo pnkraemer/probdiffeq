@@ -110,6 +110,9 @@ class AbstractRoot(AbstractLinearization):
         self.root = root
         self.root_order = root_order
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(root_order={self.root_order})"
+
 
 class AbstractOde(AbstractLinearization):
     """Interface for linearizations of ODEs."""
@@ -117,6 +120,9 @@ class AbstractOde(AbstractLinearization):
     def __init__(self, vf, /, *, ode_order) -> None:
         self.vector_field = vf
         self.ode_order = ode_order
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(ode_order={self.ode_order})"
 
     @property
     def root_order(self):

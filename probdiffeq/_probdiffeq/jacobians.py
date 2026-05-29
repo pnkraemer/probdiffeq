@@ -53,6 +53,9 @@ class jacobian_materialize(JacobianHandler):
     def __init__(self, *, jacfun=func.jacfwd) -> None:
         self.jacfun = jacfun
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(jacfun={self.jacfun})"
+
     def init_jacobian_handler(self):
         return ()
 
@@ -94,6 +97,11 @@ class jacobian_hutchinson_fwd(JacobianHandler):
     def __init__(self, *, seed=1, num_probes=10) -> None:
         self.seed = seed
         self.num_probes = num_probes
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(seed={self.seed}, num_probes={self.num_probes})"
+        )
 
     def init_jacobian_handler(self):
         return random.prng_key(seed=self.seed)

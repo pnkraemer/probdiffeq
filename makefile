@@ -3,6 +3,7 @@ format-and-lint:
 
 test:
 	python -m doctest probdiffeq/_probdiffeq/state_space_models.py
+	python -m doctest probdiffeq/_probdiffeq/constraints.py
 	pytest -n auto -v -Werror		# parallelise, verbose output, warnings as errors
 
 quickstart:

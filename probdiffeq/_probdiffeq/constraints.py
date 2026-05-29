@@ -1,4 +1,46 @@
-"""Constraint functions."""
+"""Constraint functions.
+
+Examples
+--------
+>>> from probdiffeq import probdiffeq
+
+Construct ODE constraints as such:
+
+>>> def vf(u, /, *, t):
+...     return -u
+>>>
+>>> ssm = probdiffeq.state_space_model("dense")
+>>> constraint = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
+>>> print(constraint)
+DenseOdeTs1(ode_order=1, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10))
+
+
+Implement high-order ODEs by passing a vector field with additional arguments as such:
+
+>>> def vf(u, du, ddu, /, *, t):
+...     return -ddu
+>>>
+
+>>> ssm = probdiffeq.state_space_model("isotropic")
+>>> constraint = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
+>>> print(constraint)
+IsotropicOdeTs0(ode_order=3)
+
+
+Or, use the constraint as a decorator
+
+>>> import functools
+>>>
+>>> @functools.partial(probdiffeq.constraint_ode_ts0, ssm=ssm)
+... def ode(u, du, /, *, t):
+...     return -du
+>>>
+>>> print(ode)
+IsotropicOdeTs0(ode_order=2)
+
+
+
+"""
 
 from probdiffeq import diffeqjet, ssm_impl
 from probdiffeq._probdiffeq import jacobians, linearizations
@@ -48,12 +90,6 @@ class Constraint(Protocol):
     the root_order would be two; and in second-order ODEs,
     the root_order would be three.
     """
-
-
-# TODO: should we go back to an EK0 and EK1 naming to ensure consistency
-#       with papers and other libraries? There is no more statistical linear regression
-#       (nor will there ever be as far as I expect),
-#       so technicalities regarding *how* we linearize are not so relevant anymore.
 
 
 def constraint_ode_ts0(vf: Callable, /, *, ssm: ssm_impl.FactSsmImpl) -> Constraint:
