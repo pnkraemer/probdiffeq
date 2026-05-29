@@ -1,7 +1,7 @@
 """Solvers."""
 
 from probdiffeq import ssm_impl
-from probdiffeq._probdiffeq import constraints, estimation_strategies, utilities
+from probdiffeq._probdiffeq import constraints, markov_strategies, utilities
 from probdiffeq.backend import func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, TypeVar
 
@@ -13,9 +13,7 @@ N = TypeVar("N", bound=ssm_impl.AbstractTreeNormal)
 Used to type marginals, for example.
 """
 
-T = TypeVar(
-    "T", bound=estimation_strategies.MarkovSequence | ssm_impl.AbstractTreeNormal
-)
+T = TypeVar("T", bound=markov_strategies.MarkovSequence | ssm_impl.AbstractTreeNormal)
 """A type-variable to describe posterior distributions."""
 
 
@@ -69,7 +67,7 @@ class ProbabilisticSolver:
     def __init__(
         self,
         *,
-        strategy: estimation_strategies.MarkovStrategy,
+        strategy: markov_strategies.MarkovStrategy,
         prior: Callable,
         constraint: constraints.Constraint,
         ssm: ssm_impl.FactSsmImpl,
@@ -292,7 +290,7 @@ class solver_mle(ProbabilisticSolver):
         constraint: constraints.Constraint,
         prior: Callable,
         ssm: ssm_impl.FactSsmImpl,
-        strategy: estimation_strategies.MarkovStrategy,
+        strategy: markov_strategies.MarkovStrategy,
         constraint_init: constraints.Constraint | None = None,
         correct_asymptotic_underconfidence: bool = True,
     ) -> None:
@@ -440,7 +438,7 @@ class solver_dynamic(ProbabilisticSolver):
     def __init__(
         self,
         *,
-        strategy: estimation_strategies.MarkovStrategy,
+        strategy: markov_strategies.MarkovStrategy,
         prior: Callable,
         constraint: constraints.Constraint,
         ssm: ssm_impl.FactSsmImpl,
@@ -594,7 +592,7 @@ class solver(ProbabilisticSolver):
         constraint: constraints.Constraint,
         prior: Callable,
         ssm: ssm_impl.FactSsmImpl,
-        strategy: estimation_strategies.MarkovStrategy,
+        strategy: markov_strategies.MarkovStrategy,
         constraint_init: constraints.Constraint | None = None,
     ) -> None:
         super().__init__(

@@ -8,7 +8,7 @@ from probdiffeq._probdiffeq.error_estimators import *
 from probdiffeq._probdiffeq.jacobians import *
 from probdiffeq._probdiffeq.loss_functions import *
 from probdiffeq._probdiffeq.markov_strategies import *
+from probdiffeq._probdiffeq.priors import *
 from probdiffeq._probdiffeq.solvers import *
-from probdiffeq._probdiffeq.ssms_and_priors import *
 from probdiffeq._probdiffeq.state_space_models import *
 from probdiffeq._probdiffeq.utilities import *

@@ -21,7 +21,7 @@ def main(
     path_target.mkdir(parents=True, exist_ok=True)
 
     # Loop recursively through the source
-    for path in path_source.rglob("*.py"):
+    for path in sorted(path_source.rglob("*.py")):
         # Skip "private" modules and selected directories (e.g., backend/*)
         if path.name[0] != "_" and not any(path.match(s) for s in path_skip):
             # Construct the API_documentation filename and contents
@@ -46,7 +46,7 @@ def main(
         members: false
 """
     # Read all submodules automatically and add them to the content
-    for path in path_source.rglob("*.py"):
+    for path in sorted(path_source.rglob("*.py")):
         if path.name[0] != "_":
             header = path.name.lower()
             header = header.replace(".py", "")
