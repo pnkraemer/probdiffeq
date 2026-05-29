@@ -1,4 +1,4 @@
-from probdiffeq._ssm_util import ssm_api, utilities
+from probdiffeq._ssm_util import api, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Literal, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
@@ -28,7 +28,7 @@ __all__ = [
 
 
 @structs.dataclass
-class IsotropicTreeFlatten(ssm_api.AbstractTreeFlatten):
+class IsotropicTreeFlatten(api.AbstractTreeFlatten):
     """Flattening information for isotropic random variables."""
 
     # The treedef of the target
@@ -76,7 +76,7 @@ class IsotropicTreeFlatten(ssm_api.AbstractTreeFlatten):
         return cls(treedef, unravel_leaf)
 
 
-class IsotropicNormal(ssm_api.AbstractTreeNormal[IsotropicTreeFlatten]):
+class IsotropicNormal(api.AbstractTreeNormal[IsotropicTreeFlatten]):
     """Construct an isotropic normal distribution."""
 
     @classmethod
@@ -207,16 +207,16 @@ class IsotropicNormal(ssm_api.AbstractTreeNormal[IsotropicTreeFlatten]):
         tree.register_pytree_node(IsotropicNormal, flatten, unflatten)
 
 
-class IsotropicPriorFactory(ssm_api.AbstractPriorFactory):
+class IsotropicPriorFactory(api.AbstractPriorFactory):
     """Implementation of isotropic prior constructors."""
 
-    def identity(self, template) -> ssm_api.LatentCond:
+    def identity(self, template) -> api.LatentCond:
         num, d = template.mean_flat.shape
         m0 = np.zeros((num, d))
         c0 = np.zeros((num, num))
         noise = IsotropicNormal(m0, c0, template.tree_flatten)
         matrix = np.eye(num)
-        return ssm_api.LatentCond.from_linop_and_noise(matrix, noise)
+        return api.LatentCond.from_linop_and_noise(matrix, noise)
 
     def wiener_integrated(
         self,
@@ -291,7 +291,7 @@ class IsotropicPriorFactory(ssm_api.AbstractPriorFactory):
             tree_flatten = IsotropicTreeFlatten.from_example(tcoeffs_mean)
             noise = IsotropicNormal(q0, scale * q_sqrtm, tree_flatten)
 
-            return ssm_api.LatentCond(A, noise, to_latent=p_inv, to_observed=p)
+            return api.LatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
         return init, discretise
 
@@ -400,14 +400,14 @@ class IsotropicPriorFactory(ssm_api.AbstractPriorFactory):
         # Wrap u_like and std into a list because the random variable
         # expects TaylorCoefficients.
         noise = IsotropicNormal.from_mean_and_std([u_like], [std])
-        return ssm_api.LatentCond.from_linop_and_noise(linop, noise)
+        return api.LatentCond.from_linop_and_noise(linop, noise)
 
     def prototype_output_scale_calibrated(self, template):
         del template
         return np.ones(())
 
 
-class IsotropicOdeTs0(ssm_api.AbstractOde):
+class IsotropicOdeTs0(api.AbstractOde):
     """Construct an isotropic implementation of ODE-TS0 linearization."""
 
     def __init__(self, vf, *, ode_order) -> None:
@@ -430,11 +430,11 @@ class IsotropicOdeTs0(ssm_api.AbstractOde):
         bias = IsotropicNormal.from_dirac([fx], damp=damp)
 
         linop = func.jacrev(lambda s: s[[self.ode_order], ...])(rv.mean_flat[..., 0])
-        cond = ssm_api.LatentCond.from_linop_and_noise(linop, bias)
+        cond = api.LatentCond.from_linop_and_noise(linop, bias)
         return cond, None
 
 
-class IsotropicOdeTs1(ssm_api.AbstractOde):
+class IsotropicOdeTs1(api.AbstractOde):
     """Construct an isotropic implementation of ODE-TS1 linearization."""
 
     def __init__(self, vf, *, ode_order: int, jacobian: Any) -> None:
@@ -477,11 +477,11 @@ class IsotropicOdeTs1(ssm_api.AbstractOde):
 
         # Turn fx and J_trace into an observation model
         noise = IsotropicNormal.from_dirac(fx, damp=damp)
-        cond = ssm_api.LatentCond.from_linop_and_noise(linop, noise)
+        cond = api.LatentCond.from_linop_and_noise(linop, noise)
         return cond, state
 
 
-class IsotropicLinearizationFactory(ssm_api.AbstractLinearizationFactory):
+class IsotropicLinearizationFactory(api.AbstractLinearizationFactory):
     """Construct an isotropic linearization-factory."""
 
     def root(
@@ -501,7 +501,7 @@ class IsotropicLinearizationFactory(ssm_api.AbstractLinearizationFactory):
         return IsotropicOdeTs0(vf, ode_order=ode_order)
 
 
-class IsotropicConditional(ssm_api.AbstractConditional):
+class IsotropicConditional(api.AbstractConditional):
     """Construct an isotropic implementation of manipulating conditionals."""
 
     def apply_flat(self, x, cond, /):
@@ -537,7 +537,7 @@ class IsotropicConditional(ssm_api.AbstractConditional):
 
         # Gather and return
         noise = IsotropicNormal(xi, Xi.T, cond1.noise.tree_flatten)
-        return ssm_api.LatentCond(
+        return api.LatentCond(
             g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
         )
 
@@ -558,7 +558,7 @@ class IsotropicConditional(ssm_api.AbstractConditional):
         mean_corrected = mean - gain @ mean_observed
         cholesky_corrected = r_cor.T
         corrected = IsotropicNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
-        cond_new = ssm_api.LatentCond(
+        cond_new = api.LatentCond(
             gain,
             corrected,
             to_latent=1 / cond.to_observed,
@@ -576,7 +576,7 @@ class IsotropicConditional(ssm_api.AbstractConditional):
         mean = cond.to_observed[:, None] * cond.noise.mean_flat
         cholesky = cond.to_observed[:, None] * cond.noise.cholesky_flat
         noise = IsotropicNormal(mean, cholesky, cond.noise.tree_flatten)
-        return ssm_api.LatentCond.from_linop_and_noise(A, noise)
+        return api.LatentCond.from_linop_and_noise(A, noise)
 
 
 IsotropicNormal.register_pytree_node()

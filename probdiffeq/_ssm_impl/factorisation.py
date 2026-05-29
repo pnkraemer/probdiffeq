@@ -1,4 +1,4 @@
-from probdiffeq._ssm_util import ssm_api
+from probdiffeq._ssm_util import api
 from probdiffeq.backend import structs
 
 __all__ = ["FactSsmImpl"]
@@ -8,13 +8,13 @@ __all__ = ["FactSsmImpl"]
 class FactSsmImpl:
     """Implementation of factorized Markovian state-space models."""
 
-    linearize: ssm_api.AbstractLinearizationFactory
+    linearize: api.AbstractLinearizationFactory
     """An implementation of linearization constructors."""
 
-    prior: ssm_api.AbstractPriorFactory
+    prior: api.AbstractPriorFactory
     """An implementation of constructing prior distributions."""
 
-    conditional: ssm_api.AbstractConditional
+    conditional: api.AbstractConditional
     """An implementation of manipulating conditionals."""
 
     @classmethod
