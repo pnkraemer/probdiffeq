@@ -1,8 +1,17 @@
 """Error estimators."""
 
 from probdiffeq import ssm_impl
+from probdiffeq._probdiffeq import constraints, solvers
 from probdiffeq.backend import linalg, np, tree
 from probdiffeq.backend.typing import Any, Callable
+
+__all__ = [
+    "ErrorEstimator",
+    "error_norm_rms_then_scale",
+    "error_norm_scale_then_rms",
+    "error_residual_std",
+    "error_state_std",
+]
 
 
 def error_norm_scale_then_rms(*, norm_order=None) -> Callable:
@@ -64,8 +73,8 @@ class ErrorEstimator:
     def estimate_error_norm(
         self,
         state: tuple,
-        previous: ProbabilisticSolution,
-        proposed: ProbabilisticSolution,
+        previous: solvers.ProbabilisticSolution,
+        proposed: solvers.ProbabilisticSolution,
         *,
         dt: float,
         atol: float,
@@ -144,7 +153,7 @@ class error_residual_std(ErrorEstimator):
     def __init__(
         self,
         *,
-        constraint: Constraint,
+        constraint: constraints.Constraint,
         prior: Any,
         ssm: ssm_impl.FactSsmImpl,
         error_norm: Callable | None = None,
@@ -167,8 +176,8 @@ class error_residual_std(ErrorEstimator):
     def estimate_error_norm(
         self,
         state,
-        previous: ProbabilisticSolution,
-        proposed: ProbabilisticSolution,
+        previous: solvers.ProbabilisticSolution,
+        proposed: solvers.ProbabilisticSolution,
         *,
         dt: float,
         atol: float,
@@ -243,7 +252,7 @@ class error_state_std(ErrorEstimator):
     def __init__(
         self,
         *,
-        constraint: Constraint,
+        constraint: constraints.Constraint,
         prior: Any,
         ssm: ssm_impl.FactSsmImpl,
         error_norm: Callable | None = None,
@@ -268,8 +277,8 @@ class error_state_std(ErrorEstimator):
     def estimate_error_norm(
         self,
         state,
-        previous: ProbabilisticSolution,
-        proposed: ProbabilisticSolution,
+        previous: solvers.ProbabilisticSolution,
+        proposed: solvers.ProbabilisticSolution,
         *,
         dt: float,
         atol: float,

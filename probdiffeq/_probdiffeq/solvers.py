@@ -1,6 +1,12 @@
 """Solvers."""
 
 from probdiffeq import ssm_impl
+from probdiffeq._probdiffeq import (
+    constraints,
+    estimation_strategies,
+    markov_processes,
+    utilities,
+)
 from probdiffeq.backend import func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, TypeVar
 
@@ -12,7 +18,7 @@ N = TypeVar("N", bound=ssm_impl.AbstractTreeNormal)
 Used to type marginals, for example.
 """
 
-T = TypeVar("T", bound=MarkovSequence | ssm_impl.AbstractTreeNormal)
+T = TypeVar("T", bound=markov_processes.MarkovSequence | ssm_impl.AbstractTreeNormal)
 """A type-variable to describe posterior distributions."""
 
 
@@ -66,11 +72,11 @@ class ProbabilisticSolver:
     def __init__(
         self,
         *,
-        strategy: MarkovStrategy,
+        strategy: estimation_strategies.MarkovStrategy,
         prior: Callable,
-        constraint: Constraint,
+        constraint: constraints.Constraint,
         ssm: ssm_impl.FactSsmImpl,
-        constraint_init: Constraint | None,
+        constraint_init: constraints.Constraint | None,
     ) -> None:
         self.ssm = ssm
         self.strategy = strategy
@@ -226,7 +232,9 @@ class ProbabilisticSolver:
             fun_evals=interp_from.fun_evals,
         )
 
-        interp_res = InterpResult(step_from=step_from, interp_from=interp_from)
+        interp_res = utilities.InterpResult(
+            step_from=step_from, interp_from=interp_from
+        )
         return interpolated, interp_res
 
     def interpolate_at_t1(
@@ -270,7 +278,7 @@ class ProbabilisticSolver:
             num_steps=interp_to.num_steps,
             fun_evals=interp_to.fun_evals,
         )
-        return sol, InterpResult(step_from=acc, interp_from=prev)
+        return sol, utilities.InterpResult(step_from=acc, interp_from=prev)
 
 
 class solver_mle(ProbabilisticSolver):
@@ -284,11 +292,11 @@ class solver_mle(ProbabilisticSolver):
     def __init__(
         self,
         *,
-        constraint: Constraint,
+        constraint: constraints.Constraint,
         prior: Callable,
         ssm: ssm_impl.FactSsmImpl,
-        strategy: MarkovStrategy,
-        constraint_init: Constraint | None = None,
+        strategy: estimation_strategies.MarkovStrategy,
+        constraint_init: constraints.Constraint | None = None,
         correct_asymptotic_underconfidence: bool = True,
     ) -> None:
         super().__init__(
@@ -435,11 +443,11 @@ class solver_dynamic(ProbabilisticSolver):
     def __init__(
         self,
         *,
-        strategy: MarkovStrategy,
+        strategy: estimation_strategies.MarkovStrategy,
         prior: Callable,
-        constraint: Constraint,
+        constraint: constraints.Constraint,
         ssm: ssm_impl.FactSsmImpl,
-        constraint_init: Constraint | None = None,
+        constraint_init: constraints.Constraint | None = None,
         re_linearize_after_calibration=False,
         stop_gradient_through_calibration=True,
     ) -> None:
@@ -586,11 +594,11 @@ class solver(ProbabilisticSolver):
     def __init__(
         self,
         *,
-        constraint: Constraint,
+        constraint: constraints.Constraint,
         prior: Callable,
         ssm: ssm_impl.FactSsmImpl,
-        strategy: MarkovStrategy,
-        constraint_init: Constraint | None = None,
+        strategy: estimation_strategies.MarkovStrategy,
+        constraint_init: constraints.Constraint | None = None,
     ) -> None:
         super().__init__(
             strategy=strategy,

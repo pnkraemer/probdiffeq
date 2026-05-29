@@ -1,3 +1,22 @@
+"""Estimation strategies."""
+
+from probdiffeq import ssm_impl
+from probdiffeq._probdiffeq import markov_processes, utilities
+from probdiffeq.backend import linalg, tree
+from probdiffeq.backend.typing import Generic, TypeVar
+
+__all__ = [
+    "MarkovStrategy",
+    "strategy_filter",
+    "strategy_smoother_fixedinterval",
+    "strategy_smoother_fixedpoint",
+]
+
+
+T = TypeVar("T", bound=markov_processes.MarkovSequence | ssm_impl.AbstractTreeNormal)
+"""A type-variable to describe posterior distributions."""
+
+
 class MarkovStrategy(Generic[T]):
     """An interface for estimation strategies in Markovian state-space models.
 
@@ -33,11 +52,13 @@ class MarkovStrategy(Generic[T]):
 
     def interpolate(
         self, *, posterior_t0: T, posterior_t1: T, transition_t0_t, transition_t_t1
-    ) -> tuple[tuple, InterpResult[T]]:
+    ) -> tuple[tuple, utilities.InterpResult[T]]:
         """Interpolate between two points."""
         raise NotImplementedError
 
-    def interpolate_at_t1(self, *, posterior_t1: T) -> tuple[tuple, InterpResult[T]]:
+    def interpolate_at_t1(
+        self, *, posterior_t1: T
+    ) -> tuple[tuple, utilities.InterpResult[T]]:
         """Interpolate at a checkpoint."""
         raise NotImplementedError
 
@@ -46,7 +67,7 @@ class MarkovStrategy(Generic[T]):
         raise NotImplementedError
 
 
-class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
+class strategy_smoother_fixedinterval(MarkovStrategy[markov_processes.MarkovSequence]):
     """Construct a fixed-interval smoother.
 
     Use this strategy for fixed steps.
@@ -67,28 +88,36 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
 
     def init_posterior(self, *, u):
         cond = self.ssm.prior.identity(template=u)
-        posterior = MarkovSequence(marginal=u, conditional=cond, reverse=True)
+        posterior = markov_processes.MarkovSequence(
+            marginal=u, conditional=cond, reverse=True
+        )
         return u, posterior
 
-    def predict(self, posterior: MarkovSequence, *, transition) -> tuple:
+    def predict(
+        self, posterior: markov_processes.MarkovSequence, *, transition
+    ) -> tuple:
         marginals, cond = self.ssm.conditional.revert(
             posterior.marginal, transition, solve_triu=linalg.solve_triu
         )
-        posterior = MarkovSequence(
+        posterior = markov_processes.MarkovSequence(
             marginal=marginals, conditional=cond, reverse=posterior.reverse
         )
 
         return marginals, posterior
 
     def apply_updates(self, prediction, *, updates):
-        posterior = MarkovSequence(
+        posterior = markov_processes.MarkovSequence(
             updates, prediction.conditional, reverse=prediction.reverse
         )
         marginals = updates
         return marginals, posterior
 
     def finalize(
-        self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
+        self,
+        *,
+        posterior0: markov_processes.MarkovSequence,
+        posterior: markov_processes.MarkovSequence,
+        output_scale,
     ):
         prototype = self.ssm.prior.prototype_output_scale_calibrated(
             template=posterior0.marginal
@@ -102,7 +131,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
 
         # Prepend the initial condition to the filtering distributions
         init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
-        posterior = MarkovSequence(
+        posterior = markov_processes.MarkovSequence(
             marginal=init, conditional=posterior.conditional, reverse=posterior.reverse
         )
 
@@ -112,8 +141,8 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
     def interpolate(
         self,
         *,
-        posterior_t0: MarkovSequence,
-        posterior_t1: MarkovSequence,
+        posterior_t0: markov_processes.MarkovSequence,
+        posterior_t1: markov_processes.MarkovSequence,
         transition_t0_t,
         transition_t_t1,
     ):
@@ -151,16 +180,18 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         marginal_t1 = posterior_t1.marginal
         conditional_t1_to_t = extrapolated_t1.conditional
         rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
-        solution_at_t = MarkovSequence(
+        solution_at_t = markov_processes.MarkovSequence(
             rv_at_t, extrapolated_t.conditional, reverse=extrapolated_t.reverse
         )
 
         # The state at t1 gets a new backward model;
         # (it must remember how to get back to t, not to t0).
-        solution_at_t1 = MarkovSequence(
+        solution_at_t1 = markov_processes.MarkovSequence(
             marginal_t1, conditional_t1_to_t, reverse=extrapolated_t.reverse
         )
-        interp_res = InterpResult(step_from=solution_at_t1, interp_from=solution_at_t)
+        interp_res = utilities.InterpResult(
+            step_from=solution_at_t1, interp_from=solution_at_t
+        )
 
         # Extract targets
         marginals = solution_at_t.marginal
@@ -169,7 +200,9 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
     def interpolate_at_t1(self, posterior_t1):
         marginals = posterior_t1.marginal
 
-        interp_res = InterpResult(step_from=posterior_t1, interp_from=posterior_t1)
+        interp_res = utilities.InterpResult(
+            step_from=posterior_t1, interp_from=posterior_t1
+        )
         return (marginals, posterior_t1), interp_res
 
 
@@ -231,16 +264,20 @@ class strategy_filter(MarkovStrategy):
             posterior=posterior_t0, transition=transition_t0_t
         )
         marginals = interpolated
-        interp_res = InterpResult(step_from=posterior_t1, interp_from=interpolated)
+        interp_res = utilities.InterpResult(
+            step_from=posterior_t1, interp_from=interpolated
+        )
         return (marginals, interpolated), interp_res
 
     def interpolate_at_t1(self, *, posterior_t1):
         marginals = posterior_t1
-        interp_res = InterpResult(step_from=posterior_t1, interp_from=posterior_t1)
+        interp_res = utilities.InterpResult(
+            step_from=posterior_t1, interp_from=posterior_t1
+        )
         return (marginals, posterior_t1), interp_res
 
 
-class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
+class strategy_smoother_fixedpoint(MarkovStrategy[markov_processes.MarkovSequence]):
     r"""Construct a fixedpoint-smoother.
 
     Fixed-point smoothers are the method of choice for adaptive
@@ -296,29 +333,37 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
 
     def init_posterior(self, *, u):
         cond = self.ssm.prior.identity(template=u)
-        posterior = MarkovSequence(u, cond, reverse=True)
+        posterior = markov_processes.MarkovSequence(u, cond, reverse=True)
         return u, posterior
 
-    def predict(self, posterior: MarkovSequence, *, transition) -> tuple:
+    def predict(
+        self, posterior: markov_processes.MarkovSequence, *, transition
+    ) -> tuple:
         rv = posterior.marginal
         bw0 = posterior.conditional
         marginals, cond = self.ssm.conditional.revert(
             rv, transition, solve_triu=linalg.solve_triu
         )
         cond = self.ssm.conditional.merge(bw0, cond)
-        predicted = MarkovSequence(marginals, cond, reverse=posterior.reverse)
+        predicted = markov_processes.MarkovSequence(
+            marginals, cond, reverse=posterior.reverse
+        )
 
         return marginals, predicted
 
-    def apply_updates(self, prediction: MarkovSequence, *, updates):
-        posterior = MarkovSequence(
+    def apply_updates(self, prediction: markov_processes.MarkovSequence, *, updates):
+        posterior = markov_processes.MarkovSequence(
             updates, prediction.conditional, reverse=prediction.reverse
         )
         marginals = updates
         return marginals, posterior
 
     def finalize(
-        self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
+        self,
+        *,
+        posterior0: markov_processes.MarkovSequence,
+        posterior: markov_processes.MarkovSequence,
+        output_scale,
     ):
         expected = self.ssm.prior.prototype_output_scale_calibrated(
             template=posterior0.marginal
@@ -332,21 +377,23 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
 
         # Prepend the initial condition to the filtering distributions
         init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
-        posterior = MarkovSequence(
+        posterior = markov_processes.MarkovSequence(
             marginal=init, conditional=posterior.conditional, reverse=posterior.reverse
         )
 
         # Extract targets
         return marginals, posterior
 
-    def interpolate_at_t1(self, *, posterior_t1: MarkovSequence):
+    def interpolate_at_t1(self, *, posterior_t1: markov_processes.MarkovSequence):
         cond_identity = self.ssm.prior.identity(template=posterior_t1.marginal)
-        resume_from = MarkovSequence(
+        resume_from = markov_processes.MarkovSequence(
             posterior_t1.marginal,
             conditional=cond_identity,
             reverse=posterior_t1.reverse,
         )
-        interp_res = InterpResult(step_from=resume_from, interp_from=resume_from)
+        interp_res = utilities.InterpResult(
+            step_from=resume_from, interp_from=resume_from
+        )
 
         interpolated = posterior_t1
         marginals = interpolated.marginal
@@ -355,8 +402,8 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
     def interpolate(
         self,
         *,
-        posterior_t0: MarkovSequence,
-        posterior_t1: MarkovSequence,
+        posterior_t0: markov_processes.MarkovSequence,
+        posterior_t1: markov_processes.MarkovSequence,
         transition_t0_t,
         transition_t_t1,
     ):
@@ -426,7 +473,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
             posterior=posterior_t0, transition=transition_t0_t
         )
         conditional_id = self.ssm.prior.identity(template=posterior_t0.marginal)
-        previous_new = MarkovSequence(
+        previous_new = markov_processes.MarkovSequence(
             extrapolated_t.marginal, conditional_id, reverse=extrapolated_t.reverse
         )
         _, extrapolated_t1 = self.predict(
@@ -439,15 +486,17 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
 
         # Return the right combination of marginals and conditionals.
-        interpolated = MarkovSequence(
+        interpolated = markov_processes.MarkovSequence(
             rv_at_t, extrapolated_t.conditional, reverse=extrapolated_t.reverse
         )
-        step_from = MarkovSequence(
+        step_from = markov_processes.MarkovSequence(
             posterior_t1.marginal,
             conditional=conditional_t1_to_t,
             reverse=posterior_t1.reverse,
         )
-        interp_res = InterpResult(step_from=step_from, interp_from=previous_new)
+        interp_res = utilities.InterpResult(
+            step_from=step_from, interp_from=previous_new
+        )
 
         marginals = interpolated.marginal
         return (marginals, interpolated), interp_res
