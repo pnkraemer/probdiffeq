@@ -6,7 +6,14 @@ import pathlib
 def main(
     src="probdiffeq",
     target="docs/API_documentation/",
-    path_skip=("backend/*", "util/*", "probdiffeq.py", "_probdiffeq/*"),
+    path_skip=(
+        "backend/*",
+        "util/*",
+        "probdiffeq.py",
+        "_probdiffeq/*",
+        "ssm_impl.py",
+        "_ssm_impl/*",
+    ),
 ):
     """Create an automatic API documentation.
 
@@ -34,30 +41,31 @@ def main(
                 file.write(content)
 
     # Loop over the probdiffeq directory
-    path_target = pathlib.Path(target)
-    path_source = pathlib.Path(src) / "_probdiffeq"
 
-    # Write the header for the probdiffeq file
-    content = """
-# probdiffeq.probdiffeq
+    for nested in ["probdiffeq", "ssm_impl"]:
+        path_source = pathlib.Path(src) / f"_{nested}"
 
-:::probdiffeq.probdiffeq
+        # Write the header for the probdiffeq file
+        content = f"""
+# probdiffeq.{nested}
+
+:::probdiffeq.{nested}
     options:
         members: false
 """
-    # Read all submodules automatically and add them to the content
-    for path in sorted(path_source.rglob("*.py")):
-        if path.name[0] != "_":
-            header = path.name.lower()
-            header = header.replace(".py", "")
-            header = header.replace("_and_", " & ")
-            header = header.replace("_", " ")
-            p_as_module = path_as_module(path)
-            content += f"\n\n## \n\n## {header.upper()}"
-            content += f"\n\n:::{p_as_module}"
+        # Read all submodules automatically and add them to the content
+        for path in sorted(path_source.rglob("*.py")):
+            if path.name[0] != "_":
+                header = path.name.lower()
+                header = header.replace(".py", "")
+                header = header.replace("_and_", " & ")
+                header = header.replace("_", " ")
+                p_as_module = path_as_module(path)
+                content += f"\n\n## \n\n## {header.upper()}"
+                content += f"\n\n:::{p_as_module}"
 
-    with open(f"{path_target}/probdiffeq.md", "w") as file:
-        file.write(content)
+        with open(f"{path_target}/{nested}.md", "w") as file:
+            file.write(content)
 
 
 def path_as_module(p: pathlib.Path) -> str:

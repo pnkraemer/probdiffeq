@@ -7,9 +7,13 @@ __all__ = [
     "DenseConditional",
     "DenseLinearizationFactory",
     "DenseNormal",
+    "DenseOdeTs0",
+    "DenseOdeTs1",
     "DensePriorFactory",
+    "DenseRoot",
     "DenseTreeFlatten",
 ]
+
 C = TypeVar("C", bound=Sequence)
 """A type-variable for Sequence types.
 
