@@ -46,9 +46,11 @@ class WeightedLeastSquaresNonlinearlyConstrained:
 
     Concretely, solve problems of the form
 
-    \min_x \| L^{-1}(x - mean)\|^2 s.t. constraint(x) = 0,
+    $$
+    x^\star = \arg\min_x \| L^{-1}(x - m)\|^2 ~~~\text{s.t.}~~~\text{constraint}(x) = 0,
+    $$
 
-    where L is the Cholesky factor of a covariance matrix.
+    where $L$ is the Cholesky factor of a covariance matrix and $m$ a mean.
     """
 
     def __call__(self, constraint, x0, mean, cholesky):

@@ -565,6 +565,9 @@ class DenseOdeTs1(api.AbstractOde):
         super().__init__(vf, ode_order=ode_order)
         self.jacobian = jacobian
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(ode_order={self.ode_order}, jacobian={self.jacobian})"
+
     @property
     def root_order(self):
         return self.ode_order + 1
