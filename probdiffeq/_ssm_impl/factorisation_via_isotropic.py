@@ -490,7 +490,7 @@ class IsotropicLinearizationFactory(api.AbstractLinearizationFactory):
         *,
         jacobian,
         root_order: int | Literal["max"],
-        nlstsq: Callable | None,
+        linearization: Callable | None,
     ):
         raise NotImplementedError
 

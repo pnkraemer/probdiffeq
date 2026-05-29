@@ -121,7 +121,7 @@ class linearization_map(Linearization):
     def __init__(self, wlstsq_nc: WeightedLeastSquaresNonlinearlyConstrained) -> None:
         self.wlstsq_nc = wlstsq_nc
 
-    def linearization_point(self, constraint_flat: Callable, rv) -> Array:
+    def __call__(self, constraint_flat: Callable, rv) -> Array:
         mean = rv.mean_flat
         mean, _info = self.wlstsq_nc(
             constraint_flat, mean, rv.mean_flat, rv.cholesky_flat
