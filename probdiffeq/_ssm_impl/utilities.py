@@ -2,7 +2,11 @@ from probdiffeq.backend import func, linalg, np, tree
 from probdiffeq.backend.typing import Array
 from probdiffeq.util import cholesky_util
 
-__all__ = ["preconditioner_taylor", "system_matrices_1d_iwp"]
+__all__ = [
+    "preconditioner_taylor",
+    "system_matrices_1d_iwp",
+    "verify_taylor_coefficient_pytree",
+]
 
 
 def system_matrices_1d_iwp(num_derivatives):

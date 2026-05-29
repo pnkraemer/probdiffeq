@@ -1,4 +1,4 @@
-from probdiffeq._ssm_util import api, utilities
+from probdiffeq._ssm_impl import api, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Literal, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
