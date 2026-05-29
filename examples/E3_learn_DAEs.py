@@ -6,7 +6,6 @@ import jax.numpy as jnp
 import optax
 
 from probdiffeq import diffeqjet, ivpsolve, probdiffeq
-from probdiffeq.util import nlstsq_util
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -154,7 +153,7 @@ def solver(differential, algebraic, tol, while_loop, trafo):
         def algebraic_auto(u):
             return algebraic(u, t=t0)
 
-        nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(
+        nlstsq = probdiffeq.wlstsq_nc_gauss_newton(
             maxiter=10, tol=tol, while_loop=while_loop
         )
         y0, _info = diffeqjet.daejet_nlstsq(
@@ -167,8 +166,9 @@ def solver(differential, algebraic, tol, while_loop, trafo):
         )
 
         # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
-        jet = probdiffeq.constraint_jet_dae(
-            differential, algebraic, ssm=ssm, nlstsq=nlstsq
+        linearization = probdiffeq.linearization_map(nlstsq)
+        jet = probdiffeq.constraint_dae(
+            differential, algebraic, ssm=ssm, linearization=linearization
         )
         strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
         solver = probdiffeq.solver_dynamic(

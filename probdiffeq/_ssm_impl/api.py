@@ -134,7 +134,7 @@ class AbstractLinearizationFactory(abc.ABC):
         *,
         jacobian,
         root_order: int | Literal["max"],
-        nlstsq: Callable | None,
+        linearization: Callable | None,
     ) -> AbstractRoot:
         """Construct an implementation of 1st-order Taylor-linearization for roots."""
         raise NotImplementedError

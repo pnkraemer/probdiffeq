@@ -1,18 +1,18 @@
 """Constraint functions."""
 
 from probdiffeq import diffeqjet, ssm_impl
-from probdiffeq._probdiffeq import jacobians
+from probdiffeq._probdiffeq import jacobians, linearizations
 from probdiffeq.backend import func, inspect, tree
 from probdiffeq.backend.typing import Callable, Literal, Protocol, Sequence, TypeVar
 
 __all__ = [
     "Constraint",
-    "constraint_jet",
-    "constraint_jet_dae",
-    "constraint_jet_imex",
+    "constraint",
+    "constraint_dae",
     "constraint_ode_ts0",
     "constraint_ode_ts1",
 ]
+
 C = TypeVar("C", bound=Sequence)
 """A type-variable to describe sequences.
 
@@ -51,22 +51,34 @@ class Constraint(Protocol):
 
 
 # TODO: should we go back to an EK0 and EK1 naming to ensure consistency
-#       with papers and other libraries?
-#       There is no more statistical linear regression
-#       (nor will there ever be) so technicalities regarding *how* we linearize
-#       are not relevant anymore.
-def constraint_ode_ts0(vf, /, *, ssm):
+#       with papers and other libraries? There is no more statistical linear regression
+#       (nor will there ever be as far as I expect),
+#       so technicalities regarding *how* we linearize are not so relevant anymore.
+
+
+def constraint_ode_ts0(vf: Callable, /, *, ssm: ssm_impl.FactSsmImpl) -> Constraint:
     """Create an ODE constraint with zeroth-order Taylor linearisation.
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
+
+    Parameters
+    ----------
+    vf
+        The vector field of the ODE. The ODE vector field is assumed to be one of ``f(u, *, t)``, ``f(u, du, *, t)``, etc.
+        The order of the ODE is read off the number of positional arguments before t.
+        That is, for first-order ODEs, pass ``f(u, *, t)``,
+        for second-order ODEs, pass ``f(u, du, *, t)``,
+        for third-order ODEs ``f(u, du, ddu, *, t)``, and so on.
+    ssm
+        The state-space model to use for the constraint.
     """
     ode_order = _verify_vector_field_signature_and_parse_order(vf)
     return ssm.linearize.ode_taylor_0th(vf, ode_order=ode_order)
 
 
 def constraint_ode_ts1(
-    vf,
+    vf: Callable,
     /,
     *,
     ssm: ssm_impl.FactSsmImpl,
@@ -77,12 +89,20 @@ def constraint_ode_ts1(
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
 
-    The ODE vector field is assumed to be one of ``f(u, *, t)``, ``f(u, du, *, t)``, etc.
-    The order of the ODE is read off the number of positional arguments before t.
-    That is, for first-order ODEs, pass ``f(u, *, t)``,
-    for second-order ODEs, pass ``f(u, du, *, t)``,
-    for third-order ODEs ``f(u, du, ddu, *, t)``, and so on.
-
+    Parameters
+    ----------
+    vf
+        The vector field of the ODE. The ODE vector field is assumed to be one of ``f(u, *, t)``, ``f(u, du, *, t)``, etc.
+        The order of the ODE is read off the number of positional arguments before t.
+        That is, for first-order ODEs, pass ``f(u, *, t)``,
+        for second-order ODEs, pass ``f(u, du, *, t)``,
+        for third-order ODEs ``f(u, du, ddu, *, t)``, and so on.
+    ssm
+        The state-space model to use for the constraint.
+    jacobian
+        The Jacobian handler to use for the linearization.
+        If None, a Jacobians are materialized at every stage in dense factorisations
+        and Hutchinson-approximated in isotropic or blockdiagonal models.
     """
     ode_order = _verify_vector_field_signature_and_parse_order(vf)
     if jacobian is None:
@@ -91,7 +111,7 @@ def constraint_ode_ts1(
     return ssm.linearize.ode_taylor_1st(vf, ode_order=ode_order, jacobian=jacobian)
 
 
-def _verify_vector_field_signature_and_parse_order(vf) -> int:
+def _verify_vector_field_signature_and_parse_order(vf: Callable) -> int:
     """Parse the vector-field structure from its signature."""
     sig = inspect.signature(vf)
     params = list(sig.parameters.values())
@@ -147,19 +167,15 @@ def _verify_vector_field_signature_and_parse_order(vf) -> int:
     return len(state_args)
 
 
-def constraint_jet(
+def constraint(
     root,
     *,
     ssm: ssm_impl.FactSsmImpl,
-    jacobian=None,
-    nlstsq=None,
+    jacobian: jacobians.JacobianHandler | None = None,
+    linearization: linearizations.Linearization | None = None,
     jet_order: int | Literal["max"] = "max",
 ):
-    """Construct a constraint that implements Jet-linearization.
-
-    (What is Jet-linearisation? Stay tuned!).
-
-    To use posterior linearisation, pass a `nlstsq` implementation.
+    """Construct a general constraint.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
         This function is highly experimental and not safe to use.
@@ -167,11 +183,31 @@ def constraint_jet(
         It might be deleted tomorrow and without any deprecation policy.
 
 
+    Parameters
+    ----------
+    root
+        The root constraint to linearize. The root constraint is expected to have a signature like ``f(*y, t)`` where the number of positional arguments specifies the order of the problem.
+    ssm
+        The state-space model to use for the constraint.
+    jacobian
+        The Jacobian handler to use for the linearization.
+        If None, a Jacobians are materialized at every stage in dense factorisations
+        and Hutchinson-approximated in isotropic or blockdiagonal models.
+    linearization
+        The strategy to use for finding the linearization point. If None, the prior mean is used as the linearization point.
+        Adjust this variable to use posterior linearization (also known as iterated filtering).
+    jet_order
+        The order of the jet linearization. If "max", the jet order is as large as possible given the number of Taylor coefficients provided by the solver. Otherwise, the jet order is an integer specifying the order of the jet linearization. For instance, if the solver provides Taylor coefficients
+        (What is Jet-linearisation? Stay tuned!).
+
     """
     root_order = _verify_vector_field_signature_and_parse_order(root)
 
     if jacobian is None:
         jacobian = jacobians.jacobian_hutchinson_fwd()
+
+    if linearization is None:
+        linearization = linearizations.linearization_prior_mean()
 
     def root_jet(*tcoeffs_all, t):
         _, unravel_one = tree.ravel_pytree(tcoeffs_all[0])
@@ -212,119 +248,21 @@ def constraint_jet(
 
     order = "max" if jet_order == "max" else jet_order + root_order
     return ssm.linearize.root(
-        root_jet, root_order=order, jacobian=jacobian, nlstsq=nlstsq
+        root_jet, root_order=order, jacobian=jacobian, linearization=linearization
     )
 
 
-def constraint_jet_imex(
-    *,
-    implicit: Callable,
-    explicit: Callable,
-    ssm: ssm_impl.FactSsmImpl,
-    jacobian=None,
-    nlstsq=None,
-    jet_order_implicit="max",
-    jet_order_explicit="max",
-):
-    """Like `constraint_jet`, but for roots summing implicit and explicit terms.
-
-    The advantage of a dedicated IMEX constraint is that gradients can be stopped
-    through the explicit part, which enables state-space model factorisation.
-    In other words, think of the Jet-IMEX constraint as a generalisation
-    of zeroth-order methods to implicit differential equations.
-
-
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This function is highly experimental and not safe to use.
-        There is no guarantee that it works correctly (or at all).
-        It might be deleted tomorrow and without any deprecation policy.
-
-    """
-    root_order_im = _verify_vector_field_signature_and_parse_order(implicit)
-    root_order_ex = _verify_vector_field_signature_and_parse_order(explicit)
-
-    if jacobian is None:
-        jacobian = jacobians.jacobian_hutchinson_fwd()
-
-    def root_jet(*tcoeffs_all, t):
-        _, unravel = tree.ravel_pytree(tcoeffs_all[0])
-        fx_implicit = jet_call(
-            implicit,
-            tcoeffs_all,
-            root_order=root_order_im,
-            jet_order=jet_order_implicit,
-            unravel=unravel,
-            t=t,
-        )
-        fx_explicit = jet_call(
-            explicit,
-            tcoeffs_all,
-            root_order=root_order_ex,
-            jet_order=jet_order_explicit,
-            unravel=unravel,
-            t=t,
-        )
-
-        # The Jacobian of the explicit term is ignored,
-        # which turns first-order linearisation of root_jet into
-        # first-order linearisation of the implicit term but zeroth-order
-        # linearisation in the explicit term!
-        fx_explicit = [func.stop_gradient(f) for f in fx_explicit]
-
-        # Return the sum: c(x) = Imp(x) + Exp(x)
-        return tree.tree_map(lambda a, b: a + b, fx_implicit, fx_explicit)
-
-    def jet_call(fun, tcoeffs_all, /, *, root_order, jet_order, unravel, t):
-        """Evaluate the jet'ed root function."""
-        if jet_order == "max":
-            tcoeffs = tcoeffs_all
-        else:
-            jet_order_upper = len(tcoeffs_all) - root_order
-            if jet_order < 0 or jet_order > jet_order_upper:
-                msg = "The provided jet-order is incompatible with the root order."
-                msg += f" Expected: 0 <= jet_order <= {jet_order_upper}."
-                msg += f" Received: jet_order == {jet_order}."
-                raise ValueError(msg)
-            order = jet_order + root_order
-            tcoeffs = tcoeffs_all[:order]
-
-        # Flatten the root because jax.jet is a bit high maintenance :)
-        def jet_call(*y):
-            y_tree = [unravel(s) for s in y]
-            fx = fun(*y_tree, t=t)
-            return tree.ravel_pytree(fx)[0]
-
-        coeffs_flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
-        ps, ss = diffeqjet.jet_unpack_series(coeffs_flat, root_order)
-        if len(tree.tree_leaves(ss)) == 0:
-            fx = jet_call(*ps)
-            return [fx]
-
-        primals1, series1 = func.jet(jet_call, ps, ss, is_tcoeff=False)
-        return [primals1, *series1]
-
-    if jet_order_explicit == "max" or jet_order_implicit == "max":
-        order = "max"
-    else:
-        order_ex = root_order_ex + jet_order_explicit
-        order_im = root_order_im + jet_order_implicit
-        order = max(order_ex, order_im)
-    return ssm.linearize.root(
-        root_jet, root_order=order, jacobian=jacobian, nlstsq=nlstsq
-    )
-
-
-def constraint_jet_dae(
-    differential,
-    algebraic,
+def constraint_dae(
+    differential: Callable,
+    algebraic: Callable,
     *,
     ssm: ssm_impl.FactSsmImpl,
-    jacobian=None,
-    nlstsq=None,
+    jacobian: jacobians.JacobianHandler | None = None,
+    linearization: linearizations.Linearization | None = None,
     jet_order_differential: int | Literal["max"] = "max",
     jet_order_algebraic: int | Literal["max"] = "max",
 ):
-    """Like `constraint_jet`, but for DAEs.
+    """Like `constraint`, but for DAEs.
 
     The advantage of a dedicated DAE constraint is that algebraic and differential
     roots can enjoy different jet-orders, which increases accuracy.
@@ -334,12 +272,33 @@ def constraint_jet_dae(
         There is no guarantee that it works correctly (or at all).
         It might be deleted tomorrow and without any deprecation policy.
 
+    Parameters
+    ----------
+    differential
+        The root corresponding to the differential part of the DAE. The root is expected to have a signature like ``f(*y, t)`` where the number of positional arguments specifies the order of the problem.
+    algebraic
+        The root corresponding to the algebraic part of the DAE. The root is expected to        have a signature like ``f(*y, t)`` where the number of positional arguments specifies the order of the problem.
+    ssm
+        The state-space model to use for the constraint.
+    jacobian
+        The Jacobian handler to use for the linearization.
+        If None, a Jacobians are materialized at every stage in dense factorisations
+        and Hutchinson-approximated in isotropic or blockdiagonal models.
+    linearization
+        The strategy to use for finding the linearization point. If None, the prior mean is used as the linearization point.
+    jet_order_differential
+        The order of the jet linearization for the differential root. If "max", the jet order is as large as possible given the number of Taylor coefficients provided by the solver. Otherwise, the jet order is an integer specifying the order of the jet linearization. For instance, if the solver provides Taylor coefficients up to order 5 and the differential root is of order 2, then the jet order can be at most 3.
+    jet_order_algebraic
+        The order of the jet linearization for the algebraic root. If "max", the jet order is as large as possible given the number of Taylor coefficients provided by the solver. Otherwise, the jet order is an integer specifying the order of the jet linearization. For instance, if the solver provides Taylor coefficients up to order 5 and the algebraic root is of order 1, then the jet order can be at most 4.
     """
     root_order_diff = _verify_vector_field_signature_and_parse_order(differential)
     root_order_alg = _verify_vector_field_signature_and_parse_order(algebraic)
 
     if jacobian is None:
         jacobian = jacobians.jacobian_hutchinson_fwd()
+
+    if linearization is None:
+        linearization = linearizations.linearization_prior_mean()
 
     def root_jet(*tcoeffs_all, t):
         unravel = tree.ravel_pytree(tcoeffs_all[0])[1]
@@ -394,11 +353,11 @@ def constraint_jet_dae(
 
     if jet_order_differential == "max" or jet_order_algebraic == "max":
         return ssm.linearize.root(
-            root_jet, root_order="max", jacobian=jacobian, nlstsq=nlstsq
+            root_jet, root_order="max", jacobian=jacobian, linearization=linearization
         )
     order_diff = root_order_diff + jet_order_differential
     order_alg = root_order_alg + jet_order_algebraic
     order = max(order_diff, order_alg)
     return ssm.linearize.root(
-        root_jet, root_order=order, jacobian=jacobian, nlstsq=nlstsq
+        root_jet, root_order=order, jacobian=jacobian, linearization=linearization
     )

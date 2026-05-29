@@ -433,8 +433,10 @@ class DenseNormal(api.AbstractTreeNormal[DenseTreeFlatten]):
 class DenseLinearizationFactory(api.AbstractLinearizationFactory):
     """Construct a dense linearization factory."""
 
-    def root(self, root, *, jacobian, root_order: int | Literal["max"], nlstsq: bool):
-        return DenseRoot(root, jacobian=jacobian, root_order=root_order, nlstsq=nlstsq)
+    def root(self, root, *, jacobian, root_order: int | Literal["max"], linearization):
+        return DenseRoot(
+            root, jacobian=jacobian, root_order=root_order, linearization=linearization
+        )
 
     def ode_taylor_0th(self, vf, *, ode_order):
         return DenseOdeTs0(vf, ode_order=ode_order)
@@ -605,11 +607,11 @@ class DenseRoot(api.AbstractRoot):
     """Construct a dense implementation of root-TS1 linearization."""
 
     def __init__(
-        self, root, *, root_order: int | Literal["max"], jacobian, nlstsq
+        self, root, *, root_order: int | Literal["max"], jacobian, linearization
     ) -> None:
         super().__init__(root, root_order=root_order)
         self.jacobian = jacobian
-        self.nlstsq = nlstsq
+        self.linearization_point = linearization
 
     def init_linearization(self):
         return self.jacobian.init_jacobian_handler()
@@ -635,13 +637,8 @@ class DenseRoot(api.AbstractRoot):
             self.constraint_flat, t=t, tree_flatten=rv.tree_flatten
         )
 
-        # Initial guess for the linearization point
-
-        mean = rv.mean_flat
-        if self.nlstsq is not None:  # posterior linearization
-            mean, _info = self.nlstsq(
-                constraint_flat, mean, rv.mean_flat, rv.cholesky_flat
-            )
+        # Get the linearization point (eg prior or posterior linearisation)
+        mean = self.linearization_point(constraint_flat, rv)
 
         fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
         fx = fx - linop @ mean

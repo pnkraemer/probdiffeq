@@ -2,7 +2,6 @@
 
 from probdiffeq import diffeqjet, ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, testing, tree
-from probdiffeq.util import nlstsq_util
 
 
 @testing.fixture(name="ivp")
@@ -54,9 +53,10 @@ def test_output_matches_reference(ivp, solver_factory, derivatives, ssm_fact) ->
     )
 
     # Build a solver
-    nlstsq = nlstsq_util.nlstsq_constrained_gauss_newton(maxiter=50, tol=1e-10)
+    nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
-    constraint = probdiffeq.constraint_jet(root, ssm=ssm, nlstsq=nlstsq)
+    linearization = probdiffeq.linearization_map(nlstsq)
+    constraint = probdiffeq.constraint(root, ssm=ssm, linearization=linearization)
     solver = solver_factory(
         strategy=strategy,
         prior=prior,
