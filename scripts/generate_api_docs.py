@@ -34,17 +34,27 @@ def main(
                 file.write(content)
 
     # Loop over the probdiffeq directory
-    content = "# probdiffeq.probdiffeq"
-    content += "\n\n:::probdiffeq.probdiffeq"
-    for path in path_source.rglob("_probdiffeq/*.py"):
+    path_target = pathlib.Path(target)
+    path_source = pathlib.Path(src) / "_probdiffeq"
+
+    # # Make the target directory unless it exists
+    # path_target.mkdir(parents=True, exist_ok=True)
+    content = """
+# probdiffeq.probdiffeq
+
+:::probdiffeq.probdiffeq
+    options:
+        members: false
+"""
+
+    for path in path_source.rglob("*.py"):
         if path.name[0] != "_":
             header = path.name.replace(".py", "")
-            header = header.replace("_", " ").title()
+            header = header.replace("_", " ").upper()
             p_as_module = path_as_module(path)
-            content += f"\n\n## {header}"
+            content += f"\n\n## \n\n## {header}"
             content += f"\n\n:::{p_as_module}"
 
-    # Open the markdown file and write content
     with open(f"{path_target}/probdiffeq.md", "w") as file:
         file.write(content)
 
