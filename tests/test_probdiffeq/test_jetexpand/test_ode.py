@@ -1,58 +1,60 @@
 """Test the exactness of differentiation-based routines on first-order problems."""
 
 from probdiffeq import probdiffeq
-from probdiffeq.backend import func, np, ode, testing
+from probdiffeq.backend import np, ode, testing
+from probdiffeq.backend.typing import Callable
 
 
-@testing.case()
-def case_odejet_via_jvp():
-    return probdiffeq.jetexpand_ode_via_jvp
-
-
-@testing.case()
-def case_odejet_padded_scan():
-    return probdiffeq.jetexpand_ode_padded_scan
-
-
-@testing.case()
-def case_odejet_unroll():
-    return probdiffeq.jetexpand_ode_unroll
-
-
-@testing.fixture(name="pb_with_solution")
-def fixture_pb_with_solution():
+@testing.fixture(name="problem_with_solution")
+def fixture_problem_with_solution():
     vf, (u0,), (t0, _) = ode.ivp_three_body_1st()
-    vf = func.partial(vf, t=t0)
 
-    solution = np.load("./tests/test_diffeqjet/data/three_body_first_solution.npy")
-    return (vf, (u0,)), solution
+    solution = np.load(
+        "./tests/test_probdiffeq/test_jetexpand/data/three_body_first_solution.npy"
+    )
+    return (vf, (u0,), {"t": t0}), solution
+
+
+@testing.fixture(name="num")
+@testing.parametrize("num", [0, 1, 4])
+def fixture_number_of_extensions(num):
+    return num
+
+
+@testing.case()
+def case_odejet_via_jvp(num):
+    return probdiffeq.jetexpand_ode_via_jvp(num=num)
+
+
+@testing.case()
+def case_odejet_padded_scan(num):
+    return probdiffeq.jetexpand_ode_padded_scan(num=num)
+
+
+@testing.case()
+def case_odejet_unroll(num):
+    return probdiffeq.jetexpand_ode_unroll(num=num)
 
 
 @testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_odejet_")
-@testing.parametrize("num", [0, 1, 4])
 def test_approximation_identical_to_reference_odejet(
-    pb_with_solution, taylor_fun, num
+    problem_with_solution, num, taylor_fun: Callable
 ) -> None:
-    (f, init), solution = pb_with_solution
+    (f, init, vf_kwargs), solution = problem_with_solution
 
-    derivatives = taylor_fun(f, init, num=num)
+    derivatives = taylor_fun(f, init, **vf_kwargs)
     assert len(derivatives) == num + 1
     assert testing.allclose(derivatives, list(solution[: len(derivatives)]))
 
 
-@testing.case()
-def case_doubling_odejet_unroll():
-    return probdiffeq.jetexpand_ode_doubling_unroll
-
-
-@testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_doubling_odejet_")
 @testing.parametrize("num_doublings", [0, 1, 2])
 def test_approximation_identical_to_reference_doubling(
-    pb_with_solution, taylor_fun, num_doublings
+    problem_with_solution, num_doublings
 ) -> None:
     """Separately test the doubling-function, because its API is different."""
-    (f, init), solution = pb_with_solution
+    (f, init, vf_kwargs), solution = problem_with_solution
 
-    derivatives = taylor_fun(f, init, num_doublings=num_doublings)
+    expand = probdiffeq.jetexpand_ode_doubling_unroll(num_doublings=num_doublings)
+    derivatives = expand(f, init, **vf_kwargs)
     assert len(derivatives) == np.sum(2 ** np.arange(0, num_doublings + 1))
     assert testing.allclose(derivatives, list(solution[: len(derivatives)]))

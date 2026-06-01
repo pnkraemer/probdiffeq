@@ -19,7 +19,9 @@ def fixture_pb_with_solution():
     vf, (u0, du0), (t0, _) = ode.ivp_van_der_pol_2nd()
     vf = func.partial(vf, t=t0)
 
-    solution = np.load("./tests/test_diffeqjet/data/van_der_pol_second_solution.npy")
+    solution = np.load(
+        "./tests/test_probdiffeq/test_jetexpand/data/van_der_pol_second_solution.npy"
+    )
     return (vf, (u0, du0)), solution
 
 

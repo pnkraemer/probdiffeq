@@ -14,7 +14,7 @@ __all__ = [
 ]
 
 
-def jetexpand_ode_padded_scan(vf: Callable, inits: Sequence[ArrayLike], /, num: int):
+def jetexpand_ode_padded_scan(*, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `jetexpand_ode_unroll()`, this function implements the loop via a scan,
@@ -25,57 +25,71 @@ def jetexpand_ode_padded_scan(vf: Callable, inits: Sequence[ArrayLike], /, num: 
     The differences should be small.
     Consult the benchmarks if performance is critical.
     """
-    inits = tree.tree_map(np.asarray, inits)
-    if not isinstance(inits[0], Array):
-        _, unravel = tree.ravel_pytree(inits[0])
-        inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
 
-        def vf_wrapped(*ys, **kwargs):
-            ys = tree.tree_map(unravel, ys)
-            return tree.ravel_pytree(vf(*ys, **kwargs))[0]
+    def expand(vf: Callable, inits: Sequence[ArrayLike], /, **vf_kwargs):
+        inits = tree.tree_map(np.asarray, inits)
 
-        tcoeffs = jetexpand_ode_padded_scan(vf_wrapped, inits_flat, num=num)
-        return tree.tree_map(unravel, tcoeffs)
+        # If the initial conditions are not arrays,
+        # we assume they are pytrees of arrays and promote and unpromote accordingly
+        if not isinstance(inits[0], Array):
+            _, unravel = tree.ravel_pytree(inits[0])
+            inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
 
-    if num == 0:
-        return inits
-    # Number of positional arguments in f
-    num_arguments = len(inits)
+            def vf_wrapped(*ys, **kwargs):
+                ys = tree.tree_map(unravel, ys)
+                return tree.ravel_pytree(vf(*ys, **kwargs))[0]
 
-    # Initial Taylor series (u_0, u_1, ..., u_k)
-    primals = vf(*inits)
-    taylor_coeffs = [*inits, primals]
+            tcoeffs = expand(vf_wrapped, inits_flat, **vf_kwargs)
+            return tree.tree_map(unravel, tcoeffs)
 
-    increment = jetexpand_ode_coefficient_increment(vf, num_arguments=num_arguments)
+        if num == 0:
+            return inits
 
-    def body(tcoeffs, _):
-        tcoeffs = increment(tcoeffs)
+        # Wrap the vector field to include keyword arguments
+        def vf_with_kwargs(*args):
+            return vf(*args, **vf_kwargs)
 
-        # The final values in s_new are nonsensical
-        # (well, they are not; but we don't care about them)
-        # so we remove them
-        return tcoeffs[:-1], None
+        # Number of positional arguments in f
+        num_arguments = len(inits)
 
-    # Pad the initial Taylor series with zeros
-    num_outputs = num_arguments + num
-    zeros = np.zeros_like(primals)
-    taylor_coeffs = _pad_to_length(taylor_coeffs, length=num_outputs, value=zeros)
+        # Initial Taylor series (u_0, u_1, ..., u_k)
+        primals = vf_with_kwargs(*inits)
+        taylor_coeffs = [*inits, primals]
 
-    # Early exit for num=1.
-    #  Why? because zero-length scan and disable_jit() don't work together.
-    if num == 1:
+        increment = jetexpand_ode_coefficient_increment(
+            vf_with_kwargs, num_arguments=num_arguments
+        )
+
+        def body(tcoeffs, _):
+            tcoeffs = increment(tcoeffs)
+
+            # The final values in s_new are nonsensical
+            # (well, they are not; but we don't care about them)
+            # so we remove them
+            return tcoeffs[:-1], None
+
+        # Pad the initial Taylor series with zeros
+        num_outputs = num_arguments + num
+        zeros = np.zeros_like(primals)
+        taylor_coeffs = _pad_to_length(taylor_coeffs, length=num_outputs, value=zeros)
+
+        # Early exit for num=1.
+        #  Why? because zero-length scan and disable_jit() don't work together.
+        if num == 1:
+            return taylor_coeffs
+
+        # Compute all coefficients with scan().
+        taylor_coeffs, _ = flow.scan(body, init=taylor_coeffs, xs=None, length=num - 1)
         return taylor_coeffs
 
-    # Compute all coefficients with scan().
-    taylor_coeffs, _ = flow.scan(body, init=taylor_coeffs, xs=None, length=num - 1)
-    return taylor_coeffs
+    return expand
 
 
 def _pad_to_length(x, /, *, length, value):
     return x + [value] * (length - len(x))
 
 
-def jetexpand_ode_unroll(vf: Callable, inits: Sequence[Array], /, num: int):
+def jetexpand_ode_unroll(*, num: int):
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `jetexpand_ode_padded_scan()`, this function does not depend on zero-padding
@@ -90,31 +104,41 @@ def jetexpand_ode_unroll(vf: Callable, inits: Sequence[Array], /, num: int):
         JIT-compiling this function unrolls a loop.
 
     """
-    inits = tree.tree_map(np.asarray, inits)
-    if not isinstance(inits[0], Array):
-        _, unravel = tree.ravel_pytree(inits[0])
-        inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
 
-        def vf_wrapped(*ys, **kwargs):
-            ys = tree.tree_map(unravel, ys)
-            return tree.ravel_pytree(vf(*ys, **kwargs))[0]
+    def expand(vf: Callable, inits: Sequence[ArrayLike], /, **vf_kwargs):
+        inits = tree.tree_map(np.asarray, inits)
+        if not isinstance(inits[0], Array):
+            _, unravel = tree.ravel_pytree(inits[0])
+            inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
 
-        tcoeffs = jetexpand_ode_unroll(vf_wrapped, inits_flat, num=num)
-        return tree.tree_map(unravel, tcoeffs)
+            def vf_wrapped(*ys, **kwargs):
+                ys = tree.tree_map(unravel, ys)
+                return tree.ravel_pytree(vf(*ys, **kwargs))[0]
 
-    if num == 0:
-        return inits
-    # Number of positional arguments in f
-    num_arguments = len(inits)
+            tcoeffs = expand(vf_wrapped, inits_flat, **vf_kwargs)
+            return tree.tree_map(unravel, tcoeffs)
 
-    # Initial Taylor series (u_0, u_1, ..., u_k)
-    primals = vf(*inits)
-    taylor_coeffs = [*inits, primals]
+        if num == 0:
+            return inits
 
-    increment = jetexpand_ode_coefficient_increment(vf, num_arguments=num_arguments)
-    for _ in range(num - 1):
-        taylor_coeffs = increment(taylor_coeffs)
-    return taylor_coeffs
+        def vf_with_kwargs(*args):
+            return vf(*args, **vf_kwargs)
+
+        # Number of positional arguments in f
+        num_arguments = len(inits)
+
+        # Initial Taylor series (u_0, u_1, ..., u_k)
+        primals = vf_with_kwargs(*inits)
+        taylor_coeffs = [*inits, primals]
+
+        increment = jetexpand_ode_coefficient_increment(
+            vf_with_kwargs, num_arguments=num_arguments
+        )
+        for _ in range(num - 1):
+            taylor_coeffs = increment(taylor_coeffs)
+        return taylor_coeffs
+
+    return expand
 
 
 def jet_unpack_series(taylor_series, num, /):
@@ -152,34 +176,41 @@ def jet_unpack_series(taylor_series, num, /):
     return primals, series_
 
 
-def jetexpand_ode_via_jvp(vf: Callable, inits: Sequence[Array], /, num: int):
+def jetexpand_ode_via_jvp(*, num: int):
     """Taylor-expand the solution of an IVP with recursive forward-mode differentiation.
 
     !!! warning "Compilation time"
         JIT-compiling this function unrolls a loop.
 
     """
-    inits = tree.tree_map(np.asarray, inits)
-    if not isinstance(inits[0], Array):
-        _, unravel = tree.ravel_pytree(inits[0])
-        inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
 
-        def vf_wrapped(*ys, **kwargs):
-            ys = tree.tree_map(unravel, ys)
-            return tree.ravel_pytree(vf(*ys, **kwargs))[0]
+    def expand(vf: Callable, inits: Sequence[ArrayLike], /, **vf_kwargs):
+        inits = tree.tree_map(np.asarray, inits)
+        if not isinstance(inits[0], Array):
+            _, unravel = tree.ravel_pytree(inits[0])
+            inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
 
-        tcoeffs = jetexpand_ode_via_jvp(vf_wrapped, inits_flat, num=num)
-        return tree.tree_map(unravel, tcoeffs)
+            def vf_wrapped(*ys, **kwargs):
+                ys = tree.tree_map(unravel, ys)
+                return tree.ravel_pytree(vf(*ys, **kwargs))[0]
 
-    if num == 0:
-        return inits
+            tcoeffs = expand(vf_wrapped, inits_flat, **vf_kwargs)
+            return tree.tree_map(unravel, tcoeffs)
 
-    g_n, g_0 = vf, vf
-    taylor_coeffs = [*inits, vf(*inits)]
-    for _ in range(num - 1):
-        g_n = _fwd_recursion_iterate(fun_n=g_n, fun_0=g_0)
-        taylor_coeffs = [*taylor_coeffs, g_n(*inits)]
-    return taylor_coeffs
+        if num == 0:
+            return inits
+
+        def vf_with_kwargs(*args):
+            return vf(*args, **vf_kwargs)
+
+        g_n, g_0 = vf_with_kwargs, vf_with_kwargs
+        taylor_coeffs = [*inits, vf_with_kwargs(*inits)]
+        for _ in range(num - 1):
+            g_n = _fwd_recursion_iterate(fun_n=g_n, fun_0=g_0)
+            taylor_coeffs = [*taylor_coeffs, g_n(*inits)]
+        return taylor_coeffs
+
+    return expand
 
 
 def _fwd_recursion_iterate(*, fun_n, fun_0):
@@ -196,9 +227,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return tree.Partial(df)
 
 
-def jetexpand_ode_doubling_unroll(
-    vf: Callable, inits: Sequence[Array], /, num_doublings: int
-):
+def jetexpand_ode_doubling_unroll(*, num_doublings: int):
     """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -211,28 +240,33 @@ def jetexpand_ode_doubling_unroll(
         JIT-compiling this function unrolls a loop.
 
     """
-    inits = tree.tree_map(np.asarray, inits)
-    if not isinstance(inits[0], Array):
-        # If the Pytree elements are matrices or scalars,
-        # promote and unpromote accordingly
-        _, unravel = tree.ravel_pytree(inits[0])
-        inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
 
-        def vf_wrapped(*ys, **kwargs):
-            ys = tree.tree_map(unravel, ys)
-            return tree.ravel_pytree(vf(*ys, **kwargs))[0]
+    def expand(vf: Callable, inits: Sequence[Array], /, **vf_kwargs):
+        inits = tree.tree_map(np.asarray, inits)
+        if not isinstance(inits[0], Array):
+            # If the Pytree elements are matrices or scalars,
+            # promote and unpromote accordingly
+            _, unravel = tree.ravel_pytree(inits[0])
+            inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
 
-        tcoeffs = jetexpand_ode_doubling_unroll(
-            vf_wrapped, inits_flat, num_doublings=num_doublings
-        )
-        return tree.tree_map(unravel, tcoeffs)
+            def vf_wrapped(*ys, **kwargs):
+                ys = tree.tree_map(unravel, ys)
+                return tree.ravel_pytree(vf(*ys, **kwargs))[0]
 
-    double = jetexpand_ode_coefficient_double(vf)
-    (u0,) = inits  # This asserts ODEs are first-order only. High order is a todo
-    taylor_coefficients = [u0]
-    for _ in range(num_doublings):
-        taylor_coefficients = double(taylor_coefficients)
-    return _unnormalise(*taylor_coefficients)
+            tcoeffs = expand(vf_wrapped, inits_flat, **vf_kwargs)
+            return tree.tree_map(unravel, tcoeffs)
+
+        def vf_with_kwargs(*args):
+            return vf(*args, **vf_kwargs)
+
+        double = jetexpand_ode_coefficient_double(vf_with_kwargs)
+        (u0,) = inits  # This asserts ODEs are first-order only. High order is a todo
+        taylor_coefficients = [u0]
+        for _ in range(num_doublings):
+            taylor_coefficients = double(taylor_coefficients)
+        return _unnormalise(*taylor_coefficients)
+
+    return expand
 
 
 def jetexpand_ode_coefficient_increment(vf, *, num_arguments):
