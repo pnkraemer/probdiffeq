@@ -1,21 +1,27 @@
 """Test the exactness of differentiation-based routines on first-order problems."""
 
-from probdiffeq import diffeqjet
+from probdiffeq import probdiffeq
 from probdiffeq.backend import func, np, ode, testing
 
 
-@testing.case()
-def case_odejet_via_jvp():
-    return diffeqjet.odejet_via_jvp
+@testing.fixture(name="num")
+@testing.parametrize("num", [0, 1, 4])
+def fixture_number_of_extensions(num):
+    return num
 
 
 @testing.case()
-def case_taylor_mode_scan():
-    return diffeqjet.odejet_padded_scan
+def case_jetexpand_ode_via_jvp(num):
+    return probdiffeq.jetexpand_ode_via_jvp(num=num)
 
 
-@testing.fixture(name="pb_with_solution")
-def fixture_pb_with_solution():
+@testing.case()
+def case_taylor_mode_scan(num):
+    return probdiffeq.jetexpand_ode_padded_scan(num=num)
+
+
+@testing.fixture(name="problem_with_solution")
+def fixture_problem_with_solution():
     vf, (u0, du0), (t0, _) = ode.ivp_van_der_pol_2nd()
     vf = func.partial(vf, t=t0)
 
@@ -26,12 +32,11 @@ def fixture_pb_with_solution():
 
 
 @testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_")
-@testing.parametrize("num", [0, 1, 3])
 def test_approximation_identical_to_reference(
-    pb_with_solution, taylor_fun, num
+    problem_with_solution, taylor_fun, num
 ) -> None:
-    (f, init), solution = pb_with_solution
+    (f, init), solution = problem_with_solution
 
-    derivatives = taylor_fun(f, init, num=num)
+    derivatives = taylor_fun(f, init)
     assert len(derivatives) == num + 2
     assert testing.allclose(derivatives, list(solution[: len(derivatives)]))
