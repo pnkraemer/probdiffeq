@@ -2,9 +2,10 @@ r"""Evaluate jet-recursions in differential equations."""
 
 from probdiffeq import probdiffeq
 from probdiffeq.backend import flow, func, inspect, np, tree
-from probdiffeq.backend.typing import Array, ArrayLike, Callable, Sequence
+from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeVar
 
 __all__ = [
+    "JetExpansionAlg",
     "jetexpand_dae_nlstsq",
     "jetexpand_dae_nlstsq_recursive",
     "jetexpand_ode_doubling_unroll",
@@ -14,7 +15,36 @@ __all__ = [
 ]
 
 
-def jetexpand_ode_padded_scan(*, num: int):
+T = TypeVar("T")
+
+
+class JetExpansionAlg(Protocol):
+    """A protocol for methods that evaluate Taylor series' of IVPs from initial conditions."""
+
+    def __call__(self, vf: Callable, inits: Sequence[T], /, **vf_kwargs) -> Sequence[T]:
+        """Evaluate the Taylor series of an IVP.
+
+        Parameters
+        ----------
+        vf
+            The vector field of the IVP. It is expected to have a signature like
+            `vf(u, /, t=...)` for first-order ODEs, `vf(u, du, /, t=...)` for second-order ODEs,
+            and so on. That is, the number of positional arguments specifies the order of the problem.
+            Replace `u`, `du`, and so on with any variable name of your choosing
+            but mind the keyword-only argument 't' in the signatures above.
+        inits
+            The initial conditions of the IVP. The number of elements in this sequence should match the number of positional arguments in `vf`.
+        **vf_kwargs
+            Additional keyword arguments to pass to `vf`. This is useful for passing the time `t` in the signatures above.
+
+        Returns
+        -------
+        Sequence[T]
+            A sequence of Taylor coefficients, starting with the initial conditions and followed by the derivatives.
+        """
+
+
+def jetexpand_ode_padded_scan(*, num: int) -> JetExpansionAlg:
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `jetexpand_ode_unroll()`, this function implements the loop via a scan,
@@ -26,7 +56,7 @@ def jetexpand_ode_padded_scan(*, num: int):
     Consult the benchmarks if performance is critical.
     """
 
-    def expand(vf: Callable, inits: Sequence[ArrayLike], /, **vf_kwargs):
+    def expand(vf: Callable, inits: Sequence[T], /, **vf_kwargs) -> Sequence[T]:
         inits = tree.tree_map(np.asarray, inits)
 
         # If the initial conditions are not arrays,
@@ -45,23 +75,17 @@ def jetexpand_ode_padded_scan(*, num: int):
         if num == 0:
             return inits
 
-        # Wrap the vector field to include keyword arguments
-        def vf_with_kwargs(*args):
-            return vf(*args, **vf_kwargs)
-
         # Number of positional arguments in f
         num_arguments = len(inits)
 
         # Initial Taylor series (u_0, u_1, ..., u_k)
-        primals = vf_with_kwargs(*inits)
+        primals = vf(*inits, **vf_kwargs)
         taylor_coeffs = [*inits, primals]
 
-        increment = jetexpand_ode_coefficient_increment(
-            vf_with_kwargs, num_arguments=num_arguments
-        )
+        increment = jetexpand_ode_coefficient_increment(num_arguments=num_arguments)
 
         def body(tcoeffs, _):
-            tcoeffs = increment(tcoeffs)
+            tcoeffs = increment(vf, tcoeffs, **vf_kwargs)
 
             # The final values in s_new are nonsensical
             # (well, they are not; but we don't care about them)
@@ -89,7 +113,7 @@ def _pad_to_length(x, /, *, length, value):
     return x + [value] * (length - len(x))
 
 
-def jetexpand_ode_unroll(*, num: int):
+def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg:
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `jetexpand_ode_padded_scan()`, this function does not depend on zero-padding
@@ -105,7 +129,7 @@ def jetexpand_ode_unroll(*, num: int):
 
     """
 
-    def expand(vf: Callable, inits: Sequence[ArrayLike], /, **vf_kwargs):
+    def expand(vf: Callable, inits: Sequence[T], /, **vf_kwargs) -> Sequence[T]:
         inits = tree.tree_map(np.asarray, inits)
         if not isinstance(inits[0], Array):
             _, unravel = tree.ravel_pytree(inits[0])
@@ -121,21 +145,16 @@ def jetexpand_ode_unroll(*, num: int):
         if num == 0:
             return inits
 
-        def vf_with_kwargs(*args):
-            return vf(*args, **vf_kwargs)
-
         # Number of positional arguments in f
         num_arguments = len(inits)
 
         # Initial Taylor series (u_0, u_1, ..., u_k)
-        primals = vf_with_kwargs(*inits)
+        primals = vf(*inits, **vf_kwargs)
         taylor_coeffs = [*inits, primals]
 
-        increment = jetexpand_ode_coefficient_increment(
-            vf_with_kwargs, num_arguments=num_arguments
-        )
+        increment = jetexpand_ode_coefficient_increment(num_arguments=num_arguments)
         for _ in range(num - 1):
-            taylor_coeffs = increment(taylor_coeffs)
+            taylor_coeffs = increment(vf, taylor_coeffs, **vf_kwargs)
         return taylor_coeffs
 
     return expand
@@ -176,7 +195,7 @@ def jet_unpack_series(taylor_series, num, /):
     return primals, series_
 
 
-def jetexpand_ode_via_jvp(*, num: int):
+def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg:
     """Taylor-expand the solution of an IVP with recursive forward-mode differentiation.
 
     !!! warning "Compilation time"
@@ -184,7 +203,7 @@ def jetexpand_ode_via_jvp(*, num: int):
 
     """
 
-    def expand(vf: Callable, inits: Sequence[ArrayLike], /, **vf_kwargs):
+    def expand(vf: Callable, inits: Sequence[T], /, **vf_kwargs) -> Sequence[T]:
         inits = tree.tree_map(np.asarray, inits)
         if not isinstance(inits[0], Array):
             _, unravel = tree.ravel_pytree(inits[0])
@@ -227,7 +246,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return tree.Partial(df)
 
 
-def jetexpand_ode_doubling_unroll(*, num_doublings: int):
+def jetexpand_ode_doubling_unroll(*, num_doublings: int) -> JetExpansionAlg:
     """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -241,7 +260,7 @@ def jetexpand_ode_doubling_unroll(*, num_doublings: int):
 
     """
 
-    def expand(vf: Callable, inits: Sequence[Array], /, **vf_kwargs):
+    def expand(vf: Callable, inits: Sequence[T], /, **vf_kwargs) -> Sequence[T]:
         inits = tree.tree_map(np.asarray, inits)
         if not isinstance(inits[0], Array):
             # If the Pytree elements are matrices or scalars,
@@ -256,38 +275,40 @@ def jetexpand_ode_doubling_unroll(*, num_doublings: int):
             tcoeffs = expand(vf_wrapped, inits_flat, **vf_kwargs)
             return tree.tree_map(unravel, tcoeffs)
 
-        def vf_with_kwargs(*args):
-            return vf(*args, **vf_kwargs)
-
-        double = jetexpand_ode_coefficient_double(vf_with_kwargs)
+        double = jetexpand_ode_coefficient_double()
         (u0,) = inits  # This asserts ODEs are first-order only. High order is a todo
         taylor_coefficients = [u0]
         for _ in range(num_doublings):
-            taylor_coefficients = double(taylor_coefficients)
+            taylor_coefficients = double(vf, taylor_coefficients, **vf_kwargs)
         return _unnormalise(*taylor_coefficients)
 
     return expand
 
 
-def jetexpand_ode_coefficient_increment(vf, *, num_arguments):
+def jetexpand_ode_coefficient_increment(*, num_arguments) -> JetExpansionAlg:
     """Construct a method that increments Taylor series' of an ODE."""
 
-    def increment(taylor_coeffs):
+    def increment(vf, taylor_coeffs: Sequence[T], **vf_kwargs) -> Sequence[T]:
+        def vf_with_kwargs(*args):
+            return vf(*args, **vf_kwargs)
+
         primals, series = jet_unpack_series(taylor_coeffs, num_arguments)
-        p, s_new = func.jet(vf, primals=primals, series=series)
+        p, s_new = func.jet(vf_with_kwargs, primals=primals, series=series)
         return [*primals, p, *s_new]
 
     return increment
 
 
-def jetexpand_ode_coefficient_double(vf):
+def jetexpand_ode_coefficient_double() -> JetExpansionAlg:
     """Construct a method that doubles Taylor series' lengths of an ODE."""
 
-    def double(taylor_coefficients):
+    def double(
+        vf: Callable, taylor_coefficients: Sequence[T], **vf_kwargs
+    ) -> Sequence[T]:
         zeros = np.zeros_like(taylor_coefficients[0])
         deg = len(taylor_coefficients)
 
-        jet_embedded_deg = tree.Partial(jet_embedded, degree=deg)
+        jet_embedded_deg = tree.Partial(jet_embedded, vf, degree=deg, **vf_kwargs)
         fx, jvp = func.linearize(jet_embedded_deg, *taylor_coefficients)
 
         def body_fun(cs_padded, i_and_fx_i):
@@ -318,7 +339,7 @@ def jetexpand_ode_coefficient_double(vf):
         taylor_coefficients.extend(cs_padded)
         return taylor_coefficients
 
-    def jet_embedded(*c, degree):
+    def jet_embedded(vf, *c, degree, **vf_kwargs):
         """Call a modified jet().
 
         The modifications include:
@@ -329,11 +350,15 @@ def jetexpand_ode_coefficient_double(vf):
         simplifies drastically for normalised coefficients
         (compared to unnormalised coefficients).
         """
+
+        def vf_wrapped(*args):
+            return vf(*args, **vf_kwargs)
+
         zeros = np.zeros_like(c[0])
 
         coeffs_emb = [*c] + [zeros] * degree
         p, *s = coeffs_emb
-        p_new, s_new = func.jet(vf, (p,), (s,), is_tcoeff=True)
+        p_new, s_new = func.jet(vf_wrapped, (p,), (s,), is_tcoeff=True)
         return np.stack([p_new, *s_new])
 
     return double
