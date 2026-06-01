@@ -1,6 +1,7 @@
 r"""Evaluate jet-recursions in differential equations."""
 
 from probdiffeq import probdiffeq
+from probdiffeq._probdiffeq import vector_fields
 from probdiffeq.backend import flow, func, inspect, np, tree
 from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeVar
 
@@ -57,6 +58,12 @@ def jetexpand_ode_padded_scan(*, num: int) -> JetExpansionAlg:
     """
 
     def expand(vf: Callable, inits: Sequence[T], /, **vf_kwargs) -> Sequence[T]:
+
+        if not isinstance(vf, vector_fields.ODEFunction):
+            msg = f"Expected type {vector_fields.ODEFunction}, but got {vf} of type {type(vf)}. "
+            msg += "Make sure to wrap your vector field with `probdiffeq.ode()`."
+            raise TypeError(msg)
+
         inits = tree.tree_map(np.asarray, inits)
 
         # If the initial conditions are not arrays,
@@ -203,7 +210,13 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg:
 
     """
 
-    def expand(vf: Callable, inits: Sequence[T], /, **vf_kwargs) -> Sequence[T]:
+    def expand(
+        vf: vector_fields.ODEFunction, inits: Sequence[T], /, **vf_kwargs
+    ) -> Sequence[T]:
+        if not isinstance(vf, vector_fields.ODEFunction):
+            msg = f"Expected type {vector_fields.ODEFunction}, but got {vf} of type {type(vf)}. "
+            msg += "Make sure to wrap your vector field with `probdiffeq.ode()`."
+            raise TypeError(msg)
         inits = tree.tree_map(np.asarray, inits)
         if not isinstance(inits[0], Array):
             _, unravel = tree.ravel_pytree(inits[0])
