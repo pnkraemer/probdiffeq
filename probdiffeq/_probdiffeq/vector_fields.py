@@ -63,16 +63,16 @@ class ODEFunction:
     def __repr__(self):
         return f"{self.__class__.__name__}(order={self.order})"
 
-    def __call__(self, y_and_dy_and_ddy_etc: Sequence[T], /, *, t) -> T:
-        return self._func(y_and_dy_and_ddy_etc, t=t)
+    def __call__(self, *, u: Sequence[T], t) -> T:
+        return self._func(u=u, t=t)
 
 
-def ode(func: Callable, /) -> ODEFunction:
+def ode(func: Callable[[*Sequence[T], float], T], /) -> ODEFunction:
     """Convert a function that computes the right-hand side of an ODE into a vector field with the correct API."""
     order = _verify_vector_field_signature_and_parse_order(func)
 
-    def wrapper(y_as_sequence: Sequence[T], /, *, t) -> T:
-        return func(*y_as_sequence, t=t)
+    def wrapper(u: Sequence[T], t) -> T:
+        return func(*u, t=t)
 
     return ODEFunction(wrapper, order=order)
 

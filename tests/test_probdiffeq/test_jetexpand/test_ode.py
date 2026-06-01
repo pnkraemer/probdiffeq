@@ -12,7 +12,7 @@ def fixture_problem_with_solution():
     solution = np.load(
         "./tests/test_probdiffeq/test_jetexpand/data/three_body_first_solution.npy"
     )
-    return (vf, (u0,), {"t": t0}), solution
+    return (probdiffeq.ode(vf), (u0,), {"t": t0}), solution
 
 
 @testing.fixture(name="num")
@@ -58,3 +58,12 @@ def test_approximation_identical_to_reference_doubling(
     derivatives = expand(f, init, **vf_kwargs)
     assert len(derivatives) == np.sum(2 ** np.arange(0, num_doublings + 1))
     assert testing.allclose(derivatives, list(solution[: len(derivatives)]))
+
+
+@testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_")
+def test_raises_error_for_non_ode_input(taylor_fun, num) -> None:
+    def f(y, /, *, t):
+        return y
+
+    with testing.raises(TypeError, match="Expected type"):
+        taylor_fun(f, (1.0,), t=0.0)

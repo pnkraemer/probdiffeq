@@ -26,24 +26,13 @@ def fixture_problem_with_solution():
 
     path = "./tests/test_probdiffeq/test_jetexpand/data/van_der_pol_second_solution.npy"
     solution = np.load(path)
-    return (probdiffeq.ode(vf), (u0, du0), {"t": t0}), solution
+    return (probdiffeq.ode(vf), (u0, du0), t0), solution
 
 
 @testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_")
-def test_approximation_identical_to_reference(
-    problem_with_solution, taylor_fun, num
-) -> None:
-    (f, init, vf_kwargs), solution = problem_with_solution
+def test_approximation_identical_to_reference(problem_with_solution, taylor_fun, num):
+    (f, (u0, du0), t0), solution = problem_with_solution
 
-    derivatives = taylor_fun(f, init, **vf_kwargs)
+    derivatives = taylor_fun(f, (u0, du0), t=t0)
     assert len(derivatives) == num + 2
     assert testing.allclose(derivatives, list(solution[: len(derivatives)]))
-
-
-@testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_")
-def test_raises_error_for_non_ode_input(taylor_fun, num) -> None:
-    def f_2nd(y, dy, /, *, t):
-        return y + dy
-
-    with testing.raises(TypeError, match="Expected type"):
-        taylor_fun(f_2nd, (1.0, 0.0), t=0.0)
