@@ -159,7 +159,9 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
     def param_to_solution(tol):
         # Build a solver
         vf_auto = functools.partial(vf, t=t0)
-        tcoeffs = diffeqjet.odejet_padded_scan(vf_auto, (y0,), num=num_derivatives - 1)
+        tcoeffs = probdiffeq.jetexpand_ode_padded_scan(
+            vf_auto, (y0,), num=num_derivatives - 1
+        )
         ssm = probdiffeq.state_space_model()
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])

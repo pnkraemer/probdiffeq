@@ -1,13 +1,15 @@
 """Assert that the base adaptive solver is accurate."""
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, structs, testing, tree
 from probdiffeq.backend.typing import Callable
 
 
 @testing.fixture(name="ivp")
 def ivp_lotka_volterra():
-    return ode.ivp_lotka_volterra()
+    vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
+    vf = probdiffeq.ode(vf)
+    return vf, (u0,), (t0, t1)
 
 
 @structs.dataclass
@@ -171,7 +173,8 @@ def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
     vf, u0, (t0, t1) = ivp
 
     # Build a solver
-    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
+    initialize = probdiffeq.jetexpand_ode_padded_scan(num=4)
+    tcoeffs = initialize(vf, u0, t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
     init, prior = factory.prior(tcoeffs, ssm=ssm)
     strategy = factory.strategy(ssm=ssm)

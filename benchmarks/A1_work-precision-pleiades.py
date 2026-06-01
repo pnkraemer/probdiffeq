@@ -14,7 +14,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -173,7 +173,9 @@ def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
     def param_to_solution(tol):
         # Build a solver
         vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = diffeqjet.odejet_unroll(vf_auto, (u0, du0), num=num_derivatives - 1)
+        tcoeffs = probdiffeq.jetexpand_ode_unroll(
+            vf_auto, (u0, du0), num=num_derivatives - 1
+        )
 
         ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
         init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)

@@ -1,6 +1,6 @@
 """Assert that all jet-linearisation constraints are correct."""
 
-from probdiffeq import diffeqjet, probdiffeq
+from probdiffeq import probdiffeq
 from probdiffeq.backend import linalg, np, structs, testing
 from probdiffeq.backend.typing import Array, Callable, Literal
 
@@ -88,7 +88,9 @@ def fixture_expected(root, derivatives):
     def vf_autonomous(y, /):
         return root.ode_vf(y, t=root.t0)
 
-    return diffeqjet.odejet_padded_scan(vf_autonomous, [root.u0], num=derivatives)
+    return probdiffeq.jetexpand_ode_padded_scan(
+        vf_autonomous, [root.u0], num=derivatives
+    )
 
 
 def case_jet_iterated_dae(root):

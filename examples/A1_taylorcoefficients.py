@@ -5,7 +5,7 @@ import collections
 import jax
 import jax.numpy as jnp
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -28,7 +28,7 @@ def main():
 
     # It's time to solve some ODEs:
 
-    tcoeffs = diffeqjet.odejet_padded_scan(lambda *y: vf(*y, t=t0), [u0], num=2)
+    tcoeffs = probdiffeq.jetexpand_ode_padded_scan(lambda *y: vf(*y, t=t0), [u0], num=2)
     solution = jax.jit(solve, static_argnums=[0])(vf, tcoeffs, t0=t0, t1=t1)
 
     print()

@@ -1,6 +1,6 @@
 """The RMSE of the smoother should be (slightly) lower than the RMSE of the filter."""
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, linalg, np, ode, testing, tree
 
 
@@ -10,7 +10,7 @@ def fixture_solver_setup(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     grid = np.linspace(t0, t1, endpoint=True, num=12)
-    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
+    tcoeffs = probdiffeq.jetexpand_ode_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
     return {"vf": vf, "tcoeffs": tcoeffs, "grid": grid, "fact": fact}
 
 

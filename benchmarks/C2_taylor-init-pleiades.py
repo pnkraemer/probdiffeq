@@ -10,8 +10,6 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from probdiffeq import diffeqjet
-
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
 
@@ -95,7 +93,7 @@ def taylor_mode_scan() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = diffeqjet.odejet_padded_scan(vf_auto, (u0, du0), num=num)
+        tcoeffs = probdiffeq.jetexpand_ode_padded_scan(vf_auto, (u0, du0), num=num)
         return jnp.asarray(tcoeffs)
 
     return estimate
@@ -107,7 +105,7 @@ def taylor_mode_unroll() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = diffeqjet.odejet_unroll(vf_auto, (u0, du0), num=num)
+        tcoeffs = probdiffeq.jetexpand_ode_unroll(vf_auto, (u0, du0), num=num)
         return jnp.asarray(tcoeffs)
 
     return estimate
@@ -119,7 +117,7 @@ def odejet_via_jvp() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = diffeqjet.odejet_via_jvp(vf_auto, (u0, du0), num=num)
+        tcoeffs = probdiffeq.jetexpand_ode_via_jvp(vf_auto, (u0, du0), num=num)
         return jnp.asarray(tcoeffs)
 
     return estimate

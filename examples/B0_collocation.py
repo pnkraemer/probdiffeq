@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -37,7 +37,7 @@ def main():
     mseq_prior = probdiffeq.MarkovSequence.from_grid(init, iwp, grid=ts, reverse=False)
 
     # "Good" prior (Taylor coefficients)
-    tcoeffs = diffeqjet.odejet_padded_scan(
+    tcoeffs = probdiffeq.jetexpand_ode_padded_scan(
         lambda y: vector_field(y, t=t0), (u0,), num=2
     )
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=10.0)

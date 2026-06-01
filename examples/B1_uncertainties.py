@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -32,7 +32,7 @@ def main():
     #
     # To all users: Try replacing the fixedpoint-smoother with a filter!
 
-    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
+    tcoeffs = probdiffeq.jetexpand_ode_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
     ssm = probdiffeq.state_space_model(ssm_fact="blockdiag")
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)

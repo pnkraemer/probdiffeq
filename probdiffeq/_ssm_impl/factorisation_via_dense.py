@@ -438,8 +438,8 @@ class DenseLinearizationFactory(api.AbstractLinearizationFactory):
             root, jacobian=jacobian, root_order=root_order, linearization=linearization
         )
 
-    def ode_taylor_0th(self, vf, *, ode_order):
-        return DenseOdeTs0(vf, ode_order=ode_order)
+    def ode_taylor_0th(self, vf):
+        return DenseOdeTs0(vf)
 
     def ode_taylor_1st(self, vf, *, ode_order, jacobian):
         if ode_order > 1:
@@ -530,24 +530,24 @@ class DenseConditional(api.AbstractConditional):
 class DenseOdeTs0(api.AbstractOde):
     """Construct a dense implementation of ODE-TS0 linearization."""
 
-    def __init__(self, vf, *, ode_order: int) -> None:
-        super().__init__(vf, ode_order=ode_order)
+    def __init__(self, vf) -> None:
+        super().__init__(vf)
 
     def init_linearization(self) -> None:
         return None
 
     def linearize(self, rv: DenseNormal, state: None, *, damp: float, t):
-        fun = func.partial(self.vector_field, t=t)
+        ode_order = self.vector_field.num_derivatives_in_args
         del state
 
         def a1(m: Array) -> Array:
             """Select the 'n'-th derivative."""
-            m0 = rv.tree_flatten.unflatten_array(m)[self.ode_order]
+            m0 = rv.tree_flatten.unflatten_array(m)[ode_order]
             return tree.ravel_pytree(m0)[0]
 
         Ms = rv.mean
 
-        fm = fun(*Ms[: self.ode_order])
+        fm = self.vector_field(u=Ms[:ode_order], t=t)
         fx = tree.tree_map(lambda s: -s, [fm])
         linop = func.jacrev(a1)(rv.mean_flat)
         noise = DenseNormal.from_dirac(fx, damp=damp)

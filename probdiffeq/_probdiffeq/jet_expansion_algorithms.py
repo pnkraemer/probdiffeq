@@ -2,7 +2,7 @@ r"""Evaluate jet-recursions in differential equations."""
 
 from probdiffeq import probdiffeq
 from probdiffeq._probdiffeq import vector_fields
-from probdiffeq.backend import flow, func, inspect, np, tree
+from probdiffeq.backend import flow, func, np, tree
 from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeVar
 
 __all__ = [
@@ -59,8 +59,8 @@ def jetexpand_ode_padded_scan(*, num: int) -> JetExpansionAlg:
     Consult the benchmarks if performance is critical.
     """
 
-    @_allow_pytree_inits
     @_error_if_vf_not_odefunction_type
+    @_allow_pytree_inits
     def expand(vf: Callable, inits: Sequence[T], /, *, t: float | Array) -> Sequence[T]:
         if num == 0:
             return inits
@@ -119,8 +119,8 @@ def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg:
 
     """
 
-    @_allow_pytree_inits
     @_error_if_vf_not_odefunction_type
+    @_allow_pytree_inits
     def expand(vf: Callable, inits: Sequence[T], /, *, t: float | Array) -> Sequence[T]:
         inits = tree.tree_map(np.asarray, inits)
 
@@ -185,10 +185,10 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg:
 
     """
 
-    @_allow_pytree_inits
     @_error_if_vf_not_odefunction_type
+    @_allow_pytree_inits
     def expand(
-        vf: vector_fields.ODEFunction, inits: Sequence[T], /, *, t: float | Array
+        vf: vector_fields.VectorField, inits: Sequence[T], /, *, t: float | Array
     ) -> Sequence[T]:
         if num == 0:
             return inits
@@ -232,6 +232,7 @@ def jetexpand_ode_doubling_unroll(*, num_doublings: int) -> JetExpansionAlg:
         JIT-compiling this function unrolls a loop.
 
     """
+    # TODO: error on the wrong type
 
     @_allow_pytree_inits
     def expand(vf: Callable, inits: Sequence[T], /, *, t: float | Array) -> Sequence[T]:
@@ -329,11 +330,11 @@ def _unnormalise(primals, *series):
 
 
 def _error_if_vf_not_odefunction_type(expand):
-    """A decorator to check that the vector field is of type ODEFunction."""
+    """A decorator to check that the vector field is of type VectorField."""
 
     def expand_wrapped(vf, inits, /, *, t: float | Array):
-        if not isinstance(vf, vector_fields.ODEFunction):
-            msg = f"Expected type {vector_fields.ODEFunction}, but got {vf} of type {type(vf)}. "
+        if not isinstance(vf, vector_fields.VectorField):
+            msg = f"Expected type {vector_fields.VectorField}, but got {vf} of type {type(vf)}. "
             msg += "Make sure to wrap your vector field with `probdiffeq.ode()`."
             raise TypeError(msg)
         return expand(vf, inits, t=t)
@@ -355,7 +356,7 @@ def _allow_pytree_inits(expand):
             _, unravel = tree.ravel_pytree(inits[0])
             inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
 
-            if vf.order == 1:
+            if vf.num_derivatives_in_args == 1:
 
                 @probdiffeq.ode
                 def vf_wrapped(y: T, /, *, t) -> T:
@@ -363,7 +364,7 @@ def _allow_pytree_inits(expand):
                     fy = vf(u=(y,), t=t)
                     return tree.ravel_pytree(fy)[0]
 
-            elif vf.order == 2:
+            elif vf.num_derivatives_in_args == 2:
 
                 @probdiffeq.ode
                 def vf_wrapped(y: T, dy: T, /, *, t):
@@ -383,123 +384,90 @@ def _allow_pytree_inits(expand):
     return expand_wrapped
 
 
-def jetexpand_dae_nlstsq_recursive(
-    differential: Callable,
-    algebraic: Callable,
-    inits: Sequence[Array],
-    /,
-    num_strides: int,
-    stride: int,
-    nlstsq: Callable,
-):
+def jetexpand_dae_nlstsq_recursive(num_strides: int, stride: int, nlstsq: Callable):
     """Evaluate the Taylor series of a differential-algebraic equation system.
 
     Like jetexpand_dae_nlstsq(), but called recursively which means that extremely high orders
     can be initialised exactly at the cost of multiple calls to the nonlinear least squares solver.
     """
-    received = inits
-    if num_strides == 0:
+    initialize = jetexpand_dae_nlstsq(num=stride, nlstsq=nlstsq)
+
+    def expand(
+        dae: vector_fields.DAESystem, inits: Sequence[T], /, *, t: float | Array
+    ):
+        received = inits
+        if num_strides == 0:
+            return received, {}
+
+        for _ in range(num_strides):
+            received, _info = initialize(dae, received, t=t)
         return received, {}
 
-    for _ in range(num_strides):
-        received, _info = jetexpand_dae_nlstsq(
-            differential, algebraic, received, num=stride, nlstsq=nlstsq
-        )
-    return received, {}
+    return expand
 
 
-def jetexpand_dae_nlstsq(
-    differential: Callable,
-    algebraic: Callable,
-    inits: Sequence[Array],
-    /,
-    num: int,
-    nlstsq: Callable,
-):
+def jetexpand_dae_nlstsq(num: int, nlstsq: Callable) -> JetExpansionAlg:
     """Evaluate the Taylor series of a differential-algebraic equation system."""
-    if num == 0:
-        return inits, {}
 
-    root_order_differential = _verify_dae_signature_and_parse_order(differential)
-    root_order_algebraic = _verify_dae_signature_and_parse_order(algebraic)
+    # TODO: enable pytree inputs/outputs
+    # TODO: raise error if DAE has the wrong type
+    def expand(
+        dae: vector_fields.DAESystem, inits: Sequence[T], /, *, t: float | Array
+    ):
+        """Evaluate the Taylor series of a differential-algebraic equation system.
 
-    # Determine degrees of freedom ("dof") and initialse all others diffusely
-    # Concretely: The provided 'inits' are not DOFs, all added ones are.
-    ssm = probdiffeq.state_space_model()
-    rv, _ = probdiffeq.prior_wiener_integrated(inits, diffuse_derivatives=num, ssm=ssm)
+        The Taylor coefficients are computed by solving a nonlinear least squares problem
+        at each order. This is a generalisation of the method described in
+        "Taylor expansions of solutions to differential equations: a constructive approach"
+        by Berz and Makino (1998) to DAEs.
 
-    x0, unravel = tree.ravel_pytree(rv.mean)
+        The method is expected to be more computationally expensive than jetexpand_ode_unroll(),
+        but it can handle DAEs and extremely high orders.
 
-    def root_jet(tcoeffs_flat):
-        tcoeffs_all = unravel(tcoeffs_flat)
+        !!! warning "Warning: highly EXPERIMENTAL feature!"
+            Support for DAEs is highly experimental.
+            There is no guarantee that it works correctly.
+            It might be deleted tomorrow
+            and without any deprecation policy.
+        """
+        if num == 0:
+            return inits, {}
 
-        # Differential part.
-        # Assumes that the DAE is first order.
-        ps, ss = jet_unpack_series(tcoeffs_all, root_order_differential)
-        primals1, series1 = func.jet(differential, ps, ss, is_tcoeff=False)
+        # Determine degrees of freedom ("dof") and initialse all others diffusely
+        # Concretely: The provided 'inits' are not DOFs, all added ones are.
+        ssm = probdiffeq.state_space_model()
+        rv, _ = probdiffeq.prior_wiener_integrated(
+            inits, diffuse_derivatives=num, ssm=ssm
+        )
 
-        # Algebraic part
-        # Assumes that the DAE is first order.
-        ps, ss = jet_unpack_series(tcoeffs_all, root_order_algebraic)
-        primals2, series2 = func.jet(algebraic, ps, ss, is_tcoeff=False)
+        x0, unravel = tree.ravel_pytree(rv.mean)
 
-        # Put together (order doesn't matter)
-        fx = [primals1, *series1, primals2, *series2]
-        return tree.ravel_pytree(fx)[0]
+        def root_jet(tcoeffs_flat):
+            tcoeffs_all = unravel(tcoeffs_flat)
 
-    x1, info = nlstsq(root_jet, x0, rv.mean_flat, rv.cholesky_flat)
-    return unravel(x1), info
+            # Differential part.
+            # Assumes that the DAE is first order.
+            ps, ss = jet_unpack_series(
+                tcoeffs_all, dae.differential.num_derivatives_in_args
+            )
+            primals1, series1 = func.jet(
+                lambda *s: dae.differential(u=s, t=t), ps, ss, is_tcoeff=False
+            )
 
+            # Algebraic part
+            # Assumes that the DAE is first order.
+            ps, ss = jet_unpack_series(
+                tcoeffs_all, dae.algebraic.num_derivatives_in_args
+            )
+            primals2, series2 = func.jet(
+                lambda *s: dae.algebraic(u=s, t=t), ps, ss, is_tcoeff=False
+            )
 
-def _verify_dae_signature_and_parse_order(vf) -> int:
-    """Parse the vector-field structure from its signature."""
-    sig = inspect.signature(vf)
-    params = list(sig.parameters.values())
+            # Put together (order doesn't matter)
+            fx = [primals1, *series1, primals2, *series2]
+            return tree.ravel_pytree(fx)[0]
 
-    msg = f"""The dynamics' signature is not compatible with the constraint.
+        x1, info = nlstsq(root_jet, x0, rv.mean_flat, rv.cholesky_flat)
+        return unravel(x1), info
 
-    More precisely, the dynamics are expected to look like
-
-      - f(u, /),
-      - f(u, du, /),
-      - f(u, du, ddu, /),
-
-    and so on, where the number of positional arguments
-    specifies the order of the problem.
-    Replace `u`, `du`, and so on with any variable name of your choosing
-    but mind the keyword-only argument 't' in the signatures above.
-
-    That said, the arguments
-
-    {[(p.name, p.kind) for p in params]}
-
-    have been detected in the dynamics function.
-
-    Try wrapping the vector field through a pure Python function
-    with the correct arguments before passing it to the ODE constraint.
-
-      - No *args or **kwargs
-      - No functools.partial
-
-    """
-
-    POSITIONAL = (
-        inspect.Parameter.POSITIONAL_ONLY,
-        inspect.Parameter.POSITIONAL_OR_KEYWORD,
-    )
-    KEYWORD = (inspect.Parameter.KEYWORD_ONLY,)
-
-    def is_positional(p):
-        return p.kind in POSITIONAL
-
-    def is_keyword(p):
-        return p.kind in KEYWORD
-
-    state_args = [p for p in params if is_positional(p)]
-    contains_no_positional = len(state_args) == 0
-    contains_keyword = len([p for p in params if is_keyword(p)]) > 0
-
-    if contains_no_positional or contains_keyword:
-        raise TypeError(msg)
-
-    return len(state_args)
+    return expand

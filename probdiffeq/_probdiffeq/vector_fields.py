@@ -19,7 +19,7 @@ Examples
 ...     return y
 >>>
 >>> print(ode(f))
-ODEFunction(order=1)
+VectorField(order=1)
 
 Among other things, the vector field wrappers ensure that all internal representations
 of the ODEs have the same signature, which means that sometimes (eg for first-order problems),
@@ -36,7 +36,7 @@ This API difference is more pronounced for higher-order problems:
 ...     return y + dy
 >>>
 >>> print(ode(f_2nd))
-ODEFunction(order=2)
+VectorField(order=2)
 >>>
 >>> print(inspect.signature(f_2nd))
 (y, dy, /, *, t)
@@ -50,31 +50,44 @@ from probdiffeq.backend.typing import Callable, Sequence, TypeVar
 
 T = TypeVar("T")
 
-__all__ = ["ODEFunction", "ode"]
+__all__ = ["DAESystem", "VectorField", "dae", "ode"]
 
 
-class ODEFunction:
+class VectorField:
     """A vector field, i.e. a function that computes the right-hand side of an ODE, with the correct API for use in probdiffeq."""
 
-    def __init__(self, func, order: int):
+    def __init__(self, func, num_derivatives_in_args: int):
         self._func = func
-        self.order = order
+        self.num_derivatives_in_args = num_derivatives_in_args
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(order={self.order})"
+        return f"{self.__class__.__name__}(num_derivatives_in_args={self.num_derivatives_in_args})"
 
     def __call__(self, *, u: Sequence[T], t) -> T:
         return self._func(u=u, t=t)
 
 
-def ode(func: Callable[[*Sequence[T], float], T], /) -> ODEFunction:
+class DAESystem:
+    def __init__(self, differential: VectorField, algebraic: VectorField):
+        assert (
+            differential.num_derivatives_in_args
+            == algebraic.num_derivatives_in_args + 1
+        )
+        self.differential = differential
+        self.algebraic = algebraic
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(differential={self.differential}, algebraic={self.algebraic})"
+
+
+def ode(func: Callable[[*Sequence[T], float], T], /) -> VectorField:
     """Convert a function that computes the right-hand side of an ODE into a vector field with the correct API."""
-    order = _verify_vector_field_signature_and_parse_order(func)
+    num_derivatives_in_args = _verify_vector_field_signature_and_parse_order(func)
 
     def wrapper(u: Sequence[T], t) -> T:
         return func(*u, t=t)
 
-    return ODEFunction(wrapper, order=order)
+    return VectorField(wrapper, num_derivatives_in_args=num_derivatives_in_args)
 
 
 def _verify_vector_field_signature_and_parse_order(vf: Callable) -> int:
@@ -131,3 +144,10 @@ def _verify_vector_field_signature_and_parse_order(vf: Callable) -> int:
         raise TypeError(msg)
 
     return len(state_args)
+
+
+def dae(
+    differential: Callable[[*Sequence[T], float], T],
+    algebraic: Callable[[*Sequence[T], float], T],
+) -> VectorField:
+    return DAESystem(differential=ode(differential), algebraic=ode(algebraic))

@@ -42,7 +42,7 @@ IsotropicOdeTs0(ode_order=2)
 """
 
 from probdiffeq import diffeqjet, ssm_impl
-from probdiffeq._probdiffeq import jacobians, linearizations
+from probdiffeq._probdiffeq import jacobians, linearizations, vector_fields
 from probdiffeq.backend import func, inspect, tree
 from probdiffeq.backend.typing import Callable, Literal, Protocol, Sequence, TypeVar
 
@@ -91,7 +91,9 @@ class Constraint(Protocol):
     """
 
 
-def constraint_ode_ts0(vf: Callable, /, *, ssm: ssm_impl.FactSsmImpl) -> Constraint:
+def constraint_ode_ts0(
+    vf: vector_fields.VectorField, /, *, ssm: ssm_impl.FactSsmImpl
+) -> Constraint:
     r"""Create an ODE constraint with zeroth-order Taylor linearisation.
 
     This constraint handles ODEs of the form
@@ -117,8 +119,7 @@ def constraint_ode_ts0(vf: Callable, /, *, ssm: ssm_impl.FactSsmImpl) -> Constra
     ssm
         The state-space model to use for the constraint.
     """
-    ode_order = _verify_vector_field_signature_and_parse_order(vf)
-    return ssm.linearize.ode_taylor_0th(vf, ode_order=ode_order)
+    return ssm.linearize.ode_taylor_0th(vf)
 
 
 def constraint_ode_ts1(

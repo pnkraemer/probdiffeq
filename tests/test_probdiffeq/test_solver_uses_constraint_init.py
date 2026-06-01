@@ -1,6 +1,6 @@
 """Assert that the base adaptive solver is accurate."""
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, testing, tree
 
 
@@ -40,7 +40,7 @@ def test_output_matches_reference(ivp, solver_factory, derivatives, ssm_fact) ->
         vfu = vf(u, t=t)
         return tree.tree_map(lambda a: -a, vfu)
 
-    expected = diffeqjet.odejet_padded_scan(
+    expected = probdiffeq.jetexpand_ode_padded_scan(
         lambda y: vf(y, t=t0), [u0], num=derivatives
     )
 

@@ -117,17 +117,16 @@ class AbstractRoot(AbstractLinearization):
 class AbstractOde(AbstractLinearization):
     """Interface for linearizations of ODEs."""
 
-    def __init__(self, vf, /, *, ode_order) -> None:
+    def __init__(self, vf) -> None:
         self.vector_field = vf
-        self.ode_order = ode_order
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(ode_order={self.ode_order})"
+        return f"{self.__class__.__name__}({self.vector_field})"
 
     @property
     def root_order(self):
         """The order of the root constraint."""
-        return self.ode_order + 1
+        return self.vector_field.num_derivatives_in_args + 1
 
 
 class AbstractLinearizationFactory(abc.ABC):
