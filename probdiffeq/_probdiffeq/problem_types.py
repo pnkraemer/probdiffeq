@@ -18,7 +18,7 @@ Examples
 >>> def f(y, *, t):
 ...     return y
 >>>
->>> print(ode(f))
+>>> print(ode_vector_field(f))
 JetFunction(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10))
 
 Among other things, the vector field wrappers ensure that all internal representations
@@ -27,7 +27,7 @@ the internal representation does not match the user-specified one.
 
 >>> print(inspect.signature(f))
 (y, *, t)
->>> print(inspect.signature(ode(f)))
+>>> print(inspect.signature(ode_vector_field(f)))
 (*, jet_coords: collections.abc.Sequence[~T], t: jax.Array) -> ~T
 
 This API difference is more pronounced for higher-order problems:
@@ -35,19 +35,19 @@ This API difference is more pronounced for higher-order problems:
 >>> def f_second_order(y, dy, /, *, t):
 ...     return y + dy
 >>>
->>> print(ode_second_order(f_second_order))
+>>> print(ode_vector_field_second_order(f_second_order))
 JetFunction(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10))
 >>>
 >>> print(inspect.signature(f_second_order))
 (y, dy, /, *, t)
->>> print(inspect.signature(ode_second_order(f)))
+>>> print(inspect.signature(ode_vector_field_second_order(f_second_order)))
 (*, jet_coords: collections.abc.Sequence[~T], t: jax.Array) -> ~T
 
 """
 
 from probdiffeq._probdiffeq import jacobians, utilities
-from probdiffeq.backend import func, inspect, tree
-from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeVar
+from probdiffeq.backend import func, tree
+from probdiffeq.backend.typing import Array, Protocol, Sequence, TypeVar
 
 T = TypeVar("T")
 
@@ -101,7 +101,7 @@ class JetFunction:
         return f"{self.__class__.__name__}(num_derivatives_in_args={self.num_derivatives_in_args}, jacobian={self.jacobian})"
 
     def __call__(self, *, jet_coords: Sequence[T], t: Array) -> T:
-        # jet_coords = (u, u', u'', ..., u^(K))
+        # jet_coords = (u(t), u'(t), u''(t), ..., u^(K)(t))
         return self._func(jet_coords=jet_coords, t=t)
 
     @classmethod
@@ -255,59 +255,3 @@ def jet_lift(jetfun: JetFunction, lift_by: int):
     return JetFunction(
         jetfun_lifted, num_derivatives_in_args=order, jacobian=jetfun.jacobian
     )
-
-
-def _verify_vector_field_signature_and_parse_order(vf: Callable) -> int:
-    """Parse the vector-field structure from its signature."""
-    sig = inspect.signature(vf)
-    params = list(sig.parameters.values())
-
-    POSITIONAL = (
-        inspect.Parameter.POSITIONAL_ONLY,
-        inspect.Parameter.POSITIONAL_OR_KEYWORD,
-    )
-    KEYWORD = (inspect.Parameter.KEYWORD_ONLY,)
-
-    def is_positional(p):
-        return p.kind in POSITIONAL
-
-    def is_keyword(p):
-        return p.kind in KEYWORD
-
-    state_args = [p for p in params if is_positional(p)]
-
-    msg = f"""The dynamics' signature is not compatible with the constraint.
-
-    More precisely, the dynamics are expected to look like
-
-      - f(u, /, *, t),
-      - f(u, du, /, *, t),
-      - f(u, du, ddu, /, *, t),
-
-    and so on, where the number of positional arguments
-    specifies the order of the problem.
-    Replace `u`, `du`, and so on with any variable name of your choosing
-    but mind the keyword-only argument 't' in the signatures above.
-
-    That said, the arguments
-
-    {[(p.name, p.kind) for p in params]}
-
-    have been detected in the dynamics function.
-
-    Try wrapping the vector field through a pure Python function
-    with the correct arguments before passing it to the ODE constraint.
-
-      - No *args or **kwargs
-      - No functools.partial
-
-    """
-
-    contains_no_positional = len(state_args) == 0
-    t_is_not_keyword = not any(is_keyword(p) and p.name == "t" for p in params)
-    contains_keyword_other_than_t = any(is_keyword(p) and p.name != "t" for p in params)
-
-    if contains_no_positional or t_is_not_keyword or contains_keyword_other_than_t:
-        raise TypeError(msg)
-
-    return len(state_args)

@@ -8,8 +8,8 @@ from probdiffeq.backend import func, np, testing
 def test_daejet_matches_expectation_on_sir_model(num):
 
     y0 = [np.asarray([0.99, 0.01, 0.0])]
-    jetexpand = probdiffeq.jetexpand_ode_unroll(num=num)
-    expected, _ = jetexpand(vf_ode, y0, t=0.0)
+    jetexpand_ode = probdiffeq.jetexpand_ode_unroll(num=num)
+    expected, _ = jetexpand_ode(vf_ode, y0, t=0.0)
 
     dae = probdiffeq.dae(differential=differential, algebraic=algebraic)
     eps = np.finfo_eps(y0[0].dtype)
@@ -29,8 +29,8 @@ def test_daejet_recursive_matches_expectation_on_sir_model(num_strides, stride):
     # whereas robertson would require double
 
     y0 = [np.asarray([0.99, 0.01, 0.0])]
-    jetexpand = probdiffeq.jetexpand_ode_unroll(num=num_strides * stride)
-    expected, _ = jetexpand(vf_ode, y0, t=0.0)
+    jetexpand_ode = probdiffeq.jetexpand_ode_unroll(num=num_strides * stride)
+    expected, _ = jetexpand_ode(vf_ode, y0, t=0.0)
 
     eps = np.finfo_eps(y0[0].dtype)
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=3, tol=eps)

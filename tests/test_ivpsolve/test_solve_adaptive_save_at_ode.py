@@ -8,7 +8,6 @@ from probdiffeq.backend.typing import Callable
 @testing.fixture(name="ivp")
 def ivp_lotka_volterra():
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
-    vf = probdiffeq.ode_vector_field(vf)
     return vf, (u0,), (t0, t1)
 
 
@@ -27,7 +26,7 @@ class Factory:
     prior: Callable = probdiffeq.prior_wiener_integrated
     strategy: Callable = probdiffeq.strategy_filter
     solver: Callable = probdiffeq.solver
-    jacobian: jacobians.JacobianHandler = probdiffeq.jacobian_materialize
+    jacobian: probdiffeq.JacobianHandler = probdiffeq.jacobian_materialize()
 
     # ts1 default because it uses more backend functions (eg Jacobians)
     # so the tests gain relevance
@@ -108,33 +107,30 @@ def case_factory_constraint_ode_ts1():
 @testing.case
 @testing.parametrize("jacfun", [func.jacfwd, func.jacrev])
 def case_factory_jacobian_materialize(jacfun):
-    jacobian = probdiffeq.jacobian_materialize(jacfun=jacfun)
-    return Factory(constraint=probdiffeq.constraint_ode_ts0, jacobian=jacobian)
+    return Factory(jacobian=probdiffeq.jacobian_materialize(jacfun=jacfun))
 
 
 @testing.case
 def case_factory_jacobian_hutchinson_fwd():
-    jacobian = probdiffeq.jacobian_hutchinson_fwd()
-    return Factory(constraint=probdiffeq.constraint_ode_ts0, jacobian=jacobian)
+    return Factory(jacobian=probdiffeq.jacobian_hutchinson_fwd())
 
 
 @testing.case
 def case_factory_jacobian_hutchinson_rev():
-    jacobian = probdiffeq.jacobian_hutchinson_rev()
-    return Factory(constraint=probdiffeq.constraint_ode_ts0, jacobian=jacobian)
+    return Factory(jacobian=probdiffeq.jacobian_hutchinson_rev())
 
 
 @testing.case
 def case_factory_constraint_root_ts1(ivp):
     vf, _u0, (_t0, _t1) = ivp
+    vf = probdiffeq.ode_vector_field(vf)
 
     # Always materialize to stabilise blockdiagonal/isotropic TS1
     jacobian = probdiffeq.jacobian_materialize()
 
+    @func.partial(probdiffeq.root_state_and_velocity, jacobian=jacobian)
     def root(u, du, /, *, t):
         return tree.tree_map(lambda a, b: a - b, du, vf(jet_coords=(u,), t=t))
-
-    root = probdiffeq.root_state_and_velocity(root, jacobian=jacobian)
 
     def constraint_residual(vf, **kwargs):
         try:
@@ -177,6 +173,7 @@ def case_factory_error_residual_std_not_cached():
 def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
     vf, u0, (t0, t1) = ivp
 
+    vf = probdiffeq.ode_vector_field(vf, jacobian=factory.jacobian)
     ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
 
     # Build a solver

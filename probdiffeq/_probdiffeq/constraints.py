@@ -18,14 +18,14 @@ DenseOdeTs1(JetFunction(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_
 
 Implement high-order ODEs by passing a vector field with additional arguments as such:
 
->>> @probdiffeq.ode_vector_field
-... def vf(u, du, ddu, /, *, t):
-...     return -ddu
+>>> @probdiffeq.ode_vector_field_second_order
+... def vf(u, du, /, *, t):
+...     return -du
 >>>
 >>> ssm = probdiffeq.state_space_model("isotropic")
 >>> constraint = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
 >>> print(constraint)
-IsotropicOdeTs0(JetFunction(num_derivatives_in_args=3, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
+IsotropicOdeTs0(JetFunction(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
 
 
 Or, use the constraint as a decorator
@@ -33,7 +33,7 @@ Or, use the constraint as a decorator
 >>> import functools
 >>>
 >>> @functools.partial(probdiffeq.constraint_ode_ts0, ssm=ssm)
-... @probdiffeq.ode_vector_field
+... @probdiffeq.ode_vector_field_second_order
 ... def ode(u, du, /, *, t):
 ...     return -du
 >>>
