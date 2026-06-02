@@ -160,11 +160,10 @@ def constraint_ode_ts1(vf: vector_fields.JetFunction, /, *, ssm: ssm_impl.FactSs
 
 
 def constraint(
-    root,
+    root: vector_fields.JetFunction,
     *,
     ssm: ssm_impl.FactSsmImpl,
     linearization: linearizations.Linearization | None = None,
-    # jet_order: int | Literal["max"] = "max",
 ):
     r"""Construct a general constraint.
 
@@ -194,9 +193,12 @@ def constraint(
         Adjust this variable to use posterior linearization (also known as iterated filtering).
 
     """
+    if not isinstance(root, vector_fields.JetFunction):
+        raise TypeError(root)
+
     if linearization is None:
         linearization = linearizations.linearization_prior_mean()
-    return ssm.linearize.root(root, linearization=linearization)
+    return ssm.linearize.root(root=root, linearization=linearization)
 
 
 def constraint_dae(

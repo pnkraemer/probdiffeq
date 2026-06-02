@@ -27,6 +27,8 @@ def case_solver_dynamic():
 def test_output_matches_reference(ivp, solver_factory, derivatives, ssm_fact) -> None:
     vf, (u0,), (t0, t1) = ivp
 
+    @func.partial(probdiffeq.jet_lift, lift_by=derivatives - 1)
+    @probdiffeq.implicit
     def root(u, du, *, t):
         return tree.tree_map(
             lambda a, b: a + b, root_linear(u, du, t=t), root_nonlinear(u, du, t=t)
@@ -40,9 +42,8 @@ def test_output_matches_reference(ivp, solver_factory, derivatives, ssm_fact) ->
         vfu = vf(u, t=t)
         return tree.tree_map(lambda a: -a, vfu)
 
-    expected = probdiffeq.jetexpand_ode_padded_scan(
-        lambda y: vf(y, t=t0), [u0], num=derivatives
-    )
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=derivatives)
+    expected = jetexpand(probdiffeq.ode(vf), [u0], t=t0)
 
     # Build an SSM (no ODE-jets, so that we can test the update at init)
     # Only use the dense factorisation because this test uses JET constraints
