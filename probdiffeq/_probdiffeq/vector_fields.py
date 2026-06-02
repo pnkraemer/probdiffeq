@@ -132,7 +132,6 @@ class DAESystem:
     def __init__(self, differential: JetFunction, algebraic: JetFunction):
         self.differential = differential
         self.algebraic = algebraic
-        assert differential.num_derivatives_in_args == algebraic.num_derivatives_in_args
 
     def __repr__(self):
         return f"{self.__class__.__name__}(differential={self.differential}, algebraic={self.algebraic})"

@@ -3,11 +3,11 @@ from probdiffeq.backend import linalg, np, tree
 __all__ = ["dt0", "dt0_adaptive"]
 
 
-def dt0(vf_autonomous, initial_values, /, scale=0.01, nugget=1e-5):
+def dt0(vf, initial_values, /, scale=0.01, nugget=1e-5, **vf_kwargs):
     """Propose an initial time-step."""
-    u0, *_ = initial_values
-    f0 = vf_autonomous(*initial_values)
+    f0 = vf(jet_coords=initial_values, **vf_kwargs)
 
+    u0, *_ = initial_values
     u0, _ = tree.ravel_pytree(u0)
     f0, _ = tree.ravel_pytree(f0)
 

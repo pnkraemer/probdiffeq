@@ -13,7 +13,9 @@ from probdiffeq.backend import func, np, ode, testing
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
 def case_solve_fixed_grid(fact):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
-    tcoeffs = probdiffeq.jetexpand_ode_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
+    vf = probdiffeq.ode(vf)
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
+    tcoeffs = jetexpand(vf, u0, t=t0)
 
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
@@ -35,8 +37,10 @@ def case_simulate_terminal_values(fact):
     # Since simulate_terminal_values calls simulate_save_at,
     # this test-case covers both solvers
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
-    dt0 = ivpsolve.dt0(lambda y: vf(y, t=t0), u0)
-    tcoeffs = probdiffeq.jetexpand_ode_padded_scan(lambda y: vf(y, t=t0), u0, num=4)
+    vf = probdiffeq.ode(vf)
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
+    tcoeffs = jetexpand(vf, u0, t=t0)
+    dt0 = ivpsolve.dt0(vf, u0, t=t0)
 
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)

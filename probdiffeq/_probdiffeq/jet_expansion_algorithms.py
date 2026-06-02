@@ -164,7 +164,7 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg:
         taylor_coeffs = [*inits, vf(jet_coords=inits, t=t)]
         for _ in range(num - 1):
             g_n = _fwd_recursion_iterate(fun_n=g_n, fun_0=g_0)
-            taylor_coeffs = [*taylor_coeffs, g_n(u=inits)]
+            taylor_coeffs = [*taylor_coeffs, g_n(jet_coords=inits)]
         return taylor_coeffs
 
     return expand
@@ -173,12 +173,14 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg:
 def _fwd_recursion_iterate(*, fun_n, fun_0):
     r"""Increment $F_{n+1}(x) = \langle (JF_n)(x), f_0(x) \rangle$."""
 
-    def df(*, u: Sequence[T]) -> Sequence[T]:
+    def df(*, jet_coords: Sequence[T]) -> Sequence[T]:
         # Assign primals and tangents for the JVP
-        vals = (*u, fun_0(u=u))
+        vals = (*jet_coords, fun_0(jet_coords=jet_coords))
         primals_in, tangents_in = vals[:-1], vals[1:]
 
-        _, tangents_out = func.jvp(lambda *a: fun_n(u=a), primals_in, tangents_in)
+        _, tangents_out = func.jvp(
+            lambda *a: fun_n(jet_coords=a), primals_in, tangents_in
+        )
         return tangents_out
 
     return tree.Partial(df)
@@ -378,6 +380,7 @@ def jetexpand_dae_nlstsq_recursive(num_strides: int, stride: int, nlstsq: Callab
 def jetexpand_dae_nlstsq(num: int, nlstsq: Callable) -> JetExpansionAlg:
     """Evaluate the Taylor series of a differential-algebraic equation system."""
 
+    # TODO: don't try too hard to refactor this one here, I dont think it'll be around for long
     # TODO: enable pytree inputs/outputs
     # TODO: raise error if DAE has the wrong type
     def expand(
@@ -420,7 +423,7 @@ def jetexpand_dae_nlstsq(num: int, nlstsq: Callable) -> JetExpansionAlg:
                 tcoeffs_all, dae.differential.num_derivatives_in_args
             )
             primals1, series1 = func.jet(
-                lambda *s: dae.differential(u=s, t=t), ps, ss, is_tcoeff=False
+                lambda *s: dae.differential(jet_coords=s, t=t), ps, ss, is_tcoeff=False
             )
 
             # Algebraic part
@@ -429,7 +432,7 @@ def jetexpand_dae_nlstsq(num: int, nlstsq: Callable) -> JetExpansionAlg:
                 tcoeffs_all, dae.algebraic.num_derivatives_in_args
             )
             primals2, series2 = func.jet(
-                lambda *s: dae.algebraic(u=s, t=t), ps, ss, is_tcoeff=False
+                lambda *s: dae.algebraic(jet_coords=s, t=t), ps, ss, is_tcoeff=False
             )
 
             # Put together (order doesn't matter)

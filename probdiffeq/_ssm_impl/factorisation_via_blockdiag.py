@@ -237,23 +237,45 @@ class BlockDiagPriorFactory(api.AbstractPriorFactory):
         return np.ones(single_flat.shape)
 
 
+class BlockDiagLinearizationFactory(api.AbstractLinearizationFactory):
+    """Construct a block-diagonal linearization-factory."""
+
+    def root(
+        self,
+        root,
+        *,
+        jacobian,
+        root_order: int | Literal["max"],
+        linearization: Callable | None,
+    ):
+        raise NotImplementedError
+
+    def dae_posterior_linearization(self, *, dae, linearization):
+        raise NotImplementedError
+
+    def ode_taylor_0th(self, *, vector_field):
+        return BlockDiagOdeTs0(vector_field=vector_field)
+
+    def ode_taylor_1st(self, *, vector_field):
+        return BlockDiagOdeTs1(vector_field=vector_field)
+
+
 class BlockDiagOdeTs0(api.AbstractOde):
     """Construct a block-diagonal implementation of ODE-TS0 linearization."""
-
-    def __init__(self, vf, *, ode_order: int) -> None:
-        super().__init__(vf, ode_order=ode_order)
 
     def init_linearization(self) -> None:
         return None
 
     def linearize(self, rv, state: None, *, damp: float, t):
         del state
-        fx = self.vector_field(*(rv.mean[: self.ode_order]), t=t)
+
+        jet_coords = rv.mean[: self.vector_field.num_derivatives_in_args]
+        fx = self.vector_field(jet_coords=jet_coords, t=t)
         fx = tree.tree_map(lambda s: -s, fx)
         bias = BlockDiagNormal.from_dirac([fx], damp=damp)
 
         def a1(s):
-            return s[[self.ode_order], ...]
+            return s[[self.vector_field.num_derivatives_in_args], ...]
 
         linop = func.vmap(func.jacrev(a1))(rv.mean_flat)
 
@@ -305,26 +327,6 @@ class BlockDiagOdeTs1(api.AbstractOde):
         bias = BlockDiagNormal.from_dirac([fx], damp=damp)
         cond = api.LatentCond.from_linop_and_noise(linop, bias)
         return cond, state
-
-
-class BlockDiagLinearizationFactory(api.AbstractLinearizationFactory):
-    """Construct a block-diagonal linearization-factory."""
-
-    def root(
-        self,
-        root,
-        *,
-        jacobian,
-        root_order: int | Literal["max"],
-        linearization: Callable | None,
-    ):
-        raise NotImplementedError
-
-    def ode_taylor_0th(self, vf, *, ode_order):
-        return BlockDiagOdeTs0(vf, ode_order=ode_order)
-
-    def ode_taylor_1st(self, vf, *, ode_order, jacobian):
-        return BlockDiagOdeTs1(vf, ode_order=ode_order, jacobian=jacobian)
 
 
 class BlockDiagConditional(api.AbstractConditional):

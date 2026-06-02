@@ -407,29 +407,47 @@ class IsotropicPriorFactory(api.AbstractPriorFactory):
         return np.ones(())
 
 
+class IsotropicLinearizationFactory(api.AbstractLinearizationFactory):
+    """Construct an isotropic linearization-factory."""
+
+    def root(
+        self,
+        root,
+        *,
+        jacobian,
+        root_order: int | Literal["max"],
+        linearization: Callable | None,
+    ):
+        raise NotImplementedError
+
+    def dae_posterior_linearization(self, *, dae, linearization):
+        raise NotImplementedError
+
+    def ode_taylor_1st(self, *, vector_field):
+        return IsotropicOdeTs1(vector_field=vector_field)
+
+    def ode_taylor_0th(self, *, vector_field):
+        return IsotropicOdeTs0(vector_field=vector_field)
+
+
 class IsotropicOdeTs0(api.AbstractOde):
     """Construct an isotropic implementation of ODE-TS0 linearization."""
-
-    def __init__(self, vf, *, ode_order) -> None:
-        super().__init__(vf, ode_order=ode_order)
-
-    @property
-    def root_order(self):
-        return self.ode_order + 1
 
     def init_linearization(self) -> None:
         return None
 
     def linearize(self, rv, state: None, *, damp: float, t):
         del state
-        fun = func.partial(self.vector_field, t=t)
         Ms = rv.mean
-        fx_tree = fun(*(Ms[: self.ode_order]))
+        jet_coords = Ms[: self.vector_field.num_derivatives_in_args]
+        fx_tree = self.vector_field(jet_coords=jet_coords, t=t)
         fx = tree.tree_map(lambda s: -s, fx_tree)
 
         bias = IsotropicNormal.from_dirac([fx], damp=damp)
 
-        linop = func.jacrev(lambda s: s[[self.ode_order], ...])(rv.mean_flat[..., 0])
+        linop = func.jacrev(
+            lambda s: s[[self.vector_field.num_derivatives_in_args], ...]
+        )(rv.mean_flat[..., 0])
         cond = api.LatentCond.from_linop_and_noise(linop, bias)
         return cond, None
 
@@ -479,26 +497,6 @@ class IsotropicOdeTs1(api.AbstractOde):
         noise = IsotropicNormal.from_dirac(fx, damp=damp)
         cond = api.LatentCond.from_linop_and_noise(linop, noise)
         return cond, state
-
-
-class IsotropicLinearizationFactory(api.AbstractLinearizationFactory):
-    """Construct an isotropic linearization-factory."""
-
-    def root(
-        self,
-        root,
-        *,
-        jacobian,
-        root_order: int | Literal["max"],
-        linearization: Callable | None,
-    ):
-        raise NotImplementedError
-
-    def ode_taylor_1st(self, vf, *, ode_order, jacobian):
-        return IsotropicOdeTs1(vf, jacobian=jacobian, ode_order=ode_order)
-
-    def ode_taylor_0th(self, vf, *, ode_order):
-        return IsotropicOdeTs0(vf, ode_order=ode_order)
 
 
 class IsotropicConditional(api.AbstractConditional):

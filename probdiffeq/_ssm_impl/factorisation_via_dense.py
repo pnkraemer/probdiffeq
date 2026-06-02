@@ -470,7 +470,7 @@ class DenseOdeTs0(api.AbstractOde):
 
         Ms = rv.mean
 
-        fm = self.vector_field(u=Ms[:ode_order], t=t)
+        fm = self.vector_field(jet_coords=Ms[:ode_order], t=t)
         fx = tree.tree_map(lambda s: -s, [fm])
         linop = func.jacrev(a1)(rv.mean_flat)
         noise = DenseNormal.from_dirac(fx, damp=damp)
@@ -496,7 +496,7 @@ class DenseOdeTs1(api.AbstractOde):
 
         def vf_flat(s: Array) -> Array:
             [s0] = rv0.tree_flatten.unflatten_array(s)
-            fs0 = self.vector_field(u=[s0], t=t)
+            fs0 = self.vector_field(jet_coords=[s0], t=t)
             return rv0.tree_flatten.flatten_tree([fs0])
 
         def select_i(i) -> Callable[[Array], Array]:
@@ -612,17 +612,6 @@ class DenseDAEPosteriorLinearization(api.AbstractDAEPosteriorLinearization):
             constraint_flat, mean, state
         )
         fx = fx - linop @ mean
-
-        # # Find the tree structure of the output constraint
-        # # (So that we can unravel the bias term and always work in the correct
-        # # pytree structure.)
-        # m_tree = rv.mean
-        # relevant_tcoeffs = m_tree[: self.root.num_derivatives_in_args]
-        # root_eval = func.eval_shape(lambda s: [self.root(u=s, t=t)], relevant_tcoeffs)
-
-        # # Ensure that unravelling does not yield a ShapeDtypeStruct
-        # root_eval = tree.tree_map(np.zeros_like, root_eval)
-        # _, unravel = tree.ravel_pytree(root_eval)
 
         # Turn the linearization into a conditional
         noise = DenseNormal.from_dirac([fx], damp=damp)
