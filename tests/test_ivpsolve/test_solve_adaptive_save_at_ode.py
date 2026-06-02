@@ -31,7 +31,7 @@ class Factory:
 
     # ts1 default because it uses more backend functions (eg Jacobians)
     # so the tests gain relevance
-    constraint: Callable = probdiffeq.constraint_ode_ts1
+    constraint: Callable = probdiffeq.constraint_ode_ts0
     error: Callable = probdiffeq.error_residual_std
 
 
@@ -109,19 +109,19 @@ def case_factory_constraint_ode_ts1():
 @testing.parametrize("jacfun", [func.jacfwd, func.jacrev])
 def case_factory_jacobian_materialize(jacfun):
     jacobian = probdiffeq.jacobian_materialize(jacfun=jacfun)
-    return Factory(jacobian=jacobian)
+    return Factory(constraint=probdiffeq.constraint_ode_ts0, jacobian=jacobian)
 
 
 @testing.case
 def case_factory_jacobian_hutchinson_fwd():
     jacobian = probdiffeq.jacobian_hutchinson_fwd()
-    return Factory(jacobian=jacobian)
+    return Factory(constraint=probdiffeq.constraint_ode_ts0, jacobian=jacobian)
 
 
 @testing.case
 def case_factory_jacobian_hutchinson_rev():
     jacobian = probdiffeq.jacobian_hutchinson_rev()
-    return Factory(jacobian=jacobian)
+    return Factory(constraint=probdiffeq.constraint_ode_ts0, jacobian=jacobian)
 
 
 @testing.case
@@ -132,7 +132,7 @@ def case_factory_constraint_root_ts1(ivp):
     jacobian = probdiffeq.jacobian_materialize()
 
     def root(u, du, /, *, t):
-        return tree.tree_map(lambda a, b: a - b, du, vf(u=(u,), t=t))
+        return tree.tree_map(lambda a, b: a - b, du, vf(jet_coords=(u,), t=t))
 
     root = probdiffeq.implicit(root, jacobian=jacobian)
 

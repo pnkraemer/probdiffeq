@@ -1,6 +1,6 @@
 from probdiffeq._ssm_impl import api, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
-from probdiffeq.backend.typing import Any, Array, Callable, Literal, Sequence, TypeVar
+from probdiffeq.backend.typing import Any, Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
 
 __all__ = [
@@ -240,14 +240,7 @@ class BlockDiagPriorFactory(api.AbstractPriorFactory):
 class BlockDiagLinearizationFactory(api.AbstractLinearizationFactory):
     """Construct a block-diagonal linearization-factory."""
 
-    def root(
-        self,
-        root,
-        *,
-        jacobian,
-        root_order: int | Literal["max"],
-        linearization: Callable | None,
-    ):
+    def root(self, *, root, linearization: Callable | None):
         raise NotImplementedError
 
     def dae_posterior_linearization(self, *, dae, linearization):
@@ -257,6 +250,10 @@ class BlockDiagLinearizationFactory(api.AbstractLinearizationFactory):
         return BlockDiagOdeTs0(vector_field=vector_field)
 
     def ode_taylor_1st(self, *, vector_field):
+        if vector_field.num_derivatives_in_args > 2:
+            msg = "This linearization is not compatible with high-order ODEs as of yet."
+            raise ValueError(msg)
+
         return BlockDiagOdeTs1(vector_field=vector_field)
 
 
@@ -286,18 +283,10 @@ class BlockDiagOdeTs0(api.AbstractOde):
 class BlockDiagOdeTs1(api.AbstractOde):
     """Construct a block-diagonal implementation of ODE-TS1 linearization."""
 
-    def __init__(self, vf, *, ode_order: int, jacobian: Any) -> None:
-        if ode_order > 1:
-            msg = "This linearization is not compatible with high-order ODEs as of yet."
-            raise ValueError(msg)
-        super().__init__(vf, ode_order=1)
-        self.jacobian = jacobian
-
     def init_linearization(self):
-        return self.jacobian.init_jacobian_handler()
+        return self.vector_field.jacobian.init_jacobian_handler()
 
     def linearize(self, rv, state, *, damp: float, t):
-        fun = func.partial(self.vector_field, t=t)
 
         m0_tree = rv.mean[0]
         rv0 = BlockDiagNormal.from_dirac([m0_tree], damp=0.0)
@@ -309,12 +298,14 @@ class BlockDiagOdeTs1(api.AbstractOde):
 
         def vf_flat(u):
             u_tree = rv0.tree_flatten.unflatten_array(u[:, None])
-            fu_tree = fun(*u_tree)
+            fu_tree = self.vector_field(jet_coords=u_tree, t=t)
             return rv0.tree_flatten.flatten_tree([fu_tree]).reshape((-1,))
 
         # Evaluate the linearisation
         m0 = rv.mean_flat[:, 0]
-        fx, J_diag, state = self.jacobian.calculate_diagonal(vf_flat, m0, state)
+        fx, J_diag, state = self.vector_field.jacobian.calculate_diagonal(
+            vf_flat, m0, state
+        )
 
         E1 = func.jacrev(lambda s: s[0])(rv.mean_flat[0])
         linop = linop - J_diag[:, None, None] * E1[None, None, :]
