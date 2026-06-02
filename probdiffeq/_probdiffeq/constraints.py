@@ -6,7 +6,7 @@ Examples
 
 Construct ODE constraints as such:
 
->>> @probdiffeq.ode
+>>> @probdiffeq.ode_vector_field
 ... def vf(u, /, *, t):
 ...     return -u
 >>>
@@ -18,7 +18,7 @@ DenseOdeTs1(JetFunction(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_
 
 Implement high-order ODEs by passing a vector field with additional arguments as such:
 
->>> @probdiffeq.ode
+>>> @probdiffeq.ode_vector_field
 ... def vf(u, du, ddu, /, *, t):
 ...     return -ddu
 >>>
@@ -33,7 +33,7 @@ Or, use the constraint as a decorator
 >>> import functools
 >>>
 >>> @functools.partial(probdiffeq.constraint_ode_ts0, ssm=ssm)
-... @probdiffeq.ode
+... @probdiffeq.ode_vector_field
 ... def ode(u, du, /, *, t):
 ...     return -du
 >>>
@@ -53,7 +53,7 @@ __all__ = [
     "constraint_dae",
     "constraint_ode_ts0",
     "constraint_ode_ts1",
-    "constraint_residual",
+    "constraint_root",
 ]
 
 C = TypeVar("C", bound=Sequence)
@@ -158,7 +158,7 @@ def constraint_ode_ts1(vf: problem_types.JetFunction, /, *, ssm: ssm_impl.FactSs
     return ssm.linearize.ode_taylor_1st(vector_field=vf)
 
 
-def constraint_residual(
+def constraint_root(
     root: problem_types.JetFunction,
     *,
     ssm: ssm_impl.FactSsmImpl,

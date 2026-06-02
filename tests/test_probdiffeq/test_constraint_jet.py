@@ -24,7 +24,7 @@ class Root:
 @testing.fixture(name="root")
 def fixture_root_sir():
 
-    def root(u, du, *, t):
+    def root(u, du, /, *, t):
         linear = imex_linear(u, du, t=t)
         nonlinear = imex_nonlinear(u, du, t=t)
         return linear + nonlinear
@@ -85,12 +85,13 @@ def fixture_root_sir():
 @testing.fixture(name="expected")
 @testing.parametrize("derivatives", [1, 5])
 def fixture_expected(root, derivatives):
-    @probdiffeq.ode
+    @probdiffeq.ode_vector_field
     def vf(y, /, *, t):
         return root.ode_vf(y, t=t)
 
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=derivatives)
-    return jetexpand(vf, [root.u0], t=root.t0)
+    coeffs, _ = jetexpand(vf, [root.u0], t=root.t0)
+    return coeffs
 
 
 def case_jet_dae_iterated(root):
@@ -98,9 +99,10 @@ def case_jet_dae_iterated(root):
     linearization = probdiffeq.linearization_map(nlstsq)
 
     def constraint_residual(ssm, lift_by: int):
-        differential = probdiffeq.residual(root.root_dae_differential)
+        differential = probdiffeq.root_state_and_velocity(root.root_dae_differential)
         differential = probdiffeq.jet_lift(differential, lift_by=lift_by)
-        algebraic = probdiffeq.residual(root.root_dae_algebraic)
+
+        algebraic = probdiffeq.root_state(root.root_dae_algebraic)
         algebraic = probdiffeq.jet_lift(algebraic, lift_by=lift_by + 1)
         dae = probdiffeq.dae(differential, algebraic)
 
@@ -113,10 +115,10 @@ def case_jet_constraint_iterated(root):
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     linearization = probdiffeq.linearization_map(nlstsq)
 
-    def constraint_residual(ssm, lift_by):
-        implicit = probdiffeq.residual(root.root)
+    def constraint_residual(ssm, lift_by: int):
+        implicit = probdiffeq.root_state_and_velocity(root.root)
         implicit = probdiffeq.jet_lift(implicit, lift_by=lift_by)
-        return probdiffeq.constraint_residual(
+        return probdiffeq.constraint_root(
             implicit, ssm=ssm, linearization=linearization
         )
 

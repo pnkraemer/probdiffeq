@@ -17,14 +17,17 @@ __all__ = [
 
 
 T = TypeVar("T")
+F = TypeVar(
+    "F", bound=problem_types.JetFunction | problem_types.DAESystem, contravariant=True
+)
 
 
-class JetExpansionAlg(Protocol):
+class JetExpansionAlg(Protocol[F]):
     """A protocol for methods that evaluate Taylor series' of IVPs from initial conditions."""
 
     def __call__(
-        self, vf: Callable, inits: Sequence[T], /, *, t: float | Array
-    ) -> Sequence[T]:
+        self, vf: F, inits: Sequence[T], /, *, t: float
+    ) -> tuple[list[T], dict]:
         """Evaluate the Taylor series of an IVP.
 
         Parameters
@@ -47,7 +50,9 @@ class JetExpansionAlg(Protocol):
         """
 
 
-def jetexpand_ode_padded_scan(*, num: int) -> JetExpansionAlg:
+def jetexpand_ode_padded_scan(
+    *, num: int
+) -> JetExpansionAlg[problem_types.JetFunction]:
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `jetexpand_ode_unroll()`, this function implements the loop via a scan,
@@ -61,9 +66,11 @@ def jetexpand_ode_padded_scan(*, num: int) -> JetExpansionAlg:
 
     @_error_if_vf_not_odefunction_type
     @_allow_pytree_inits
-    def expand(vf: Callable, inits: Sequence[T], /, *, t: float | Array) -> Sequence[T]:
+    def expand(
+        vf: problem_types.JetFunction, inits: Sequence[T], /, *, t: float
+    ) -> tuple[list[T], dict]:
         if num == 0:
-            return inits
+            return list(inits), {}
 
         # Number of positional arguments in f
         num_arguments = len(inits)
@@ -71,6 +78,11 @@ def jetexpand_ode_padded_scan(*, num: int) -> JetExpansionAlg:
         # Initial Taylor series (u_0, u_1, ..., u_k)
         primals = vf(jet_coords=inits, t=t)
         taylor_coeffs = [*inits, primals]
+
+        # Early exit for num=1.
+        #  Why? because zero-length scan and disable_jit() don't work together.
+        if num == 1:
+            return taylor_coeffs, {}
 
         increment = jetexpand_ode_coefficient_increment(num_arguments=num_arguments)
 
@@ -87,14 +99,9 @@ def jetexpand_ode_padded_scan(*, num: int) -> JetExpansionAlg:
         zeros = np.zeros_like(primals)
         taylor_coeffs = _pad_to_length(taylor_coeffs, length=num_outputs, value=zeros)
 
-        # Early exit for num=1.
-        #  Why? because zero-length scan and disable_jit() don't work together.
-        if num == 1:
-            return taylor_coeffs
-
         # Compute all coefficients with scan().
         taylor_coeffs, _ = flow.scan(body, init=taylor_coeffs, xs=None, length=num - 1)
-        return taylor_coeffs
+        return taylor_coeffs, {}
 
     return expand
 
@@ -103,7 +110,7 @@ def _pad_to_length(x, /, *, length, value):
     return x + [value] * (length - len(x))
 
 
-def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg:
+def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg[problem_types.JetFunction]:
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `jetexpand_ode_padded_scan()`, this function does not depend on zero-padding
@@ -121,28 +128,49 @@ def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg:
 
     @_error_if_vf_not_odefunction_type
     @_allow_pytree_inits
-    def expand(vf: Callable, inits: Sequence[T], /, *, t: float | Array) -> Sequence[T]:
+    def expand(
+        vf: problem_types.JetFunction, inits: Sequence[T], /, *, t: float
+    ) -> tuple[list[T], dict]:
         inits = tree.tree_map(np.asarray, inits)
 
         if num == 0:
-            return inits
+            return list(inits), {}
 
         # Number of positional arguments in f
         num_arguments = len(inits)
+
+        increment = jetexpand_ode_coefficient_increment(num_arguments=num_arguments)
 
         # Initial Taylor series (u_0, u_1, ..., u_k)
         primals = vf(jet_coords=inits, t=t)
         taylor_coeffs = [*inits, primals]
 
-        increment = jetexpand_ode_coefficient_increment(num_arguments=num_arguments)
         for _ in range(num - 1):
             taylor_coeffs = increment(vf, taylor_coeffs, t=t)
-        return taylor_coeffs
+        return taylor_coeffs, {}
 
     return expand
 
 
-def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg:
+def jetexpand_ode_coefficient_increment(*, num_arguments):
+    """Construct a method that increments Taylor series' of an ODE."""
+
+    def increment(
+        vf: problem_types.JetFunction, taylor_coeffs: Sequence[T], *, t: float
+    ) -> list[T]:
+        def vf_with_kwargs(*u: *tuple[T, ...]) -> T:
+            return vf(jet_coords=u, t=t)
+
+        primals, series = utilities.jet_coords_to_primals_and_series(
+            taylor_coeffs, num_arguments
+        )
+        p, s_new = func.jet(vf_with_kwargs, primals=primals, series=series)
+        return [*primals, p, *s_new]
+
+    return increment
+
+
+def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg[problem_types.JetFunction]:
     """Taylor-expand the solution of an IVP with recursive forward-mode differentiation.
 
     !!! warning "Compilation time"
@@ -153,10 +181,10 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg:
     @_error_if_vf_not_odefunction_type
     @_allow_pytree_inits
     def expand(
-        vf: problem_types.JetFunction, inits: Sequence[T], /, *, t: float | Array
-    ) -> Sequence[T]:
+        vf: problem_types.JetFunction, inits: Sequence[T], /, *, t: float
+    ) -> tuple[list[T], dict]:
         if num == 0:
-            return inits
+            return list(inits), {}
 
         vf_wrapped = func.partial(vf, t=t)
         g_n, g_0 = vf_wrapped, vf_wrapped
@@ -165,7 +193,7 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg:
         for _ in range(num - 1):
             g_n = _fwd_recursion_iterate(fun_n=g_n, fun_0=g_0)
             taylor_coeffs = [*taylor_coeffs, g_n(jet_coords=inits)]
-        return taylor_coeffs
+        return taylor_coeffs, {}
 
     return expand
 
@@ -186,7 +214,9 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
     return tree.Partial(df)
 
 
-def jetexpand_ode_doubling_unroll(*, num_doublings: int) -> JetExpansionAlg:
+def jetexpand_ode_doubling_unroll(
+    *, num_doublings: int
+) -> JetExpansionAlg[problem_types.JetFunction]:
     """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -202,41 +232,28 @@ def jetexpand_ode_doubling_unroll(*, num_doublings: int) -> JetExpansionAlg:
     # TODO: error on the wrong type
 
     @_allow_pytree_inits
-    def expand(vf: Callable, inits: Sequence[T], /, *, t: float | Array) -> Sequence[T]:
+    def expand(
+        vf: problem_types.JetFunction, inits: Sequence[T], /, *, t: float
+    ) -> tuple[list[T], dict]:
         inits = tree.tree_map(np.asarray, inits)
 
         double = jetexpand_ode_coefficient_double()
         (u0,) = inits  # This asserts ODEs are first-order only. High order is a todo
         taylor_coefficients = [u0]
         for _ in range(num_doublings):
-            taylor_coefficients = double(vf, taylor_coefficients, t=t)
-        return _unnormalise(*taylor_coefficients)
+            taylor_coefficients, _ = double(vf, taylor_coefficients, t=t)
+        return _unnormalise(*taylor_coefficients), {}
 
     return expand
 
 
-def jetexpand_ode_coefficient_increment(*, num_arguments) -> JetExpansionAlg:
-    """Construct a method that increments Taylor series' of an ODE."""
-
-    def increment(vf, taylor_coeffs: Sequence[T], *, t: float | Array) -> Sequence[T]:
-        def vf_with_kwargs(*u: *Sequence[T]) -> T:
-            return vf(jet_coords=u, t=t)
-
-        primals, series = utilities.jet_coords_to_primals_and_series(
-            taylor_coeffs, num_arguments
-        )
-        p, s_new = func.jet(vf_with_kwargs, primals=primals, series=series)
-        return [*primals, p, *s_new]
-
-    return increment
-
-
-def jetexpand_ode_coefficient_double() -> JetExpansionAlg:
+def jetexpand_ode_coefficient_double() -> JetExpansionAlg[problem_types.JetFunction]:
     """Construct a method that doubles Taylor series' lengths of an ODE."""
 
     def double(
-        vf: Callable, taylor_coefficients: Sequence[T], *, t: float | Array
-    ) -> Sequence[T]:
+        vf: problem_types.JetFunction, inits: Sequence[T], *, t: float
+    ) -> tuple[list[T], dict]:
+        taylor_coefficients = inits
         zeros = np.zeros_like(taylor_coefficients[0])
         deg = len(taylor_coefficients)
 
@@ -268,10 +285,11 @@ def jetexpand_ode_coefficient_double() -> JetExpansionAlg:
         xs = [np.arange(0, len(fx[deg : 2 * deg])), fx[deg : 2 * deg]]
         cs_padded, _ = flow.scan(body_fun, xs=xs, init=cs_padded)
 
+        taylor_coefficients = list(taylor_coefficients)
         taylor_coefficients.extend(cs_padded)
-        return taylor_coefficients
+        return taylor_coefficients, {}
 
-    def jet_embedded(vf, *c, degree, t: float | Array):
+    def jet_embedded(vf, *c, degree, t: float):
         """Call a modified jet().
 
         The modifications include:
@@ -303,10 +321,10 @@ def _unnormalise(primals, *series):
 def _error_if_vf_not_odefunction_type(expand):
     """A decorator to check that the vector field is of type JetFunction."""
 
-    def expand_wrapped(vf, inits, /, *, t: float | Array):
+    def expand_wrapped(vf, inits, /, *, t: float):
         if not isinstance(vf, problem_types.JetFunction):
             msg = f"Expected type {problem_types.JetFunction}, but got {vf} of type {type(vf)}. "
-            msg += "Make sure to wrap your vector field with `probdiffeq.ode()`."
+            msg += "Make sure to wrap your vector field with `probdiffeq.ode_vector_field()`."
             raise TypeError(msg)
         return expand(vf, inits, t=t)
 
@@ -316,7 +334,7 @@ def _error_if_vf_not_odefunction_type(expand):
 def _allow_pytree_inits(expand):
     """A decorator to allow pytrees as initial conditions in jet expansion algorithms."""
 
-    def expand_wrapped(vf, inits, /, *, t: float | Array):
+    def expand_wrapped(vf, inits, /, *, t: float):
         """Allow pytrees as initial conditions in jet expansion algorithms.
 
         If the initial conditions are not arrays,
@@ -329,24 +347,21 @@ def _allow_pytree_inits(expand):
 
             if vf.num_derivatives_in_args == 1:
 
-                @probdiffeq.ode
-                def vf_wrapped(y: T, /, *, t) -> T:
+                @probdiffeq.ode_vector_field
+                def vf_wrapped(y: T, /, *, t: float) -> T:
                     y = tree.tree_map(unravel, y)
                     fy = vf(jet_coords=(y,), t=t)
                     return tree.ravel_pytree(fy)[0]
-
             elif vf.num_derivatives_in_args == 2:
 
-                @probdiffeq.ode
-                def vf_wrapped(y: T, dy: T, /, *, t):
+                @probdiffeq.ode_vector_field_second_order
+                def vf_wrapped(y: T, dy: T, /, *, t: float) -> T:
                     y = tree.tree_map(unravel, y)
                     dy = tree.tree_map(unravel, dy)
                     fy = vf(jet_coords=(y, dy), t=t)
                     return tree.ravel_pytree(fy)[0]
-
             else:
-                raise RuntimeError
-
+                raise ValueError
             tcoeffs = expand(vf_wrapped, inits_flat, t=t)
             return tree.tree_map(unravel, tcoeffs)
 
@@ -355,37 +370,41 @@ def _allow_pytree_inits(expand):
     return expand_wrapped
 
 
-def jetexpand_dae_nlstsq_recursive(num_strides: int, stride: int, nlstsq: Callable):
+def jetexpand_dae_nlstsq_recursive(
+    num_strides: int, stride: int, nlstsq: Callable
+) -> JetExpansionAlg[problem_types.DAESystem]:
     """Evaluate the Taylor series of a differential-algebraic equation system.
 
     Like jetexpand_dae_nlstsq(), but called recursively which means that extremely high orders
     can be initialised exactly at the cost of multiple calls to the nonlinear least squares solver.
     """
-    initialize = jetexpand_dae_nlstsq(num=stride, nlstsq=nlstsq)
+    jetexpand = jetexpand_dae_nlstsq(num=stride, nlstsq=nlstsq)
 
     def expand(
-        dae: problem_types.DAESystem, inits: Sequence[T], /, *, t: float | Array
-    ):
-        received = inits
+        dae: problem_types.DAESystem, inits: Sequence[T], /, *, t: float
+    ) -> tuple[list[T], dict]:
+        received = list(inits)
         if num_strides == 0:
             return received, {}
 
         for _ in range(num_strides):
-            received, _info = initialize(dae, received, t=t)
+            received, _info = jetexpand(dae, received, t=t)
         return received, {}
 
     return expand
 
 
-def jetexpand_dae_nlstsq(num: int, nlstsq: Callable) -> JetExpansionAlg:
+def jetexpand_dae_nlstsq(
+    num: int, nlstsq: Callable
+) -> JetExpansionAlg[problem_types.DAESystem]:
     """Evaluate the Taylor series of a differential-algebraic equation system."""
 
     # TODO: don't try too hard to refactor this one here, I dont think it'll be around for long
     # TODO: enable pytree inputs/outputs
     # TODO: raise error if DAE has the wrong type
     def expand(
-        dae: problem_types.DAESystem, inits: Sequence[T], /, *, t: float | Array
-    ):
+        dae: problem_types.DAESystem, inits: Sequence[T], /, *, t: float
+    ) -> tuple[list[T], dict]:
         """Evaluate the Taylor series of a differential-algebraic equation system.
 
         The Taylor coefficients are computed by solving a nonlinear least squares problem
@@ -403,7 +422,7 @@ def jetexpand_dae_nlstsq(num: int, nlstsq: Callable) -> JetExpansionAlg:
             and without any deprecation policy.
         """
         if num == 0:
-            return inits, {}
+            return list(inits), {}
 
         # Determine degrees of freedom ("dof") and initialse all others diffusely
         # Concretely: The provided 'inits' are not DOFs, all added ones are.
@@ -440,6 +459,6 @@ def jetexpand_dae_nlstsq(num: int, nlstsq: Callable) -> JetExpansionAlg:
             return tree.ravel_pytree(fx)[0]
 
         x1, info = nlstsq(root_jet, x0, rv.mean_flat, rv.cholesky_flat)
-        return unravel(x1), info
+        return list(unravel(x1)), info
 
     return expand

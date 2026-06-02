@@ -125,13 +125,8 @@ class AbstractDAEPosteriorLinearization(AbstractLinearization):
         self.dae = dae
         self.linearization = linearization
 
-    @property
-    def root_order(self):
-        """The order of the root constraint."""
-        return self.root.num_derivatives_in_args
-
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.root})"
+        return f"{self.__class__.__name__}({self.dae}, {self.linearization})"
 
 
 class AbstractOde(AbstractLinearization):

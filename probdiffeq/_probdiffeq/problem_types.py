@@ -35,23 +35,51 @@ This API difference is more pronounced for higher-order problems:
 >>> def f_second_order(y, dy, /, *, t):
 ...     return y + dy
 >>>
->>> print(ode(f_second_order))
+>>> print(ode_second_order(f_second_order))
 JetFunction(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10))
 >>>
 >>> print(inspect.signature(f_second_order))
 (y, dy, /, *, t)
->>> print(inspect.signature(ode(f)))
+>>> print(inspect.signature(ode_second_order(f)))
 (*, jet_coords: collections.abc.Sequence[~T], t: jax.Array) -> ~T
 
 """
 
 from probdiffeq._probdiffeq import jacobians, utilities
 from probdiffeq.backend import func, inspect, tree
-from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
+from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeVar
 
 T = TypeVar("T")
 
-__all__ = ["DAESystem", "JetFunction", "dae", "jet_lift", "ode", "residual"]
+__all__ = [
+    "DAESystem",
+    "JetFunction",
+    "dae",
+    "jet_lift",
+    "ode_vector_field",
+    "ode_vector_field_second_order",
+    "root_state",
+    "root_state_and_velocity",
+]
+
+
+class ZeroJetFunction(Protocol):
+    """Zero-jet functions.
+
+    An interface for right-hand sides of first-order ODEs.
+    """
+
+    def __call__(self, u: T, /, *, t: float) -> T: ...
+
+
+class OneJetFunction(Protocol):
+    """One-jet functions.
+
+    An interface for right-hand sides of second-order ODEs
+    and residuals of first-order implicit differential equations.
+    """
+
+    def __call__(self, u: T, du: T, /, *, t: float) -> T: ...
 
 
 class JetFunction:
@@ -78,15 +106,13 @@ class JetFunction:
 
     @classmethod
     def from_callable(
-        cls, func: Callable[[*Sequence[T], Array], T], /, *, jacobian=None
+        cls,
+        jet_function,
+        /,
+        *,
+        num_derivatives_in_args: int,
+        jacobian: jacobians.JacobianHandler,
     ):
-        num_derivatives_in_args = _verify_vector_field_signature_and_parse_order(func)
-
-        def jet_function(*, jet_coords: Sequence[T], t: Array) -> T:
-            return func(*jet_coords, t=t)
-
-        if jacobian is None:
-            jacobian = jacobians.jacobian_hutchinson_fwd()
 
         return cls(
             jet_function,
@@ -95,35 +121,78 @@ class JetFunction:
         )
 
 
-def ode(func: Callable[[*Sequence[T], float], T], /, *, jacobian=None) -> JetFunction:
-    """A description of an explicit ODE y^{(K)} = f(y, y', ..., y^{(K-1)}, t).
-
-    Parameters
-    ----------
-    func
-        A function with the signature f(u: T, *, t) -> T, f(u: T, du: T, *, t) -> T, and so on.
-        This is a vector field on jet coordinates with fixed order, and internally,
-        probdiffeq represents them as general jet functions
-        (because implicit differential equations share most of the source code).
-        The number of positional arguments determines the order of the jet
-        -- think, the number of derivatives in the argument list --, and
-        is read from the vector field signature automatically.
-        For example, if we pass f(u, t), the order is one; if we pass f(u, du, t), the order is two.
-    jacobian
-        How to handle Jacobians of the vector field. For example, whether forward or reverse mode
-        should be used, or how we should extract traces and diagonals from Jacobian-vector products.
-    """
-    return JetFunction.from_callable(func, jacobian=jacobian)
-
-
-def residual(
-    func: Callable[[*Sequence[T], float], T], /, *, jacobian=None
+def ode_vector_field(
+    func: ZeroJetFunction, /, *, jacobian: jacobians.JacobianHandler | None = None
 ) -> JetFunction:
-    """A description of an implicit differential equation f(u, du, t) = 0."""
+    """A description of an explicit ODE y^{(K)} = f(y, y', ..., y^{(K-1)}, t)."""
+
+    def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
+        (y,) = jet_coords
+        return func(y, t=t)
+
+    if jacobian is None:
+        jacobian = jacobians.jacobian_hutchinson_fwd()
+
+    return JetFunction.from_callable(
+        jetfunc, jacobian=jacobian, num_derivatives_in_args=1
+    )
+
+
+def ode_vector_field_second_order(
+    func: OneJetFunction, /, *, jacobian: jacobians.JacobianHandler | None = None
+) -> JetFunction:
+    """A description of an explicit ODE y^{(K)} = f(y, y', ..., y^{(K-1)}, t)."""
+
+    def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
+        (y, dy) = jet_coords
+        return func(y, dy, t=t)
+
+    if jacobian is None:
+        jacobian = jacobians.jacobian_hutchinson_fwd()
+
+    return JetFunction.from_callable(
+        jetfunc, jacobian=jacobian, num_derivatives_in_args=2
+    )
+
+
+def root_state(
+    func: ZeroJetFunction, /, *, jacobian: jacobians.JacobianHandler | None = None
+) -> JetFunction:
+    """A description of a root f(u, t) = 0."""
+
     # No implementation difference between ode and implicit, but
     # we don't want to force the user to think in terms of jet functions
     # so we offer these wrappers.
-    return JetFunction.from_callable(func, jacobian=jacobian)
+    def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
+        (y,) = jet_coords
+        return func(y, t=t)
+
+    if jacobian is None:
+        jacobian = jacobians.jacobian_hutchinson_fwd()
+
+    return JetFunction.from_callable(
+        jetfunc, jacobian=jacobian, num_derivatives_in_args=1
+    )
+
+
+def root_state_and_velocity(
+    func: OneJetFunction, /, *, jacobian: jacobians.JacobianHandler | None = None
+) -> JetFunction:
+    """A description of a root f(u, du, t) = 0."""
+
+    # No implementation difference between ode and implicit, but
+    # we don't want to force the user to think in terms of jet functions
+    # so we offer these wrappers.
+    def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
+        (y, dy) = jet_coords
+        return func(y, dy, t=t)
+
+    if jacobian is None:
+        jacobian = jacobians.jacobian_hutchinson_fwd()
+
+    return JetFunction.from_callable(
+        jetfunc, jacobian=jacobian, num_derivatives_in_args=2
+    )
 
 
 class DAESystem:
@@ -137,7 +206,7 @@ class DAESystem:
         return f"{self.__class__.__name__}(differential={self.differential}, algebraic={self.algebraic})"
 
 
-def dae(differential, algebraic):
+def dae(differential, algebraic) -> DAESystem:
     return DAESystem(differential, algebraic)
 
 

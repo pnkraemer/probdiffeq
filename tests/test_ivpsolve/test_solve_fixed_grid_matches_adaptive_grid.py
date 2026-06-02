@@ -15,10 +15,10 @@ def test_fixed_grid_result_matches_adaptive_grid_result_when_reusing_grid(fact) 
         velocity: Array
         acceleration: Array
 
-    vf = probdiffeq.ode(vf)
-    initialize = probdiffeq.jetexpand_ode_padded_scan(num=2)
-
-    tcoeffs = Taylor(*initialize(vf, u0, t=t0))
+    vf = probdiffeq.ode_vector_field(vf)
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
+    coeffs, _ = jetexpand(vf, u0, t=t0)
+    tcoeffs = Taylor(*coeffs)
 
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)

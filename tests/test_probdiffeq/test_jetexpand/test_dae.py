@@ -9,14 +9,14 @@ def test_daejet_matches_expectation_on_sir_model(num):
 
     y0 = [np.asarray([0.99, 0.01, 0.0])]
     jetexpand = probdiffeq.jetexpand_ode_unroll(num=num)
-    expected = jetexpand(vf_ode, y0, t=0.0)
+    expected, _ = jetexpand(vf_ode, y0, t=0.0)
 
     dae = probdiffeq.dae(differential=differential, algebraic=algebraic)
     eps = np.finfo_eps(y0[0].dtype)
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=10, tol=eps)
-    initialize = probdiffeq.jetexpand_dae_nlstsq(num=num, nlstsq=nlstsq)
-    initialize = func.jit(initialize, static_argnums=(0,))
-    received, _info = initialize(dae, y0, t=0.0)
+    jetexpand = probdiffeq.jetexpand_dae_nlstsq(num=num, nlstsq=nlstsq)
+    jetexpand = func.jit(jetexpand, static_argnums=(0,))
+    received, _info = jetexpand(dae, y0, t=0.0)
     assert testing.allclose(received, expected)
 
 
@@ -30,20 +30,21 @@ def test_daejet_recursive_matches_expectation_on_sir_model(num_strides, stride):
 
     y0 = [np.asarray([0.99, 0.01, 0.0])]
     jetexpand = probdiffeq.jetexpand_ode_unroll(num=num_strides * stride)
-    expected = jetexpand(vf_ode, y0, t=0.0)
+    expected, _ = jetexpand(vf_ode, y0, t=0.0)
+
     eps = np.finfo_eps(y0[0].dtype)
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=3, tol=eps)
     dae = probdiffeq.dae(differential=differential, algebraic=algebraic)
 
-    initialize = probdiffeq.jetexpand_dae_nlstsq_recursive(
+    jetexpand = probdiffeq.jetexpand_dae_nlstsq_recursive(
         num_strides=num_strides, stride=stride, nlstsq=nlstsq
     )
-    initialize = func.jit(initialize, static_argnums=0)
-    received, _info = initialize(dae, y0, t=0.0)
+    jetexpand = func.jit(jetexpand, static_argnums=0)
+    received, _info = jetexpand(dae, y0, t=0.0)
     assert testing.allclose(received, expected)
 
 
-@probdiffeq.ode
+@probdiffeq.ode_vector_field
 def vf_ode(y, /, *, t):
     del t
     beta, gamma = 2.0, 0.5  # infection and recovery rates
@@ -56,14 +57,14 @@ def vf_ode(y, /, *, t):
     return np.stack([f0, f1, f2])
 
 
-@probdiffeq.residual
+@probdiffeq.root_state
 def algebraic(u, /, *, t):
     del t
     N = 1.0  # total population
     return u[0] + u[1] + u[2] - N
 
 
-@probdiffeq.residual
+@probdiffeq.root_state_and_velocity
 def differential(u, du, /, *, t):
     del t
     beta, gamma = 2.0, 0.5

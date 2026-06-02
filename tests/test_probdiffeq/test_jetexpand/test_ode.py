@@ -12,7 +12,7 @@ def fixture_problem_with_solution():
     solution = np.load(
         "./tests/test_probdiffeq/test_jetexpand/data/three_body_first_solution.npy"
     )
-    return (probdiffeq.ode(vf), (u0,), {"t": t0}), solution
+    return (probdiffeq.ode_vector_field(vf), (u0,), {"t": t0}), solution
 
 
 @testing.fixture(name="num")
@@ -42,7 +42,7 @@ def test_approximation_identical_to_reference_odejet(
 ) -> None:
     (f, init, vf_kwargs), solution = problem_with_solution
 
-    derivatives = taylor_fun(f, init, **vf_kwargs)
+    derivatives, _ = taylor_fun(f, init, **vf_kwargs)
     assert len(derivatives) == num + 1
     assert testing.allclose(derivatives, list(solution[: len(derivatives)]))
 
@@ -55,7 +55,7 @@ def test_approximation_identical_to_reference_doubling(
     (f, init, vf_kwargs), solution = problem_with_solution
 
     expand = probdiffeq.jetexpand_ode_doubling_unroll(num_doublings=num_doublings)
-    derivatives = expand(f, init, **vf_kwargs)
+    derivatives, _ = expand(f, init, **vf_kwargs)
     assert len(derivatives) == np.sum(2 ** np.arange(0, num_doublings + 1))
     assert testing.allclose(derivatives, list(solution[: len(derivatives)]))
 

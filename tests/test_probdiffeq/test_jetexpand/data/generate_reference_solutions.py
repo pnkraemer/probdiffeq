@@ -6,14 +6,14 @@ from probdiffeq.backend import np, ode
 
 def three_body_first(num_derivatives_max=10):
     vf, (u0,), (t0, _) = ode.ivp_three_body_1st()
-    vf = probdiffeq.ode(vf)
+    vf = probdiffeq.ode_vector_field(vf)
     jetexpand = probdiffeq.jetexpand_ode_unroll(num=num_derivatives_max)
     return jetexpand(vf, (u0,), t=t0)
 
 
 def van_der_pol_second(num_derivatives_max=10):
     vf, (u0, du0), (t0, _) = ode.ivp_van_der_pol_2nd()
-    vf = probdiffeq.ode(vf)
+    vf = probdiffeq.ode_vector_field(vf)
     jetexpand = probdiffeq.jetexpand_ode_unroll(num=num_derivatives_max)
     return jetexpand(vf, (u0, du0), t=t0)
 

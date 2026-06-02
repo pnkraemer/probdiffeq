@@ -19,9 +19,10 @@ def fixture_pn_solution(fact):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     # Generate a solver
-    vf = probdiffeq.ode(vf)
+    vf = probdiffeq.ode_vector_field(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
-    tcoeffs = Taylor(*jetexpand(vf, u0, t=t0))
+    coeffs, _ = jetexpand(vf, u0, t=t0)
+    tcoeffs = Taylor(*coeffs)
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
 

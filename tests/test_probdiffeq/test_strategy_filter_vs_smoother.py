@@ -8,10 +8,10 @@ from probdiffeq.backend import func, linalg, np, ode, testing, tree
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
 def fixture_solver_setup(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
-    vf = probdiffeq.ode(vf)
+    vf = probdiffeq.ode_vector_field(vf)
     grid = np.linspace(t0, t1, endpoint=True, num=12)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
-    tcoeffs = jetexpand(vf, [u0], t=t0)
+    tcoeffs, _ = jetexpand(vf, [u0], t=t0)
     return {"vf": vf, "tcoeffs": tcoeffs, "grid": grid, "fact": fact}
 
 
@@ -61,7 +61,7 @@ def test_compare_filter_smoother_rmse(filter_solution, smoother_solution) -> Non
 
 def _reference_solution(ts):
     vf, (u0,), (_t0, _t1) = ode.ivp_lotka_volterra()
-    vf = probdiffeq.ode(vf)
+    vf = probdiffeq.ode_vector_field(vf)
     return ode.odeint_and_save_at(vf, (u0,), save_at=ts, atol=1e-10, rtol=1e-10)
 
 

@@ -11,9 +11,9 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact) -> None:
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     # Generate a solver
-    vf = probdiffeq.ode(vf)
+    vf = probdiffeq.ode_vector_field(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
-    tcoeffs = jetexpand(vf, u0, t=t0)
+    tcoeffs, _ = jetexpand(vf, u0, t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
@@ -59,7 +59,7 @@ def test_filter_marginals_close_only_to_left_boundary(fact) -> None:
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = (u0, vf(u0, t=t0))
-    vf = probdiffeq.ode(vf)
+    vf = probdiffeq.ode_vector_field(vf)
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
@@ -89,9 +89,9 @@ def test_smoother_marginals_close_to_both_boundaries(fact) -> None:
     """Assert that the smoother-marginals interpolate well close to the boundary."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
-    vf = probdiffeq.ode(vf)
+    vf = probdiffeq.ode_vector_field(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
-    tcoeffs = jetexpand(vf, (u0,), t=t0)
+    tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)

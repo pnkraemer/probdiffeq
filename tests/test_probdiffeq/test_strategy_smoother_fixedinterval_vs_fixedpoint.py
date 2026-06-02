@@ -12,9 +12,9 @@ from probdiffeq.util import test_util
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
 def fixture_solver_setup(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
-    vf = probdiffeq.ode(vf)
+    vf = probdiffeq.ode_vector_field(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
-    tcoeffs = jetexpand(vf, [u0], t=t0)
+    tcoeffs, _ = jetexpand(vf, [u0], t=t0)
     return {"vf": vf, "tcoeffs": tcoeffs, "t0": t0, "t1": t1, "fact": fact}
 
 
