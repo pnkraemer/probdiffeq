@@ -19,7 +19,7 @@ Examples
 ...     return y
 >>>
 >>> print(ode(f))
-VectorField(order=1)
+VectorField(num_derivatives_in_args=1)
 
 Among other things, the vector field wrappers ensure that all internal representations
 of the ODEs have the same signature, which means that sometimes (eg for first-order problems),
@@ -28,36 +28,41 @@ the internal representation does not match the user-specified one.
 >>> print(inspect.signature(f))
 (y, *, t)
 >>> print(inspect.signature(ode(f)))
-(y_and_dy_and_ddy_etc: collections.abc.Sequence[~T], /, *, t) -> ~T
+(*, u: collections.abc.Sequence[~T], t) -> ~T
 
 This API difference is more pronounced for higher-order problems:
 
->>> def f_2nd(y, dy, /, *, t):
+>>> def f_second_order(y, dy, /, *, t):
 ...     return y + dy
 >>>
->>> print(ode(f_2nd))
-VectorField(order=2)
+>>> print(ode(f_second_order))
+VectorField(num_derivatives_in_args=2)
 >>>
->>> print(inspect.signature(f_2nd))
+>>> print(inspect.signature(f_second_order))
 (y, dy, /, *, t)
 >>> print(inspect.signature(ode(f)))
-(y_and_dy_and_ddy_etc: collections.abc.Sequence[~T], /, *, t) -> ~T
+(*, u: collections.abc.Sequence[~T], t) -> ~T
 
 """
 
+from probdiffeq._probdiffeq import jacobians
 from probdiffeq.backend import inspect
-from probdiffeq.backend.typing import Callable, Sequence, TypeVar
+from probdiffeq.backend.typing import Callable, Literal, Sequence, TypeVar
 
 T = TypeVar("T")
 
-__all__ = ["DAESystem", "VectorField", "dae", "ode"]
+__all__ = ["DAESystem", "VectorField", "dae", "implicit", "ode"]
 
 
 class VectorField:
     """A vector field, i.e. a function that computes the right-hand side of an ODE, with the correct API for use in probdiffeq."""
 
-    def __init__(self, func, num_derivatives_in_args: int):
+    def __init__(
+        self, func, /, jacobian: jacobians.JacobianHandler, num_derivatives_in_args: int
+    ):
         self._func = func
+
+        self.jacobian = jacobian
         self.num_derivatives_in_args = num_derivatives_in_args
 
     def __repr__(self):
@@ -80,14 +85,31 @@ class DAESystem:
         return f"{self.__class__.__name__}(differential={self.differential}, algebraic={self.algebraic})"
 
 
-def ode(func: Callable[[*Sequence[T], float], T], /) -> VectorField:
+def ode(func: Callable[[*Sequence[T], float], T], /, *, jacobian=None) -> VectorField:
     """Convert a function that computes the right-hand side of an ODE into a vector field with the correct API."""
     num_derivatives_in_args = _verify_vector_field_signature_and_parse_order(func)
 
     def wrapper(u: Sequence[T], t) -> T:
         return func(*u, t=t)
 
-    return VectorField(wrapper, num_derivatives_in_args=num_derivatives_in_args)
+    if jacobian is None:
+        jacobian = jacobians.jacobian_hutchinson_fwd()
+
+    return VectorField(
+        wrapper, num_derivatives_in_args=num_derivatives_in_args, jacobian=jacobian
+    )
+
+
+def implicit(
+    func: Callable[[*Sequence[T], float], T], /, *, jacobian=None
+) -> VectorField:
+
+    # Different API function, but the implementation matches the ODE one (at least for now)
+    return ode(func, jacobian=jacobian)
+
+
+def jet_lift(vf: VectorField, jet_order: int | Literal["max"]):
+    pass
 
 
 def _verify_vector_field_signature_and_parse_order(vf: Callable) -> int:

@@ -12,7 +12,7 @@ def odeint_and_save_at(vf, y0: tuple, /, save_at, *, atol, rtol):
     assert len(y0) == 1
 
     def vf_wrapped(y, t):
-        return vf(y, t=t)
+        return vf(u=[y], t=t)
 
     return jax.experimental.ode.odeint(vf_wrapped, *y0, save_at, atol=atol, rtol=rtol)
 

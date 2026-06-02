@@ -43,7 +43,7 @@ IsotropicOdeTs0(ode_order=2)
 
 from probdiffeq import diffeqjet, ssm_impl
 from probdiffeq._probdiffeq import jacobians, linearizations, vector_fields
-from probdiffeq.backend import func, inspect, tree
+from probdiffeq.backend import func, tree
 from probdiffeq.backend.typing import Callable, Literal, Protocol, Sequence, TypeVar
 
 __all__ = [
@@ -119,16 +119,10 @@ def constraint_ode_ts0(
     ssm
         The state-space model to use for the constraint.
     """
-    return ssm.linearize.ode_taylor_0th(vf)
+    return ssm.linearize.ode_taylor_0th(vector_field=vf)
 
 
-def constraint_ode_ts1(
-    vf: Callable,
-    /,
-    *,
-    ssm: ssm_impl.FactSsmImpl,
-    jacobian: jacobians.JacobianHandler | None = None,
-):
+def constraint_ode_ts1(vf: vector_fields.VectorField, /, *, ssm: ssm_impl.FactSsmImpl):
     r"""Create an ODE constraint and linearise with a first-order Taylor approximation.
 
     This constraint handles ODEs of the form
@@ -159,76 +153,15 @@ def constraint_ode_ts1(
         If None, a Jacobians are materialized at every stage in dense factorisations
         and Hutchinson-approximated in isotropic or blockdiagonal models.
     """
-    ode_order = _verify_vector_field_signature_and_parse_order(vf)
-    if jacobian is None:
-        # Use Hutchinson-Jacobian handling for backward compatibility.
-        jacobian = jacobians.jacobian_hutchinson_fwd()
-    return ssm.linearize.ode_taylor_1st(vf, ode_order=ode_order, jacobian=jacobian)
-
-
-def _verify_vector_field_signature_and_parse_order(vf: Callable) -> int:
-    """Parse the vector-field structure from its signature."""
-    sig = inspect.signature(vf)
-    params = list(sig.parameters.values())
-
-    POSITIONAL = (
-        inspect.Parameter.POSITIONAL_ONLY,
-        inspect.Parameter.POSITIONAL_OR_KEYWORD,
-    )
-    KEYWORD = (inspect.Parameter.KEYWORD_ONLY,)
-
-    def is_positional(p):
-        return p.kind in POSITIONAL
-
-    def is_keyword(p):
-        return p.kind in KEYWORD
-
-    state_args = [p for p in params if is_positional(p)]
-
-    msg = f"""The dynamics' signature is not compatible with the constraint.
-
-    More precisely, the dynamics are expected to look like
-
-      - f(u, /, *, t),
-      - f(u, du, /, *, t),
-      - f(u, du, ddu, /, *, t),
-
-    and so on, where the number of positional arguments
-    specifies the order of the problem.
-    Replace `u`, `du`, and so on with any variable name of your choosing
-    but mind the keyword-only argument 't' in the signatures above.
-
-    That said, the arguments
-
-    {[(p.name, p.kind) for p in params]}
-
-    have been detected in the dynamics function.
-
-    Try wrapping the vector field through a pure Python function
-    with the correct arguments before passing it to the ODE constraint.
-
-      - No *args or **kwargs
-      - No functools.partial
-
-    """
-
-    contains_no_positional = len(state_args) == 0
-    t_is_not_keyword = not any(is_keyword(p) and p.name == "t" for p in params)
-    contains_keyword_other_than_t = any(is_keyword(p) and p.name != "t" for p in params)
-
-    if contains_no_positional or t_is_not_keyword or contains_keyword_other_than_t:
-        raise TypeError(msg)
-
-    return len(state_args)
+    return ssm.linearize.ode_taylor_1st(vector_field=vf)
 
 
 def constraint(
     root,
     *,
     ssm: ssm_impl.FactSsmImpl,
-    jacobian: jacobians.JacobianHandler | None = None,
     linearization: linearizations.Linearization | None = None,
-    jet_order: int | Literal["max"] = "max",
+    # jet_order: int | Literal["max"] = "max",
 ):
     r"""Construct a general constraint.
 
@@ -265,55 +198,50 @@ def constraint(
         (What is Jet-linearisation? Stay tuned!).
 
     """
-    root_order = _verify_vector_field_signature_and_parse_order(root)
-
-    if jacobian is None:
-        jacobian = jacobians.jacobian_hutchinson_fwd()
-
     if linearization is None:
         linearization = linearizations.linearization_prior_mean()
 
-    def root_jet(*tcoeffs_all, t):
-        _, unravel_one = tree.ravel_pytree(tcoeffs_all[0])
+    # root_order = root.num_derivatives_in_args
 
-        if jet_order == "max":
-            tcoeffs = tcoeffs_all
-        else:
-            jet_order_upper = len(tcoeffs_all) - root_order
-            if jet_order < 0 or jet_order > jet_order_upper:
-                msg = "The provided jet-order is incompatible with the root order."
-                msg += f" Expected: 0 <= jet_order <= {jet_order_upper}."
-                msg += f" Received: jet_order == {jet_order}."
-                raise ValueError(msg)
+    # def root_jet(*tcoeffs_all, t):
+    #     _, unravel_one = tree.ravel_pytree(tcoeffs_all[0])
 
-            order = root_order + jet_order
-            tcoeffs = tcoeffs_all[:order]
+    #     if jet_order == "max":
+    #         tcoeffs = tcoeffs_all
+    #     else:
+    #         jet_order_upper = len(tcoeffs_all) - root_order
+    #         if jet_order < 0 or jet_order > jet_order_upper:
+    #             msg = "The provided jet-order is incompatible with the root order."
+    #             msg += f" Expected: 0 <= jet_order <= {jet_order_upper}."
+    #             msg += f" Received: jet_order == {jet_order}."
+    #             raise ValueError(msg)
 
-        # Flatten the root because jax.jet is a bit high maintenance :)
-        def jet_call(*y):
-            y_tree = [unravel_one(s) for s in y]
-            fx = root(*y_tree, t=t)
-            return tree.ravel_pytree(fx)[0]
+    #         order = root_order + jet_order
+    #         tcoeffs = tcoeffs_all[:order]
 
-        flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
+    #     # Flatten the root because jax.jet is a bit high maintenance :)
+    #     def jet_call(*y):
+    #         y_tree = [unravel_one(s) for s in y]
+    #         fx = root(*y_tree, t=t)
+    #         return tree.ravel_pytree(fx)[0]
 
-        ps, ss = diffeqjet.jet_unpack_series(flat, root_order)
+    #     flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
 
-        if len(tree.tree_leaves(ss)) == 0:
-            fx = jet_call(*ps)
+    #     ps, ss = diffeqjet.jet_unpack_series(flat, root_order)
 
-            # Return a sequence to be compatible with Taylor-coeff logic,
-            # but don't bother unflattening the content
-            # because the result will be compared to zero anyway
-            return [fx]
+    #     if len(tree.tree_leaves(ss)) == 0:
+    #         fx = jet_call(*ps)
 
-        primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
-        return [primals, *series]
+    #         # Return a sequence to be compatible with Taylor-coeff logic,
+    #         # but don't bother unflattening the content
+    #         # because the result will be compared to zero anyway
+    #         return [fx]
 
-    order = "max" if jet_order == "max" else jet_order + root_order
-    return ssm.linearize.root(
-        root_jet, root_order=order, jacobian=jacobian, linearization=linearization
-    )
+    #     primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
+    #     return [primals, *series]
+
+    # order = "max" if jet_order == "max" else jet_order + root_order
+    return ssm.linearize.root(root, linearization=linearization)
 
 
 def constraint_dae(

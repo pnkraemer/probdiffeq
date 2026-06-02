@@ -27,7 +27,11 @@ class Factory:
     prior: Callable = probdiffeq.prior_wiener_integrated
     strategy: Callable = probdiffeq.strategy_filter
     solver: Callable = probdiffeq.solver
-    constraint: Callable = probdiffeq.constraint_ode_ts0
+    jacobian: Callable = probdiffeq.jacobian_materialize
+
+    # ts1 default because it uses more backend functions (eg Jacobians)
+    # so the tests gain relevance
+    constraint: Callable = probdiffeq.constraint_ode_ts1
     error: Callable = probdiffeq.error_residual_std
 
 
@@ -38,7 +42,6 @@ def case_factory_prior_wiener_integrated():
 
 @testing.case
 def case_factory_prior_ioup():
-
     def prior(*args, **kwargs):
         try:
 
@@ -98,25 +101,27 @@ def case_factory_constraint_ode_ts0():
 
 
 @testing.case
+def case_factory_constraint_ode_ts1():
+    return Factory(constraint=probdiffeq.constraint_ode_ts1)
+
+
+@testing.case
 @testing.parametrize("jacfun", [func.jacfwd, func.jacrev])
-def case_factory_constraint_ode_ts1_materialize(jacfun):
+def case_factory_jacobian_materialize(jacfun):
     jacobian = probdiffeq.jacobian_materialize(jacfun=jacfun)
-    constraint = func.partial(probdiffeq.constraint_ode_ts1, jacobian=jacobian)
-    return Factory(constraint=constraint)
+    return Factory(jacobian=jacobian)
 
 
 @testing.case
-def case_factory_constraint_ode_ts1_hutchinson_fwd():
+def case_factory_jacobian_hutchinson_fwd():
     jacobian = probdiffeq.jacobian_hutchinson_fwd()
-    constraint = func.partial(probdiffeq.constraint_ode_ts1, jacobian=jacobian)
-    return Factory(constraint=constraint)
+    return Factory(jacobian=jacobian)
 
 
 @testing.case
-def case_factory_constraint_ode_ts1_hutchinson_rev():
+def case_factory_jacobian_hutchinson_rev():
     jacobian = probdiffeq.jacobian_hutchinson_rev()
-    constraint = func.partial(probdiffeq.constraint_ode_ts1, jacobian=jacobian)
-    return Factory(constraint=constraint)
+    return Factory(jacobian=jacobian)
 
 
 @testing.case
@@ -127,14 +132,14 @@ def case_factory_constraint_root_ts1(ivp):
     jacobian = probdiffeq.jacobian_materialize()
 
     def root(u, du, /, *, t):
-        return tree.tree_map(lambda a, b: a - b, du, vf(u, t=t))
+        return tree.tree_map(lambda a, b: a - b, du, vf(u=(u,), t=t))
 
-    constraint_fn = func.partial(probdiffeq.constraint, jacobian=jacobian, jet_order=0)
+    root = probdiffeq.implicit(root, jacobian=jacobian)
 
     def constraint(vf, **kwargs):
         try:
             del vf  # no vector fields, we use the root instead
-            return constraint_fn(root, **kwargs)
+            return probdiffeq.constraint(root, **kwargs)
         except NotImplementedError:
             reason = "This linearisation is not implemented"
             reason += ", likely due to the selected state-space factorisation."
@@ -172,10 +177,12 @@ def case_factory_error_residual_std_not_cached():
 def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
     vf, u0, (t0, t1) = ivp
 
+    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
+
     # Build a solver
     initialize = probdiffeq.jetexpand_ode_padded_scan(num=4)
+
     tcoeffs = initialize(vf, u0, t=t0)
-    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
     init, prior = factory.prior(tcoeffs, ssm=ssm)
     strategy = factory.strategy(ssm=ssm)
     constraint = factory.constraint(vf, ssm=ssm)

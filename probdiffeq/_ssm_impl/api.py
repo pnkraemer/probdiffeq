@@ -106,22 +106,20 @@ class AbstractLinearization(abc.ABC):
 class AbstractRoot(AbstractLinearization):
     """Interface for linearizations of general roots."""
 
-    def __init__(self, root, /, *, root_order: int | Literal["max"]) -> None:
+    def __init__(self, root, /) -> None:
         self.root = root
-        self.root_order = root_order
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(root_order={self.root_order})"
+    @property
+    def root_order(self):
+        """The order of the root constraint."""
+        return self.root.num_derivatives_in_args
 
 
 class AbstractOde(AbstractLinearization):
     """Interface for linearizations of ODEs."""
 
-    def __init__(self, vf) -> None:
-        self.vector_field = vf
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.vector_field})"
+    def __init__(self, *, vector_field) -> None:
+        self.vector_field = vector_field
 
     @property
     def root_order(self):
