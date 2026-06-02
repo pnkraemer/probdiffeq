@@ -56,14 +56,14 @@ def vf_ode(y, /, *, t):
     return np.stack([f0, f1, f2])
 
 
-@probdiffeq.implicit
+@probdiffeq.residual
 def algebraic(u, /, *, t):
     del t
     N = 1.0  # total population
     return u[0] + u[1] + u[2] - N
 
 
-@probdiffeq.implicit
+@probdiffeq.residual
 def differential(u, du, /, *, t):
     del t
     beta, gamma = 2.0, 0.5

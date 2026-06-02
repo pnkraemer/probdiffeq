@@ -19,7 +19,7 @@ Examples
 ...     return y
 >>>
 >>> print(ode(f))
-JetFunction(num_derivatives_in_args=1)
+JetFunction(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10))
 
 Among other things, the vector field wrappers ensure that all internal representations
 of the ODEs have the same signature, which means that sometimes (eg for first-order problems),
@@ -28,7 +28,7 @@ the internal representation does not match the user-specified one.
 >>> print(inspect.signature(f))
 (y, *, t)
 >>> print(inspect.signature(ode(f)))
-(*, u: collections.abc.Sequence[~T], t) -> ~T
+(*, jet_coords: collections.abc.Sequence[~T], t: jax.Array) -> ~T
 
 This API difference is more pronounced for higher-order problems:
 
@@ -36,12 +36,12 @@ This API difference is more pronounced for higher-order problems:
 ...     return y + dy
 >>>
 >>> print(ode(f_second_order))
-JetFunction(num_derivatives_in_args=2)
+JetFunction(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10))
 >>>
 >>> print(inspect.signature(f_second_order))
 (y, dy, /, *, t)
 >>> print(inspect.signature(ode(f)))
-(*, u: collections.abc.Sequence[~T], t) -> ~T
+(*, jet_coords: collections.abc.Sequence[~T], t: jax.Array) -> ~T
 
 """
 
@@ -51,7 +51,7 @@ from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 
 T = TypeVar("T")
 
-__all__ = ["DAESystem", "JetFunction", "dae", "implicit", "jet_lift", "ode"]
+__all__ = ["DAESystem", "JetFunction", "dae", "jet_lift", "ode", "residual"]
 
 
 class JetFunction:
@@ -96,7 +96,7 @@ class JetFunction:
 
 
 def ode(func: Callable[[*Sequence[T], float], T], /, *, jacobian=None) -> JetFunction:
-    """A description of an ordinary differential equation y^{(K)} = f(y, y', ..., y^{(K-1)}, t).
+    """A description of an explicit ODE y^{(K)} = f(y, y', ..., y^{(K-1)}, t).
 
     Parameters
     ----------
@@ -116,7 +116,7 @@ def ode(func: Callable[[*Sequence[T], float], T], /, *, jacobian=None) -> JetFun
     return JetFunction.from_callable(func, jacobian=jacobian)
 
 
-def implicit(
+def residual(
     func: Callable[[*Sequence[T], float], T], /, *, jacobian=None
 ) -> JetFunction:
     """A description of an implicit differential equation f(u, du, t) = 0."""

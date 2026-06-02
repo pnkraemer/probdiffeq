@@ -95,7 +95,7 @@ def main():
     )
 
     # Use this constraint function for custom roots:
-    ts1 = probdiffeq.constraint(root, ssm=ssm, jet_order=0)
+    ts1 = probdiffeq.constraint_residual(root, ssm=ssm, jet_order=0)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver_2nd = probdiffeq.solver_mle(
         strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm

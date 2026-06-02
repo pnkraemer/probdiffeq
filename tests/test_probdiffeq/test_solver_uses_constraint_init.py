@@ -28,7 +28,7 @@ def test_output_matches_reference(ivp, solver_factory, derivatives, ssm_fact) ->
     vf, (u0,), (t0, t1) = ivp
 
     @func.partial(probdiffeq.jet_lift, lift_by=derivatives - 1)
-    @probdiffeq.implicit
+    @probdiffeq.residual
     def root(u, du, *, t):
         return tree.tree_map(
             lambda a, b: a + b, root_linear(u, du, t=t), root_nonlinear(u, du, t=t)
@@ -57,7 +57,9 @@ def test_output_matches_reference(ivp, solver_factory, derivatives, ssm_fact) ->
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     linearization = probdiffeq.linearization_map(nlstsq)
-    constraint = probdiffeq.constraint(root, ssm=ssm, linearization=linearization)
+    constraint = probdiffeq.constraint_residual(
+        root, ssm=ssm, linearization=linearization
+    )
     solver = solver_factory(
         strategy=strategy,
         prior=prior,

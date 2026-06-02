@@ -6,24 +6,26 @@ Examples
 
 Construct ODE constraints as such:
 
->>> def vf(u, /, *, t):
+>>> @probdiffeq.ode
+... def vf(u, /, *, t):
 ...     return -u
 >>>
 >>> ssm = probdiffeq.state_space_model("dense")
 >>> constraint = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
 >>> print(constraint)
-DenseOdeTs1(ode_order=1, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10))
+DenseOdeTs1(JetFunction(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
 
 
 Implement high-order ODEs by passing a vector field with additional arguments as such:
 
->>> def vf(u, du, ddu, /, *, t):
+>>> @probdiffeq.ode
+... def vf(u, du, ddu, /, *, t):
 ...     return -ddu
 >>>
 >>> ssm = probdiffeq.state_space_model("isotropic")
 >>> constraint = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
 >>> print(constraint)
-IsotropicOdeTs0(ode_order=3)
+IsotropicOdeTs0(JetFunction(num_derivatives_in_args=3, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
 
 
 Or, use the constraint as a decorator
@@ -31,26 +33,27 @@ Or, use the constraint as a decorator
 >>> import functools
 >>>
 >>> @functools.partial(probdiffeq.constraint_ode_ts0, ssm=ssm)
+... @probdiffeq.ode
 ... def ode(u, du, /, *, t):
 ...     return -du
 >>>
 >>> print(ode)
-IsotropicOdeTs0(ode_order=2)
+IsotropicOdeTs0(JetFunction(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
 
 
 
 """
 
 from probdiffeq import ssm_impl
-from probdiffeq._probdiffeq import linearizations, vector_fields
+from probdiffeq._probdiffeq import linearizations, problem_types
 from probdiffeq.backend.typing import Callable, Protocol, Sequence, TypeVar
 
 __all__ = [
     "Constraint",
-    "constraint",
     "constraint_dae",
     "constraint_ode_ts0",
     "constraint_ode_ts1",
+    "constraint_residual",
 ]
 
 C = TypeVar("C", bound=Sequence)
@@ -91,7 +94,7 @@ class Constraint(Protocol):
 
 
 def constraint_ode_ts0(
-    vf: vector_fields.JetFunction, /, *, ssm: ssm_impl.FactSsmImpl
+    vf: problem_types.JetFunction, /, *, ssm: ssm_impl.FactSsmImpl
 ) -> Constraint:
     r"""Create an ODE constraint with zeroth-order Taylor linearisation.
 
@@ -118,12 +121,12 @@ def constraint_ode_ts0(
     ssm
         The state-space model to use for the constraint.
     """
-    if not isinstance(vf, vector_fields.JetFunction):
+    if not isinstance(vf, problem_types.JetFunction):
         raise TypeError(vf)
     return ssm.linearize.ode_taylor_0th(vector_field=vf)
 
 
-def constraint_ode_ts1(vf: vector_fields.JetFunction, /, *, ssm: ssm_impl.FactSsmImpl):
+def constraint_ode_ts1(vf: problem_types.JetFunction, /, *, ssm: ssm_impl.FactSsmImpl):
     r"""Create an ODE constraint and linearise with a first-order Taylor approximation.
 
     This constraint handles ODEs of the form
@@ -149,18 +152,14 @@ def constraint_ode_ts1(vf: vector_fields.JetFunction, /, *, ssm: ssm_impl.FactSs
         for third-order ODEs ``f(u, du, ddu, *, t)``, and so on.
     ssm
         The state-space model to use for the constraint.
-    jacobian
-        The Jacobian handler to use for the linearization.
-        If None, a Jacobians are materialized at every stage in dense factorisations
-        and Hutchinson-approximated in isotropic or blockdiagonal models.
     """
-    if not isinstance(vf, vector_fields.JetFunction):
+    if not isinstance(vf, problem_types.JetFunction):
         raise TypeError(vf)
     return ssm.linearize.ode_taylor_1st(vector_field=vf)
 
 
-def constraint(
-    root: vector_fields.JetFunction,
+def constraint_residual(
+    root: problem_types.JetFunction,
     *,
     ssm: ssm_impl.FactSsmImpl,
     linearization: linearizations.Linearization | None = None,
@@ -193,7 +192,7 @@ def constraint(
         Adjust this variable to use posterior linearization (also known as iterated filtering).
 
     """
-    if not isinstance(root, vector_fields.JetFunction):
+    if not isinstance(root, problem_types.JetFunction):
         raise TypeError(root)
 
     if linearization is None:
@@ -202,7 +201,7 @@ def constraint(
 
 
 def constraint_dae(
-    dae: vector_fields.DAESystem,
+    dae: problem_types.DAESystem,
     *,
     ssm: ssm_impl.FactSsmImpl,
     linearization: linearizations.Linearization | None = None,

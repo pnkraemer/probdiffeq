@@ -11,7 +11,7 @@ from probdiffeq._probdiffeq.linearizations import *
 from probdiffeq._probdiffeq.loss_functions import *
 from probdiffeq._probdiffeq.markov_strategies import *
 from probdiffeq._probdiffeq.priors import *
+from probdiffeq._probdiffeq.problem_types import *
 from probdiffeq._probdiffeq.solvers import *
 from probdiffeq._probdiffeq.state_space_models import *
 from probdiffeq._probdiffeq.utilities import *
-from probdiffeq._probdiffeq.vector_fields import *

@@ -1,6 +1,6 @@
 from probdiffeq._ssm_impl import api, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
-from probdiffeq.backend.typing import Any, Array, Callable, Literal, Sequence, TypeVar
+from probdiffeq.backend.typing import Any, Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
 
 T = TypeVar("T", bound=Array)
@@ -410,20 +410,17 @@ class IsotropicPriorFactory(api.AbstractPriorFactory):
 class IsotropicLinearizationFactory(api.AbstractLinearizationFactory):
     """Construct an isotropic linearization-factory."""
 
-    def root(
-        self,
-        root,
-        *,
-        jacobian,
-        root_order: int | Literal["max"],
-        linearization: Callable | None,
-    ):
+    def root(self, *, root, linearization: Callable | None):
         raise NotImplementedError
 
     def dae_posterior_linearization(self, *, dae, linearization):
         raise NotImplementedError
 
     def ode_taylor_1st(self, *, vector_field):
+        if vector_field.num_derivatives_in_args > 1:
+            msg = "This linearization is not compatible with high-order ODEs as of yet."
+            raise ValueError(msg)
+
         return IsotropicOdeTs1(vector_field=vector_field)
 
     def ode_taylor_0th(self, *, vector_field):
@@ -455,19 +452,11 @@ class IsotropicOdeTs0(api.AbstractOde):
 class IsotropicOdeTs1(api.AbstractOde):
     """Construct an isotropic implementation of ODE-TS1 linearization."""
 
-    def __init__(self, vf, *, ode_order: int, jacobian: Any) -> None:
-        if ode_order > 1:
-            msg = "This linearization is not compatible with high-order ODEs as of yet."
-            raise ValueError(msg)
-        super().__init__(vf, ode_order=1)
-
-        self.jacobian = jacobian
-
     def init_linearization(self):
-        return self.jacobian.init_jacobian_handler()
+        return self.vector_field.jacobian.init_jacobian_handler()
 
     def linearize(self, rv, state, *, damp: float, t):
-        fun = func.partial(self.vector_field, t=t)
+
         # Evaluate the linearisation
         m0 = rv.mean_flat[0]
 
@@ -476,11 +465,13 @@ class IsotropicOdeTs1(api.AbstractOde):
 
         def vf_ravel(s):
             s_tree = rv0.tree_flatten.unflatten_array(s[None])
-            fs = fun(*s_tree)
+            fs = self.vector_field(jet_coords=s_tree, t=t)
             return tree.ravel_pytree(fs)[0]
 
         # Estimate the trace using Hutchinson's estimator
-        fx, J_trace, state = self.jacobian.calculate_trace(vf_ravel, m0, state)
+        fx, J_trace, state = self.vector_field.jacobian.calculate_trace(
+            vf_ravel, m0, state
+        )
 
         # Best Jacobian approximation: mean of diagonal = trace / len(diagonal)
         J_trace /= len(fx)

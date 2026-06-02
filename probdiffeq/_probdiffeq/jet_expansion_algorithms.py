@@ -1,7 +1,7 @@
 r"""Evaluate jet-recursions in differential equations."""
 
 from probdiffeq import probdiffeq
-from probdiffeq._probdiffeq import utilities, vector_fields
+from probdiffeq._probdiffeq import problem_types, utilities
 from probdiffeq.backend import flow, func, np, tree
 from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeVar
 
@@ -153,7 +153,7 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg:
     @_error_if_vf_not_odefunction_type
     @_allow_pytree_inits
     def expand(
-        vf: vector_fields.JetFunction, inits: Sequence[T], /, *, t: float | Array
+        vf: problem_types.JetFunction, inits: Sequence[T], /, *, t: float | Array
     ) -> Sequence[T]:
         if num == 0:
             return inits
@@ -304,8 +304,8 @@ def _error_if_vf_not_odefunction_type(expand):
     """A decorator to check that the vector field is of type JetFunction."""
 
     def expand_wrapped(vf, inits, /, *, t: float | Array):
-        if not isinstance(vf, vector_fields.JetFunction):
-            msg = f"Expected type {vector_fields.JetFunction}, but got {vf} of type {type(vf)}. "
+        if not isinstance(vf, problem_types.JetFunction):
+            msg = f"Expected type {problem_types.JetFunction}, but got {vf} of type {type(vf)}. "
             msg += "Make sure to wrap your vector field with `probdiffeq.ode()`."
             raise TypeError(msg)
         return expand(vf, inits, t=t)
@@ -364,7 +364,7 @@ def jetexpand_dae_nlstsq_recursive(num_strides: int, stride: int, nlstsq: Callab
     initialize = jetexpand_dae_nlstsq(num=stride, nlstsq=nlstsq)
 
     def expand(
-        dae: vector_fields.DAESystem, inits: Sequence[T], /, *, t: float | Array
+        dae: problem_types.DAESystem, inits: Sequence[T], /, *, t: float | Array
     ):
         received = inits
         if num_strides == 0:
@@ -384,7 +384,7 @@ def jetexpand_dae_nlstsq(num: int, nlstsq: Callable) -> JetExpansionAlg:
     # TODO: enable pytree inputs/outputs
     # TODO: raise error if DAE has the wrong type
     def expand(
-        dae: vector_fields.DAESystem, inits: Sequence[T], /, *, t: float | Array
+        dae: problem_types.DAESystem, inits: Sequence[T], /, *, t: float | Array
     ):
         """Evaluate the Taylor series of a differential-algebraic equation system.
 

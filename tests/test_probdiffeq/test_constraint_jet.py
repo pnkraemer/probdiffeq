@@ -97,28 +97,30 @@ def case_jet_dae_iterated(root):
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     linearization = probdiffeq.linearization_map(nlstsq)
 
-    def constraint(ssm, lift_by: int):
-        differential = probdiffeq.implicit(root.root_dae_differential)
+    def constraint_residual(ssm, lift_by: int):
+        differential = probdiffeq.residual(root.root_dae_differential)
         differential = probdiffeq.jet_lift(differential, lift_by=lift_by)
-        algebraic = probdiffeq.implicit(root.root_dae_algebraic)
+        algebraic = probdiffeq.residual(root.root_dae_algebraic)
         algebraic = probdiffeq.jet_lift(algebraic, lift_by=lift_by + 1)
         dae = probdiffeq.dae(differential, algebraic)
 
         return probdiffeq.constraint_dae(dae, ssm=ssm, linearization=linearization)
 
-    return constraint
+    return constraint_residual
 
 
 def case_jet_constraint_iterated(root):
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     linearization = probdiffeq.linearization_map(nlstsq)
 
-    def constraint(ssm, lift_by):
-        implicit = probdiffeq.implicit(root.root)
+    def constraint_residual(ssm, lift_by):
+        implicit = probdiffeq.residual(root.root)
         implicit = probdiffeq.jet_lift(implicit, lift_by=lift_by)
-        return probdiffeq.constraint(implicit, ssm=ssm, linearization=linearization)
+        return probdiffeq.constraint_residual(
+            implicit, ssm=ssm, linearization=linearization
+        )
 
-    return constraint
+    return constraint_residual
 
 
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")

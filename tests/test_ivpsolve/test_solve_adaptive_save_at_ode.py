@@ -134,18 +134,18 @@ def case_factory_constraint_root_ts1(ivp):
     def root(u, du, /, *, t):
         return tree.tree_map(lambda a, b: a - b, du, vf(jet_coords=(u,), t=t))
 
-    root = probdiffeq.implicit(root, jacobian=jacobian)
+    root = probdiffeq.residual(root, jacobian=jacobian)
 
-    def constraint(vf, **kwargs):
+    def constraint_residual(vf, **kwargs):
         try:
             del vf  # no vector fields, we use the root instead
-            return probdiffeq.constraint(root, **kwargs)
+            return probdiffeq.constraint_residual(root, **kwargs)
         except NotImplementedError:
             reason = "This linearisation is not implemented"
             reason += ", likely due to the selected state-space factorisation."
             testing.skip(reason)
 
-    return Factory(constraint=constraint)
+    return Factory(constraint=constraint_residual)
 
 
 @testing.case
