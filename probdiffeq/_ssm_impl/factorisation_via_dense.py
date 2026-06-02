@@ -470,7 +470,7 @@ class DenseOdeTs0(api.AbstractOde):
 
         Ms = rv.mean
 
-        fm = self.vector_field(jet_coords=Ms[:ode_order], t=t)
+        fm = self.vector_field.jet_function(jet_coords=Ms[:ode_order], t=t)
         fx = tree.tree_map(lambda s: -s, [fm])
         linop = func.jacrev(a1)(rv.mean_flat)
         noise = DenseNormal.from_dirac(fx, damp=damp)
@@ -496,7 +496,7 @@ class DenseOdeTs1(api.AbstractOde):
 
         def vf_flat(s: Array) -> Array:
             [s0] = rv0.tree_flatten.unflatten_array(s)
-            fs0 = self.vector_field(jet_coords=[s0], t=t)
+            fs0 = self.vector_field.jet_function(jet_coords=[s0], t=t)
             return rv0.tree_flatten.flatten_tree([fs0])
 
         def select_i(i) -> Callable[[Array], Array]:
@@ -536,7 +536,7 @@ class DenseRoot(api.AbstractRoot):
         relevant_tcoeffs = m_tree[: self.root.num_derivatives_in_args]
 
         # Evaluate the root
-        root_eval = self.root(jet_coords=relevant_tcoeffs, t=t)
+        root_eval = self.root.jet_function(jet_coords=relevant_tcoeffs, t=t)
 
         # Flatten the output so that the Jacobians are matrices, not Pytrees.
         return tree.ravel_pytree(root_eval)[0]
@@ -562,7 +562,7 @@ class DenseRoot(api.AbstractRoot):
         m_tree = rv.mean
         relevant_tcoeffs = m_tree[: self.root.num_derivatives_in_args]
         root_eval = func.eval_shape(
-            lambda s: [self.root(jet_coords=s, t=t)], relevant_tcoeffs
+            lambda s: [self.root.jet_function(jet_coords=s, t=t)], relevant_tcoeffs
         )
 
         # Ensure that unravelling does not yield a ShapeDtypeStruct

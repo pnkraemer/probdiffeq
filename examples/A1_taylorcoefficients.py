@@ -15,7 +15,7 @@ def main():
     """Explore different Taylor coefficients."""
     # We start by defining an ODE.
 
-    @jax.jit
+    @probdiffeq.ode_vector_field
     def vf(y, /, *, t):
         """Evaluate the dynamics of the logistic ODE."""
         del t  # unused argument
@@ -28,8 +28,9 @@ def main():
 
     # It's time to solve some ODEs:
 
-    tcoeffs = probdiffeq.jetexpand_ode_padded_scan(lambda *y: vf(*y, t=t0), [u0], num=2)
-    solution = jax.jit(solve, static_argnums=[0])(vf, tcoeffs, t0=t0, t1=t1)
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
+    tcoeffs_list, _ = jetexpand(vf, (u0,), t=t0)
+    solution = jax.jit(solve, static_argnums=[0])(vf, tcoeffs_list, t0=t0, t1=t1)
 
     print()
     print("Probabilistic solution:")
@@ -39,7 +40,7 @@ def main():
 
     print()
     print("Solution matches initial condition:")
-    print(jax.tree.map(jnp.shape, tcoeffs))
+    print(jax.tree.map(jnp.shape, tcoeffs_list))
     print(jax.tree.map(jnp.shape, solution.u))
 
     # Anything that behaves like a list work.
@@ -48,7 +49,7 @@ def main():
     CustomTCoeffs = collections.namedtuple(
         "CustomTCoeffs", ["state", "velocity", "acceleration"]
     )
-    tcoeffs = CustomTCoeffs(*tcoeffs)
+    tcoeffs = CustomTCoeffs(*tcoeffs_list)
     solution = jax.jit(solve, static_argnums=[0])(vf, tcoeffs, t0=t0, t1=t1)
 
     print()
@@ -72,6 +73,10 @@ def main():
     print(jax.tree.map(jnp.shape, solution.u.std))
     print(jax.tree.map(jnp.shape, sample_one))
     print(jax.tree.map(jnp.shape, sample_many))
+    assert isinstance(solution.u.mean, CustomTCoeffs)
+    assert isinstance(solution.u.std, CustomTCoeffs)
+    assert isinstance(sample_one, CustomTCoeffs)
+    assert isinstance(sample_many, CustomTCoeffs)
 
 
 def solve(vf, tc, *, t0, t1):

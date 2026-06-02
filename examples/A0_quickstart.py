@@ -16,7 +16,7 @@ def main():
     """Solve the logistic equation."""
     # Define a differential equation
 
-    @jax.jit
+    @probdiffeq.ode_vector_field
     def vf(y, /, *, t):
         """Evaluate the dynamics of the logistic ODE."""
         del t  # unused argument
@@ -30,7 +30,8 @@ def main():
     ssm = probdiffeq.state_space_model()
 
     # Build a solver
-    tcoeffs = probdiffeq.jetexpand_ode_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=1)
+    tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)

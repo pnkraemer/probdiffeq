@@ -90,9 +90,12 @@ class JetFunction:
     """
 
     def __init__(
-        self, func, /, jacobian: jacobians.JacobianHandler, num_derivatives_in_args: int
+        self,
+        jet_function,
+        jacobian: jacobians.JacobianHandler,
+        num_derivatives_in_args: int,
     ):
-        self._func = func
+        self.jet_function = jet_function
 
         self.jacobian = jacobian
         self.num_derivatives_in_args = num_derivatives_in_args
@@ -100,31 +103,16 @@ class JetFunction:
     def __repr__(self):
         return f"{self.__class__.__name__}(num_derivatives_in_args={self.num_derivatives_in_args}, jacobian={self.jacobian})"
 
-    def __call__(self, *, jet_coords: Sequence[T], t: Array) -> T:
+    def __call__(self, *jet_coords: *tuple[T], t: Array) -> T:
+        """Make the vector field callable like the original user function to hide the "sophisticated" API."""
         # jet_coords = (u(t), u'(t), u''(t), ..., u^(K)(t))
-        return self._func(jet_coords=jet_coords, t=t)
-
-    @classmethod
-    def from_callable(
-        cls,
-        jet_function,
-        /,
-        *,
-        num_derivatives_in_args: int,
-        jacobian: jacobians.JacobianHandler,
-    ):
-
-        return cls(
-            jet_function,
-            num_derivatives_in_args=num_derivatives_in_args,
-            jacobian=jacobian,
-        )
+        return self.jet_function(jet_coords=jet_coords, t=t)
 
 
 def ode_vector_field(
     func: ZeroJetFunction, /, *, jacobian: jacobians.JacobianHandler | None = None
 ) -> JetFunction:
-    """A description of an explicit ODE y^{(K)} = f(y, y', ..., y^{(K-1)}, t)."""
+    """Construct a description of an explicit ODE y^{(K)} = f(y, y', ..., y^{(K-1)}, t)."""
 
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
         (y,) = jet_coords
@@ -133,15 +121,13 @@ def ode_vector_field(
     if jacobian is None:
         jacobian = jacobians.jacobian_hutchinson_fwd()
 
-    return JetFunction.from_callable(
-        jetfunc, jacobian=jacobian, num_derivatives_in_args=1
-    )
+    return JetFunction(jetfunc, jacobian=jacobian, num_derivatives_in_args=1)
 
 
 def ode_vector_field_second_order(
     func: OneJetFunction, /, *, jacobian: jacobians.JacobianHandler | None = None
 ) -> JetFunction:
-    """A description of an explicit ODE y^{(K)} = f(y, y', ..., y^{(K-1)}, t)."""
+    """Construct a description of an explicit ODE y^{(K)} = f(y, y', ..., y^{(K-1)}, t)."""
 
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
         (y, dy) = jet_coords
@@ -150,15 +136,13 @@ def ode_vector_field_second_order(
     if jacobian is None:
         jacobian = jacobians.jacobian_hutchinson_fwd()
 
-    return JetFunction.from_callable(
-        jetfunc, jacobian=jacobian, num_derivatives_in_args=2
-    )
+    return JetFunction(jetfunc, jacobian=jacobian, num_derivatives_in_args=2)
 
 
 def root_state(
     func: ZeroJetFunction, /, *, jacobian: jacobians.JacobianHandler | None = None
 ) -> JetFunction:
-    """A description of a root f(u, t) = 0."""
+    """Construct a description of a root f(u, t) = 0."""
 
     # No implementation difference between ode and implicit, but
     # we don't want to force the user to think in terms of jet functions
@@ -170,15 +154,13 @@ def root_state(
     if jacobian is None:
         jacobian = jacobians.jacobian_hutchinson_fwd()
 
-    return JetFunction.from_callable(
-        jetfunc, jacobian=jacobian, num_derivatives_in_args=1
-    )
+    return JetFunction(jetfunc, jacobian=jacobian, num_derivatives_in_args=1)
 
 
 def root_state_and_velocity(
     func: OneJetFunction, /, *, jacobian: jacobians.JacobianHandler | None = None
 ) -> JetFunction:
-    """A description of a root f(u, du, t) = 0."""
+    """Construct a description of a root f(u, du, t) = 0."""
 
     # No implementation difference between ode and implicit, but
     # we don't want to force the user to think in terms of jet functions
@@ -190,9 +172,7 @@ def root_state_and_velocity(
     if jacobian is None:
         jacobian = jacobians.jacobian_hutchinson_fwd()
 
-    return JetFunction.from_callable(
-        jetfunc, jacobian=jacobian, num_derivatives_in_args=2
-    )
+    return JetFunction(jetfunc, jacobian=jacobian, num_derivatives_in_args=2)
 
 
 class DAESystem:
@@ -231,7 +211,7 @@ def jet_lift(jetfun: JetFunction, lift_by: int):
         # Flatten the root because jax.jet is a bit high maintenance :)
         def jet_call(*y):
             y_tree = [unravel_one(s) for s in y]
-            fx = jetfun(jet_coords=y_tree, t=t)
+            fx = jetfun.jet_function(jet_coords=y_tree, t=t)
             return tree.ravel_pytree(fx)[0]
 
         flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]

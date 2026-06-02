@@ -61,8 +61,9 @@ def test_approximation_identical_to_reference_doubling(
 
 
 @testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_")
-def test_raises_error_for_non_ode_input(taylor_fun, num) -> None:
+def test_raises_error_for_non_ode_input(taylor_fun) -> None:
     def f(y, /, *, t):
+        del t
         return y
 
     with testing.raises(TypeError, match="Expected type"):

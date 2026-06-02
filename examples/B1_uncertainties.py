@@ -15,7 +15,7 @@ jax.config.update("jax_debug_nans", True)
 def main():
     """Plot means and standard deviations of solvers."""
 
-    @jax.jit
+    @probdiffeq.ode_vector_field
     def vf(y, /, *, t):  # noqa: ARG001
         """Evaluate the Lotka-Volterra vector field."""
         y0, y1 = y[0], y[1]
@@ -32,7 +32,8 @@ def main():
     #
     # To all users: Try replacing the fixedpoint-smoother with a filter!
 
-    tcoeffs = probdiffeq.jetexpand_ode_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=3)
+    tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact="blockdiag")
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)

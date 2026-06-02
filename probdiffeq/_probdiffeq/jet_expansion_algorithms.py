@@ -76,7 +76,7 @@ def jetexpand_ode_padded_scan(
         num_arguments = len(inits)
 
         # Initial Taylor series (u_0, u_1, ..., u_k)
-        primals = vf(jet_coords=inits, t=t)
+        primals = vf.jet_function(jet_coords=inits, t=t)
         taylor_coeffs = [*inits, primals]
 
         # Early exit for num=1.
@@ -142,7 +142,7 @@ def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg[problem_types.JetFuncti
         increment = jetexpand_ode_coefficient_increment(num_arguments=num_arguments)
 
         # Initial Taylor series (u_0, u_1, ..., u_k)
-        primals = vf(jet_coords=inits, t=t)
+        primals = vf.jet_function(jet_coords=inits, t=t)
         taylor_coeffs = [*inits, primals]
 
         for _ in range(num - 1):
@@ -159,7 +159,7 @@ def jetexpand_ode_coefficient_increment(*, num_arguments):
         vf: problem_types.JetFunction, taylor_coeffs: Sequence[T], *, t: float
     ) -> list[T]:
         def vf_with_kwargs(*u: *tuple[T, ...]) -> T:
-            return vf(jet_coords=u, t=t)
+            return vf.jet_function(jet_coords=u, t=t)
 
         primals, series = utilities.jet_coords_to_primals_and_series(
             taylor_coeffs, num_arguments
@@ -189,10 +189,10 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg[problem_types.JetFunct
         vf_wrapped = func.partial(vf, t=t)
         g_n, g_0 = vf_wrapped, vf_wrapped
 
-        taylor_coeffs = [*inits, vf(jet_coords=inits, t=t)]
+        taylor_coeffs = [*inits, vf.jet_function(jet_coords=inits, t=t)]
         for _ in range(num - 1):
             g_n = _fwd_recursion_iterate(fun_n=g_n, fun_0=g_0)
-            taylor_coeffs = [*taylor_coeffs, g_n(jet_coords=inits)]
+            taylor_coeffs = [*taylor_coeffs, g_n.jet_function(jet_coords=inits)]
         return taylor_coeffs, {}
 
     return expand
@@ -203,11 +203,11 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
 
     def df(*, jet_coords: Sequence[T]) -> Sequence[T]:
         # Assign primals and tangents for the JVP
-        vals = (*jet_coords, fun_0(jet_coords=jet_coords))
+        vals = (*jet_coords, fun_0.jet_function(jet_coords=jet_coords))
         primals_in, tangents_in = vals[:-1], vals[1:]
 
         _, tangents_out = func.jvp(
-            lambda *a: fun_n(jet_coords=a), primals_in, tangents_in
+            lambda *a: fun_n.jet_function(jet_coords=a), primals_in, tangents_in
         )
         return tangents_out
 
@@ -305,7 +305,7 @@ def jetexpand_ode_coefficient_double() -> JetExpansionAlg[problem_types.JetFunct
         coeffs_emb = [*c] + [zeros] * degree
         p, *s = coeffs_emb
         p_new, s_new = func.jet(
-            lambda *u: vf(jet_coords=u, t=t), (p,), (s,), is_tcoeff=True
+            lambda *u: vf.jet_function(jet_coords=u, t=t), (p,), (s,), is_tcoeff=True
         )
         return np.stack([p_new, *s_new])
 
@@ -319,7 +319,7 @@ def _unnormalise(primals, *series):
 
 
 def _error_if_vf_not_odefunction_type(expand):
-    """A decorator to check that the vector field is of type JetFunction."""
+    """Construct a decorator to check that the vector field is of type JetFunction."""
 
     def expand_wrapped(vf, inits, /, *, t: float):
         if not isinstance(vf, problem_types.JetFunction):
@@ -332,7 +332,7 @@ def _error_if_vf_not_odefunction_type(expand):
 
 
 def _allow_pytree_inits(expand):
-    """A decorator to allow pytrees as initial conditions in jet expansion algorithms."""
+    """Construct a decorator to allow pytrees as initial conditions in jet expansion algorithms."""
 
     def expand_wrapped(vf, inits, /, *, t: float):
         """Allow pytrees as initial conditions in jet expansion algorithms.
@@ -350,7 +350,7 @@ def _allow_pytree_inits(expand):
                 @probdiffeq.ode_vector_field
                 def vf_wrapped(y: T, /, *, t: float) -> T:
                     y = tree.tree_map(unravel, y)
-                    fy = vf(jet_coords=(y,), t=t)
+                    fy = vf.jet_function(jet_coords=(y,), t=t)
                     return tree.ravel_pytree(fy)[0]
             elif vf.num_derivatives_in_args == 2:
 
@@ -358,7 +358,7 @@ def _allow_pytree_inits(expand):
                 def vf_wrapped(y: T, dy: T, /, *, t: float) -> T:
                     y = tree.tree_map(unravel, y)
                     dy = tree.tree_map(unravel, dy)
-                    fy = vf(jet_coords=(y, dy), t=t)
+                    fy = vf.jet_function(jet_coords=(y, dy), t=t)
                     return tree.ravel_pytree(fy)[0]
             else:
                 raise ValueError
@@ -442,7 +442,10 @@ def jetexpand_dae_nlstsq(
                 tcoeffs_all, dae.differential.num_derivatives_in_args
             )
             primals1, series1 = func.jet(
-                lambda *s: dae.differential(jet_coords=s, t=t), ps, ss, is_tcoeff=False
+                lambda *s: dae.differential.jet_function(jet_coords=s, t=t),
+                ps,
+                ss,
+                is_tcoeff=False,
             )
 
             # Algebraic part
@@ -451,7 +454,10 @@ def jetexpand_dae_nlstsq(
                 tcoeffs_all, dae.algebraic.num_derivatives_in_args
             )
             primals2, series2 = func.jet(
-                lambda *s: dae.algebraic(jet_coords=s, t=t), ps, ss, is_tcoeff=False
+                lambda *s: dae.algebraic.jet_function(jet_coords=s, t=t),
+                ps,
+                ss,
+                is_tcoeff=False,
             )
 
             # Put together (order doesn't matter)

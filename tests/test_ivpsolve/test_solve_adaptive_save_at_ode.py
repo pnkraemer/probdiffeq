@@ -130,7 +130,7 @@ def case_factory_constraint_root_ts1(ivp):
 
     @func.partial(probdiffeq.root_state_and_velocity, jacobian=jacobian)
     def root(u, du, /, *, t):
-        return tree.tree_map(lambda a, b: a - b, du, vf(jet_coords=(u,), t=t))
+        return tree.tree_map(lambda a, b: a - b, du, vf(u, t=t))
 
     def constraint_residual(vf, **kwargs):
         try:

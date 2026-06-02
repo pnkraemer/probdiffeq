@@ -12,7 +12,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -215,7 +215,7 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
         nlstsq = probdiffeq.wlstsq_nc_gauss_newton(
             maxiter=10, tol=jnp.finfo(y0[0].dtype).eps ** 0.5
         )
-        tcoeffs, _info = diffeqjet.daejet_nlstsq(
+        tcoeffs, _info = probdiffeq.daejet_nlstsq(
             differential_auto, algebraic_auto, y0, num=num_derivatives, nlstsq=nlstsq
         )
         ssm = probdiffeq.state_space_model()

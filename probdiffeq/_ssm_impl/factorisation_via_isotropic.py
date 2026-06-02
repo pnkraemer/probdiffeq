@@ -437,7 +437,7 @@ class IsotropicOdeTs0(api.AbstractOde):
         del state
         Ms = rv.mean
         jet_coords = Ms[: self.vector_field.num_derivatives_in_args]
-        fx_tree = self.vector_field(jet_coords=jet_coords, t=t)
+        fx_tree = self.vector_field.jet_function(jet_coords=jet_coords, t=t)
         fx = tree.tree_map(lambda s: -s, fx_tree)
 
         bias = IsotropicNormal.from_dirac([fx], damp=damp)
@@ -465,7 +465,7 @@ class IsotropicOdeTs1(api.AbstractOde):
 
         def vf_ravel(s):
             s_tree = rv0.tree_flatten.unflatten_array(s[None])
-            fs = self.vector_field(jet_coords=s_tree, t=t)
+            fs = self.vector_field.jet_function(jet_coords=s_tree, t=t)
             return tree.ravel_pytree(fs)[0]
 
         # Estimate the trace using Hutchinson's estimator

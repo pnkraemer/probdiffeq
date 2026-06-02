@@ -141,10 +141,7 @@ def test_posterior_linearisation_matches_closed_form_recursion(
         [root.u0], diffuse_derivatives=derivatives, ssm=ssm
     )
 
-    if lift_by == "max":
-        lift_by = len(expected) - 2
-    else:
-        lift_by = lift_by
+    lift_by = len(expected) - 2 if lift_by == "max" else lift_by
     constraint = jet_factory(ssm=ssm, lift_by=lift_by)
 
     cstate = constraint.init_linearization()

@@ -10,6 +10,8 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
+from probdiffeq import probdiffeq
+
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
 

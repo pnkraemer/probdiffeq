@@ -17,7 +17,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import scipy.integrate
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -28,6 +28,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
 
+    @probdiffeq.root_state_and_velocity
     def differential(u, du, /, *, t):
         del t
         return du[:2] - dynamics(u)
@@ -38,23 +39,17 @@ def main(t0=1e-6, t1=1e5) -> None:
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
         return jnp.stack([f0, f1])
 
+    @probdiffeq.root_state
     def algebraic(u, *, t):
         del t
         return u[0] + u[1] + u[2] - 1
 
-    def differential_auto(u, du):
-        return differential(u, du, t=t0)
-
-    def algebraic_auto(u):
-        return algebraic(u, t=t0)
-
     ssm = probdiffeq.state_space_model()
 
-    y0 = [jnp.array([1.0, 0.0, 0.0])]
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=10, tol=1e-8)
-    y0, _info = diffeqjet.daejet_nlstsq(
-        differential_auto, algebraic_auto, y0, num=4, nlstsq=nlstsq
-    )
+    jetexpand = probdiffeq.jetexpand_dae_nlstsq(num=4, nlstsq=nlstsq)
+    dae = probdiffeq.dae(differential, algebraic)
+    y0, _info = jetexpand(dae, [jnp.array([1.0, 0.0, 0.0])], t=t0)
 
     # This base scale is critical to Robertson, because
     # the solutions live on vastly different scales
@@ -66,9 +61,7 @@ def main(t0=1e-6, t1=1e5) -> None:
 
     # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
     linearization = probdiffeq.linearization_map(nlstsq)
-    jet = probdiffeq.constraint_dae(
-        differential, algebraic, ssm=ssm, linearization=linearization
-    )
+    jet = probdiffeq.constraint_dae(dae, ssm=ssm, linearization=linearization)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_dynamic(
         strategy=strategy, prior=ioup, constraint=jet, ssm=ssm
