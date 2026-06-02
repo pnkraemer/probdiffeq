@@ -439,6 +439,9 @@ class DenseLinearizationFactory(api.AbstractLinearizationFactory):
     def root(self, root, *, linearization):
         return DenseRoot(root, linearization=linearization)
 
+    def dae_posterior_linearization(self, *, dae, linearization):
+        return DenseDAEPosteriorLinearization(dae=dae, linearization=linearization)
+
     def ode_taylor_0th(self, *, vector_field):
         return DenseOdeTs0(vector_field=vector_field)
 
@@ -533,7 +536,7 @@ class DenseRoot(api.AbstractRoot):
         relevant_tcoeffs = m_tree[: self.root.num_derivatives_in_args]
 
         # Evaluate the root
-        root_eval = self.root(u=relevant_tcoeffs, t=t)
+        root_eval = self.root(jet_coords=relevant_tcoeffs, t=t)
 
         # Flatten the output so that the Jacobians are matrices, not Pytrees.
         return tree.ravel_pytree(root_eval)[0]
@@ -558,7 +561,9 @@ class DenseRoot(api.AbstractRoot):
         # pytree structure.)
         m_tree = rv.mean
         relevant_tcoeffs = m_tree[: self.root.num_derivatives_in_args]
-        root_eval = func.eval_shape(lambda s: [self.root(u=s, t=t)], relevant_tcoeffs)
+        root_eval = func.eval_shape(
+            lambda s: [self.root(jet_coords=s, t=t)], relevant_tcoeffs
+        )
 
         # Ensure that unravelling does not yield a ShapeDtypeStruct
         root_eval = tree.tree_map(np.zeros_like, root_eval)
@@ -566,6 +571,61 @@ class DenseRoot(api.AbstractRoot):
 
         # Turn the linearization into a conditional
         noise = DenseNormal.from_dirac(unravel(fx), damp=damp)
+
+        cond = api.LatentCond.from_linop_and_noise(linop, noise)
+        return cond, state
+
+
+class DenseDAEPosteriorLinearization(api.AbstractDAEPosteriorLinearization):
+    def init_linearization(self):
+        # Skip the algebraic Jacobian because constraints get stacked
+        # TODO: handle Jacobians separately and combine later
+        return self.dae.differential.jacobian.init_jacobian_handler()
+
+    def constraint_flat(self, m: Array, *, t, tree_flatten) -> Array:
+        """Evaluate a flattened version of the root constraint."""
+        # Unravel the location and extract derivatives
+        m_tree = tree_flatten.unflatten_array(m)
+
+        # Evaluate the root
+
+        jet_order1 = self.dae.differential.num_derivatives_in_args
+        diff_eval1 = self.dae.differential(jet_coords=m_tree[:jet_order1], t=t)
+
+        jet_order2 = self.dae.algebraic.num_derivatives_in_args
+        diff_eval2 = self.dae.algebraic(jet_coords=m_tree[:jet_order2], t=t)
+
+        # Flatten the output so that the Jacobians are matrices, not Pytrees.
+        return tree.ravel_pytree([diff_eval1, diff_eval2])[0]
+
+    def linearize(self, rv, state, *, damp: float, t):
+
+        # Fix all arguments except the Array ones
+        constraint_flat = func.partial(
+            self.constraint_flat, t=t, tree_flatten=rv.tree_flatten
+        )
+
+        # Get the linearization point (eg prior or posterior linearisation)
+        mean = self.linearization(constraint_flat, rv)
+
+        fx, linop, state = self.dae.differential.jacobian.materialize_dense(
+            constraint_flat, mean, state
+        )
+        fx = fx - linop @ mean
+
+        # # Find the tree structure of the output constraint
+        # # (So that we can unravel the bias term and always work in the correct
+        # # pytree structure.)
+        # m_tree = rv.mean
+        # relevant_tcoeffs = m_tree[: self.root.num_derivatives_in_args]
+        # root_eval = func.eval_shape(lambda s: [self.root(u=s, t=t)], relevant_tcoeffs)
+
+        # # Ensure that unravelling does not yield a ShapeDtypeStruct
+        # root_eval = tree.tree_map(np.zeros_like, root_eval)
+        # _, unravel = tree.ravel_pytree(root_eval)
+
+        # Turn the linearization into a conditional
+        noise = DenseNormal.from_dirac([fx], damp=damp)
 
         cond = api.LatentCond.from_linop_and_noise(linop, noise)
         return cond, state

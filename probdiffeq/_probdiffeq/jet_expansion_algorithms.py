@@ -1,7 +1,7 @@
 r"""Evaluate jet-recursions in differential equations."""
 
 from probdiffeq import probdiffeq
-from probdiffeq._probdiffeq import vector_fields
+from probdiffeq._probdiffeq import utilities, vector_fields
 from probdiffeq.backend import flow, func, np, tree
 from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeVar
 
@@ -69,7 +69,7 @@ def jetexpand_ode_padded_scan(*, num: int) -> JetExpansionAlg:
         num_arguments = len(inits)
 
         # Initial Taylor series (u_0, u_1, ..., u_k)
-        primals = vf(u=inits, t=t)
+        primals = vf(jet_coords=inits, t=t)
         taylor_coeffs = [*inits, primals]
 
         increment = jetexpand_ode_coefficient_increment(num_arguments=num_arguments)
@@ -131,7 +131,7 @@ def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg:
         num_arguments = len(inits)
 
         # Initial Taylor series (u_0, u_1, ..., u_k)
-        primals = vf(u=inits, t=t)
+        primals = vf(jet_coords=inits, t=t)
         taylor_coeffs = [*inits, primals]
 
         increment = jetexpand_ode_coefficient_increment(num_arguments=num_arguments)
@@ -140,41 +140,6 @@ def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg:
         return taylor_coeffs
 
     return expand
-
-
-def jet_unpack_series(taylor_series, num, /):
-    """Compute Jet-compatible arguments from a Taylor series.
-
-    That is, for a function like f(u, u'), the present function
-    turns a Taylor series (u, u', u'', ...) into arguments
-    compatible with jax.experimental.jet.
-
-    Arguments
-    ---------
-    taylor_series
-        A sequence of arrays to evaluate the Taylor series at.
-    num
-        The number of inputs to the root
-        (2 for a first-order ODE, 3 for second-order, etc.)
-
-    Examples
-    --------
-    >>> a = (1, 2, 3, 4, 5)
-    >>> print(jet_unpack_series(a, n=1))
-    [1], [(1, 2, 3, 4, 5)]
-    >>> print(jet_unpack_series(a, n=2))
-    [1, 2], [(1, 2, 3, 4), (2, 3, 4, 5)]
-    >>> print(jet_unpack_series(a, n=3))
-    [1, 2, 3], [(1, 2, 3), (2, 3, 4), (3, 4, 5)]
-
-    """
-    primals, series = taylor_series[:num], taylor_series[1:]
-
-    def mask(i):
-        return None if i == 0 else i
-
-    series_ = [series[mask(k) : mask(k + 1 - num)] for k in range(num)]
-    return primals, series_
 
 
 def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg:
@@ -188,7 +153,7 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg:
     @_error_if_vf_not_odefunction_type
     @_allow_pytree_inits
     def expand(
-        vf: vector_fields.VectorField, inits: Sequence[T], /, *, t: float | Array
+        vf: vector_fields.JetFunction, inits: Sequence[T], /, *, t: float | Array
     ) -> Sequence[T]:
         if num == 0:
             return inits
@@ -196,7 +161,7 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg:
         vf_wrapped = func.partial(vf, t=t)
         g_n, g_0 = vf_wrapped, vf_wrapped
 
-        taylor_coeffs = [*inits, vf(u=inits, t=t)]
+        taylor_coeffs = [*inits, vf(jet_coords=inits, t=t)]
         for _ in range(num - 1):
             g_n = _fwd_recursion_iterate(fun_n=g_n, fun_0=g_0)
             taylor_coeffs = [*taylor_coeffs, g_n(u=inits)]
@@ -253,9 +218,11 @@ def jetexpand_ode_coefficient_increment(*, num_arguments) -> JetExpansionAlg:
 
     def increment(vf, taylor_coeffs: Sequence[T], *, t: float | Array) -> Sequence[T]:
         def vf_with_kwargs(*u: *Sequence[T]) -> T:
-            return vf(u=u, t=t)
+            return vf(jet_coords=u, t=t)
 
-        primals, series = jet_unpack_series(taylor_coeffs, num_arguments)
+        primals, series = utilities.jet_coords_to_primals_and_series(
+            taylor_coeffs, num_arguments
+        )
         p, s_new = func.jet(vf_with_kwargs, primals=primals, series=series)
         return [*primals, p, *s_new]
 
@@ -317,7 +284,9 @@ def jetexpand_ode_coefficient_double() -> JetExpansionAlg:
 
         coeffs_emb = [*c] + [zeros] * degree
         p, *s = coeffs_emb
-        p_new, s_new = func.jet(lambda *u: vf(u=u, t=t), (p,), (s,), is_tcoeff=True)
+        p_new, s_new = func.jet(
+            lambda *u: vf(jet_coords=u, t=t), (p,), (s,), is_tcoeff=True
+        )
         return np.stack([p_new, *s_new])
 
     return double
@@ -330,11 +299,11 @@ def _unnormalise(primals, *series):
 
 
 def _error_if_vf_not_odefunction_type(expand):
-    """A decorator to check that the vector field is of type VectorField."""
+    """A decorator to check that the vector field is of type JetFunction."""
 
     def expand_wrapped(vf, inits, /, *, t: float | Array):
-        if not isinstance(vf, vector_fields.VectorField):
-            msg = f"Expected type {vector_fields.VectorField}, but got {vf} of type {type(vf)}. "
+        if not isinstance(vf, vector_fields.JetFunction):
+            msg = f"Expected type {vector_fields.JetFunction}, but got {vf} of type {type(vf)}. "
             msg += "Make sure to wrap your vector field with `probdiffeq.ode()`."
             raise TypeError(msg)
         return expand(vf, inits, t=t)
@@ -361,7 +330,7 @@ def _allow_pytree_inits(expand):
                 @probdiffeq.ode
                 def vf_wrapped(y: T, /, *, t) -> T:
                     y = tree.tree_map(unravel, y)
-                    fy = vf(u=(y,), t=t)
+                    fy = vf(jet_coords=(y,), t=t)
                     return tree.ravel_pytree(fy)[0]
 
             elif vf.num_derivatives_in_args == 2:
@@ -370,7 +339,7 @@ def _allow_pytree_inits(expand):
                 def vf_wrapped(y: T, dy: T, /, *, t):
                     y = tree.tree_map(unravel, y)
                     dy = tree.tree_map(unravel, dy)
-                    fy = vf(u=(y, dy), t=t)
+                    fy = vf(jet_coords=(y, dy), t=t)
                     return tree.ravel_pytree(fy)[0]
 
             else:
@@ -447,7 +416,7 @@ def jetexpand_dae_nlstsq(num: int, nlstsq: Callable) -> JetExpansionAlg:
 
             # Differential part.
             # Assumes that the DAE is first order.
-            ps, ss = jet_unpack_series(
+            ps, ss = utilities.jet_coords_to_primals_and_series(
                 tcoeffs_all, dae.differential.num_derivatives_in_args
             )
             primals1, series1 = func.jet(
@@ -456,7 +425,7 @@ def jetexpand_dae_nlstsq(num: int, nlstsq: Callable) -> JetExpansionAlg:
 
             # Algebraic part
             # Assumes that the DAE is first order.
-            ps, ss = jet_unpack_series(
+            ps, ss = utilities.jet_coords_to_primals_and_series(
                 tcoeffs_all, dae.algebraic.num_derivatives_in_args
             )
             primals2, series2 = func.jet(

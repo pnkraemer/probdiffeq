@@ -41,10 +41,9 @@ IsotropicOdeTs0(ode_order=2)
 
 """
 
-from probdiffeq import diffeqjet, ssm_impl
-from probdiffeq._probdiffeq import jacobians, linearizations, vector_fields
-from probdiffeq.backend import func, tree
-from probdiffeq.backend.typing import Callable, Literal, Protocol, Sequence, TypeVar
+from probdiffeq import ssm_impl
+from probdiffeq._probdiffeq import linearizations, vector_fields
+from probdiffeq.backend.typing import Callable, Protocol, Sequence, TypeVar
 
 __all__ = [
     "Constraint",
@@ -92,7 +91,7 @@ class Constraint(Protocol):
 
 
 def constraint_ode_ts0(
-    vf: vector_fields.VectorField, /, *, ssm: ssm_impl.FactSsmImpl
+    vf: vector_fields.JetFunction, /, *, ssm: ssm_impl.FactSsmImpl
 ) -> Constraint:
     r"""Create an ODE constraint with zeroth-order Taylor linearisation.
 
@@ -122,7 +121,7 @@ def constraint_ode_ts0(
     return ssm.linearize.ode_taylor_0th(vector_field=vf)
 
 
-def constraint_ode_ts1(vf: vector_fields.VectorField, /, *, ssm: ssm_impl.FactSsmImpl):
+def constraint_ode_ts1(vf: vector_fields.JetFunction, /, *, ssm: ssm_impl.FactSsmImpl):
     r"""Create an ODE constraint and linearise with a first-order Taylor approximation.
 
     This constraint handles ODEs of the form
@@ -245,14 +244,10 @@ def constraint(
 
 
 def constraint_dae(
-    differential: Callable,
-    algebraic: Callable,
+    dae: vector_fields.DAESystem,
     *,
     ssm: ssm_impl.FactSsmImpl,
-    jacobian: jacobians.JacobianHandler | None = None,
     linearization: linearizations.Linearization | None = None,
-    jet_order_differential: int | Literal["max"] = "max",
-    jet_order_algebraic: int | Literal["max"] = "max",
 ):
     r"""Like `constraint`, but for DAEs.
 
@@ -294,73 +289,77 @@ def constraint_dae(
     jet_order_algebraic
         The order of the jet linearization for the algebraic root. If "max", the jet order is as large as possible given the number of Taylor coefficients provided by the solver. Otherwise, the jet order is an integer specifying the order of the jet linearization. For instance, if the solver provides Taylor coefficients up to order 5 and the algebraic root is of order 1, then the jet order can be at most 4.
     """
-    root_order_diff = _verify_vector_field_signature_and_parse_order(differential)
-    root_order_alg = _verify_vector_field_signature_and_parse_order(algebraic)
-
-    if jacobian is None:
-        jacobian = jacobians.jacobian_hutchinson_fwd()
-
     if linearization is None:
         linearization = linearizations.linearization_prior_mean()
 
-    def root_jet(*tcoeffs_all, t):
-        unravel = tree.ravel_pytree(tcoeffs_all[0])[1]
-
-        fx1 = jet_evaluate(
-            differential,
-            tcoeffs_all,
-            jet_order=jet_order_differential,
-            root_order=root_order_diff,
-            unravel=unravel,
-            t=t,
-        )
-        fx2 = jet_evaluate(
-            algebraic,
-            tcoeffs_all,
-            jet_order=jet_order_algebraic,
-            root_order=root_order_alg,
-            unravel=unravel,
-            t=t,
-        )
-
-        return [fx1, fx2]
-
-    def jet_evaluate(fun, tcoeffs_all, /, *, jet_order, root_order, unravel, t):
-        # Flatten the root because jax.jet is a bit high maintenance :)
-        def jet_call(*y):
-            y_tree = [unravel(s) for s in y]
-            fx = fun(*y_tree, t=t)
-            return tree.ravel_pytree(fx)[0]
-
-        if jet_order == "max":
-            tcoeffs = tcoeffs_all
-        else:
-            jet_order_upper = len(tcoeffs_all) - root_order
-            if jet_order < 0 or jet_order > jet_order_upper:
-                msg = "The provided jet-order is incompatible with the root order."
-                msg += f" Expected: 0 <= jet_order <= {jet_order_upper}."
-                msg += f" Received: jet_order == {jet_order}."
-                raise ValueError(msg)
-
-            order = jet_order + root_order
-            tcoeffs = tcoeffs_all[:order]
-
-        flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
-        ps, ss = diffeqjet.jet_unpack_series(flat, root_order)
-
-        if len(tree.tree_leaves(ss)) == 0:
-            fx = jet_call(*ps)
-            return [fx]
-        primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
-        return [primals, *series]
-
-    if jet_order_differential == "max" or jet_order_algebraic == "max":
-        return ssm.linearize.root(
-            root_jet, root_order="max", jacobian=jacobian, linearization=linearization
-        )
-    order_diff = root_order_diff + jet_order_differential
-    order_alg = root_order_alg + jet_order_algebraic
-    order = max(order_diff, order_alg)
-    return ssm.linearize.root(
-        root_jet, root_order=order, jacobian=jacobian, linearization=linearization
+    return ssm.linearize.dae_posterior_linearization(
+        dae=dae, linearization=linearization
     )
+
+    # root_order_diff = _verify_vector_field_signature_and_parse_order(differential)
+    # root_order_alg = _verify_vector_field_signature_and_parse_order(algebraic)
+
+    # if jacobian is None:
+    #     jacobian = jacobians.jacobian_hutchinson_fwd()
+
+    # def root_jet(*tcoeffs_all, t):
+    #     unravel = tree.ravel_pytree(tcoeffs_all[0])[1]
+
+    #     fx1 = jet_evaluate(
+    #         differential,
+    #         tcoeffs_all,
+    #         jet_order=jet_order_differential,
+    #         root_order=root_order_diff,
+    #         unravel=unravel,
+    #         t=t,
+    #     )
+    #     fx2 = jet_evaluate(
+    #         algebraic,
+    #         tcoeffs_all,
+    #         jet_order=jet_order_algebraic,
+    #         root_order=root_order_alg,
+    #         unravel=unravel,
+    #         t=t,
+    #     )
+
+    #     return [fx1, fx2]
+
+    # def jet_evaluate(fun, tcoeffs_all, /, *, jet_order, root_order, unravel, t):
+    #     # Flatten the root because jax.jet is a bit high maintenance :)
+    #     def jet_call(*y):
+    #         y_tree = [unravel(s) for s in y]
+    #         fx = fun(*y_tree, t=t)
+    #         return tree.ravel_pytree(fx)[0]
+
+    #     if jet_order == "max":
+    #         tcoeffs = tcoeffs_all
+    #     else:
+    #         jet_order_upper = len(tcoeffs_all) - root_order
+    #         if jet_order < 0 or jet_order > jet_order_upper:
+    #             msg = "The provided jet-order is incompatible with the root order."
+    #             msg += f" Expected: 0 <= jet_order <= {jet_order_upper}."
+    #             msg += f" Received: jet_order == {jet_order}."
+    #             raise ValueError(msg)
+
+    #         order = jet_order + root_order
+    #         tcoeffs = tcoeffs_all[:order]
+
+    #     flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
+    #     ps, ss = diffeqjet.jet_unpack_series(flat, root_order)
+
+    #     if len(tree.tree_leaves(ss)) == 0:
+    #         fx = jet_call(*ps)
+    #         return [fx]
+    #     primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
+    #     return [primals, *series]
+
+    # if jet_order_differential == "max" or jet_order_algebraic == "max":
+    #     return ssm.linearize.root(
+    #         root_jet, root_order="max", jacobian=jacobian, linearization=linearization
+    #     )
+    # order_diff = root_order_diff + jet_order_differential
+    # order_alg = root_order_alg + jet_order_algebraic
+    # order = max(order_diff, order_alg)
+    # return ssm.linearize.root(
+    #     root_jet, root_order=order, jacobian=jacobian, linearization=linearization
+    # )

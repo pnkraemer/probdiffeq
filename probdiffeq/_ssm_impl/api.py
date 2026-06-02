@@ -114,12 +114,34 @@ class AbstractRoot(AbstractLinearization):
         """The order of the root constraint."""
         return self.root.num_derivatives_in_args
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.root})"
+
+
+class AbstractDAEPosteriorLinearization(AbstractLinearization):
+    """Interface for linearizations of general roots."""
+
+    def __init__(self, *, dae, linearization) -> None:
+        self.dae = dae
+        self.linearization = linearization
+
+    @property
+    def root_order(self):
+        """The order of the root constraint."""
+        return self.root.num_derivatives_in_args
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.root})"
+
 
 class AbstractOde(AbstractLinearization):
     """Interface for linearizations of ODEs."""
 
     def __init__(self, *, vector_field) -> None:
         self.vector_field = vector_field
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.vector_field})"
 
     @property
     def root_order(self):
@@ -146,12 +168,18 @@ class AbstractLinearizationFactory(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_taylor_0th(self, ode_order: int) -> AbstractOde:
+    def dae_posterior_linearization(
+        self, *, dae, linearization
+    ) -> AbstractDAEPosteriorLinearization:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def ode_taylor_0th(self, *, vector_field) -> AbstractOde:
         """Construct an implementation of 0th-order Taylor-linearization for ODEs."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_taylor_1st(self, vf, *, ode_order: int) -> AbstractOde:
+    def ode_taylor_1st(self, *, vector_fied) -> AbstractOde:
         """Construct an implementation of 1st-order Taylor-linearization for ODEs."""
         raise NotImplementedError
 

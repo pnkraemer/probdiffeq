@@ -85,51 +85,50 @@ def fixture_root_sir():
 @testing.fixture(name="expected")
 @testing.parametrize("derivatives", [1, 5])
 def fixture_expected(root, derivatives):
-    def vf_autonomous(y, /):
-        return root.ode_vf(y, t=root.t0)
+    @probdiffeq.ode
+    def vf(y, /, *, t):
+        return root.ode_vf(y, t=t)
 
-    return probdiffeq.jetexpand_ode_padded_scan(
-        vf_autonomous, [root.u0], num=derivatives
-    )
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=derivatives)
+    return jetexpand(vf, [root.u0], t=root.t0)
 
 
-def case_jet_iterated_dae(root):
+def case_jet_dae_iterated(root):
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     linearization = probdiffeq.linearization_map(nlstsq)
 
-    def constraint(ssm, jet_order):
-        return probdiffeq.constraint_dae(
-            differential=root.root_dae_differential,
-            algebraic=root.root_dae_algebraic,
-            ssm=ssm,
-            linearization=linearization,
-            jet_order_differential=jet_order,
-            jet_order_algebraic=jet_order + 1 if jet_order != "max" else "max",
-        )
+    def constraint(ssm, lift_by: int):
+        differential = probdiffeq.implicit(root.root_dae_differential)
+        differential = probdiffeq.jet_lift(differential, lift_by=lift_by)
+        algebraic = probdiffeq.implicit(root.root_dae_algebraic)
+        algebraic = probdiffeq.jet_lift(algebraic, lift_by=lift_by + 1)
+        dae = probdiffeq.dae(differential, algebraic)
+
+        return probdiffeq.constraint_dae(dae, ssm=ssm, linearization=linearization)
 
     return constraint
 
 
-def case_jet_iterated(root):
+def case_jet_constraint_iterated(root):
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     linearization = probdiffeq.linearization_map(nlstsq)
 
-    def constraint(ssm, jet_order):
-        return probdiffeq.constraint(
-            root.root, ssm=ssm, linearization=linearization, jet_order=jet_order
-        )
+    def constraint(ssm, lift_by):
+        implicit = probdiffeq.implicit(root.root)
+        implicit = probdiffeq.jet_lift(implicit, lift_by=lift_by)
+        return probdiffeq.constraint(implicit, ssm=ssm, linearization=linearization)
 
     return constraint
 
 
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
-@testing.parametrize("jet_order", [0, "max"])
+@testing.parametrize("lift_by", [0, "max"])
 @testing.parametrize("ssm_fact", ["dense"])
 def test_posterior_linearisation_matches_closed_form_recursion(
     root: Root,
     jet_factory: Callable,
     expected: list,
-    jet_order: int | Literal["max"],
+    lift_by: int | Literal["max"],
     ssm_fact,
 ):
     derivatives = len(expected) - 1
@@ -137,7 +136,12 @@ def test_posterior_linearisation_matches_closed_form_recursion(
     init, _iwp = probdiffeq.prior_wiener_integrated(
         [root.u0], diffuse_derivatives=derivatives, ssm=ssm
     )
-    constraint = jet_factory(ssm=ssm, jet_order=jet_order)
+
+    if lift_by == "max":
+        lift_by = len(expected) - 2
+    else:
+        lift_by = lift_by
+    constraint = jet_factory(ssm=ssm, lift_by=lift_by)
 
     cstate = constraint.init_linearization()
     fx, cstate = constraint.linearize(init, cstate, damp=0.0, t=root.t0)
@@ -146,47 +150,25 @@ def test_posterior_linearisation_matches_closed_form_recursion(
 
     updated = ssm.conditional.apply_flat(0.0, reverted)
     received = updated.mean
-    if jet_order == "max":
+    if lift_by == "max":
         assert testing.allclose(received, expected)
     else:
-        assert testing.allclose(received[: 2 + jet_order], expected[: 2 + jet_order])
+        assert testing.allclose(received[: 2 + lift_by], expected[: 2 + lift_by])
 
 
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
-@testing.parametrize("wrong_jet_order", [-1, 4, 100])
+@testing.parametrize("wrong_lift_by", [-1, 4, 100])
 @testing.parametrize("ssm_fact", ["dense"])
-def test_wrong_jet_order_raises_error(
-    root: Root, jet_factory: Callable, wrong_jet_order, ssm_fact
+def test_wrong_lift_by_raises_error(
+    root: Root, jet_factory: Callable, wrong_lift_by, ssm_fact
 ):
     # 5 Taylor coefficients + root-orders of 2 (constraints depend on u and du).
     ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
     init, _ = probdiffeq.prior_wiener_integrated(
         [root.u0], diffuse_derivatives=4, ssm=ssm
     )
-    constraint = jet_factory(ssm=ssm, jet_order=wrong_jet_order)
+    constraint = jet_factory(ssm=ssm, lift_by=wrong_lift_by)
 
     cstate = constraint.init_linearization()
     with testing.raises(ValueError, match="Received"):
         _ = constraint.linearize(init, cstate, damp=0.0, t=root.t0)
-
-
-@testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
-@testing.parametrize("ssm_fact", ["dense"])
-def test_max_jet_order_is_tight(root: Root, jet_factory: Callable, ssm_fact):
-    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
-    init, _ = probdiffeq.prior_wiener_integrated(
-        [root.u0], diffuse_derivatives=4, ssm=ssm
-    )
-    c1 = jet_factory(ssm=ssm, jet_order="max")
-    cstate = c1.init_linearization()
-    output1 = c1.linearize(init, cstate, damp=0.0, t=root.t0)
-
-    # 5 Taylor coefficients (u, du, ddu, dddu)
-    # and a root-order of 2 (constraints depend on u and du)
-    # implies the max feasible jet order is 3
-    c2 = jet_factory(ssm=ssm, jet_order=3)
-    cstate = c2.init_linearization()
-    output2 = c2.linearize(init, cstate, damp=0.0, t=root.t0)
-
-    # The outputs should be identical
-    assert testing.allclose(output1, output2)
