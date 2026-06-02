@@ -1,18 +1,21 @@
 """Precompute and save reference solutions. Accelerate testing."""
 
-from probdiffeq.backend import func, np, ode
+from probdiffeq import probdiffeq
+from probdiffeq.backend import np, ode
 
 
 def three_body_first(num_derivatives_max=10):
     vf, (u0,), (t0, _) = ode.ivp_three_body_1st()
-    vf = func.partial(vf, t=t0)
-    return probdiffeq.jetexpand_ode_unroll(vf, (u0,), num=num_derivatives_max)
+    vf = probdiffeq.ode(vf)
+    jetexpand = probdiffeq.jetexpand_ode_unroll(num=num_derivatives_max)
+    return jetexpand(vf, (u0,), t=t0)
 
 
 def van_der_pol_second(num_derivatives_max=10):
     vf, (u0, du0), (t0, _) = ode.ivp_van_der_pol_2nd()
-    vf = func.partial(vf, t=t0)
-    return probdiffeq.jetexpand_ode_unroll(vf, (u0, du0), num=num_derivatives_max)
+    vf = probdiffeq.ode(vf)
+    jetexpand = probdiffeq.jetexpand_ode_unroll(num=num_derivatives_max)
+    return jetexpand(vf, (u0, du0), t=t0)
 
 
 if __name__ == "__main__":
