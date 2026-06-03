@@ -1,4 +1,4 @@
-from probdiffeq._ssm_impl import api, utilities
+from probdiffeq._ssm_impl import interfaces, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
@@ -21,16 +21,16 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class DensePriorFactory(api.AbstractPriorFactory):
+class DensePriorFactory(interfaces.AbstractPriorFactory):
     """Implementation of dense prior constructors."""
 
-    def identity(self, template) -> api.LatentCond:
+    def identity(self, template) -> interfaces.LatentCond:
         (n,) = template.mean_flat.shape
         A = np.eye(n)
         m = np.zeros((n,))
         C = np.zeros((n, n))
         noise = DenseNormal(m, C, template.tree_flatten)
-        return api.LatentCond.from_linop_and_noise(A, noise)
+        return interfaces.LatentCond.from_linop_and_noise(A, noise)
 
     def wiener_integrated(
         self,
@@ -99,7 +99,7 @@ class DensePriorFactory(api.AbstractPriorFactory):
 
             tree_flatten = DenseTreeFlatten.from_example(tcoeffs_mean)
             noise = DenseNormal(q0, output_scale * Q, tree_flatten)
-            return api.LatentCond(A, noise, to_latent=p_inv, to_observed=p)
+            return interfaces.LatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
         # Return the initial variable and the discretisation
         return init, discretise
@@ -209,7 +209,7 @@ class DensePriorFactory(api.AbstractPriorFactory):
             eA, L = exp_gram(A_p, B_p)
             tree_flatten = DenseTreeFlatten.from_example(tcoeffs_mean)
             noise = DenseNormal(q0, output_scale * L, tree_flatten)
-            return api.LatentCond(eA, noise, to_latent=p_inv, to_observed=p)
+            return interfaces.LatentCond(eA, noise, to_latent=p_inv, to_observed=p)
 
         return init, discretise
 
@@ -302,7 +302,7 @@ class DensePriorFactory(api.AbstractPriorFactory):
 
         data_like = all_unravel(x)[0]
         noise = DenseNormal.from_mean_and_std([data_like], [std])
-        return api.LatentCond.from_linop_and_noise(linop, noise)
+        return interfaces.LatentCond.from_linop_and_noise(linop, noise)
 
     def prototype_output_scale_calibrated(self, template):
         del template
@@ -310,7 +310,7 @@ class DensePriorFactory(api.AbstractPriorFactory):
 
 
 @structs.dataclass
-class DenseTreeFlatten(api.AbstractTreeFlatten):
+class DenseTreeFlatten(interfaces.AbstractTreeFlatten):
     """Implementation of flattening information for dense models."""
 
     unravel: Callable
@@ -327,7 +327,7 @@ class DenseTreeFlatten(api.AbstractTreeFlatten):
         return cls(unravel)
 
 
-class DenseNormal(api.AbstractTreeNormal[DenseTreeFlatten]):
+class DenseNormal(interfaces.AbstractTreeNormal[DenseTreeFlatten]):
     """Construct a dense implementation of a normal distribution."""
 
     @classmethod
@@ -433,7 +433,7 @@ class DenseNormal(api.AbstractTreeNormal[DenseTreeFlatten]):
 DenseNormal.register_pytree_node()
 
 
-class DenseLinearizationFactory(api.AbstractLinearizationFactory):
+class DenseLinearizationFactory(interfaces.AbstractLinearizationFactory):
     """Construct a dense linearization factory."""
 
     def residual(self, residual, *, linearization):
@@ -453,7 +453,7 @@ class DenseLinearizationFactory(api.AbstractLinearizationFactory):
         return DenseOdeTs1(ode=ode)
 
 
-class DenseOdeTs0(api.AbstractOde):
+class DenseOdeTs0(interfaces.AbstractOde):
     """Construct a dense implementation of ODE-TS0 linearization."""
 
     def init_linearization(self) -> None:
@@ -474,11 +474,11 @@ class DenseOdeTs0(api.AbstractOde):
         fx = tree.tree_map(lambda s: -s, [fm])
         linop = func.jacrev(a1)(rv.mean_flat)
         noise = DenseNormal.from_dirac(fx, damp=damp)
-        cond = api.LatentCond.from_linop_and_noise(linop, noise)
+        cond = interfaces.LatentCond.from_linop_and_noise(linop, noise)
         return cond, None
 
 
-class DenseOdeTs1(api.AbstractOde):
+class DenseOdeTs1(interfaces.AbstractOde):
     """Construct a dense implementation of ODE-TS1 linearization."""
 
     @property
@@ -515,11 +515,11 @@ class DenseOdeTs1(api.AbstractOde):
         fx = -(fx - J @ m0)
         fx = rv0.tree_flatten.unflatten_array(fx)
         noise = DenseNormal.from_dirac(fx, damp=damp)
-        cond = api.LatentCond.from_linop_and_noise(linop, noise)
+        cond = interfaces.LatentCond.from_linop_and_noise(linop, noise)
         return cond, state
 
 
-class DenseRoot(api.AbstractRoot):
+class DenseRoot(interfaces.AbstractRoot):
     """Construct a dense implementation of residual-TS1 linearization."""
 
     def __init__(self, residual, *, linearization) -> None:
@@ -575,11 +575,11 @@ class DenseRoot(api.AbstractRoot):
         # Turn the linearization into a conditional
         noise = DenseNormal.from_dirac(unravel(fx), damp=damp)
 
-        cond = api.LatentCond.from_linop_and_noise(linop, noise)
+        cond = interfaces.LatentCond.from_linop_and_noise(linop, noise)
         return cond, state
 
 
-class DenseDAEPosteriorLinearization(api.AbstractDAEPosteriorLinearization):
+class DenseDAEPosteriorLinearization(interfaces.AbstractDAEPosteriorLinearization):
     def init_linearization(self):
         # Skip the algebraic Jacobian because constraints get stacked
         # TODO: handle Jacobians separately and combine later
@@ -623,11 +623,11 @@ class DenseDAEPosteriorLinearization(api.AbstractDAEPosteriorLinearization):
         # Turn the linearization into a conditional
         noise = DenseNormal.from_dirac([fx], damp=damp)
 
-        cond = api.LatentCond.from_linop_and_noise(linop, noise)
+        cond = interfaces.LatentCond.from_linop_and_noise(linop, noise)
         return cond, state
 
 
-class DenseConditional(api.AbstractConditional):
+class DenseConditional(interfaces.AbstractConditional):
     """Construct a dense implementation of manipulating conditionals."""
 
     def apply_flat(self, x, cond, /):
@@ -647,7 +647,9 @@ class DenseConditional(api.AbstractConditional):
         cholesky_new = cond.to_observed[:, None] * cholesky_new
         return DenseNormal(mean_new, cholesky_new, cond.noise.tree_flatten)
 
-    def merge(self, cond1: api.LatentCond, cond2: api.LatentCond, /) -> api.LatentCond:
+    def merge(
+        self, cond1: interfaces.LatentCond, cond2: interfaces.LatentCond, /
+    ) -> interfaces.LatentCond:
         # Transform: latent (2) to latent (1)
         T = cond1.to_latent * cond2.to_observed
 
@@ -664,11 +666,13 @@ class DenseConditional(api.AbstractConditional):
 
         # Gather and return
         noise = DenseNormal(xi, Xi.T, cond1.noise.tree_flatten)
-        return api.LatentCond(
+        return interfaces.LatentCond(
             g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
         )
 
-    def revert(self, rv: DenseNormal, cond: api.LatentCond, /, *, solve_triu: Callable):
+    def revert(
+        self, rv: DenseNormal, cond: interfaces.LatentCond, /, *, solve_triu: Callable
+    ):
         # Pull RV into the latent space
         mean = cond.to_latent * rv.mean_flat
         cholesky = cond.to_latent[:, None] * rv.cholesky_flat
@@ -685,7 +689,7 @@ class DenseConditional(api.AbstractConditional):
         mean_corrected = mean - gain @ mean_observed
         cholesky_corrected = r_cor.T
         corrected = DenseNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
-        cond_new = api.LatentCond(
+        cond_new = interfaces.LatentCond(
             gain,
             corrected,
             to_latent=1 / cond.to_observed,
@@ -703,4 +707,4 @@ class DenseConditional(api.AbstractConditional):
         mean = cond.to_observed * cond.noise.mean_flat
         cholesky = cond.to_observed[:, None] * cond.noise.cholesky_flat
         noise = DenseNormal(mean, cholesky, cond.noise.tree_flatten)
-        return api.LatentCond.from_linop_and_noise(A, noise)
+        return interfaces.LatentCond.from_linop_and_noise(A, noise)

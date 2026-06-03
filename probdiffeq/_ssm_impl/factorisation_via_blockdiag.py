@@ -1,4 +1,4 @@
-from probdiffeq._ssm_impl import api, utilities
+from probdiffeq._ssm_impl import interfaces, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
@@ -21,16 +21,16 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class BlockDiagPriorFactory(api.AbstractPriorFactory):
+class BlockDiagPriorFactory(interfaces.AbstractPriorFactory):
     """Implementation of block-diagonal prior constructors."""
 
-    def identity(self, template) -> api.LatentCond:
+    def identity(self, template) -> interfaces.LatentCond:
         (d, ndim) = template.mean_flat.shape
         m0 = np.zeros((d, ndim))
         c0 = np.zeros((d, ndim, ndim))
         noise = BlockDiagNormal(m0, c0, template.tree_flatten)
         matrix = np.ones((d, 1, 1)) * np.eye(ndim, ndim)[None, ...]
-        return api.LatentCond.from_linop_and_noise(matrix, noise)
+        return interfaces.LatentCond.from_linop_and_noise(matrix, noise)
 
     def wiener_integrated(
         self,
@@ -119,7 +119,7 @@ class BlockDiagPriorFactory(api.AbstractPriorFactory):
             noise = BlockDiagNormal(mean, cholesky, tree_flatten)
             p = np.ones((d, 1)) * p[None, :]
             p_inv = np.ones((d, 1)) * p_inv[None, :]
-            return api.LatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
+            return interfaces.LatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
 
         return init, discretise
 
@@ -227,7 +227,7 @@ class BlockDiagPriorFactory(api.AbstractPriorFactory):
 
         u_like = tree.tree_map(np.zeros_like, template.mean[0])
         noise = BlockDiagNormal.from_mean_and_std([u_like], [std])
-        return api.LatentCond.from_linop_and_noise(linop, noise)
+        return interfaces.LatentCond.from_linop_and_noise(linop, noise)
 
     def prototype_output_scale_calibrated(self, template):
         single_flat, _ = tree.ravel_pytree(template.mean[0])
@@ -237,7 +237,7 @@ class BlockDiagPriorFactory(api.AbstractPriorFactory):
         return np.ones(single_flat.shape)
 
 
-class BlockDiagLinearizationFactory(api.AbstractLinearizationFactory):
+class BlockDiagLinearizationFactory(interfaces.AbstractLinearizationFactory):
     """Construct a block-diagonal linearization-factory."""
 
     def residual(self, *, residual, linearization: Callable | None):
@@ -257,7 +257,7 @@ class BlockDiagLinearizationFactory(api.AbstractLinearizationFactory):
         return BlockDiagOdeTs1(ode=ode)
 
 
-class BlockDiagOdeTs0(api.AbstractOde):
+class BlockDiagOdeTs0(interfaces.AbstractOde):
     """Construct a block-diagonal implementation of ODE-TS0 linearization."""
 
     def init_linearization(self) -> None:
@@ -276,11 +276,11 @@ class BlockDiagOdeTs0(api.AbstractOde):
 
         linop = func.vmap(func.jacrev(a1))(rv.mean_flat)
 
-        cond = api.LatentCond.from_linop_and_noise(linop, bias)
+        cond = interfaces.LatentCond.from_linop_and_noise(linop, bias)
         return cond, None
 
 
-class BlockDiagOdeTs1(api.AbstractOde):
+class BlockDiagOdeTs1(interfaces.AbstractOde):
     """Construct a block-diagonal implementation of ODE-TS1 linearization."""
 
     def init_linearization(self):
@@ -314,11 +314,11 @@ class BlockDiagOdeTs1(api.AbstractOde):
         fx = fx - diff
         fx = rv0.tree_flatten.unflatten_array(fx)
         bias = BlockDiagNormal.from_dirac([fx], damp=damp)
-        cond = api.LatentCond.from_linop_and_noise(linop, bias)
+        cond = interfaces.LatentCond.from_linop_and_noise(linop, bias)
         return cond, state
 
 
-class BlockDiagConditional(api.AbstractConditional):
+class BlockDiagConditional(interfaces.AbstractConditional):
     """Construct a block-diagonal implementation of manipulating conditionals."""
 
     def apply_flat(self, x, cond, /):
@@ -369,7 +369,7 @@ class BlockDiagConditional(api.AbstractConditional):
 
         # Gather and return
         noise = BlockDiagNormal(xi, Xi, cond1.noise.tree_flatten)
-        return api.LatentCond(
+        return interfaces.LatentCond(
             g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
         )
 
@@ -397,7 +397,7 @@ class BlockDiagConditional(api.AbstractConditional):
         mean_observed = (cond.A @ mean[..., None])[..., 0] + cond.noise.mean_flat
         mean_corrected = mean - (gain @ (mean_observed[..., None]))[..., 0]
         corrected = BlockDiagNormal(mean_corrected, cholesky_cor, rv.tree_flatten)
-        bwd = api.LatentCond(
+        bwd = interfaces.LatentCond(
             gain,
             corrected,
             to_latent=1 / cond.to_observed,
@@ -419,7 +419,9 @@ class BlockDiagConditional(api.AbstractConditional):
         noise = BlockDiagNormal(mean, cholesky, cond.noise.tree_flatten)
         to_observed = np.ones_like(cond.to_observed)
         to_latent = np.ones_like(cond.to_latent)
-        return api.LatentCond(A, noise, to_observed=to_observed, to_latent=to_latent)
+        return interfaces.LatentCond(
+            A, noise, to_observed=to_observed, to_latent=to_latent
+        )
 
 
 def _transpose(matrix):
@@ -427,7 +429,7 @@ def _transpose(matrix):
 
 
 @structs.dataclass
-class BlockDiagTreeFlatten(api.AbstractTreeFlatten):
+class BlockDiagTreeFlatten(interfaces.AbstractTreeFlatten):
     """Flattening information for block-diagonal random variables."""
 
     # The treedef of the target
@@ -455,7 +457,7 @@ class BlockDiagTreeFlatten(api.AbstractTreeFlatten):
         return cls(treedef, unravel_leaf)
 
 
-class BlockDiagNormal(api.AbstractTreeNormal[BlockDiagTreeFlatten]):
+class BlockDiagNormal(interfaces.AbstractTreeNormal[BlockDiagTreeFlatten]):
     """Construct a block-diagonal normal distribution.
 
     This assumes that the pytree is of the form [M_1, ..., M_{num_coeffs}],
