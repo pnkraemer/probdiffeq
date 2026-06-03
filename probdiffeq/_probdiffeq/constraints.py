@@ -13,7 +13,7 @@ Construct ODE constraints as such:
 >>> ssm = probdiffeq.state_space_model("dense")
 >>> constraint = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
 >>> print(constraint)
-DenseOdeTs1(JetFunction(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
+DenseOdeTs1(ode=ODE(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
 
 
 Implement high-order ODEs by passing a vector field with additional arguments as such:
@@ -25,7 +25,7 @@ Implement high-order ODEs by passing a vector field with additional arguments as
 >>> ssm = probdiffeq.state_space_model("isotropic")
 >>> constraint = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
 >>> print(constraint)
-IsotropicOdeTs0(JetFunction(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
+IsotropicOdeTs0(ode=ODE(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
 
 
 Or, use the constraint as a decorator
@@ -38,7 +38,7 @@ Or, use the constraint as a decorator
 ...     return -du
 >>>
 >>> print(ode)
-IsotropicOdeTs0(JetFunction(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
+IsotropicOdeTs0(ode=ODE(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
 
 
 """
@@ -93,7 +93,7 @@ class Constraint(Protocol):
 
 
 def constraint_ode_ts0(
-    vf: problem_types.JetFunction, /, *, ssm: ssm_impl.FactSsmImpl
+    vf: problem_types.ODE, /, *, ssm: ssm_impl.FactSsmImpl
 ) -> Constraint:
     r"""Create an ODE constraint with zeroth-order Taylor linearisation.
 
@@ -109,12 +109,12 @@ def constraint_ode_ts0(
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
-    if not isinstance(vf, problem_types.JetFunction):
+    if not isinstance(vf, problem_types.ODE):
         raise TypeError(vf)
     return ssm.linearize.ode_taylor_0th(vector_field=vf)
 
 
-def constraint_ode_ts1(vf: problem_types.JetFunction, /, *, ssm: ssm_impl.FactSsmImpl):
+def constraint_ode_ts1(vf: problem_types.ODE, /, *, ssm: ssm_impl.FactSsmImpl):
     r"""Create an ODE constraint and linearise with a first-order Taylor approximation.
 
     This constraint handles ODEs of the form
@@ -129,7 +129,7 @@ def constraint_ode_ts1(vf: problem_types.JetFunction, /, *, ssm: ssm_impl.FactSs
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
 
     """
-    if not isinstance(vf, problem_types.JetFunction):
+    if not isinstance(vf, problem_types.ODE):
         raise TypeError(vf)
     return ssm.linearize.ode_taylor_1st(vector_field=vf)
 

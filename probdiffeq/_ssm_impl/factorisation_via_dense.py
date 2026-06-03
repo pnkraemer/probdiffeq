@@ -590,10 +590,14 @@ class DenseDAEPosteriorLinearization(api.AbstractDAEPosteriorLinearization):
         # Evaluate the root
 
         jet_order1 = self.dae.differential.num_derivatives_in_args
-        diff_eval1 = self.dae.differential(jet_coords=m_tree[:jet_order1], t=t)
+        diff_eval1 = self.dae.differential.jet_function(
+            jet_coords=m_tree[:jet_order1], t=t
+        )
 
         jet_order2 = self.dae.algebraic.num_derivatives_in_args
-        diff_eval2 = self.dae.algebraic(jet_coords=m_tree[:jet_order2], t=t)
+        diff_eval2 = self.dae.algebraic.jet_function(
+            jet_coords=m_tree[:jet_order2], t=t
+        )
 
         # Flatten the output so that the Jacobians are matrices, not Pytrees.
         return tree.ravel_pytree([diff_eval1, diff_eval2])[0]

@@ -115,7 +115,7 @@ class AbstractRoot(AbstractLinearization):
         return self.root.num_derivatives_in_args
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.root})"
+        return f"{self.__class__.__name__}(root={self.root})"
 
 
 class AbstractDAEPosteriorLinearization(AbstractLinearization):
@@ -126,7 +126,7 @@ class AbstractDAEPosteriorLinearization(AbstractLinearization):
         self.linearization = linearization
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.dae}, {self.linearization})"
+        return f"{self.__class__.__name__}(dae={self.dae}, linearization={self.linearization})"
 
 
 class AbstractOde(AbstractLinearization):
@@ -136,7 +136,7 @@ class AbstractOde(AbstractLinearization):
         self.vector_field = vector_field
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.vector_field})"
+        return f"{self.__class__.__name__}(ode={self.vector_field})"
 
     @property
     def root_order(self):

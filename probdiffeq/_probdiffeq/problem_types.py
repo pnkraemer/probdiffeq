@@ -19,7 +19,7 @@ Examples
 ...     return y
 >>>
 >>> print(ode_function(f))
-JetFunction(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10))
+ODE(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10))
 
 Among other things, the vector field wrappers ensure that all internal representations
 of the ODEs have the same signature, which means that sometimes (eg for first-order problems),
@@ -28,7 +28,7 @@ the internal representation does not match the user-specified one.
 >>> print(inspect.signature(f))
 (y, *, t)
 >>> print(inspect.signature(ode_function(f)))
-(*, jet_coords: collections.abc.Sequence[~T], t: jax.Array) -> ~T
+(*jet_coords: *tuple[~T], t: jax.Array) -> ~T
 
 This API difference is more pronounced for higher-order problems:
 
@@ -36,25 +36,30 @@ This API difference is more pronounced for higher-order problems:
 ...     return y + dy
 >>>
 >>> print(ode_function_second_order(f_second_order))
-JetFunction(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10))
+ODE(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10))
 >>>
 >>> print(inspect.signature(f_second_order))
 (y, dy, /, *, t)
 >>> print(inspect.signature(ode_function_second_order(f_second_order)))
-(*, jet_coords: collections.abc.Sequence[~T], t: jax.Array) -> ~T
+(*jet_coords: *tuple[~T], t: jax.Array) -> ~T
 
 """
 
 from probdiffeq._probdiffeq import jacobians, utilities
 from probdiffeq.backend import func, tree
-from probdiffeq.backend.typing import Array, Protocol, Sequence, TypeVar
+from probdiffeq.backend.typing import Any, Array, Generic, Protocol, Sequence, TypeVar
 
 T = TypeVar("T")
+T_contra = TypeVar("T_contra", contravariant=True)
 
 __all__ = [
+    "ODE",
+    "AbstractJetFunction",
+    "FirstOrderODEProtocol",
     "JetFunction",
-    "OneJetFunction",
-    "ZeroJetFunction",
+    "OneJetFunctionProtocol",
+    "SecondOrderODEProtocol",
+    "ZeroJetFunctionProtocol",
     "dae_system",
     "jet_lift",
     "ode_function",
@@ -64,30 +69,15 @@ __all__ = [
 ]
 
 
-class ZeroJetFunction(Protocol):
-    """Zero-jet functions.
-
-    An interface for right-hand sides of first-order ODEs.
-    """
-
-    def __call__(self, u: T, /, *, t: float) -> T: ...
-
-
-class OneJetFunction(Protocol):
-    """One-jet functions.
-
-    An interface for right-hand sides of second-order ODEs
-    and residuals of first-order implicit differential equations.
-    """
-
-    def __call__(self, u: T, du: T, /, *, t: float) -> T: ...
-
-
-class JetFunction:
+class AbstractJetFunction:
     """A jet function, ie a function that operates on jet coordinates (y, y', ..., t).
 
     This is typically used to define right-hand sides of (high-order) ODEs
     and residuals in implicit differential equations.
+
+    Specifications include JetFunctions (y, y', ..., t) -> Any, which define DAEs
+    and implicit differential equations, as well as ODEs, where the output type
+    matches the input types.
     """
 
     def __init__(
@@ -104,15 +94,20 @@ class JetFunction:
     def __repr__(self):
         return f"{self.__class__.__name__}(num_derivatives_in_args={self.num_derivatives_in_args}, jacobian={self.jacobian})"
 
+
+class ODE(AbstractJetFunction, Generic[T]):
     def __call__(self, *jet_coords: *tuple[T], t: Array) -> T:
-        """Make the vector field callable like the original user function to hide the "sophisticated" API."""
         # jet_coords = (u(t), u'(t), u''(t), ..., u^(K)(t))
         return self.jet_function(jet_coords=jet_coords, t=t)
 
 
+class FirstOrderODEProtocol(Protocol[T]):
+    def __call__(self, u: T, /, *, t: float) -> T: ...
+
+
 def ode_function(
-    func: ZeroJetFunction, /, *, jacobian: jacobians.JacobianHandler | None = None
-) -> JetFunction:
+    func: FirstOrderODEProtocol, /, *, jacobian: jacobians.JacobianHandler | None = None
+) -> ODE:
     """Construct a description of an explicit ODE y^{(K)} = f(y, y', ..., y^{(K-1)}, t)."""
 
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
@@ -122,12 +117,19 @@ def ode_function(
     if jacobian is None:
         jacobian = jacobians.jacobian_hutchinson_fwd()
 
-    return JetFunction(jetfunc, jacobian=jacobian, num_derivatives_in_args=1)
+    return ODE(jetfunc, jacobian=jacobian, num_derivatives_in_args=1)
+
+
+class SecondOrderODEProtocol(Protocol[T]):
+    def __call__(self, u: T, du: T, /, *, t: float) -> T: ...
 
 
 def ode_function_second_order(
-    func: OneJetFunction, /, *, jacobian: jacobians.JacobianHandler | None = None
-) -> JetFunction:
+    func: SecondOrderODEProtocol,
+    /,
+    *,
+    jacobian: jacobians.JacobianHandler | None = None,
+) -> ODE:
     """Construct a description of an explicit ODE y^{(K)} = f(y, y', ..., y^{(K-1)}, t)."""
 
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
@@ -137,11 +139,31 @@ def ode_function_second_order(
     if jacobian is None:
         jacobian = jacobians.jacobian_hutchinson_fwd()
 
-    return JetFunction(jetfunc, jacobian=jacobian, num_derivatives_in_args=2)
+    return ODE(jetfunc, jacobian=jacobian, num_derivatives_in_args=2)
+
+
+class JetFunction(AbstractJetFunction):
+    """A jet function, ie a function that operates on jet coordinates (y, y', ..., t).
+
+    This is typically used to define right-hand sides of (high-order) ODEs
+    and residuals in implicit differential equations.
+    """
+
+    def __call__(self, *jet_coords: *tuple[T], t: Array) -> Any:
+        """Make the vector field callable like the original user function to hide the "sophisticated" API."""
+        # jet_coords = (u(t), u'(t), u''(t), ..., u^(K)(t))
+        return self.jet_function(jet_coords=jet_coords, t=t)
+
+
+class ZeroJetFunctionProtocol(Protocol[T_contra]):
+    def __call__(self, u: T_contra, /, *, t: float) -> Any: ...
 
 
 def root_state(
-    func: ZeroJetFunction, /, *, jacobian: jacobians.JacobianHandler | None = None
+    func: ZeroJetFunctionProtocol,
+    /,
+    *,
+    jacobian: jacobians.JacobianHandler | None = None,
 ) -> JetFunction:
     """Construct a description of a root f(u, t) = 0."""
 
@@ -158,8 +180,15 @@ def root_state(
     return JetFunction(jetfunc, jacobian=jacobian, num_derivatives_in_args=1)
 
 
+class OneJetFunctionProtocol(Protocol[T_contra]):
+    def __call__(self, u: T_contra, du: T_contra, /, *, t: float) -> Any: ...
+
+
 def root_state_and_velocity(
-    func: OneJetFunction, /, *, jacobian: jacobians.JacobianHandler | None = None
+    func: OneJetFunctionProtocol,
+    /,
+    *,
+    jacobian: jacobians.JacobianHandler | None = None,
 ) -> JetFunction:
     """Construct a description of a root f(u, du, t) = 0."""
 
@@ -187,7 +216,10 @@ class dae_system:
         return f"{self.__class__.__name__}(differential={self.differential}, algebraic={self.algebraic})"
 
 
-def jet_lift(jetfun: JetFunction, lift_by: int):
+F = TypeVar("F", bound=AbstractJetFunction)
+
+
+def jet_lift(jetfun: F, lift_by: int) -> F:
     """Lift a function on k-jet coordinates to one on (k+m)-jet coordinates."""
     if not isinstance(lift_by, int):
         raise TypeError
@@ -229,6 +261,6 @@ def jet_lift(jetfun: JetFunction, lift_by: int):
         return [primals, *series]
 
     order = jetfun.num_derivatives_in_args + lift_by
-    return JetFunction(
+    return type(jetfun)(
         jetfun_lifted, num_derivatives_in_args=order, jacobian=jetfun.jacobian
     )

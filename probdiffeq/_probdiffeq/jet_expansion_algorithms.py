@@ -17,9 +17,7 @@ __all__ = [
 
 
 T = TypeVar("T")
-F = TypeVar(
-    "F", bound=problem_types.JetFunction | problem_types.dae_system, contravariant=True
-)
+F = TypeVar("F", bound=problem_types.ODE | problem_types.dae_system, contravariant=True)
 
 
 class JetExpansionAlg(Protocol[F]):
@@ -50,9 +48,7 @@ class JetExpansionAlg(Protocol[F]):
         """
 
 
-def jetexpand_ode_padded_scan(
-    *, num: int
-) -> JetExpansionAlg[problem_types.JetFunction]:
+def jetexpand_ode_padded_scan(*, num: int) -> JetExpansionAlg[problem_types.ODE]:
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `jetexpand_ode_unroll()`, this function implements the loop via a scan,
@@ -67,7 +63,7 @@ def jetexpand_ode_padded_scan(
     @_error_if_vf_not_odefunction_type
     @_allow_pytree_inits
     def expand(
-        vf: problem_types.JetFunction, inits: Sequence[T], /, *, t: float
+        vf: problem_types.ODE, inits: Sequence[T], /, *, t: float
     ) -> tuple[list[T], dict]:
         if num == 0:
             return list(inits), {}
@@ -110,7 +106,7 @@ def _pad_to_length(x, /, *, length, value):
     return x + [value] * (length - len(x))
 
 
-def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg[problem_types.JetFunction]:
+def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg[problem_types.ODE]:
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `jetexpand_ode_padded_scan()`, this function does not depend on zero-padding
@@ -129,7 +125,7 @@ def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg[problem_types.JetFuncti
     @_error_if_vf_not_odefunction_type
     @_allow_pytree_inits
     def expand(
-        vf: problem_types.JetFunction, inits: Sequence[T], /, *, t: float
+        vf: problem_types.ODE, inits: Sequence[T], /, *, t: float
     ) -> tuple[list[T], dict]:
         inits = tree.tree_map(np.asarray, inits)
 
@@ -156,7 +152,7 @@ def jetexpand_ode_coefficient_increment(*, num_arguments):
     """Construct a method that increments Taylor series' of an ODE."""
 
     def increment(
-        vf: problem_types.JetFunction, taylor_coeffs: Sequence[T], *, t: float
+        vf: problem_types.ODE, taylor_coeffs: Sequence[T], *, t: float
     ) -> list[T]:
         def vf_with_kwargs(*u: *tuple[T, ...]) -> T:
             return vf.jet_function(jet_coords=u, t=t)
@@ -170,7 +166,7 @@ def jetexpand_ode_coefficient_increment(*, num_arguments):
     return increment
 
 
-def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg[problem_types.JetFunction]:
+def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg[problem_types.ODE]:
     """Taylor-expand the solution of an IVP with recursive forward-mode differentiation.
 
     !!! warning "Compilation time"
@@ -181,7 +177,7 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg[problem_types.JetFunct
     @_error_if_vf_not_odefunction_type
     @_allow_pytree_inits
     def expand(
-        vf: problem_types.JetFunction, inits: Sequence[T], /, *, t: float
+        vf: problem_types.ODE, inits: Sequence[T], /, *, t: float
     ) -> tuple[list[T], dict]:
         if num == 0:
             return list(inits), {}
@@ -189,10 +185,10 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg[problem_types.JetFunct
         vf_wrapped = func.partial(vf, t=t)
         g_n, g_0 = vf_wrapped, vf_wrapped
 
-        taylor_coeffs = [*inits, vf.jet_function(jet_coords=inits, t=t)]
+        taylor_coeffs = [*inits, vf(*inits, t=t)]
         for _ in range(num - 1):
             g_n = _fwd_recursion_iterate(fun_n=g_n, fun_0=g_0)
-            taylor_coeffs = [*taylor_coeffs, g_n.jet_function(jet_coords=inits)]
+            taylor_coeffs = [*taylor_coeffs, g_n(*inits)]
         return taylor_coeffs, {}
 
     return expand
@@ -201,14 +197,12 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg[problem_types.JetFunct
 def _fwd_recursion_iterate(*, fun_n, fun_0):
     r"""Increment $F_{n+1}(x) = \langle (JF_n)(x), f_0(x) \rangle$."""
 
-    def df(*, jet_coords: Sequence[T]) -> Sequence[T]:
+    def df(*jet_coords: *tuple[T]) -> list[T]:
         # Assign primals and tangents for the JVP
-        vals = (*jet_coords, fun_0.jet_function(jet_coords=jet_coords))
+        vals = (*jet_coords, fun_0(*jet_coords))
         primals_in, tangents_in = vals[:-1], vals[1:]
 
-        _, tangents_out = func.jvp(
-            lambda *a: fun_n.jet_function(jet_coords=a), primals_in, tangents_in
-        )
+        _, tangents_out = func.jvp(fun_n, primals_in, tangents_in)
         return tangents_out
 
     return tree.Partial(df)
@@ -216,7 +210,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
 
 def jetexpand_ode_doubling_unroll(
     *, num_doublings: int
-) -> JetExpansionAlg[problem_types.JetFunction]:
+) -> JetExpansionAlg[problem_types.ODE]:
     """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -233,7 +227,7 @@ def jetexpand_ode_doubling_unroll(
 
     @_allow_pytree_inits
     def expand(
-        vf: problem_types.JetFunction, inits: Sequence[T], /, *, t: float
+        vf: problem_types.ODE, inits: Sequence[T], /, *, t: float
     ) -> tuple[list[T], dict]:
         inits = tree.tree_map(np.asarray, inits)
 
@@ -247,11 +241,11 @@ def jetexpand_ode_doubling_unroll(
     return expand
 
 
-def jetexpand_ode_coefficient_double() -> JetExpansionAlg[problem_types.JetFunction]:
+def jetexpand_ode_coefficient_double() -> JetExpansionAlg[problem_types.ODE]:
     """Construct a method that doubles Taylor series' lengths of an ODE."""
 
     def double(
-        vf: problem_types.JetFunction, inits: Sequence[T], *, t: float
+        vf: problem_types.ODE, inits: Sequence[T], *, t: float
     ) -> tuple[list[T], dict]:
         taylor_coefficients = inits
         zeros = np.zeros_like(taylor_coefficients[0])
@@ -322,8 +316,10 @@ def _error_if_vf_not_odefunction_type(expand):
     """Construct a decorator to check that the vector field is of type JetFunction."""
 
     def expand_wrapped(vf, inits, /, *, t: float):
-        if not isinstance(vf, problem_types.JetFunction):
-            msg = f"Expected type {problem_types.JetFunction}, but got {vf} of type {type(vf)}. "
+        if not isinstance(vf, problem_types.ODE):
+            msg = (
+                f"Expected type {problem_types.ODE}, but got {vf} of type {type(vf)}. "
+            )
             msg += (
                 "Make sure to wrap your vector field with `probdiffeq.ode_function()`."
             )
