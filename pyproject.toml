@@ -60,6 +60,7 @@ doc = [
     "mkdocstrings-python",
     "mkdocstrings",
     "mkdocs-jupyter",
+    "mkdocs-awesome-pages-plugin",
 ]
 
 

@@ -7,7 +7,6 @@ theme:
     - navigation.indexes
     - search.suggest
     - search.highlight
-    - toc.integrate
   palette:
     - scheme: default
       primary: white
@@ -73,6 +72,7 @@ plugins:
       include: ['*.py']
       execute: false
       allow_errors: false
+  - awesome-pages
 extra:
   social:
     - icon: fontawesome/brands/twitter
