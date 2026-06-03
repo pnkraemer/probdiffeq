@@ -13,7 +13,7 @@ from probdiffeq.backend import func, np, ode, testing
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
 def case_solve_fixed_grid(fact):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
-    vf = probdiffeq.ode_vector_field(vf)
+    vf = probdiffeq.ode_function(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
     tcoeffs, _ = jetexpand(vf, u0, t=t0)
 
@@ -37,7 +37,7 @@ def case_simulate_terminal_values(fact):
     # Since simulate_terminal_values calls simulate_save_at,
     # this test-case covers both solvers
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
-    vf = probdiffeq.ode_vector_field(vf)
+    vf = probdiffeq.ode_function(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
     tcoeffs, _ = jetexpand(vf, u0, t=t0)
     dt0 = ivpsolve.dt0(vf, u0, t=t0)

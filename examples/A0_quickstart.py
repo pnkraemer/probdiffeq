@@ -16,7 +16,7 @@ def main():
     """Solve the logistic equation."""
     # Define a differential equation
 
-    @probdiffeq.ode_vector_field
+    @probdiffeq.ode_function
     def vf(y, /, *, t):
         """Evaluate the dynamics of the logistic ODE."""
         del t  # unused argument

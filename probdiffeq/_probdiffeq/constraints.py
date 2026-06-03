@@ -6,7 +6,7 @@ Examples
 
 Construct ODE constraints as such:
 
->>> @probdiffeq.ode_vector_field
+>>> @probdiffeq.ode_function
 ... def vf(u, /, *, t):
 ...     return -u
 >>>
@@ -18,7 +18,7 @@ DenseOdeTs1(JetFunction(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_
 
 Implement high-order ODEs by passing a vector field with additional arguments as such:
 
->>> @probdiffeq.ode_vector_field_second_order
+>>> @probdiffeq.ode_function_second_order
 ... def vf(u, du, /, *, t):
 ...     return -du
 >>>
@@ -33,13 +33,12 @@ Or, use the constraint as a decorator
 >>> import functools
 >>>
 >>> @functools.partial(probdiffeq.constraint_ode_ts0, ssm=ssm)
-... @probdiffeq.ode_vector_field_second_order
+... @probdiffeq.ode_function_second_order
 ... def ode(u, du, /, *, t):
 ...     return -du
 >>>
 >>> print(ode)
 IsotropicOdeTs0(JetFunction(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
-
 
 
 """
@@ -109,17 +108,6 @@ def constraint_ode_ts0(
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
-
-    Parameters
-    ----------
-    vf
-        The vector field of the ODE. The ODE vector field is assumed to be one of ``f(u, *, t)``, ``f(u, du, *, t)``, etc.
-        The order of the ODE is read off the number of positional arguments before t.
-        That is, for first-order ODEs, pass ``f(u, *, t)``,
-        for second-order ODEs, pass ``f(u, du, *, t)``,
-        for third-order ODEs ``f(u, du, ddu, *, t)``, and so on.
-    ssm
-        The state-space model to use for the constraint.
     """
     if not isinstance(vf, problem_types.JetFunction):
         raise TypeError(vf)
@@ -135,23 +123,11 @@ def constraint_ode_ts1(vf: problem_types.JetFunction, /, *, ssm: ssm_impl.FactSs
     \frac{d^k}{dt^k} u(t) = f\left(u(t), \frac{du}{dt}(t), \frac{d^2u}{dt^2}(t), ..., t\right)
     $$
 
-    where $k$ is the order of the ODE, which is read off the number of positional arguments in the vector field $f$ (argument `vf`).
-
-
+    where $k$ is the order of the ODE.
 
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
 
-    Parameters
-    ----------
-    vf
-        The vector field of the ODE. The ODE vector field is assumed to be one of ``f(u, *, t)``, ``f(u, du, *, t)``, etc.
-        The order of the ODE is read off the number of positional arguments before t.
-        That is, for first-order ODEs, pass ``f(u, *, t)``,
-        for second-order ODEs, pass ``f(u, du, *, t)``,
-        for third-order ODEs ``f(u, du, ddu, *, t)``, and so on.
-    ssm
-        The state-space model to use for the constraint.
     """
     if not isinstance(vf, problem_types.JetFunction):
         raise TypeError(vf)
@@ -172,7 +148,7 @@ def constraint_root(
     f\left(u(t), \frac{du}{dt}(t), ..., \frac{d^k u}{dt^k}(t), t\right) = 0
     $$
 
-    where $k$ is the order of the problem, which is read off the number of positional arguments in the root function $f$ (argument `root`).
+    where $k$ is the order of the problem.
 
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -184,7 +160,7 @@ def constraint_root(
     Parameters
     ----------
     root
-        The root constraint to linearize. The root constraint is expected to have a signature like ``f(*y, t)`` where the number of positional arguments specifies the order of the problem.
+        The root constraint to apply linearization to.
     ssm
         The state-space model to use for the constraint.
     linearization
@@ -201,7 +177,7 @@ def constraint_root(
 
 
 def constraint_dae(
-    dae: problem_types.DAESystem,
+    dae: problem_types.dae_system,
     *,
     ssm: ssm_impl.FactSsmImpl,
     linearization: linearizations.Linearization | None = None,
@@ -230,7 +206,7 @@ def constraint_dae(
     Parameters
     ----------
     dae
-        The differential-algebraic equation.
+        The differential-algebraic equation system.
     ssm
         The state-space model to use for the constraint.
     linearization

@@ -18,7 +18,7 @@ Examples
 >>> def f(y, *, t):
 ...     return y
 >>>
->>> print(ode_vector_field(f))
+>>> print(ode_function(f))
 JetFunction(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10))
 
 Among other things, the vector field wrappers ensure that all internal representations
@@ -27,7 +27,7 @@ the internal representation does not match the user-specified one.
 
 >>> print(inspect.signature(f))
 (y, *, t)
->>> print(inspect.signature(ode_vector_field(f)))
+>>> print(inspect.signature(ode_function(f)))
 (*, jet_coords: collections.abc.Sequence[~T], t: jax.Array) -> ~T
 
 This API difference is more pronounced for higher-order problems:
@@ -35,12 +35,12 @@ This API difference is more pronounced for higher-order problems:
 >>> def f_second_order(y, dy, /, *, t):
 ...     return y + dy
 >>>
->>> print(ode_vector_field_second_order(f_second_order))
+>>> print(ode_function_second_order(f_second_order))
 JetFunction(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10))
 >>>
 >>> print(inspect.signature(f_second_order))
 (y, dy, /, *, t)
->>> print(inspect.signature(ode_vector_field_second_order(f_second_order)))
+>>> print(inspect.signature(ode_function_second_order(f_second_order)))
 (*, jet_coords: collections.abc.Sequence[~T], t: jax.Array) -> ~T
 
 """
@@ -52,12 +52,13 @@ from probdiffeq.backend.typing import Array, Protocol, Sequence, TypeVar
 T = TypeVar("T")
 
 __all__ = [
-    "DAESystem",
     "JetFunction",
-    "dae",
+    "OneJetFunction",
+    "ZeroJetFunction",
+    "dae_system",
     "jet_lift",
-    "ode_vector_field",
-    "ode_vector_field_second_order",
+    "ode_function",
+    "ode_function_second_order",
     "root_state",
     "root_state_and_velocity",
 ]
@@ -109,7 +110,7 @@ class JetFunction:
         return self.jet_function(jet_coords=jet_coords, t=t)
 
 
-def ode_vector_field(
+def ode_function(
     func: ZeroJetFunction, /, *, jacobian: jacobians.JacobianHandler | None = None
 ) -> JetFunction:
     """Construct a description of an explicit ODE y^{(K)} = f(y, y', ..., y^{(K-1)}, t)."""
@@ -124,7 +125,7 @@ def ode_vector_field(
     return JetFunction(jetfunc, jacobian=jacobian, num_derivatives_in_args=1)
 
 
-def ode_vector_field_second_order(
+def ode_function_second_order(
     func: OneJetFunction, /, *, jacobian: jacobians.JacobianHandler | None = None
 ) -> JetFunction:
     """Construct a description of an explicit ODE y^{(K)} = f(y, y', ..., y^{(K-1)}, t)."""
@@ -175,7 +176,7 @@ def root_state_and_velocity(
     return JetFunction(jetfunc, jacobian=jacobian, num_derivatives_in_args=2)
 
 
-class DAESystem:
+class dae_system:
     """Differential-algebraic equations."""
 
     def __init__(self, differential: JetFunction, algebraic: JetFunction):
@@ -184,10 +185,6 @@ class DAESystem:
 
     def __repr__(self):
         return f"{self.__class__.__name__}(differential={self.differential}, algebraic={self.algebraic})"
-
-
-def dae(differential, algebraic) -> DAESystem:
-    return DAESystem(differential, algebraic)
 
 
 def jet_lift(jetfun: JetFunction, lift_by: int):

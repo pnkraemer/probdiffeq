@@ -48,7 +48,7 @@ def main(t0=1e-6, t1=1e5) -> None:
 
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=10, tol=1e-8)
     jetexpand = probdiffeq.jetexpand_dae_nlstsq(num=4, nlstsq=nlstsq)
-    dae = probdiffeq.dae(differential, algebraic)
+    dae = probdiffeq.dae_system(differential, algebraic)
     y0, _info = jetexpand(dae, [jnp.array([1.0, 0.0, 0.0])], t=t0)
 
     # This base scale is critical to Robertson, because

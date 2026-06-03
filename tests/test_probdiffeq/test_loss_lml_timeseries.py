@@ -9,7 +9,7 @@ from probdiffeq.backend import func, np, ode, testing, tree
 def fixture_solution(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
-    vf = probdiffeq.ode_vector_field(vf)
+    vf = probdiffeq.ode_function(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact=fact)

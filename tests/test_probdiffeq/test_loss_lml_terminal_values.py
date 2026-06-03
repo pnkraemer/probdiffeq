@@ -25,7 +25,7 @@ def case_strategy_smoother_fixedpoint():
 def fixture_solution_and_loss_and_data(strategy_func, fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
-    vf = probdiffeq.ode_vector_field(vf)
+    vf = probdiffeq.ode_function(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact=fact)

@@ -11,7 +11,7 @@ def test_daejet_matches_expectation_on_sir_model(num):
     jetexpand_ode = probdiffeq.jetexpand_ode_unroll(num=num)
     expected, _ = jetexpand_ode(vf_ode, y0, t=0.0)
 
-    dae = probdiffeq.dae(differential=differential, algebraic=algebraic)
+    dae = probdiffeq.dae_system(differential=differential, algebraic=algebraic)
     eps = np.finfo_eps(y0[0].dtype)
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=10, tol=eps)
     jetexpand = probdiffeq.jetexpand_dae_nlstsq(num=num, nlstsq=nlstsq)
@@ -34,7 +34,7 @@ def test_daejet_recursive_matches_expectation_on_sir_model(num_strides, stride):
 
     eps = np.finfo_eps(y0[0].dtype)
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=3, tol=eps)
-    dae = probdiffeq.dae(differential=differential, algebraic=algebraic)
+    dae = probdiffeq.dae_system(differential=differential, algebraic=algebraic)
 
     jetexpand = probdiffeq.jetexpand_dae_nlstsq_recursive(
         num_strides=num_strides, stride=stride, nlstsq=nlstsq
@@ -44,7 +44,7 @@ def test_daejet_recursive_matches_expectation_on_sir_model(num_strides, stride):
     assert testing.allclose(received, expected)
 
 
-@probdiffeq.ode_vector_field
+@probdiffeq.ode_function
 def vf_ode(y, /, *, t):
     del t
     beta, gamma = 2.0, 0.5  # infection and recovery rates

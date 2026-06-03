@@ -18,7 +18,7 @@ __all__ = [
 
 T = TypeVar("T")
 F = TypeVar(
-    "F", bound=problem_types.JetFunction | problem_types.DAESystem, contravariant=True
+    "F", bound=problem_types.JetFunction | problem_types.dae_system, contravariant=True
 )
 
 
@@ -324,7 +324,9 @@ def _error_if_vf_not_odefunction_type(expand):
     def expand_wrapped(vf, inits, /, *, t: float):
         if not isinstance(vf, problem_types.JetFunction):
             msg = f"Expected type {problem_types.JetFunction}, but got {vf} of type {type(vf)}. "
-            msg += "Make sure to wrap your vector field with `probdiffeq.ode_vector_field()`."
+            msg += (
+                "Make sure to wrap your vector field with `probdiffeq.ode_function()`."
+            )
             raise TypeError(msg)
         return expand(vf, inits, t=t)
 
@@ -347,14 +349,14 @@ def _allow_pytree_inits(expand):
 
             if vf.num_derivatives_in_args == 1:
 
-                @probdiffeq.ode_vector_field
+                @probdiffeq.ode_function
                 def vf_wrapped(y: T, /, *, t: float) -> T:
                     y = tree.tree_map(unravel, y)
                     fy = vf.jet_function(jet_coords=(y,), t=t)
                     return tree.ravel_pytree(fy)[0]
             elif vf.num_derivatives_in_args == 2:
 
-                @probdiffeq.ode_vector_field_second_order
+                @probdiffeq.ode_function_second_order
                 def vf_wrapped(y: T, dy: T, /, *, t: float) -> T:
                     y = tree.tree_map(unravel, y)
                     dy = tree.tree_map(unravel, dy)
@@ -372,7 +374,7 @@ def _allow_pytree_inits(expand):
 
 def jetexpand_dae_nlstsq_recursive(
     num_strides: int, stride: int, nlstsq: Callable
-) -> JetExpansionAlg[problem_types.DAESystem]:
+) -> JetExpansionAlg[problem_types.dae_system]:
     """Evaluate the Taylor series of a differential-algebraic equation system.
 
     Like jetexpand_dae_nlstsq(), but called recursively which means that extremely high orders
@@ -381,7 +383,7 @@ def jetexpand_dae_nlstsq_recursive(
     jetexpand = jetexpand_dae_nlstsq(num=stride, nlstsq=nlstsq)
 
     def expand(
-        dae: problem_types.DAESystem, inits: Sequence[T], /, *, t: float
+        dae: problem_types.dae_system, inits: Sequence[T], /, *, t: float
     ) -> tuple[list[T], dict]:
         received = list(inits)
         if num_strides == 0:
@@ -396,14 +398,14 @@ def jetexpand_dae_nlstsq_recursive(
 
 def jetexpand_dae_nlstsq(
     num: int, nlstsq: Callable
-) -> JetExpansionAlg[problem_types.DAESystem]:
+) -> JetExpansionAlg[problem_types.dae_system]:
     """Evaluate the Taylor series of a differential-algebraic equation system."""
 
     # TODO: don't try too hard to refactor this one here, I dont think it'll be around for long
     # TODO: enable pytree inputs/outputs
     # TODO: raise error if DAE has the wrong type
     def expand(
-        dae: problem_types.DAESystem, inits: Sequence[T], /, *, t: float
+        dae: problem_types.dae_system, inits: Sequence[T], /, *, t: float
     ) -> tuple[list[T], dict]:
         """Evaluate the Taylor series of a differential-algebraic equation system.
 

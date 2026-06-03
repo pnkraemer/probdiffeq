@@ -43,7 +43,7 @@ def test_output_matches_reference(ivp, solver_factory, derivatives, ssm_fact) ->
         return tree.tree_map(lambda a: -a, vfu)
 
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=derivatives)
-    expected, _ = jetexpand(probdiffeq.ode_vector_field(vf), [u0], t=t0)
+    expected, _ = jetexpand(probdiffeq.ode_function(vf), [u0], t=t0)
 
     # Build an SSM (no ODE-jets, so that we can test the update at init)
     # Only use the dense factorisation because this test uses JET constraints

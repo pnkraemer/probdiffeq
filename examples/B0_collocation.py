@@ -14,7 +14,7 @@ def main():
     """Sample from a probabilistic solution and plot residuals."""
     # Create an ODE problem.
 
-    @probdiffeq.ode_vector_field
+    @probdiffeq.ode_function
     def vector_field(y, /, *, t):
         """Evaluate the logistic ODE vector field."""
         del t

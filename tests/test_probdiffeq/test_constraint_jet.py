@@ -85,7 +85,7 @@ def fixture_root_sir():
 @testing.fixture(name="expected")
 @testing.parametrize("derivatives", [1, 5])
 def fixture_expected(root, derivatives):
-    @probdiffeq.ode_vector_field
+    @probdiffeq.ode_function
     def vf(y, /, *, t):
         return root.ode_vf(y, t=t)
 
@@ -104,7 +104,7 @@ def case_jet_dae_iterated(root):
 
         algebraic = probdiffeq.root_state(root.root_dae_algebraic)
         algebraic = probdiffeq.jet_lift(algebraic, lift_by=lift_by + 1)
-        dae = probdiffeq.dae(differential, algebraic)
+        dae = probdiffeq.dae_system(differential, algebraic)
 
         return probdiffeq.constraint_dae(dae, ssm=ssm, linearization=linearization)
 
