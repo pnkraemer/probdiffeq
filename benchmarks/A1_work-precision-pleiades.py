@@ -1,6 +1,5 @@
 """Walltime | Pleiades."""
 
-import functools
 import statistics
 import timeit
 from collections.abc import Callable
@@ -154,7 +153,7 @@ def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
     )
     # fmt: on
 
-    @jax.jit
+    @probdiffeq.ode_function_second_order
     def vf_probdiffeq(u, du, /, *, t):  # noqa: ARG001
         """Pleiades problem."""
         x = u[0:7]  # x
@@ -172,10 +171,8 @@ def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
     @jax.jit
     def param_to_solution(tol):
         # Build a solver
-        vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = probdiffeq.jetexpand_ode_unroll(
-            vf_auto, (u0, du0), num=num_derivatives - 1
-        )
+        jetexpand = probdiffeq.jetexpand_ode_unroll(num=num_derivatives - 1)
+        tcoeffs, _ = jetexpand(vf_probdiffeq, (u0, du0), t=t0)
 
         ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
         init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
@@ -192,7 +189,7 @@ def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
         )
 
         # Solve
-        dt0 = ivpsolve.dt0(vf_auto, (u0, du0))
+        dt0 = ivpsolve.dt0(vf_probdiffeq, (u0, du0), t=t0)
         solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-3 * tol, rtol=tol)
 
         # Return the terminal value
