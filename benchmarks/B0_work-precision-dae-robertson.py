@@ -141,7 +141,7 @@ def setup_timeit(*, repeats: int) -> Callable:
 def solver_ode(*, num_derivatives: int, time_span) -> Callable:
     """Construct a method that solves Robertson as an ODE."""
 
-    def root(u, du, /, *, t):
+    def residual(u, du, /, *, t):
         return du - vf(u, t=t)
 
     def vf(y, *, t):

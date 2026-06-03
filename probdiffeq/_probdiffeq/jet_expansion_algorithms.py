@@ -17,7 +17,9 @@ __all__ = [
 
 
 T = TypeVar("T")
-F = TypeVar("F", bound=problem_types.ODE | problem_types.dae_system, contravariant=True)
+F = TypeVar(
+    "F", bound=problem_types.ODEFunction | problem_types.dae_system, contravariant=True
+)
 
 
 class JetExpansionAlg(Protocol[F]):
@@ -48,7 +50,9 @@ class JetExpansionAlg(Protocol[F]):
         """
 
 
-def jetexpand_ode_padded_scan(*, num: int) -> JetExpansionAlg[problem_types.ODE]:
+def jetexpand_ode_padded_scan(
+    *, num: int
+) -> JetExpansionAlg[problem_types.ODEFunction]:
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `jetexpand_ode_unroll()`, this function implements the loop via a scan,
@@ -63,7 +67,7 @@ def jetexpand_ode_padded_scan(*, num: int) -> JetExpansionAlg[problem_types.ODE]
     @_error_if_vf_not_odefunction_type
     @_allow_pytree_inits
     def expand(
-        vf: problem_types.ODE, inits: Sequence[T], /, *, t: float
+        vf: problem_types.ODEFunction, inits: Sequence[T], /, *, t: float
     ) -> tuple[list[T], dict]:
         if num == 0:
             return list(inits), {}
@@ -72,7 +76,7 @@ def jetexpand_ode_padded_scan(*, num: int) -> JetExpansionAlg[problem_types.ODE]
         num_arguments = len(inits)
 
         # Initial Taylor series (u_0, u_1, ..., u_k)
-        primals = vf.jet_function(jet_coords=inits, t=t)
+        primals = vf.vector_field(jet_coords=inits, t=t)
         taylor_coeffs = [*inits, primals]
 
         # Early exit for num=1.
@@ -106,7 +110,7 @@ def _pad_to_length(x, /, *, length, value):
     return x + [value] * (length - len(x))
 
 
-def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg[problem_types.ODE]:
+def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg[problem_types.ODEFunction]:
     """Taylor-expand the solution of an IVP with Taylor-mode differentiation.
 
     Other than `jetexpand_ode_padded_scan()`, this function does not depend on zero-padding
@@ -125,7 +129,7 @@ def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg[problem_types.ODE]:
     @_error_if_vf_not_odefunction_type
     @_allow_pytree_inits
     def expand(
-        vf: problem_types.ODE, inits: Sequence[T], /, *, t: float
+        vf: problem_types.ODEFunction, inits: Sequence[T], /, *, t: float
     ) -> tuple[list[T], dict]:
         inits = tree.tree_map(np.asarray, inits)
 
@@ -138,7 +142,7 @@ def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg[problem_types.ODE]:
         increment = jetexpand_ode_coefficient_increment(num_arguments=num_arguments)
 
         # Initial Taylor series (u_0, u_1, ..., u_k)
-        primals = vf.jet_function(jet_coords=inits, t=t)
+        primals = vf.vector_field(jet_coords=inits, t=t)
         taylor_coeffs = [*inits, primals]
 
         for _ in range(num - 1):
@@ -152,10 +156,10 @@ def jetexpand_ode_coefficient_increment(*, num_arguments):
     """Construct a method that increments Taylor series' of an ODE."""
 
     def increment(
-        vf: problem_types.ODE, taylor_coeffs: Sequence[T], *, t: float
+        vf: problem_types.ODEFunction, taylor_coeffs: Sequence[T], *, t: float
     ) -> list[T]:
         def vf_with_kwargs(*u: *tuple[T, ...]) -> T:
-            return vf.jet_function(jet_coords=u, t=t)
+            return vf.vector_field(jet_coords=u, t=t)
 
         primals, series = utilities.jet_coords_to_primals_and_series(
             taylor_coeffs, num_arguments
@@ -166,7 +170,7 @@ def jetexpand_ode_coefficient_increment(*, num_arguments):
     return increment
 
 
-def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg[problem_types.ODE]:
+def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg[problem_types.ODEFunction]:
     """Taylor-expand the solution of an IVP with recursive forward-mode differentiation.
 
     !!! warning "Compilation time"
@@ -177,7 +181,7 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg[problem_types.ODE]:
     @_error_if_vf_not_odefunction_type
     @_allow_pytree_inits
     def expand(
-        vf: problem_types.ODE, inits: Sequence[T], /, *, t: float
+        vf: problem_types.ODEFunction, inits: Sequence[T], /, *, t: float
     ) -> tuple[list[T], dict]:
         if num == 0:
             return list(inits), {}
@@ -210,7 +214,7 @@ def _fwd_recursion_iterate(*, fun_n, fun_0):
 
 def jetexpand_ode_doubling_unroll(
     *, num_doublings: int
-) -> JetExpansionAlg[problem_types.ODE]:
+) -> JetExpansionAlg[problem_types.ODEFunction]:
     """Combine Taylor-mode differentiation and Newton's doubling.
 
     !!! warning "Warning: highly EXPERIMENTAL feature!"
@@ -227,7 +231,7 @@ def jetexpand_ode_doubling_unroll(
 
     @_allow_pytree_inits
     def expand(
-        vf: problem_types.ODE, inits: Sequence[T], /, *, t: float
+        vf: problem_types.ODEFunction, inits: Sequence[T], /, *, t: float
     ) -> tuple[list[T], dict]:
         inits = tree.tree_map(np.asarray, inits)
 
@@ -241,11 +245,11 @@ def jetexpand_ode_doubling_unroll(
     return expand
 
 
-def jetexpand_ode_coefficient_double() -> JetExpansionAlg[problem_types.ODE]:
+def jetexpand_ode_coefficient_double() -> JetExpansionAlg[problem_types.ODEFunction]:
     """Construct a method that doubles Taylor series' lengths of an ODE."""
 
     def double(
-        vf: problem_types.ODE, inits: Sequence[T], *, t: float
+        vf: problem_types.ODEFunction, inits: Sequence[T], *, t: float
     ) -> tuple[list[T], dict]:
         taylor_coefficients = inits
         zeros = np.zeros_like(taylor_coefficients[0])
@@ -299,7 +303,7 @@ def jetexpand_ode_coefficient_double() -> JetExpansionAlg[problem_types.ODE]:
         coeffs_emb = [*c] + [zeros] * degree
         p, *s = coeffs_emb
         p_new, s_new = func.jet(
-            lambda *u: vf.jet_function(jet_coords=u, t=t), (p,), (s,), is_tcoeff=True
+            lambda *u: vf.vector_field(jet_coords=u, t=t), (p,), (s,), is_tcoeff=True
         )
         return np.stack([p_new, *s_new])
 
@@ -316,10 +320,8 @@ def _error_if_vf_not_odefunction_type(expand):
     """Construct a decorator to check that the vector field is of type JetFunction."""
 
     def expand_wrapped(vf, inits, /, *, t: float):
-        if not isinstance(vf, problem_types.ODE):
-            msg = (
-                f"Expected type {problem_types.ODE}, but got {vf} of type {type(vf)}. "
-            )
+        if not isinstance(vf, problem_types.ODEFunction):
+            msg = f"Expected type {problem_types.ODEFunction}, but got {vf} of type {type(vf)}. "
             msg += (
                 "Make sure to wrap your vector field with `probdiffeq.ode_function()`."
             )
@@ -348,7 +350,7 @@ def _allow_pytree_inits(expand):
                 @probdiffeq.ode_function
                 def vf_wrapped(y: T, /, *, t: float) -> T:
                     y = tree.tree_map(unravel, y)
-                    fy = vf.jet_function(jet_coords=(y,), t=t)
+                    fy = vf.vector_field(jet_coords=(y,), t=t)
                     return tree.ravel_pytree(fy)[0]
             elif vf.num_derivatives_in_args == 2:
 
@@ -356,7 +358,7 @@ def _allow_pytree_inits(expand):
                 def vf_wrapped(y: T, dy: T, /, *, t: float) -> T:
                     y = tree.tree_map(unravel, y)
                     dy = tree.tree_map(unravel, dy)
-                    fy = vf.jet_function(jet_coords=(y, dy), t=t)
+                    fy = vf.vector_field(jet_coords=(y, dy), t=t)
                     return tree.ravel_pytree(fy)[0]
             else:
                 raise ValueError
@@ -431,7 +433,7 @@ def jetexpand_dae_nlstsq(
 
         x0, unravel = tree.ravel_pytree(rv.mean)
 
-        def root_jet(tcoeffs_flat):
+        def residual_jet(tcoeffs_flat):
             tcoeffs_all = unravel(tcoeffs_flat)
 
             # Differential part.
@@ -440,7 +442,7 @@ def jetexpand_dae_nlstsq(
                 tcoeffs_all, dae.differential.num_derivatives_in_args
             )
             primals1, series1 = func.jet(
-                lambda *s: dae.differential.jet_function(jet_coords=s, t=t),
+                lambda *s: dae.differential.residual_function(jet_coords=s, t=t),
                 ps,
                 ss,
                 is_tcoeff=False,
@@ -452,7 +454,7 @@ def jetexpand_dae_nlstsq(
                 tcoeffs_all, dae.algebraic.num_derivatives_in_args
             )
             primals2, series2 = func.jet(
-                lambda *s: dae.algebraic.jet_function(jet_coords=s, t=t),
+                lambda *s: dae.algebraic.residual_function(jet_coords=s, t=t),
                 ps,
                 ss,
                 is_tcoeff=False,
@@ -462,7 +464,7 @@ def jetexpand_dae_nlstsq(
             fx = [primals1, *series1, primals2, *series2]
             return tree.ravel_pytree(fx)[0]
 
-        x1, info = nlstsq(root_jet, x0, rv.mean_flat, rv.cholesky_flat)
+        x1, info = nlstsq(residual_jet, x0, rv.mean_flat, rv.cholesky_flat)
         return list(unravel(x1)), info
 
     return expand

@@ -60,7 +60,7 @@ def jet_coords_to_primals_and_series(taylor_series, num, /):
     taylor_series
         A sequence of arrays to evaluate the Taylor series at.
     num
-        The number of inputs to the root
+        The number of inputs to the residual
         (2 for a first-order ODE, 3 for second-order, etc.)
 
     Examples

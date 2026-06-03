@@ -121,21 +121,21 @@ def case_factory_jacobian_hutchinson_rev():
 
 
 @testing.case
-def case_factory_constraint_root_ts1(ivp):
+def case_factory_constraint_residual_ts1(ivp):
     vf, _u0, (_t0, _t1) = ivp
     vf = probdiffeq.ode_function(vf)
 
     # Always materialize to stabilise blockdiagonal/isotropic TS1
     jacobian = probdiffeq.jacobian_materialize()
 
-    @func.partial(probdiffeq.root_state_and_velocity, jacobian=jacobian)
-    def root(u, du, /, *, t):
+    @func.partial(probdiffeq.residual_state_and_velocity, jacobian=jacobian)
+    def residual(u, du, /, *, t):
         return tree.tree_map(lambda a, b: a - b, du, vf(u, t=t))
 
     def constraint_residual(vf, **kwargs):
         try:
-            del vf  # no vector fields, we use the root instead
-            return probdiffeq.constraint_root(root, **kwargs)
+            del vf  # no vector fields, we use the residual instead
+            return probdiffeq.constraint_residual(residual, **kwargs)
         except NotImplementedError:
             reason = "This linearisation is not implemented"
             reason += ", likely due to the selected state-space factorisation."

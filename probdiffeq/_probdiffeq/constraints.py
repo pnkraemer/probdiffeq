@@ -13,7 +13,7 @@ Construct ODE constraints as such:
 >>> ssm = probdiffeq.state_space_model("dense")
 >>> constraint = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
 >>> print(constraint)
-DenseOdeTs1(ode=ODE(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
+DenseOdeTs1(ode=ODEFunction(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
 
 
 Implement high-order ODEs by passing a vector field with additional arguments as such:
@@ -25,7 +25,7 @@ Implement high-order ODEs by passing a vector field with additional arguments as
 >>> ssm = probdiffeq.state_space_model("isotropic")
 >>> constraint = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
 >>> print(constraint)
-IsotropicOdeTs0(ode=ODE(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
+IsotropicOdeTs0(ode=ODEFunction(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
 
 
 Or, use the constraint as a decorator
@@ -38,7 +38,7 @@ Or, use the constraint as a decorator
 ...     return -du
 >>>
 >>> print(ode)
-IsotropicOdeTs0(ode=ODE(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
+IsotropicOdeTs0(ode=ODEFunction(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
 
 
 """
@@ -52,7 +52,7 @@ __all__ = [
     "constraint_dae",
     "constraint_ode_ts0",
     "constraint_ode_ts1",
-    "constraint_root",
+    "constraint_residual",
 ]
 
 C = TypeVar("C", bound=Sequence)
@@ -93,7 +93,7 @@ class Constraint(Protocol):
 
 
 def constraint_ode_ts0(
-    vf: problem_types.ODE, /, *, ssm: ssm_impl.FactSsmImpl
+    ode: problem_types.ODEFunction, /, *, ssm: ssm_impl.FactSsmImpl
 ) -> Constraint:
     r"""Create an ODE constraint with zeroth-order Taylor linearisation.
 
@@ -109,12 +109,12 @@ def constraint_ode_ts0(
     Related:
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
     """
-    if not isinstance(vf, problem_types.ODE):
-        raise TypeError(vf)
-    return ssm.linearize.ode_taylor_0th(vector_field=vf)
+    if not isinstance(ode, problem_types.ODEFunction):
+        raise TypeError(ode)
+    return ssm.linearize.ode_taylor_0th(ode=ode)
 
 
-def constraint_ode_ts1(vf: problem_types.ODE, /, *, ssm: ssm_impl.FactSsmImpl):
+def constraint_ode_ts1(vf: problem_types.ODEFunction, /, *, ssm: ssm_impl.FactSsmImpl):
     r"""Create an ODE constraint and linearise with a first-order Taylor approximation.
 
     This constraint handles ODEs of the form
@@ -129,13 +129,13 @@ def constraint_ode_ts1(vf: problem_types.ODE, /, *, ssm: ssm_impl.FactSsmImpl):
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
 
     """
-    if not isinstance(vf, problem_types.ODE):
+    if not isinstance(vf, problem_types.ODEFunction):
         raise TypeError(vf)
     return ssm.linearize.ode_taylor_1st(vector_field=vf)
 
 
-def constraint_root(
-    root: problem_types.JetFunction,
+def constraint_residual(
+    residual: problem_types.Residual,
     *,
     ssm: ssm_impl.FactSsmImpl,
     linearization: linearizations.Linearization | None = None,
@@ -159,8 +159,8 @@ def constraint_root(
 
     Parameters
     ----------
-    root
-        The root constraint to apply linearization to.
+    residual
+        The residual to apply linearization to.
     ssm
         The state-space model to use for the constraint.
     linearization
@@ -168,12 +168,12 @@ def constraint_root(
         Adjust this variable to use posterior linearization (also known as iterated filtering).
 
     """
-    if not isinstance(root, problem_types.JetFunction):
-        raise TypeError(root)
+    if not isinstance(residual, problem_types.Residual):
+        raise TypeError(residual)
 
     if linearization is None:
         linearization = linearizations.linearization_prior_mean()
-    return ssm.linearize.root(root=root, linearization=linearization)
+    return ssm.linearize.residual(residual=residual, linearization=linearization)
 
 
 def constraint_dae(
@@ -215,6 +215,4 @@ def constraint_dae(
     if linearization is None:
         linearization = linearizations.linearization_prior_mean()
 
-    return ssm.linearize.dae_posterior_linearization(
-        dae=dae, linearization=linearization
-    )
+    return ssm.linearize.dae(dae=dae, linearization=linearization)

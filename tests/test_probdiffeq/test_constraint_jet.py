@@ -7,24 +7,24 @@ from probdiffeq.backend.typing import Array, Callable, Literal
 
 @structs.dataclass
 class Root:
-    """Different APIs for one and the same root-finding problem.
+    """Different APIs for one and the same residual-finding problem.
 
     Its purpose is to enable different jet-constraints to solve the same
-    problem but work with different roots.
+    problem but work with different residuals.
     """
 
-    root: Callable
-    root_dae_algebraic: Callable
-    root_dae_differential: Callable
+    residual: Callable
+    residual_dae_algebraic: Callable
+    residual_dae_differential: Callable
     ode_vf: Callable
     t0: float
     u0: Array
 
 
-@testing.fixture(name="root")
-def fixture_root_sir():
+@testing.fixture(name="residual")
+def fixture_residual_sir():
 
-    def root(u, du, /, *, t):
+    def residual(u, du, /, *, t):
         linear = imex_linear(u, du, t=t)
         nonlinear = imex_nonlinear(u, du, t=t)
         return linear + nonlinear
@@ -73,9 +73,9 @@ def fixture_root_sir():
     u0 = np.asarray([0.99, 0.01, 0.0])
     t0 = 0.0
     return Root(
-        root=root,
-        root_dae_differential=dae_differential,
-        root_dae_algebraic=dae_algebraic,
+        residual=residual,
+        residual_dae_differential=dae_differential,
+        residual_dae_algebraic=dae_algebraic,
         ode_vf=vf,
         t0=t0,
         u0=u0,
@@ -84,25 +84,27 @@ def fixture_root_sir():
 
 @testing.fixture(name="expected")
 @testing.parametrize("derivatives", [1, 5])
-def fixture_expected(root, derivatives):
+def fixture_expected(residual, derivatives):
     @probdiffeq.ode_function
     def vf(y, /, *, t):
-        return root.ode_vf(y, t=t)
+        return residual.ode_vf(y, t=t)
 
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=derivatives)
-    coeffs, _ = jetexpand(vf, [root.u0], t=root.t0)
+    coeffs, _ = jetexpand(vf, [residual.u0], t=residual.t0)
     return coeffs
 
 
-def case_jet_dae_iterated(root):
+def case_jet_dae_iterated(residual):
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     linearization = probdiffeq.linearization_map(nlstsq)
 
     def constraint_residual(ssm, lift_by: int):
-        differential = probdiffeq.root_state_and_velocity(root.root_dae_differential)
+        differential = probdiffeq.residual_state_and_velocity(
+            residual.residual_dae_differential
+        )
         differential = probdiffeq.jet_lift(differential, lift_by=lift_by)
 
-        algebraic = probdiffeq.root_state(root.root_dae_algebraic)
+        algebraic = probdiffeq.residual_state(residual.residual_dae_algebraic)
         algebraic = probdiffeq.jet_lift(algebraic, lift_by=lift_by + 1)
         dae = probdiffeq.dae_system(differential, algebraic)
 
@@ -111,14 +113,14 @@ def case_jet_dae_iterated(root):
     return constraint_residual
 
 
-def case_jet_constraint_iterated(root):
+def case_jet_constraint_iterated(residual):
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     linearization = probdiffeq.linearization_map(nlstsq)
 
     def constraint_residual(ssm, lift_by: int):
-        implicit = probdiffeq.root_state_and_velocity(root.root)
+        implicit = probdiffeq.residual_state_and_velocity(residual.residual)
         implicit = probdiffeq.jet_lift(implicit, lift_by=lift_by)
-        return probdiffeq.constraint_root(
+        return probdiffeq.constraint_residual(
             implicit, ssm=ssm, linearization=linearization
         )
 
@@ -129,7 +131,7 @@ def case_jet_constraint_iterated(root):
 @testing.parametrize("lift_by", [0, "max"])
 @testing.parametrize("ssm_fact", ["dense"])
 def test_posterior_linearisation_matches_closed_form_recursion(
-    root: Root,
+    residual: Root,
     jet_factory: Callable,
     expected: list,
     lift_by: int | Literal["max"],
@@ -138,14 +140,14 @@ def test_posterior_linearisation_matches_closed_form_recursion(
     derivatives = len(expected) - 1
     ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
     init, _iwp = probdiffeq.prior_wiener_integrated(
-        [root.u0], diffuse_derivatives=derivatives, ssm=ssm
+        [residual.u0], diffuse_derivatives=derivatives, ssm=ssm
     )
 
     lift_by = len(expected) - 2 if lift_by == "max" else lift_by
     constraint = jet_factory(ssm=ssm, lift_by=lift_by)
 
     cstate = constraint.init_linearization()
-    fx, cstate = constraint.linearize(init, cstate, damp=0.0, t=root.t0)
+    fx, cstate = constraint.linearize(init, cstate, damp=0.0, t=residual.t0)
 
     _observed, reverted = ssm.conditional.revert(init, fx, solve_triu=linalg.lstsq_svd)
 
@@ -161,15 +163,15 @@ def test_posterior_linearisation_matches_closed_form_recursion(
 @testing.parametrize("wrong_lift_by", [-1, 4, 100])
 @testing.parametrize("ssm_fact", ["dense"])
 def test_wrong_lift_by_raises_error(
-    root: Root, jet_factory: Callable, wrong_lift_by, ssm_fact
+    residual: Root, jet_factory: Callable, wrong_lift_by, ssm_fact
 ):
-    # 5 Taylor coefficients + root-orders of 2 (constraints depend on u and du).
+    # 5 Taylor coefficients + residual-orders of 2 (constraints depend on u and du).
     ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
     init, _ = probdiffeq.prior_wiener_integrated(
-        [root.u0], diffuse_derivatives=4, ssm=ssm
+        [residual.u0], diffuse_derivatives=4, ssm=ssm
     )
     constraint = jet_factory(ssm=ssm, lift_by=wrong_lift_by)
 
     cstate = constraint.init_linearization()
     with testing.raises(ValueError, match="Received"):
-        _ = constraint.linearize(init, cstate, damp=0.0, t=root.t0)
+        _ = constraint.linearize(init, cstate, damp=0.0, t=residual.t0)

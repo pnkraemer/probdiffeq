@@ -410,10 +410,10 @@ class IsotropicPriorFactory(api.AbstractPriorFactory):
 class IsotropicLinearizationFactory(api.AbstractLinearizationFactory):
     """Construct an isotropic linearization-factory."""
 
-    def root(self, *, root, linearization: Callable | None):
+    def residual(self, *, residual, linearization: Callable | None):
         raise NotImplementedError
 
-    def dae_posterior_linearization(self, *, dae, linearization):
+    def dae(self, *, dae, linearization):
         raise NotImplementedError
 
     def ode_taylor_1st(self, *, vector_field):

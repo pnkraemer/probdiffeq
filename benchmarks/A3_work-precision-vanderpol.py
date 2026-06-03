@@ -118,8 +118,8 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         """Van-der-Pol dynamics as a second-order differential equation."""
         return 1e5 * ((1.0 - u**2) * du - u)
 
-    def root(u, du, ddu, /, *, t):
-        """Evaluate a root to solve the 2nd-order problem directly."""
+    def residual(u, du, ddu, /, *, t):
+        """Evaluate a residual to solve the 2nd-order problem directly."""
         return ddu - vf_probdiffeq(u, du, t=t)
 
     t0, t1 = 0.0, 3.0
@@ -136,7 +136,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
 
         ssm = probdiffeq.state_space_model(ssm_fact="dense")
         init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-        ts = probdiffeq.constraint_root(root, ssm=ssm, jet_order=0)
+        ts = probdiffeq.constraint_residual(residual, ssm=ssm, jet_order=0)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         solver = probdiffeq.solver_dynamic(

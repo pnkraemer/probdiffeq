@@ -240,10 +240,10 @@ class BlockDiagPriorFactory(api.AbstractPriorFactory):
 class BlockDiagLinearizationFactory(api.AbstractLinearizationFactory):
     """Construct a block-diagonal linearization-factory."""
 
-    def root(self, *, root, linearization: Callable | None):
+    def residual(self, *, residual, linearization: Callable | None):
         raise NotImplementedError
 
-    def dae_posterior_linearization(self, *, dae, linearization):
+    def dae(self, *, dae, linearization):
         raise NotImplementedError
 
     def ode_taylor_0th(self, *, vector_field):
