@@ -434,33 +434,18 @@ def jetexpand_dae_nlstsq(
         def residual_jet(tcoeffs_flat):
             tcoeffs_all = unravel(tcoeffs_flat)
 
-            # Differential part.
-            # Assumes that the DAE is first order.
-            ps, ss = utilities.jet_coords_to_primals_and_series(
-                tcoeffs_all, dae.differential.num_derivatives_in_args
-            )
-            primals1, series1 = func.jet(
-                lambda *s: dae.differential.residual_function(jet_coords=s, t=t),
-                ps,
-                ss,
-                is_tcoeff=False,
+            jet_order1 = dae.differential.num_derivatives_in_args
+            diff_eval1 = dae.differential.residual_function(
+                jet_coords=tcoeffs_all[:jet_order1], t=t
             )
 
-            # Algebraic part
-            # Assumes that the DAE is first order.
-            ps, ss = utilities.jet_coords_to_primals_and_series(
-                tcoeffs_all, dae.algebraic.num_derivatives_in_args
-            )
-            primals2, series2 = func.jet(
-                lambda *s: dae.algebraic.residual_function(jet_coords=s, t=t),
-                ps,
-                ss,
-                is_tcoeff=False,
+            jet_order2 = dae.algebraic.num_derivatives_in_args
+            diff_eval2 = dae.algebraic.residual_function(
+                jet_coords=tcoeffs_all[:jet_order2], t=t
             )
 
-            # Put together (order doesn't matter)
-            fx = [primals1, *series1, primals2, *series2]
-            return tree.ravel_pytree(fx)[0]
+            # Flatten the output so that the Jacobians are matrices, not Pytrees.
+            return tree.ravel_pytree([diff_eval1, diff_eval2])[0]
 
         x1, info = nlstsq(residual_jet, x0, rv.mean_flat, rv.cholesky_flat)
         return list(unravel(x1)), info

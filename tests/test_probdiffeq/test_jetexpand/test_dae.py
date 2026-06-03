@@ -34,7 +34,12 @@ def test_daejet_recursive_matches_expectation_on_sir_model(num_strides, stride):
 
     eps = np.finfo_eps(y0[0].dtype)
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=3, tol=eps)
-    dae = probdiffeq.dae_system(differential=differential, algebraic=algebraic)
+
+    differential_lifted = probdiffeq.jet_lift(differential, lift_by=len(expected) - 2)
+    algebraic_lifted = probdiffeq.jet_lift(algebraic, lift_by=len(expected) - 1)
+    dae = probdiffeq.dae_system(
+        differential=differential_lifted, algebraic=algebraic_lifted
+    )
 
     jetexpand = probdiffeq.jetexpand_dae_nlstsq_recursive(
         num_strides=num_strides, stride=stride, nlstsq=nlstsq

@@ -141,9 +141,11 @@ def setup_timeit(*, repeats: int) -> Callable:
 def solver_ode(*, num_derivatives: int, time_span) -> Callable:
     """Construct a method that solves Robertson as an ODE."""
 
+    @probdiffeq.residual_state_velocity
     def residual(u, du, /, *, t):
         return du - vf(u, t=t)
 
+    @probdiffeq.ode
     def vf(y, *, t):
         del t
         k1, k2, k3 = 0.04, 3e7, 1e4
@@ -158,10 +160,9 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
     @jax.jit
     def param_to_solution(tol):
         # Build a solver
-        vf_auto = functools.partial(vf, t=t0)
-        tcoeffs = probdiffeq.jetexpand_ode_padded_scan(
-            vf_auto, (y0,), num=num_derivatives - 1
-        )
+        jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives - 1)
+        tcoeffs, _ = jetexpand(vf, (y0,), t=t0)
+
         ssm = probdiffeq.state_space_model()
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
@@ -187,6 +188,8 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
 def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
     """Construct a method that solves Robertson as a DAE."""
 
+    @functools.partial(probdiffeq.jet_lift, lift_by=num_derivatives - 1)
+    @probdiffeq.residual_state_velocity
     def differential(u, du, /, *, t):
         del t
         return du[:2] - dynamics(u)
@@ -197,27 +200,24 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
         return jnp.stack([f0, f1])
 
+    @functools.partial(probdiffeq.jet_lift, lift_by=num_derivatives)
+    @probdiffeq.residual_state
     def algebraic(u, *, t):
         del t
         return u[0] + u[1] + u[2] - 1
 
+    dae = probdiffeq.dae_system(differential, algebraic)
+
     @jax.jit
     def param_to_solution(tol):
         t0, t1 = time_span
-
-        def differential_auto(u, du):
-            return differential(u, du, t=t0)
-
-        def algebraic_auto(u):
-            return algebraic(u, t=t0)
-
         y0 = [jnp.array([1.0, 0.0, 0.0])]
         nlstsq = probdiffeq.wlstsq_nc_gauss_newton(
             maxiter=10, tol=jnp.finfo(y0[0].dtype).eps ** 0.5
         )
-        tcoeffs, _info = probdiffeq.daejet_nlstsq(
-            differential_auto, algebraic_auto, y0, num=num_derivatives, nlstsq=nlstsq
-        )
+        jetexpand = probdiffeq.jetexpand_dae_nlstsq(nlstsq=nlstsq, num=num_derivatives)
+        tcoeffs, _ = jetexpand(dae, y0, t=t0)
+
         ssm = probdiffeq.state_space_model()
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
@@ -227,9 +227,7 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
 
         # We build a Jet constraint
         linearization = probdiffeq.linearization_map(nlstsq)
-        jet = probdiffeq.constraint_dae(
-            differential, algebraic, ssm=ssm, linearization=linearization
-        )
+        jet = probdiffeq.constraint_dae(dae, ssm=ssm, linearization=linearization)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         # For proper DAEs, non-iterated solver's simply don't cut it

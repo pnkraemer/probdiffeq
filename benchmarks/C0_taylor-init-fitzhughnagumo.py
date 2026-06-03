@@ -96,7 +96,8 @@ def taylor_mode_scan() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = probdiffeq.jetexpand_ode_padded_scan(vf_auto, (u0,), num=num)
+        jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num)
+        tcoeffs, _ = jetexpand(vf_auto, (u0,), t=0.0)
         return jnp.asarray(tcoeffs)
 
     return estimate
@@ -108,7 +109,8 @@ def taylor_mode_unroll() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = probdiffeq.jetexpand_ode_unroll(vf_auto, (u0,), num=num)
+        jetexpand = probdiffeq.jetexpand_ode_unroll(num=num)
+        tcoeffs, _ = jetexpand(vf_auto, (u0,), t=0.0)
         return jnp.asarray(tcoeffs)
 
     return estimate
@@ -120,9 +122,8 @@ def taylor_mode_doubling() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = probdiffeq.jetexpand_ode_doubling_unroll(
-            vf_auto, (u0,), num_doublings=num
-        )
+        jetexpand = probdiffeq.jetexpand_ode_doubling_unroll(num_doublings=num)
+        tcoeffs, _ = jetexpand(vf_auto, (u0,), t=0.0)
         return jnp.asarray(tcoeffs)
 
     return estimate
@@ -134,7 +135,8 @@ def odejet_via_jvp() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = probdiffeq.jetexpand_ode_via_jvp(vf_auto, (u0,), num=num)
+        jetexpand = probdiffeq.jetexpand_ode_via_jvp(num=num)
+        tcoeffs, _ = jetexpand(vf_auto, (u0,), t=0.0)
         return jnp.asarray(tcoeffs)
 
     return estimate
@@ -143,9 +145,11 @@ def odejet_via_jvp() -> Callable:
 def _fitzhugh_nagumo():
     u0 = jnp.asarray([-1.0, 1.0])
 
-    @jax.jit
-    def vf_probdiffeq(u, a=0.2, b=0.2, c=3.0):
+    @probdiffeq.ode
+    def vf_probdiffeq(u, *, t):
         """FitzHugh--Nagumo model."""
+        del t
+        a, b, c = 0.2, 0.2, 3.0
         du1 = c * (u[0] - u[0] ** 3 / 3 + u[1])
         du2 = -(1.0 / c) * (u[0] - a - b * u[1])
         return jnp.asarray([du1, du2])
