@@ -8,7 +8,6 @@ from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeV
 __all__ = [
     "JetExpansionAlg",
     "jetexpand_dae_nlstsq",
-    "jetexpand_dae_nlstsq_recursive",
     "jetexpand_ode_doubling_unroll",
     "jetexpand_ode_padded_scan",
     "jetexpand_ode_unroll",
@@ -366,30 +365,6 @@ def _allow_pytree_inits(expand):
         return expand(vf, inits, t=t)
 
     return expand_wrapped
-
-
-def jetexpand_dae_nlstsq_recursive(
-    num_strides: int, stride: int, nlstsq: Callable
-) -> JetExpansionAlg[problem_types.dae_system]:
-    """Evaluate the Taylor series of a differential-algebraic equation system.
-
-    Like jetexpand_dae_nlstsq(), but called recursively which means that extremely high orders
-    can be initialised exactly at the cost of multiple calls to the nonlinear least squares solver.
-    """
-    jetexpand = jetexpand_dae_nlstsq(num=stride, nlstsq=nlstsq)
-
-    def expand(
-        dae: problem_types.dae_system, inits: Sequence[T], /, *, t: float
-    ) -> tuple[list[T], dict]:
-        received = list(inits)
-        if num_strides == 0:
-            return received, {}
-
-        for _ in range(num_strides):
-            received, _info = jetexpand(dae, received, t=t)
-        return received, {}
-
-    return expand
 
 
 def jetexpand_dae_nlstsq(

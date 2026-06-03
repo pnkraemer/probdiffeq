@@ -1,5 +1,7 @@
 """Learn a DAE."""
 
+import functools
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -41,6 +43,7 @@ def main(
 ) -> None:
     """Run the script."""
 
+    @functools.partial(probdiffeq.jet_lift, lift_by=2)
     @probdiffeq.residual_state_velocity
     def differential(u, du, /, *, t):
         del t
@@ -52,6 +55,7 @@ def main(
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
         return jnp.stack([f0, f1])
 
+    @functools.partial(probdiffeq.jet_lift, lift_by=3)
     @probdiffeq.residual_state
     def algebraic(u, *, t):
         del t
