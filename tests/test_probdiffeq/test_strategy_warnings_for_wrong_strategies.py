@@ -9,7 +9,7 @@ from probdiffeq.util import test_util
 def test_warning_for_fixedpoint_in_save_every_step_mode(fact) -> None:
     vf, (u0,), (t0, _t1) = ode.ivp_lotka_volterra()
 
-    vf = probdiffeq.ode_function(vf)
+    vf = probdiffeq.ode(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     tcoeffs, _ = jetexpand(vf, [u0], t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
@@ -28,7 +28,7 @@ def test_warning_for_fixedpoint_in_save_every_step_mode(fact) -> None:
 def test_warning_for_smoother_in_save_at_mode(fact) -> None:
     vf, (u0,), (t0, _t1) = ode.ivp_lotka_volterra()
 
-    vf = probdiffeq.ode_function(vf)
+    vf = probdiffeq.ode(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     tcoeffs, _ = jetexpand(vf, [u0], t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact=fact)

@@ -112,7 +112,7 @@ def setup_timeit(*, repeats: int) -> Callable:
 def solver_probdiffeq(num_derivatives: int, implementation, constraint) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
-    @probdiffeq.ode_function
+    @probdiffeq.ode
     def vf_probdiffeq(y, /, *, t):  # noqa: ARG001
         """Lotka--Volterra dynamics."""
         dy1 = 0.5 * y[0] - 0.05 * y[0] * y[1]

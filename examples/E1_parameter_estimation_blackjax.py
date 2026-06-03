@@ -28,7 +28,7 @@ def main():
 
     f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
-    @probdiffeq.ode_function
+    @probdiffeq.ode
     def vf(y, /, *, t):  # noqa: ARG001
         """Evaluate the Lotka-Volterra vector field."""
         return f(y, *f_args)

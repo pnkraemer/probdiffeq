@@ -153,7 +153,7 @@ def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
     )
     # fmt: on
 
-    @probdiffeq.ode_function_second_order
+    @probdiffeq.ode_second_order
     def vf_probdiffeq(u, du, /, *, t):  # noqa: ARG001
         """Pleiades problem."""
         x = u[0:7]  # x

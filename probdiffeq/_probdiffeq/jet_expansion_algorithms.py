@@ -322,9 +322,7 @@ def _error_if_vf_not_odefunction_type(expand):
     def expand_wrapped(vf, inits, /, *, t: float):
         if not isinstance(vf, problem_types.ODEFunction):
             msg = f"Expected type {problem_types.ODEFunction}, but got {vf} of type {type(vf)}. "
-            msg += (
-                "Make sure to wrap your vector field with `probdiffeq.ode_function()`."
-            )
+            msg += "Make sure to wrap your vector field with `probdiffeq.ode()`."
             raise TypeError(msg)
         return expand(vf, inits, t=t)
 
@@ -347,14 +345,14 @@ def _allow_pytree_inits(expand):
 
             if vf.num_derivatives_in_args == 1:
 
-                @probdiffeq.ode_function
+                @probdiffeq.ode
                 def vf_wrapped(y: T, /, *, t: float) -> T:
                     y = tree.tree_map(unravel, y)
                     fy = vf.vector_field(jet_coords=(y,), t=t)
                     return tree.ravel_pytree(fy)[0]
             elif vf.num_derivatives_in_args == 2:
 
-                @probdiffeq.ode_function_second_order
+                @probdiffeq.ode_second_order
                 def vf_wrapped(y: T, dy: T, /, *, t: float) -> T:
                     y = tree.tree_map(unravel, y)
                     dy = tree.tree_map(unravel, dy)

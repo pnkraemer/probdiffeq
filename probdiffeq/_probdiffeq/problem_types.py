@@ -15,7 +15,7 @@ Examples
 --------
 >>> import inspect
 >>>
->>> @ode_function
+>>> @ode
 ... def f(y, *, t):
 ...     return y
 >>>
@@ -25,7 +25,7 @@ ODEFunction(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_fwd(seed=1, 
 
 Higher-order problems:
 
->>> @ode_function_second_order
+>>> @ode_second_order
 ... def f(y, dy, /, *, t):
 ...     return y + dy
 >>>
@@ -45,7 +45,7 @@ Residual(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_fwd(seed=1, num
 
 Higher-order constraints:
 
->>> @residual_state_and_velocity
+>>> @residual_state_velocity
 ... def g(y, /, dy, *, t):
 ...     return jnp.abs2(dy)
 >>>
@@ -56,32 +56,216 @@ Residual(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num
 
 """
 
-from probdiffeq._probdiffeq import jacobians, utilities
-from probdiffeq.backend import func, tree
+from probdiffeq._probdiffeq import utilities
+from probdiffeq.backend import func, linalg, random, tree
 from probdiffeq.backend.typing import Any, Array, Generic, Protocol, Sequence, TypeVar
+
+__all__ = [
+    "JacobianHandler",
+    "ODEFunction",
+    "ProtocolODEFirstOrder",
+    "ProtocolODESecondOrder",
+    "ProtocolResidualState",
+    "ProtocolResidualVelocity",
+    "Residual",
+    "dae_system",
+    "jacobian_hutchinson_fwd",
+    "jacobian_hutchinson_rev",
+    "jacobian_materialize",
+    "jet_lift",
+    "ode",
+    "ode_second_order",
+    "residual_state",
+    "residual_state_velocity",
+    "residual_state_velocity_acceleration",
+]
+
+
+class JacobianHandler:
+    """An interface for working with Jacobian matrices."""
+
+    def init_jacobian_handler(self):
+        """Initialize the handler state.
+
+        For example, if the handler uses stochastic sampling,
+        this initialisation would create a random key.
+        """
+        raise NotImplementedError
+
+    def materialize_dense(self, fun, x, state, /):
+        """Materialize a dense Jacobian.
+
+        This is typically used for first-order linearization in dense
+        state-space models.
+        """
+        raise NotImplementedError
+
+    def calculate_trace(self, fun, x, state, /):
+        """Calculate the trace of a Jacobian.
+
+        This is typically used for first-order linearization in isotropic
+        state-space models.
+        """
+        raise NotImplementedError
+
+    def calculate_diagonal(self, fun, x, state, /):
+        """Calculate the diagonal of a Jacobian.
+
+        This is typically used for first-order linearization in block-diagonal
+        state-space models.
+        """
+        raise NotImplementedError
+
+
+class jacobian_materialize(JacobianHandler):
+    """Construct a handler that always materialized Jacobian matrices.
+
+    Use this Jacobian if the dimension of the problem is relatively small.
+    """
+
+    def __init__(self, *, jacfun=func.jacfwd) -> None:
+        self.jacfun = jacfun
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(jacfun={self.jacfun})"
+
+    def init_jacobian_handler(self):
+        return ()
+
+    def materialize_dense(self, fun, x, state, /):
+        del state
+        fx = fun(x)
+        dfx = func.jacfwd(fun)(x)
+        return fx, dfx, ()
+
+    def calculate_trace(self, fun, x, state, /):
+        del state
+        fx = fun(x)
+        dfx = func.jacfwd(fun)(x)
+        dfx_trace = linalg.trace(dfx)
+        return fx, dfx_trace, ()
+
+    def calculate_diagonal(self, fun, x, state, /):
+        del state
+        fx = fun(x)
+        dfx = func.jacfwd(fun)(x)
+        dfx_diagonal = linalg.diagonal(dfx)
+        return fx, dfx_diagonal, ()
+
+
+class jacobian_hutchinson_fwd(JacobianHandler):
+    """Construct a handler that uses stochastic trace estimation for traces/diagonals.
+
+    Use a Hutchinson handler if the dimension of the problem is large.
+
+    This implementation uses **forward-mode** automatic differentiation.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This function is highly experimental and not safe to use.
+        There is no guarantee that it works correctly (or at all).
+        It might be deleted tomorrow and without any deprecation policy.
+
+    """
+
+    def __init__(self, *, seed=1, num_probes=10) -> None:
+        self.seed = seed
+        self.num_probes = num_probes
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(seed={self.seed}, num_probes={self.num_probes})"
+        )
+
+    def init_jacobian_handler(self):
+        return random.prng_key(seed=self.seed)
+
+    def materialize_dense(self, fun, x, state, /):
+        # TODO: approximate Jacobian with outer products instead of forming?
+        # What is the "correct" thing to do?
+        fx = fun(x)
+        dfx = func.jacfwd(fun)(x)
+        return fx, dfx, state
+
+    def calculate_trace(self, fun, x, key, /):
+        key, subkey = random.split(key, num=2)
+        sample_shape = (self.num_probes, *x.shape)
+        v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
+
+        fx, Jvp = func.linearize(fun, x)
+        J_trace = func.vmap(lambda s: linalg.vector_dot(s, Jvp(s)))(v)
+        J_trace = J_trace.mean(axis=0)
+        return fx, J_trace, key
+
+    def calculate_diagonal(self, fun, x, key, /):
+        key, subkey = random.split(key, num=2)
+        sample_shape = (self.num_probes, *x.shape)
+        v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
+
+        fx, Jvp = func.linearize(fun, x)
+        vJv = func.vmap(lambda s: s * Jvp(s))(v)
+        J_diagonal = vJv.mean(axis=0)
+        return fx, J_diagonal, key
+
+
+class jacobian_hutchinson_rev(JacobianHandler):
+    """Construct a handler that uses stochastic trace estimation for traces/diagonals.
+
+    Use a Hutchinson handler if the dimension of the problem is large.
+
+    This implementation uses **reverse-mode** automatic differentiation.
+
+    !!! warning "Warning: highly EXPERIMENTAL feature!"
+        This function is highly experimental and not safe to use.
+        There is no guarantee that it works correctly (or at all).
+        It might be deleted tomorrow and without any deprecation policy.
+
+    """
+
+    def __init__(self, *, seed=1, num_probes=10) -> None:
+        self.seed = seed
+        self.num_probes = num_probes
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(seed={self.seed}, num_probes={self.num_probes})"
+        )
+
+    def init_jacobian_handler(self):
+        return random.prng_key(seed=self.seed)
+
+    def materialize_dense(self, fun, x, state, /):
+        # TODO: approximate Jacobian with outer products instead of forming?
+        # What is the "correct" thing to do?
+        fx = fun(x)
+        dfx = func.jacrev(fun)(x)
+        return fx, dfx, state
+
+    def calculate_trace(self, fun, x, key, /):
+        key, subkey = random.split(key, num=2)
+        sample_shape = (self.num_probes, *x.shape)
+        v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
+
+        fx, vjp = func.vjp(fun, x)
+        J_trace = func.vmap(lambda s: linalg.vector_dot(s, vjp(s)[0]))(v)
+        J_trace = J_trace.mean(axis=0)
+        return fx, J_trace, key
+
+    def calculate_diagonal(self, fun, x, key, /):
+        key, subkey = random.split(key, num=2)
+        sample_shape = (self.num_probes, *x.shape)
+        v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
+
+        fx, vjp = func.vjp(fun, x)
+        vJv = func.vmap(lambda s: s * vjp(s)[0])(v)
+        J_diagonal = vJv.mean(axis=0)
+        return fx, J_diagonal, key
+
 
 T = TypeVar("T")
 T_contra = TypeVar("T_contra", contravariant=True)
 
-__all__ = [
-    "AbstractJetFunction",
-    "FirstOrderODEProtocol",
-    "ODEFunction",
-    "Residual",
-    "ResidualStateProtocol",
-    "ResidualStateVelocityProtocol",
-    "SecondOrderODEProtocol",
-    "dae_system",
-    "jet_lift",
-    "ode_function",
-    "ode_function_second_order",
-    "residual_state",
-    "residual_state_and_velocity",
-    "residual_state_and_velocity_and_acceleration",
-]
 
-
-class AbstractJetFunction:
+class _AbstractJetFunction:
     """A jet function, ie a function that operates on jet coordinates (y, y', ..., t).
 
     This is typically used to define right-hand sides of (high-order) ODEs
@@ -92,9 +276,7 @@ class AbstractJetFunction:
     matches the input types.
     """
 
-    def __init__(
-        self, jacobian: jacobians.JacobianHandler, num_derivatives_in_args: int
-    ):
+    def __init__(self, jacobian: JacobianHandler, num_derivatives_in_args: int):
         self.jacobian = jacobian
         self.num_derivatives_in_args = num_derivatives_in_args
 
@@ -102,20 +284,17 @@ class AbstractJetFunction:
         return f"{self.__class__.__name__}(num_derivatives_in_args={self.num_derivatives_in_args}, jacobian={self.jacobian})"
 
 
-class FirstOrderODEProtocol(Protocol[T]):
+class ProtocolODEFirstOrder(Protocol[T]):
     def __call__(self, u: T, /, *, t: float) -> T: ...
 
 
-class SecondOrderODEProtocol(Protocol[T]):
+class ProtocolODESecondOrder(Protocol[T]):
     def __call__(self, u: T, du: T, /, *, t: float) -> T: ...
 
 
-class ODEFunction(AbstractJetFunction, Generic[T]):
+class ODEFunction(_AbstractJetFunction, Generic[T]):
     def __init__(
-        self,
-        vector_field,
-        jacobian: jacobians.JacobianHandler,
-        num_derivatives_in_args: int,
+        self, vector_field, jacobian: JacobianHandler, num_derivatives_in_args: int
     ):
         super().__init__(
             jacobian=jacobian, num_derivatives_in_args=num_derivatives_in_args
@@ -127,9 +306,7 @@ class ODEFunction(AbstractJetFunction, Generic[T]):
         return self.vector_field(jet_coords=jet_coords, t=t)
 
 
-def ode_function(
-    func: FirstOrderODEProtocol, /, *, jacobian: jacobians.JacobianHandler | None = None
-):
+def ode(func: ProtocolODEFirstOrder, /, *, jacobian: JacobianHandler | None = None):
     """Construct a description of an  ODE y' = f(y, t)."""
 
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
@@ -137,16 +314,13 @@ def ode_function(
         return func(y, t=t)
 
     if jacobian is None:
-        jacobian = jacobians.jacobian_hutchinson_fwd()
+        jacobian = jacobian_hutchinson_fwd()
 
     return ODEFunction(jetfunc, jacobian=jacobian, num_derivatives_in_args=1)
 
 
-def ode_function_second_order(
-    func: SecondOrderODEProtocol,
-    /,
-    *,
-    jacobian: jacobians.JacobianHandler | None = None,
+def ode_second_order(
+    func: ProtocolODESecondOrder, /, *, jacobian: JacobianHandler | None = None
 ):
     """Construct a description of an  ODE y'' = f(y, y', t)."""
 
@@ -155,19 +329,16 @@ def ode_function_second_order(
         return func(y, dy, t=t)
 
     if jacobian is None:
-        jacobian = jacobians.jacobian_hutchinson_fwd()
+        jacobian = jacobian_hutchinson_fwd()
 
     return ODEFunction(jetfunc, jacobian=jacobian, num_derivatives_in_args=2)
 
 
-class Residual(AbstractJetFunction):
+class Residual(_AbstractJetFunction):
     """A residual on jet coordinates, ie a function that operates on (y, y', ..., t)."""
 
     def __init__(
-        self,
-        residual_function,
-        jacobian: jacobians.JacobianHandler,
-        num_derivatives_in_args: int,
+        self, residual_function, jacobian: JacobianHandler, num_derivatives_in_args: int
     ):
         super().__init__(
             jacobian=jacobian, num_derivatives_in_args=num_derivatives_in_args
@@ -180,12 +351,12 @@ class Residual(AbstractJetFunction):
         return self.residual_function(jet_coords=jet_coords, t=t)
 
 
-class ResidualStateProtocol(Protocol[T_contra]):
+class ProtocolResidualState(Protocol[T_contra]):
     def __call__(self, u: T_contra, /, *, t: float) -> Any: ...
 
 
 def residual_state(
-    func: ResidualStateProtocol, /, *, jacobian: jacobians.JacobianHandler | None = None
+    func: ProtocolResidualState, /, *, jacobian: JacobianHandler | None = None
 ) -> Residual:
     """Construct a description of a residual f(u, t) = 0."""
 
@@ -197,20 +368,17 @@ def residual_state(
         return func(y, t=t)
 
     if jacobian is None:
-        jacobian = jacobians.jacobian_hutchinson_fwd()
+        jacobian = jacobian_hutchinson_fwd()
 
     return Residual(jetfunc, jacobian=jacobian, num_derivatives_in_args=1)
 
 
-class ResidualStateVelocityProtocol(Protocol[T_contra]):
+class ProtocolResidualVelocity(Protocol[T_contra]):
     def __call__(self, u: T_contra, du: T_contra, /, *, t: float) -> Any: ...
 
 
-def residual_state_and_velocity(
-    func: ResidualStateVelocityProtocol,
-    /,
-    *,
-    jacobian: jacobians.JacobianHandler | None = None,
+def residual_state_velocity(
+    func: ProtocolResidualVelocity, /, *, jacobian: JacobianHandler | None = None
 ) -> Residual:
     """Construct a description of a residual f(u, du, t) = 0."""
 
@@ -222,22 +390,19 @@ def residual_state_and_velocity(
         return func(y, dy, t=t)
 
     if jacobian is None:
-        jacobian = jacobians.jacobian_hutchinson_fwd()
+        jacobian = jacobian_hutchinson_fwd()
 
     return Residual(jetfunc, jacobian=jacobian, num_derivatives_in_args=2)
 
 
-class ResidualStateVelocityAccelerationProtocol(Protocol[T_contra]):
+class ProtocolResidualAcceleration(Protocol[T_contra]):
     def __call__(
         self, u: T_contra, du: T_contra, ddu: T_contra, /, *, t: float
     ) -> Any: ...
 
 
-def residual_state_and_velocity_and_acceleration(
-    func: ResidualStateVelocityAccelerationProtocol,
-    /,
-    *,
-    jacobian: jacobians.JacobianHandler | None = None,
+def residual_state_velocity_acceleration(
+    func: ProtocolResidualAcceleration, /, *, jacobian: JacobianHandler | None = None
 ) -> Residual:
     """Construct a description of a residual f(u, du, t) = 0."""
 
@@ -249,7 +414,7 @@ def residual_state_and_velocity_and_acceleration(
         return func(y, dy, ddy, t=t)
 
     if jacobian is None:
-        jacobian = jacobians.jacobian_hutchinson_fwd()
+        jacobian = jacobian_hutchinson_fwd()
 
     return Residual(jetfunc, jacobian=jacobian, num_derivatives_in_args=3)
 

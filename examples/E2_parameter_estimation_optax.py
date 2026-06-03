@@ -97,7 +97,7 @@ def solver(vf, u0, *, grid):
             tcoeffs, ssm=ssm, output_scale=10.0
         )
 
-        @probdiffeq.ode_function
+        @probdiffeq.ode
         def vf_p(y, /, *, t):
             return vf(y, t=t, p=p)
 

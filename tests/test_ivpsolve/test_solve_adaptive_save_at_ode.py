@@ -123,12 +123,12 @@ def case_factory_jacobian_hutchinson_rev():
 @testing.case
 def case_factory_constraint_residual_ts1(ivp):
     vf, _u0, (_t0, _t1) = ivp
-    vf = probdiffeq.ode_function(vf)
+    vf = probdiffeq.ode(vf)
 
     # Always materialize to stabilise blockdiagonal/isotropic TS1
     jacobian = probdiffeq.jacobian_materialize()
 
-    @func.partial(probdiffeq.residual_state_and_velocity, jacobian=jacobian)
+    @func.partial(probdiffeq.residual_state_velocity, jacobian=jacobian)
     def residual(u, du, /, *, t):
         return tree.tree_map(lambda a, b: a - b, du, vf(u, t=t))
 
@@ -173,7 +173,7 @@ def case_factory_error_residual_std_not_cached():
 def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
     vf, u0, (t0, t1) = ivp
 
-    vf = probdiffeq.ode_function(vf, jacobian=factory.jacobian)
+    vf = probdiffeq.ode(vf, jacobian=factory.jacobian)
     ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
 
     # Build a solver

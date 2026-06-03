@@ -22,7 +22,7 @@ def main():
     save_at = jnp.linspace(t0, t1, endpoint=True, num=250)
     atol, rtol = 1e-5, 1e-5
 
-    @probdiffeq.ode_function
+    @probdiffeq.ode
     def vf_1(y, /, *, t):
         """Evaluate the three-body problem as a first-order IVP."""
         del t
@@ -49,7 +49,7 @@ def main():
 
     f, (u0, du0), (t0, t1), f_args = ivps.three_body_restricted()
 
-    @probdiffeq.ode_function_second_order
+    @probdiffeq.ode_second_order
     def vf_2(y, dy, /, *, t):
         """Evaluate the three-body problem as a second-order IVP."""
         del t

@@ -41,7 +41,7 @@ def main(
 ) -> None:
     """Run the script."""
 
-    @probdiffeq.residual_state_and_velocity
+    @probdiffeq.residual_state_velocity
     def differential(u, du, /, *, t):
         del t
         return du[:2] - dynamics(u)

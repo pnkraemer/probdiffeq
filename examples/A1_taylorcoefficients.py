@@ -15,7 +15,7 @@ def main():
     """Explore different Taylor coefficients."""
     # We start by defining an ODE.
 
-    @probdiffeq.ode_function
+    @probdiffeq.ode
     def vf(y, /, *, t):
         """Evaluate the dynamics of the logistic ODE."""
         del t  # unused argument

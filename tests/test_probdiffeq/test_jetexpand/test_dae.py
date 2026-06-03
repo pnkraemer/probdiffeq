@@ -44,7 +44,7 @@ def test_daejet_recursive_matches_expectation_on_sir_model(num_strides, stride):
     assert testing.allclose(received, expected)
 
 
-@probdiffeq.ode_function
+@probdiffeq.ode
 def vf_ode(y, /, *, t):
     del t
     beta, gamma = 2.0, 0.5  # infection and recovery rates
@@ -64,7 +64,7 @@ def algebraic(u, /, *, t):
     return u[0] + u[1] + u[2] - N
 
 
-@probdiffeq.residual_state_and_velocity
+@probdiffeq.residual_state_velocity
 def differential(u, du, /, *, t):
     del t
     beta, gamma = 2.0, 0.5

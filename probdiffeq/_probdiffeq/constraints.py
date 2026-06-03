@@ -6,7 +6,7 @@ Examples
 
 Construct ODE constraints as such:
 
->>> @probdiffeq.ode_function
+>>> @probdiffeq.ode
 ... def vf(u, /, *, t):
 ...     return -u
 >>>
@@ -18,7 +18,7 @@ DenseOdeTs1(ode=ODEFunction(num_derivatives_in_args=1, jacobian=jacobian_hutchin
 
 Implement high-order ODEs by passing a vector field with additional arguments as such:
 
->>> @probdiffeq.ode_function_second_order
+>>> @probdiffeq.ode_second_order
 ... def vf(u, du, /, *, t):
 ...     return -du
 >>>
@@ -33,7 +33,7 @@ Or, use the constraint as a decorator
 >>> import functools
 >>>
 >>> @functools.partial(probdiffeq.constraint_ode_ts0, ssm=ssm)
-... @probdiffeq.ode_function_second_order
+... @probdiffeq.ode_second_order
 ... def ode(u, du, /, *, t):
 ...     return -du
 >>>

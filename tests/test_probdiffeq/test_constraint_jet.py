@@ -85,7 +85,7 @@ def fixture_residual_sir():
 @testing.fixture(name="expected")
 @testing.parametrize("derivatives", [1, 5])
 def fixture_expected(residual, derivatives):
-    @probdiffeq.ode_function
+    @probdiffeq.ode
     def vf(y, /, *, t):
         return residual.ode_vf(y, t=t)
 
@@ -99,7 +99,7 @@ def case_jet_dae_iterated(residual):
     linearization = probdiffeq.linearization_map(nlstsq)
 
     def constraint_residual(ssm, lift_by: int):
-        differential = probdiffeq.residual_state_and_velocity(
+        differential = probdiffeq.residual_state_velocity(
             residual.residual_dae_differential
         )
         differential = probdiffeq.jet_lift(differential, lift_by=lift_by)
@@ -118,7 +118,7 @@ def case_jet_constraint_iterated(residual):
     linearization = probdiffeq.linearization_map(nlstsq)
 
     def constraint_residual(ssm, lift_by: int):
-        implicit = probdiffeq.residual_state_and_velocity(residual.residual)
+        implicit = probdiffeq.residual_state_velocity(residual.residual)
         implicit = probdiffeq.jet_lift(implicit, lift_by=lift_by)
         return probdiffeq.constraint_residual(
             implicit, ssm=ssm, linearization=linearization

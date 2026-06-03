@@ -25,7 +25,7 @@ jax.config.update("jax_debug_nans", True)
 def main():
     """Plot the solution of a semilinear ODE with different solvers and priors."""
 
-    @probdiffeq.ode_function
+    @probdiffeq.ode
     def vf(u, *, t):
         """Evaluate a linear vector field."""
         del t

@@ -15,7 +15,7 @@ jax.config.update("jax_debug_nans", True)
 def main():
     """Plot means and standard deviations of solvers."""
 
-    @probdiffeq.ode_function
+    @probdiffeq.ode
     def vf(y, /, *, t):  # noqa: ARG001
         """Evaluate the Lotka-Volterra vector field."""
         y0, y1 = y[0], y[1]

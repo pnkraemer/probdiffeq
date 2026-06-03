@@ -20,7 +20,7 @@ def main() -> None:
     key = jax.random.PRNGKey(1)
     f, (u0,), (t0, t1) = fhn_2d(key, num=40, t1=10.0)
 
-    @probdiffeq.ode_function
+    @probdiffeq.ode
     def vf(y, /, *, t):  # noqa: ARG001
         """Evaluate the dynamics of the PDE."""
         return f(y)

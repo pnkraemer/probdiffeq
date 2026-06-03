@@ -110,7 +110,7 @@ def main():
     plt.show()
 
 
-@probdiffeq.ode_function
+@probdiffeq.ode
 def vf_1st(y, /, *, t):
     """Evaluate the harmonic oscillator dynamics."""
     u, du = jnp.split(y, 2)
@@ -130,7 +130,7 @@ def hamiltonian_2nd(u, du):
     return kinetic + potential
 
 
-@probdiffeq.residual_state_and_velocity_and_acceleration
+@probdiffeq.residual_state_velocity_acceleration
 def residual(u, du, ddu, /, *, t):
     """Evaluate a custom residual for the harmonic oscillator."""
     deriv = ddu - vf_2nd(u, du, t=t)

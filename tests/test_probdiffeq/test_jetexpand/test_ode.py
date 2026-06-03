@@ -12,7 +12,7 @@ def fixture_problem_with_solution():
     solution = np.load(
         "./tests/test_probdiffeq/test_jetexpand/data/three_body_first_solution.npy"
     )
-    return (probdiffeq.ode_function(vf), (u0,), {"t": t0}), solution
+    return (probdiffeq.ode(vf), (u0,), {"t": t0}), solution
 
 
 @testing.fixture(name="num")

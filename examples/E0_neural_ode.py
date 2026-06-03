@@ -133,7 +133,7 @@ def loss_log_marginal_likelihood(vf, *, t0):
             tcoeffs, ssm=ssm, output_scale=output_scale
         )
 
-        @probdiffeq.ode_function
+        @probdiffeq.ode
         def vf_p(y, /, *, t):
             return vf(y, t=t, p=p)
 
