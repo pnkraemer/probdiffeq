@@ -77,6 +77,7 @@ __all__ = [
     "ode_function_second_order",
     "residual_state",
     "residual_state_and_velocity",
+    "residual_state_and_velocity_and_acceleration",
 ]
 
 
@@ -226,10 +227,42 @@ def residual_state_and_velocity(
     return Residual(jetfunc, jacobian=jacobian, num_derivatives_in_args=2)
 
 
+class ResidualStateVelocityAccelerationProtocol(Protocol[T_contra]):
+    def __call__(
+        self, u: T_contra, du: T_contra, ddu: T_contra, /, *, t: float
+    ) -> Any: ...
+
+
+def residual_state_and_velocity_and_acceleration(
+    func: ResidualStateVelocityAccelerationProtocol,
+    /,
+    *,
+    jacobian: jacobians.JacobianHandler | None = None,
+) -> Residual:
+    """Construct a description of a residual f(u, du, t) = 0."""
+
+    # No implementation difference between ode and implicit, but
+    # we don't want to force the user to think in terms of jet functions
+    # so we offer these wrappers.
+    def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
+        (y, dy, ddy) = jet_coords
+        return func(y, dy, ddy, t=t)
+
+    if jacobian is None:
+        jacobian = jacobians.jacobian_hutchinson_fwd()
+
+    return Residual(jetfunc, jacobian=jacobian, num_derivatives_in_args=3)
+
+
 class dae_system:
     """Differential-algebraic equations."""
 
     def __init__(self, differential: Residual, algebraic: Residual):
+        if not isinstance(differential, Residual):
+            raise TypeError(differential)
+        if not isinstance(algebraic, Residual):
+            raise TypeError(algebraic)
+
         self.differential = differential
         self.algebraic = algebraic
 

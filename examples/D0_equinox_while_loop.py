@@ -42,7 +42,7 @@ def main():
 def solution_routine(while_loop):
     """Construct a parameter-to-solution function and an initial value."""
 
-    @jax.jit
+    @probdiffeq.ode_function
     def vf(y, /, *, t):  # noqa: ARG001
         """Evaluate the vector field."""
         return 0.5 * y * (1 - y)
@@ -50,7 +50,8 @@ def solution_routine(while_loop):
     t0, t1 = 0.0, 1.0
     u0 = jnp.asarray([0.1])
 
-    tcoeffs = probdiffeq.jetexpand_ode_padded_scan(lambda y: vf(y, t=t0), (u0,), num=1)
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=1)
+    tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)

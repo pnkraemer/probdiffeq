@@ -22,15 +22,14 @@ def main():
     save_at = jnp.linspace(t0, t1, endpoint=True, num=250)
     atol, rtol = 1e-5, 1e-5
 
-    @jax.jit
+    @probdiffeq.ode_function
     def vf_1(y, /, *, t):
         """Evaluate the three-body problem as a first-order IVP."""
         del t
         return f(y, *f_args)
 
-    tcoeffs = probdiffeq.jetexpand_ode_padded_scan(
-        lambda y: vf_1(y, t=t0), (u0,), num=4
-    )
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
+    tcoeffs, _ = jetexpand(vf_1, (u0,), t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=1.0)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
@@ -50,7 +49,7 @@ def main():
 
     f, (u0, du0), (t0, t1), f_args = ivps.three_body_restricted()
 
-    @jax.jit
+    @probdiffeq.ode_function_second_order
     def vf_2(y, dy, /, *, t):
         """Evaluate the three-body problem as a second-order IVP."""
         del t
@@ -58,9 +57,8 @@ def main():
 
     # Different derivative count because we don't transform to first order
     # The goal is to match the number of tracked taylor coefficients.
-    tcoeffs = probdiffeq.jetexpand_ode_padded_scan(
-        lambda *ys: vf_2(*ys, t=t0), (u0, du0), num=3
-    )
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=3)
+    tcoeffs, _ = jetexpand(vf_2, (u0, du0), t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=1.0)
     ts0 = probdiffeq.constraint_ode_ts0(vf_2, ssm=ssm)

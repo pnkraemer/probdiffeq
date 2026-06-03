@@ -28,7 +28,7 @@ def main():
 
     f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
-    @jax.jit
+    @probdiffeq.ode_function
     def vf(y, /, *, t):  # noqa: ARG001
         """Evaluate the Lotka-Volterra vector field."""
         return f(y, *f_args)
@@ -37,9 +37,8 @@ def main():
     theta_guess = u0  # initial guess
 
     # Construct solvers
-    tcoeffs = probdiffeq.jetexpand_ode_padded_scan(
-        lambda y: vf(y, t=t0), (theta_guess,), num=2
-    )
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
+    tcoeffs, _ = jetexpand(vf, (theta_guess,), t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
     _init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=10.0)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
@@ -159,9 +158,9 @@ def solve_adaptive(vf, *, solver, error, save_at):
     @jax.jit
     def solve(theta):
         """Evaluate the parameter-to-solution map, solving on an adaptive grid."""
-        tcoeffs = probdiffeq.jetexpand_ode_padded_scan(
-            lambda y: vf(y, t=save_at[0]), (theta,), num=2
-        )
+        jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
+        tcoeffs, _ = jetexpand(vf, (theta,), t=save_at[0])
+
         ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
         init, _iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
         solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
@@ -181,9 +180,9 @@ def plot_solution(t, u, *, ax, marker=".", **plotting_kwargs):
 
 def log_posterior(vf, theta_true, *, solver, ts, mean, cov, obs_std=0.1):
     """Create a log-posterior density function."""
-    tcoeffs = probdiffeq.jetexpand_ode_padded_scan(
-        lambda y: vf(y, t=ts[0]), (theta_true,), num=2
-    )
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
+    tcoeffs, _ = jetexpand(vf, (theta_true,), t=ts[0])
+
     ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
     init, _iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
@@ -193,9 +192,9 @@ def log_posterior(vf, theta_true, *, solver, ts, mean, cov, obs_std=0.1):
     @jax.jit
     def logposterior(theta):
         """Evaluate the logposterior-function of the data."""
-        tcoeffs = probdiffeq.jetexpand_ode_padded_scan(
-            lambda y: vf(y, t=ts[0]), (theta,), num=2
-        )
+        jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
+        tcoeffs, _ = jetexpand(vf, (theta,), t=ts[0])
+
         init, _iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
         solve = ivpsolve.solve_fixed_grid(solver=solver)
         solution = solve(init, grid=ts)

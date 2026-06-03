@@ -29,7 +29,6 @@ def main():
     f, u0, (t0, t1), f_args = ivps.lotka_volterra()
     f_args = jnp.asarray(f_args)
 
-    @jax.jit
     def vf(y, t, *, p):  # noqa: ARG001
         """Evaluate the Lotka-Volterra vector field."""
         return f(y, *p)
@@ -98,6 +97,7 @@ def solver(vf, u0, *, grid):
             tcoeffs, ssm=ssm, output_scale=10.0
         )
 
+        @probdiffeq.ode_function
         def vf_p(y, /, *, t):
             return vf(y, t=t, p=p)
 
