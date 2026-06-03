@@ -29,16 +29,16 @@ def fixture_residual_sir():
         nonlinear = imex_nonlinear(u, du, t=t)
         return linear + nonlinear
 
-    def imex_linear(u, du, *, t):
+    def imex_linear(u, du, /, *, t):
         del t
         del u
         return du
 
-    def imex_nonlinear(u, du, *, t):
+    def imex_nonlinear(u, du, /, *, t):
         del du
         return -vf(u, t=t)
 
-    def vf(y, *, t):
+    def vf(y, /, *, t):
         del t
         # infection and recovery rates
         beta, gamma = 2.0, 0.5

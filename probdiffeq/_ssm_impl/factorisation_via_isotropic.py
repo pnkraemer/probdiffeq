@@ -416,15 +416,15 @@ class IsotropicLinearizationFactory(api.AbstractLinearizationFactory):
     def dae(self, *, dae, linearization):
         raise NotImplementedError
 
-    def ode_taylor_1st(self, *, vector_field):
-        if vector_field.num_derivatives_in_args > 1:
+    def ode_taylor_1st(self, *, ode):
+        if ode.num_derivatives_in_args > 1:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
             raise ValueError(msg)
 
-        return IsotropicOdeTs1(vector_field=vector_field)
+        return IsotropicOdeTs1(ode=ode)
 
-    def ode_taylor_0th(self, *, vector_field):
-        return IsotropicOdeTs0(vector_field=vector_field)
+    def ode_taylor_0th(self, *, ode):
+        return IsotropicOdeTs0(ode=ode)
 
 
 class IsotropicOdeTs0(api.AbstractOde):
@@ -436,15 +436,15 @@ class IsotropicOdeTs0(api.AbstractOde):
     def linearize(self, rv, state: None, *, damp: float, t):
         del state
         Ms = rv.mean
-        jet_coords = Ms[: self.vector_field.num_derivatives_in_args]
-        fx_tree = self.vector_field.jet_function(jet_coords=jet_coords, t=t)
+        jet_coords = Ms[: self.ode.num_derivatives_in_args]
+        fx_tree = self.ode.vector_field(jet_coords=jet_coords, t=t)
         fx = tree.tree_map(lambda s: -s, fx_tree)
 
         bias = IsotropicNormal.from_dirac([fx], damp=damp)
 
-        linop = func.jacrev(
-            lambda s: s[[self.vector_field.num_derivatives_in_args], ...]
-        )(rv.mean_flat[..., 0])
+        linop = func.jacrev(lambda s: s[[self.ode.num_derivatives_in_args], ...])(
+            rv.mean_flat[..., 0]
+        )
         cond = api.LatentCond.from_linop_and_noise(linop, bias)
         return cond, None
 
@@ -453,7 +453,7 @@ class IsotropicOdeTs1(api.AbstractOde):
     """Construct an isotropic implementation of ODE-TS1 linearization."""
 
     def init_linearization(self):
-        return self.vector_field.jacobian.init_jacobian_handler()
+        return self.ode.jacobian.init_jacobian_handler()
 
     def linearize(self, rv, state, *, damp: float, t):
 
@@ -465,13 +465,11 @@ class IsotropicOdeTs1(api.AbstractOde):
 
         def vf_ravel(s):
             s_tree = rv0.tree_flatten.unflatten_array(s[None])
-            fs = self.vector_field.jet_function(jet_coords=s_tree, t=t)
+            fs = self.ode.vector_field(jet_coords=s_tree, t=t)
             return tree.ravel_pytree(fs)[0]
 
         # Estimate the trace using Hutchinson's estimator
-        fx, J_trace, state = self.vector_field.jacobian.calculate_trace(
-            vf_ravel, m0, state
-        )
+        fx, J_trace, state = self.ode.jacobian.calculate_trace(vf_ravel, m0, state)
 
         # Best Jacobian approximation: mean of diagonal = trace / len(diagonal)
         J_trace /= len(fx)

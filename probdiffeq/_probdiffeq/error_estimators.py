@@ -226,7 +226,7 @@ class error_residual_std(ErrorEstimator):
         # For higher-order problems it is closer to Taylor-series based
         # (non-probabilistic) ODE solvers; for example, refer to
         # Tan et al. (2026; https://arxiv.org/pdf/2602.04086).
-        n = self.constraint.root_order - 1
+        n = self.constraint.residual_order - 1
         if self.error_per_unit_step:
             n += 1
 

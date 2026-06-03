@@ -442,15 +442,15 @@ class DenseLinearizationFactory(api.AbstractLinearizationFactory):
     def dae(self, *, dae, linearization):
         return DenseDAEPosteriorLinearization(dae=dae, linearization=linearization)
 
-    def ode_taylor_0th(self, *, vector_field):
-        return DenseOdeTs0(vector_field=vector_field)
+    def ode_taylor_0th(self, *, ode):
+        return DenseOdeTs0(ode=ode)
 
-    def ode_taylor_1st(self, *, vector_field):
-        if vector_field.num_derivatives_in_args > 1:
+    def ode_taylor_1st(self, *, ode):
+        if ode.num_derivatives_in_args > 1:
             msg = "Not implemented. Try the a residual-based TS1 constraint instead."
             raise ValueError(msg)
 
-        return DenseOdeTs1(vector_field=vector_field)
+        return DenseOdeTs1(ode=ode)
 
 
 class DenseOdeTs0(api.AbstractOde):
@@ -460,7 +460,7 @@ class DenseOdeTs0(api.AbstractOde):
         return None
 
     def linearize(self, rv: DenseNormal, state: None, *, damp: float, t):
-        ode_order = self.vector_field.num_derivatives_in_args
+        ode_order = self.ode.num_derivatives_in_args
         del state
 
         def a1(m: Array) -> Array:
@@ -470,7 +470,7 @@ class DenseOdeTs0(api.AbstractOde):
 
         Ms = rv.mean
 
-        fm = self.vector_field.jet_function(jet_coords=Ms[:ode_order], t=t)
+        fm = self.ode.vector_field(jet_coords=Ms[:ode_order], t=t)
         fx = tree.tree_map(lambda s: -s, [fm])
         linop = func.jacrev(a1)(rv.mean_flat)
         noise = DenseNormal.from_dirac(fx, damp=damp)
@@ -483,20 +483,20 @@ class DenseOdeTs1(api.AbstractOde):
 
     @property
     def residual_order(self):
-        return self.vector_field.num_derivatives_in_args + 1
+        return self.ode.num_derivatives_in_args + 1
 
     def init_linearization(self):
-        return self.vector_field.jacobian.init_jacobian_handler()
+        return self.ode.jacobian.init_jacobian_handler()
 
     def linearize(self, rv, state: None, *, damp: float, t):
-        # fun = func.partial(self.vector_field, t=t)
+        # fun = func.partial(self.ode, t=t)
         m_tree = rv.mean
 
         rv0 = DenseNormal.from_dirac([m_tree[0]], damp=0.0)
 
         def vf_flat(s: Array) -> Array:
             [s0] = rv0.tree_flatten.unflatten_array(s)
-            fs0 = self.vector_field.jet_function(jet_coords=[s0], t=t)
+            fs0 = self.ode.vector_field(jet_coords=[s0], t=t)
             return rv0.tree_flatten.flatten_tree([fs0])
 
         def select_i(i) -> Callable[[Array], Array]:
@@ -510,7 +510,7 @@ class DenseOdeTs1(api.AbstractOde):
         E1 = func.jacfwd(select_i(i=1))(rv.mean_flat)
 
         m0 = rv0.mean_flat
-        fx, J, state = self.vector_field.jacobian.materialize_dense(vf_flat, m0, state)
+        fx, J, state = self.ode.jacobian.materialize_dense(vf_flat, m0, state)
         linop = E1 - J @ E0
         fx = -(fx - J @ m0)
         fx = rv0.tree_flatten.unflatten_array(fx)
@@ -536,7 +536,9 @@ class DenseRoot(api.AbstractRoot):
         relevant_tcoeffs = m_tree[: self.residual.num_derivatives_in_args]
 
         # Evaluate the residual
-        residual_eval = self.residual.jet_function(jet_coords=relevant_tcoeffs, t=t)
+        residual_eval = self.residual.residual_function(
+            jet_coords=relevant_tcoeffs, t=t
+        )
 
         # Flatten the output so that the Jacobians are matrices, not Pytrees.
         return tree.ravel_pytree(residual_eval)[0]
@@ -562,7 +564,8 @@ class DenseRoot(api.AbstractRoot):
         m_tree = rv.mean
         relevant_tcoeffs = m_tree[: self.residual.num_derivatives_in_args]
         residual_eval = func.eval_shape(
-            lambda s: [self.residual.jet_function(jet_coords=s, t=t)], relevant_tcoeffs
+            lambda s: [self.residual.residual_function(jet_coords=s, t=t)],
+            relevant_tcoeffs,
         )
 
         # Ensure that unravelling does not yield a ShapeDtypeStruct
@@ -590,12 +593,12 @@ class DenseDAEPosteriorLinearization(api.AbstractDAEPosteriorLinearization):
         # Evaluate the residual
 
         jet_order1 = self.dae.differential.num_derivatives_in_args
-        diff_eval1 = self.dae.differential.jet_function(
+        diff_eval1 = self.dae.differential.residual_function(
             jet_coords=m_tree[:jet_order1], t=t
         )
 
         jet_order2 = self.dae.algebraic.num_derivatives_in_args
-        diff_eval2 = self.dae.algebraic.jet_function(
+        diff_eval2 = self.dae.algebraic.residual_function(
             jet_coords=m_tree[:jet_order2], t=t
         )
 

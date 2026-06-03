@@ -82,13 +82,13 @@ class Constraint(Protocol):
     linearize: Callable
     """Linearize the constraint."""
 
-    root_order: int
+    residual_order: int
     """The order of the root-constraint.
 
     Here, 'order' relates to the highest derivative that the
     constraint depends on; for instance, in first-order ODEs,
-    the root_order would be two; and in second-order ODEs,
-    the root_order would be three.
+    the residual_order would be two; and in second-order ODEs,
+    the residual_order would be three.
     """
 
 
@@ -114,7 +114,7 @@ def constraint_ode_ts0(
     return ssm.linearize.ode_taylor_0th(ode=ode)
 
 
-def constraint_ode_ts1(vf: problem_types.ODEFunction, /, *, ssm: ssm_impl.FactSsmImpl):
+def constraint_ode_ts1(ode: problem_types.ODEFunction, /, *, ssm: ssm_impl.FactSsmImpl):
     r"""Create an ODE constraint and linearise with a first-order Taylor approximation.
 
     This constraint handles ODEs of the form
@@ -129,9 +129,9 @@ def constraint_ode_ts1(vf: problem_types.ODEFunction, /, *, ssm: ssm_impl.FactSs
     [`Constraint`](#probdiffeq.probdiffeq.Constraint).
 
     """
-    if not isinstance(vf, problem_types.ODEFunction):
-        raise TypeError(vf)
-    return ssm.linearize.ode_taylor_1st(vector_field=vf)
+    if not isinstance(ode, problem_types.ODEFunction):
+        raise TypeError(ode)
+    return ssm.linearize.ode_taylor_1st(ode=ode)
 
 
 def constraint_residual(

@@ -125,16 +125,16 @@ class AbstractDAEPosteriorLinearization(AbstractLinearization):
 class AbstractOde(AbstractLinearization):
     """Interface for linearizations of ODEs."""
 
-    def __init__(self, *, vector_field) -> None:
-        self.vector_field = vector_field
+    def __init__(self, *, ode) -> None:
+        self.ode = ode
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(ode={self.vector_field})"
+        return f"{self.__class__.__name__}(ode={self.ode})"
 
     @property
     def residual_order(self):
         """The order of the residual constraint."""
-        return self.vector_field.num_derivatives_in_args + 1
+        return self.ode.num_derivatives_in_args + 1
 
 
 class AbstractLinearizationFactory(abc.ABC):

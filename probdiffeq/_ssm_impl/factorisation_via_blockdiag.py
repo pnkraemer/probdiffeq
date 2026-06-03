@@ -246,15 +246,15 @@ class BlockDiagLinearizationFactory(api.AbstractLinearizationFactory):
     def dae(self, *, dae, linearization):
         raise NotImplementedError
 
-    def ode_taylor_0th(self, *, vector_field):
-        return BlockDiagOdeTs0(vector_field=vector_field)
+    def ode_taylor_0th(self, *, ode):
+        return BlockDiagOdeTs0(ode=ode)
 
-    def ode_taylor_1st(self, *, vector_field):
-        if vector_field.num_derivatives_in_args > 2:
+    def ode_taylor_1st(self, *, ode):
+        if ode.num_derivatives_in_args > 2:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
             raise ValueError(msg)
 
-        return BlockDiagOdeTs1(vector_field=vector_field)
+        return BlockDiagOdeTs1(ode=ode)
 
 
 class BlockDiagOdeTs0(api.AbstractOde):
@@ -266,13 +266,13 @@ class BlockDiagOdeTs0(api.AbstractOde):
     def linearize(self, rv, state: None, *, damp: float, t):
         del state
 
-        jet_coords = rv.mean[: self.vector_field.num_derivatives_in_args]
-        fx = self.vector_field.jet_function(jet_coords=jet_coords, t=t)
+        jet_coords = rv.mean[: self.ode.num_derivatives_in_args]
+        fx = self.ode.vector_field(jet_coords=jet_coords, t=t)
         fx = tree.tree_map(lambda s: -s, fx)
         bias = BlockDiagNormal.from_dirac([fx], damp=damp)
 
         def a1(s):
-            return s[[self.vector_field.num_derivatives_in_args], ...]
+            return s[[self.ode.num_derivatives_in_args], ...]
 
         linop = func.vmap(func.jacrev(a1))(rv.mean_flat)
 
@@ -284,7 +284,7 @@ class BlockDiagOdeTs1(api.AbstractOde):
     """Construct a block-diagonal implementation of ODE-TS1 linearization."""
 
     def init_linearization(self):
-        return self.vector_field.jacobian.init_jacobian_handler()
+        return self.ode.jacobian.init_jacobian_handler()
 
     def linearize(self, rv, state, *, damp: float, t):
 
@@ -298,14 +298,12 @@ class BlockDiagOdeTs1(api.AbstractOde):
 
         def vf_flat(u):
             u_tree = rv0.tree_flatten.unflatten_array(u[:, None])
-            fu_tree = self.vector_field.jet_function(jet_coords=u_tree, t=t)
+            fu_tree = self.ode.vector_field(jet_coords=u_tree, t=t)
             return rv0.tree_flatten.flatten_tree([fu_tree]).reshape((-1,))
 
         # Evaluate the linearisation
         m0 = rv.mean_flat[:, 0]
-        fx, J_diag, state = self.vector_field.jacobian.calculate_diagonal(
-            vf_flat, m0, state
-        )
+        fx, J_diag, state = self.ode.jacobian.calculate_diagonal(vf_flat, m0, state)
 
         E1 = func.jacrev(lambda s: s[0])(rv.mean_flat[0])
         linop = linop - J_diag[:, None, None] * E1[None, None, :]
