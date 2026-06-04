@@ -226,7 +226,7 @@ def solver_residual(*, num_derivatives: int, time_span) -> Callable:
         )
 
         # We build a Jet constraint
-        taylor_point = probdiffeq.taylor_point_map(nlstsq)
+        taylor_point = probdiffeq.taylor_point_maximum_a_posteriori(nlstsq)
         jet = probdiffeq.constraint_residual(
             residual, ssm=ssm, taylor_point=taylor_point
         )

@@ -167,7 +167,7 @@ def solver(residual, tol, while_loop, trafo):
         )
 
         # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
-        taylor_point = probdiffeq.taylor_point_map(nlstsq)
+        taylor_point = probdiffeq.taylor_point_maximum_a_posteriori(nlstsq)
         jet = probdiffeq.constraint_residual(
             residual, ssm=ssm, taylor_point=taylor_point
         )

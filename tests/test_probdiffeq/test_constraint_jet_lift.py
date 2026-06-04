@@ -95,7 +95,7 @@ def fixture_expected(residual, derivatives):
 
 
 def case_jet_lift_dae(residual):
-    taylor_point = probdiffeq.taylor_point_map()
+    taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
 
     def constraint_residual(ssm, lift_by: int):
         differential = probdiffeq.residual_state_velocity(
@@ -115,7 +115,7 @@ def case_jet_lift_dae(residual):
 
 
 def case_jet_lift_residual(residual):
-    taylor_point = probdiffeq.taylor_point_map()
+    taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
 
     def constraint_residual(ssm, lift_by: int):
         implicit = probdiffeq.residual_state_velocity(residual.residual)

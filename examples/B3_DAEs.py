@@ -59,7 +59,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     )
 
     # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
-    taylor_point = probdiffeq.taylor_point_map()
+    taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
     jet = probdiffeq.constraint_residual(residual, ssm=ssm, taylor_point=taylor_point)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_dynamic(

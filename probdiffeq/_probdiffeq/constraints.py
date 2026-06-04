@@ -56,8 +56,8 @@ __all__ = [
     "constraint_ode_ts1",
     "constraint_residual",
     "lstsq_constrained_gauss_newton",
-    "taylor_point_map",
-    "taylor_point_prior_mean",
+    "taylor_point_maximum_a_posteriori",
+    "taylor_point_prior",
 ]
 
 N = TypeVar("N", bound=ssm_impl.AbstractTreeNormal)
@@ -167,7 +167,7 @@ class lstsq_constrained_gauss_newton(LstSqConstrained):
         return final.x, {"iters": final.i}
 
 
-class taylor_point_prior_mean(TaylorPointFinder):
+class taylor_point_prior(TaylorPointFinder):
     """TaylorPointFinder point is the prior mean."""
 
     def __call__(self, constraint_flat: Callable, rv, **constraint_kwargs) -> Array:
@@ -176,7 +176,7 @@ class taylor_point_prior_mean(TaylorPointFinder):
         return rv.mean_flat
 
 
-class taylor_point_map(TaylorPointFinder):
+class taylor_point_maximum_a_posteriori(TaylorPointFinder):
     """TaylorPointFinder point is the maximum-a-posteriori estimate."""
 
     def __init__(self, wlstsq_nc: LstSqConstrained | None = None) -> None:
@@ -304,5 +304,5 @@ def constraint_residual(
         raise TypeError(residual)
 
     if taylor_point is None:
-        taylor_point = taylor_point_prior_mean()
+        taylor_point = taylor_point_prior()
     return ssm.linearize.residual(residual=residual, taylor_point=taylor_point)
