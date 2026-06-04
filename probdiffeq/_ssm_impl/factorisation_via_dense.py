@@ -446,8 +446,8 @@ DenseNormal.register_pytree_node()
 class DenseLinearizationFactory(interfaces.AbstractLinearizationFactory):
     """Construct a dense linearization factory."""
 
-    def residual(self, residual, *, linearization):
-        return DenseRoot(residual, linearization=linearization)
+    def residual(self, residual, *, taylor_point):
+        return DenseRoot(residual, taylor_point=taylor_point)
 
     def ode_taylor_0th(self, *, ode):
         return DenseOdeTs0(ode=ode)
@@ -530,9 +530,9 @@ class DenseOdeTs1(interfaces.AbstractOde):
 class DenseRoot(interfaces.AbstractRoot):
     """Construct a dense implementation of residual-TS1 linearization."""
 
-    def __init__(self, residual, *, linearization) -> None:
+    def __init__(self, residual, *, taylor_point) -> None:
         super().__init__(residual)
-        self.linearization_point = linearization
+        self.taylor_point = taylor_point
 
     def init_linearization(self):
         return self.residual.jacobian.init_jacobian_handler()
@@ -560,14 +560,13 @@ class DenseRoot(interfaces.AbstractRoot):
         # Fix all arguments except the Array ones
         constraint_flat = self.constraint_flat(tree_flatten=rv.tree_flatten)
 
-        # Get the linearization point (eg prior or posterior linearisation)
-        mean = self.linearization_point(constraint_flat, rv, t=t)
+        # Get the linearization point (i.e., prior or posterior linearisation)
+        xi = self.taylor_point(constraint_flat, rv, t=t)
 
         # Evaluate the linearization
-        fx, linop, state = self.residual.jacobian.materialize_dense(
-            constraint_flat, mean, state, t=t
-        )
-        fx = fx - linop @ mean
+        jacobian = self.residual.jacobian.materialize_dense
+        fx, linop, state = jacobian(constraint_flat, xi, state, t=t)
+        fx = fx - linop @ xi
 
         # Turn the linearization into a conditional
         noise = DenseNormal.from_dirac([fx], damp=damp)

@@ -50,14 +50,14 @@ from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeV
 
 __all__ = [
     "Constraint",
-    "Linearization",
     "LstSqConstrained",
+    "TaylorPointFinder",
     "constraint_ode_ts0",
     "constraint_ode_ts1",
     "constraint_residual",
-    "linearization_map",
-    "linearization_prior_mean",
     "lstsq_constrained_gauss_newton",
+    "taylor_point_map",
+    "taylor_point_prior_mean",
 ]
 
 N = TypeVar("N", bound=ssm_impl.AbstractTreeNormal)
@@ -67,14 +67,14 @@ Used to type marginals, for example.
 """
 
 
-class Linearization:
-    """Find a linearization point.
+class TaylorPointFinder:
+    """Find a linearization point for the Taylor expansion.
 
-    Note how this object handles *where* to linearize, but not *how* to linearize.
+    Use this API to distinguish iterated filtering from extended filtering.
     """
 
     def __call__(self, constraint_flat: Callable, rv: N, **constraint_kwargs) -> Array:
-        """Find a linearization point.
+        """Find a linearization point for the Taylor expansion.
 
         Parameters
         ----------
@@ -167,8 +167,8 @@ class lstsq_constrained_gauss_newton(LstSqConstrained):
         return final.x, {"iters": final.i}
 
 
-class linearization_prior_mean(Linearization):
-    """Linearization point is the prior mean."""
+class taylor_point_prior_mean(TaylorPointFinder):
+    """TaylorPointFinder point is the prior mean."""
 
     def __call__(self, constraint_flat: Callable, rv, **constraint_kwargs) -> Array:
         del constraint_flat
@@ -176,8 +176,8 @@ class linearization_prior_mean(Linearization):
         return rv.mean_flat
 
 
-class linearization_map(Linearization):
-    """Linearization point is the maximum-a-posteriori estimate."""
+class taylor_point_map(TaylorPointFinder):
+    """TaylorPointFinder point is the maximum-a-posteriori estimate."""
 
     def __init__(self, wlstsq_nc: LstSqConstrained | None = None) -> None:
         if wlstsq_nc is None:
@@ -269,7 +269,7 @@ def constraint_residual(
     residual: problem_types.Residual,
     *,
     ssm: ssm_impl.FactSsmImpl,
-    linearization: Linearization | None = None,
+    taylor_point: TaylorPointFinder | None = None,
 ):
     r"""Construct a general constraint.
 
@@ -294,56 +294,15 @@ def constraint_residual(
         The residual to apply linearization to.
     ssm
         The state-space model to use for the constraint.
-    linearization
-        The strategy to use for finding the linearization point. If None, the prior mean is used as the linearization point.
+    taylor_point
+        The strategy to use for finding the linearization point for the Taylor expansion.
+        If None, the prior mean is used as the linearization point.
         Adjust this variable to use posterior linearization (also known as iterated filtering).
 
     """
     if not isinstance(residual, problem_types.Residual):
         raise TypeError(residual)
 
-    if linearization is None:
-        linearization = linearization_prior_mean()
-    return ssm.linearize.residual(residual=residual, linearization=linearization)
-
-
-# def constraint_dae(
-#     dae: problem_types.residual_from_stack,
-#     *,
-#     ssm: ssm_impl.FactSsmImpl,
-#     linearization: Linearization | None = None,
-# ):
-#     r"""Like `constraint`, but for DAEs.
-
-#     The advantage of a dedicated DAE constraint is that algebraic and differential
-#     roots can enjoy different jet-orders, which increases accuracy.
-
-#     This constraint handles problems of the form
-
-#     $$
-#     f\left(u(t), \frac{du}{dt}(t), ..., \frac{d^k u}{dt^k}(t), t\right) = 0,
-#     ~~~
-#     g\left(u(t), \frac{du}{dt}(t), ..., \frac{d^{k-1} u}{dt^{k-1}}(t), t\right) = 0
-#     $$
-
-#     where $f$ is the differential part and $g$ the algebraic part of the DAE. The order of the problem is read off the number of positional arguments in the algebraic root $g$ (argument `algebraic`), plus one. For instance, if the algebraic root has two positional arguments, then the problem is a second-order DAE. The differential root (argument `differential`) is expected to have one positional argument more than the algebraic root; in the previous example, the differential root would be expected to have three positional arguments.
-
-
-#     !!! warning "Warning: highly EXPERIMENTAL feature!"
-#         This function is highly experimental and not safe to use.
-#         There is no guarantee that it works correctly (or at all).
-#         It might be deleted tomorrow and without any deprecation policy.
-
-#     Parameters
-#     ----------
-#     dae
-#         The differential-algebraic equation system.
-#     ssm
-#         The state-space model to use for the constraint.
-#     linearization
-#         The strategy to use for finding the linearization point. If None, the prior mean is used as the linearization point.
-#     """
-#     if linearization is None:
-#         linearization = linearization_prior_mean()
-
-#     return ssm.linearize.dae(dae=dae, linearization=linearization)
+    if taylor_point is None:
+        taylor_point = taylor_point_prior_mean()
+    return ssm.linearize.residual(residual=residual, taylor_point=taylor_point)

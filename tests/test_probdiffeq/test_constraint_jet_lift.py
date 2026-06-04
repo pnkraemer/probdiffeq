@@ -95,7 +95,7 @@ def fixture_expected(residual, derivatives):
 
 
 def case_jet_lift_dae(residual):
-    linearization = probdiffeq.linearization_map()
+    taylor_point = probdiffeq.taylor_point_map()
 
     def constraint_residual(ssm, lift_by: int):
         differential = probdiffeq.residual_state_velocity(
@@ -108,20 +108,20 @@ def case_jet_lift_dae(residual):
         residual_stack = probdiffeq.residual_from_stack(differential, algebraic)
 
         return probdiffeq.constraint_residual(
-            residual_stack, ssm=ssm, linearization=linearization
+            residual_stack, ssm=ssm, taylor_point=taylor_point
         )
 
     return constraint_residual
 
 
 def case_jet_lift_residual(residual):
-    linearization = probdiffeq.linearization_map()
+    taylor_point = probdiffeq.taylor_point_map()
 
     def constraint_residual(ssm, lift_by: int):
         implicit = probdiffeq.residual_state_velocity(residual.residual)
         implicit = probdiffeq.jet_lift(implicit, lift_by=lift_by)
         return probdiffeq.constraint_residual(
-            implicit, ssm=ssm, linearization=linearization
+            implicit, ssm=ssm, taylor_point=taylor_point
         )
 
     return constraint_residual

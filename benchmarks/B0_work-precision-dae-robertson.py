@@ -226,9 +226,9 @@ def solver_residual(*, num_derivatives: int, time_span) -> Callable:
         )
 
         # We build a Jet constraint
-        linearization = probdiffeq.linearization_map(nlstsq)
+        taylor_point = probdiffeq.taylor_point_map(nlstsq)
         jet = probdiffeq.constraint_residual(
-            residual, ssm=ssm, linearization=linearization
+            residual, ssm=ssm, taylor_point=taylor_point
         )
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
