@@ -73,7 +73,7 @@ class Linearization:
     Note how this object handles *where* to linearize, but not *how* to linearize.
     """
 
-    def __call__(self, constraint_flat: Callable, rv: N) -> Array:
+    def __call__(self, constraint_flat: Callable, rv: N, **constraint_kwargs) -> Array:
         """Find a linearization point.
 
         Parameters
@@ -82,6 +82,8 @@ class Linearization:
             The constraint to linearize, flattened to work with the raveled mean.
         rv
             The distribution to linearize around. The mean of this distribution is typically used as the linearization point.
+        **constraint_kwargs
+            Additional keyword-arguments to pass to the constraint function.
 
         Returns
         -------
@@ -123,7 +125,8 @@ class wlstsq_nc_gauss_newton(WeightedLeastSquaresNonlinearlyConstrained):
         self.lstsq = lstsq
         self.while_loop = while_loop
 
-    def __call__(self, constraint, x0, mean, cholesky):
+    def __call__(self, constraint, x0, mean, cholesky, **constraint_kwargs):
+
         @tree.register_dataclass
         @structs.dataclass
         class State:
@@ -148,7 +151,7 @@ class wlstsq_nc_gauss_newton(WeightedLeastSquaresNonlinearlyConstrained):
             return np.logical_and(np.logical_and(cond1, cond2), cond3)
 
         def body_fun(state: State) -> State:
-            Jx = func.jacfwd(constraint)(state.x)
+            Jx = func.jacfwd(lambda s: constraint(s, **constraint_kwargs))(state.x)
 
             H = Jx @ cholesky
             r = state.fx + Jx @ (mean - state.x)
@@ -156,10 +159,10 @@ class wlstsq_nc_gauss_newton(WeightedLeastSquaresNonlinearlyConstrained):
             dx = mean - state.x - cholesky @ dy
             xnew = state.x + dx
 
-            fxnew = constraint(xnew)
+            fxnew = constraint(xnew, **constraint_kwargs)
             return State(xnew, fxnew, dx=xnew - state.x, i=state.i + 1)
 
-        init = State(x0, constraint(x0), dx=np.ones_like(x0), i=0)
+        init = State(x0, constraint(x0, **constraint_kwargs), dx=np.ones_like(x0), i=0)
         final = self.while_loop(cond_fun, body_fun, init=init)
         return final.x, {"iters": final.i}
 
@@ -167,8 +170,9 @@ class wlstsq_nc_gauss_newton(WeightedLeastSquaresNonlinearlyConstrained):
 class linearization_prior_mean(Linearization):
     """Linearization point is the prior mean."""
 
-    def __call__(self, constraint_flat: Callable, rv) -> Array:
+    def __call__(self, constraint_flat: Callable, rv, **constraint_kwargs) -> Array:
         del constraint_flat
+        del constraint_kwargs
         return rv.mean_flat
 
 
@@ -182,10 +186,10 @@ class linearization_map(Linearization):
             wlstsq_nc = wlstsq_nc_gauss_newton()
         self.wlstsq_nc = wlstsq_nc
 
-    def __call__(self, constraint_flat: Callable, rv) -> Array:
+    def __call__(self, constraint_flat: Callable, rv, **constraint_kwargs) -> Array:
         mean = rv.mean_flat
         mean, _info = self.wlstsq_nc(
-            constraint_flat, mean, rv.mean_flat, rv.cholesky_flat
+            constraint_flat, mean, rv.mean_flat, rv.cholesky_flat, **constraint_kwargs
         )
         return mean
 

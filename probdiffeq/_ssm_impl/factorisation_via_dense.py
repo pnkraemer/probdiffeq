@@ -454,7 +454,8 @@ class DenseLinearizationFactory(interfaces.AbstractLinearizationFactory):
 
     def ode_taylor_1st(self, *, ode):
         if ode.num_derivatives_in_args > 1:
-            msg = "Not implemented. Try the a residual-based TS1 constraint instead."
+            msg = "Not implemented."
+            msg += " Try zeroth-order methods or residual-based constraints instead."
             raise ValueError(msg)
 
         return DenseOdeTs1(ode=ode)
@@ -536,51 +537,40 @@ class DenseRoot(interfaces.AbstractRoot):
     def init_linearization(self):
         return self.residual.jacobian.init_jacobian_handler()
 
-    def constraint_flat(self, m: Array, *, t, tree_flatten) -> Array:
+    def constraint_flat(self, *, tree_flatten) -> Callable:
         """Evaluate a flattened version of the residual constraint."""
-        # Unravel the location and extract derivatives
-        m_tree = tree_flatten.unflatten_array(m)
-        relevant_tcoeffs = m_tree[: self.residual.num_derivatives_in_args]
 
-        # Evaluate the residual
-        residual_eval = self.residual.residual_function(
-            jet_coords=relevant_tcoeffs, t=t
-        )
+        def fun(m: Array, *, t):
+            # Unravel the location and extract derivatives
+            m_tree = tree_flatten.unflatten_array(m)
+            relevant_tcoeffs = m_tree[: self.residual.num_derivatives_in_args]
 
-        # Flatten the output so that the Jacobians are matrices, not Pytrees.
-        return tree.ravel_pytree(residual_eval)[0]
+            # Evaluate the residual
+            residual_eval = self.residual.residual_function(
+                jet_coords=relevant_tcoeffs, t=t
+            )
+
+            # Flatten the output so that the Jacobians are matrices, not Pytrees.
+            return tree.ravel_pytree(residual_eval)[0]
+
+        return fun
 
     def linearize(self, rv, state, *, damp: float, t):
 
         # Fix all arguments except the Array ones
-        constraint_flat = func.partial(
-            self.constraint_flat, t=t, tree_flatten=rv.tree_flatten
-        )
+        constraint_flat = self.constraint_flat(tree_flatten=rv.tree_flatten)
 
         # Get the linearization point (eg prior or posterior linearisation)
-        mean = self.linearization_point(constraint_flat, rv)
+        mean = self.linearization_point(constraint_flat, rv, t=t)
 
+        # Evaluate the linearization
         fx, linop, state = self.residual.jacobian.materialize_dense(
-            constraint_flat, mean, state
+            constraint_flat, mean, state, t=t
         )
         fx = fx - linop @ mean
 
-        # Find the tree structure of the output constraint
-        # (So that we can unravel the bias term and always work in the correct
-        # pytree structure.)
-        m_tree = rv.mean
-        relevant_tcoeffs = m_tree[: self.residual.num_derivatives_in_args]
-        residual_eval = func.eval_shape(
-            lambda s: [self.residual.residual_function(jet_coords=s, t=t)],
-            relevant_tcoeffs,
-        )
-
-        # Ensure that unravelling does not yield a ShapeDtypeStruct
-        residual_eval = tree.tree_map(np.zeros_like, residual_eval)
-        _, unravel = tree.ravel_pytree(residual_eval)
-
         # Turn the linearization into a conditional
-        noise = DenseNormal.from_dirac(unravel(fx), damp=damp)
+        noise = DenseNormal.from_dirac([fx], damp=damp)
 
         cond = interfaces.LatentCond.from_linop_and_noise(linop, noise)
         return cond, state

@@ -92,7 +92,7 @@ class JacobianHandler:
         """
         raise NotImplementedError
 
-    def materialize_dense(self, fun, x, state, /):
+    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
         """Materialize a dense Jacobian.
 
         This is typically used for first-order linearization in dense
@@ -100,7 +100,7 @@ class JacobianHandler:
         """
         raise NotImplementedError
 
-    def calculate_trace(self, fun, x, state, /):
+    def calculate_trace(self, fun, x, state, /, **fun_kwargs):
         """Calculate the trace of a Jacobian.
 
         This is typically used for first-order linearization in isotropic
@@ -108,7 +108,7 @@ class JacobianHandler:
         """
         raise NotImplementedError
 
-    def calculate_diagonal(self, fun, x, state, /):
+    def calculate_diagonal(self, fun, x, state, /, **fun_kwargs):
         """Calculate the diagonal of a Jacobian.
 
         This is typically used for first-order linearization in block-diagonal
@@ -132,23 +132,23 @@ class jacobian_materialize(JacobianHandler):
     def init_jacobian_handler(self):
         return ()
 
-    def materialize_dense(self, fun, x, state, /):
+    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
         del state
-        fx = fun(x)
-        dfx = func.jacfwd(fun)(x)
+        fx = fun(x, **fun_kwargs)
+        dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, ()
 
-    def calculate_trace(self, fun, x, state, /):
+    def calculate_trace(self, fun, x, state, /, **fun_kwargs):
         del state
-        fx = fun(x)
-        dfx = func.jacfwd(fun)(x)
+        fx = fun(x, **fun_kwargs)
+        dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         dfx_trace = linalg.trace(dfx)
         return fx, dfx_trace, ()
 
-    def calculate_diagonal(self, fun, x, state, /):
+    def calculate_diagonal(self, fun, x, state, /, **fun_kwargs):
         del state
         fx = fun(x)
-        dfx = func.jacfwd(fun)(x)
+        dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         dfx_diagonal = linalg.diagonal(dfx)
         return fx, dfx_diagonal, ()
 
@@ -179,29 +179,29 @@ class jacobian_hutchinson_fwd(JacobianHandler):
     def init_jacobian_handler(self):
         return random.prng_key(seed=self.seed)
 
-    def materialize_dense(self, fun, x, state, /):
+    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
         # TODO: approximate Jacobian with outer products instead of forming?
         # What is the "correct" thing to do?
-        fx = fun(x)
-        dfx = func.jacfwd(fun)(x)
+        fx = fun(x, **fun_kwargs)
+        dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, state
 
-    def calculate_trace(self, fun, x, key, /):
+    def calculate_trace(self, fun, x, key, /, **fun_kwargs):
         key, subkey = random.split(key, num=2)
         sample_shape = (self.num_probes, *x.shape)
         v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
 
-        fx, Jvp = func.linearize(fun, x)
+        fx, Jvp = func.linearize(lambda s: fun(s, **fun_kwargs), x)
         J_trace = func.vmap(lambda s: linalg.vector_dot(s, Jvp(s)))(v)
         J_trace = J_trace.mean(axis=0)
         return fx, J_trace, key
 
-    def calculate_diagonal(self, fun, x, key, /):
+    def calculate_diagonal(self, fun, x, key, /, **fun_kwargs):
         key, subkey = random.split(key, num=2)
         sample_shape = (self.num_probes, *x.shape)
         v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
 
-        fx, Jvp = func.linearize(fun, x)
+        fx, Jvp = func.linearize(lambda s: fun(s, **fun_kwargs), x)
         vJv = func.vmap(lambda s: s * Jvp(s))(v)
         J_diagonal = vJv.mean(axis=0)
         return fx, J_diagonal, key
@@ -233,29 +233,29 @@ class jacobian_hutchinson_rev(JacobianHandler):
     def init_jacobian_handler(self):
         return random.prng_key(seed=self.seed)
 
-    def materialize_dense(self, fun, x, state, /):
+    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
         # TODO: approximate Jacobian with outer products instead of forming?
         # What is the "correct" thing to do?
-        fx = fun(x)
-        dfx = func.jacrev(fun)(x)
+        fx = fun(x, **fun_kwargs)
+        dfx = func.jacrev(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, state
 
-    def calculate_trace(self, fun, x, key, /):
+    def calculate_trace(self, fun, x, key, /, **fun_kwargs):
         key, subkey = random.split(key, num=2)
         sample_shape = (self.num_probes, *x.shape)
         v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
 
-        fx, vjp = func.vjp(fun, x)
+        fx, vjp = func.vjp(lambda s: fun(s, **fun_kwargs), x)
         J_trace = func.vmap(lambda s: linalg.vector_dot(s, vjp(s)[0]))(v)
         J_trace = J_trace.mean(axis=0)
         return fx, J_trace, key
 
-    def calculate_diagonal(self, fun, x, key, /):
+    def calculate_diagonal(self, fun, x, key, /, **fun_kwargs):
         key, subkey = random.split(key, num=2)
         sample_shape = (self.num_probes, *x.shape)
         v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
 
-        fx, vjp = func.vjp(fun, x)
+        fx, vjp = func.vjp(lambda s: fun(s, **fun_kwargs), x)
         vJv = func.vmap(lambda s: s * vjp(s)[0])(v)
         J_diagonal = vJv.mean(axis=0)
         return fx, J_diagonal, key
