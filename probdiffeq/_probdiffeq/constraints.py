@@ -112,7 +112,12 @@ class wlstsq_nc_gauss_newton(WeightedLeastSquaresNonlinearlyConstrained):
     """Solve the weighted lstsq problem with nonlinear constraints using Gauss--Newton."""
 
     def __init__(
-        self, *, maxiter, tol, lstsq=linalg.lstsq_svd, while_loop=flow.while_loop
+        self,
+        *,
+        maxiter=10,
+        tol=1e-6,
+        lstsq=linalg.lstsq_svd,
+        while_loop=flow.while_loop,
     ):
         self.maxiter = maxiter
         self.tol = tol

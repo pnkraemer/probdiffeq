@@ -13,6 +13,20 @@ def test_solution_matches_odesolve():
 
 @func.partial(func.jit, static_argnames=("num",))
 def solve_ode(inits, num):
+    """Solve the SIR model as an ODE to serve as a reference solution."""
+
+    @probdiffeq.ode
+    def vf_ode(y, /, *, t):
+        del t
+        beta, gamma = 2.0, 0.5  # infection and recovery rates
+        S, I, _R = y  # noqa: E741 ("I" is a good variable name in an SIR model)
+
+        f0 = -beta * S * I
+        f1 = beta * S * I - gamma * I
+        f2 = gamma * I
+
+        return np.stack([f0, f1, f2])
+
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num)
     tcoeffs, _ = jetexpand(vf_ode, inits, t=0.0)
 
@@ -30,14 +44,33 @@ def solve_ode(inits, num):
 
 @func.partial(func.jit, static_argnames=("num",))
 def solve_dae(inits, num):
-    differential_lifted = probdiffeq.jet_lift(differential, lift_by=num - 1)
-    algebraic_lifted = probdiffeq.jet_lift(algebraic, lift_by=num)
-    dae = probdiffeq.dae_system(
-        differential=differential_lifted, algebraic=algebraic_lifted
-    )
+    """Solve the SIR model as a DAE."""
 
-    nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=10, tol=1e-5)
-    jetexpand = probdiffeq.jetexpand_dae_nlstsq(num=num, nlstsq=nlstsq)
+    @func.partial(probdiffeq.jet_lift, lift_by=num)
+    @probdiffeq.residual_state
+    def algebraic(u, /, *, t):
+        del t
+        N = 1.0  # total population
+        return u[0] + u[1] + u[2] - N
+
+    @func.partial(probdiffeq.jet_lift, lift_by=num - 1)
+    @probdiffeq.residual_state_velocity
+    def differential(u, du, /, *, t):
+        del t
+        beta, gamma = 2.0, 0.5
+        S, I, _R = u  # noqa: E741 ("I" is a good variable name in an SIR model)
+
+        f0 = -beta * S * I
+        f1 = beta * S * I - gamma * I
+
+        F1 = du[0] - f0
+        F2 = du[1] - f1
+
+        return np.stack([F1, F2])
+
+    dae = probdiffeq.dae_system(differential=differential, algebraic=algebraic)
+
+    jetexpand = probdiffeq.jetexpand_dae_nlstsq(num=num)
     tcoeffs, _ = jetexpand(dae, inits, t=0.0)
 
     ssm = probdiffeq.state_space_model(ssm_fact="dense")
@@ -50,38 +83,3 @@ def solve_dae(inits, num):
 
     save_at = np.linspace(0.0, 5.0, endpoint=True, num=10)
     return func.jit(solve)(init, save_at=save_at, atol=1e-6, rtol=1e-6)
-
-
-@probdiffeq.ode
-def vf_ode(y, /, *, t):
-    del t
-    beta, gamma = 2.0, 0.5  # infection and recovery rates
-    S, I, _R = y  # noqa: E741 ("I" is a good variable name in an SIR model)
-
-    f0 = -beta * S * I
-    f1 = beta * S * I - gamma * I
-    f2 = gamma * I
-
-    return np.stack([f0, f1, f2])
-
-
-@probdiffeq.residual_state
-def algebraic(u, /, *, t):
-    del t
-    N = 1.0  # total population
-    return u[0] + u[1] + u[2] - N
-
-
-@probdiffeq.residual_state_velocity
-def differential(u, du, /, *, t):
-    del t
-    beta, gamma = 2.0, 0.5
-    S, I, _R = u  # noqa: E741 ("I" is a good variable name in an SIR model)
-
-    f0 = -beta * S * I
-    f1 = beta * S * I - gamma * I
-
-    F1 = du[0] - f0
-    F2 = du[1] - f1
-
-    return np.stack([F1, F2])
