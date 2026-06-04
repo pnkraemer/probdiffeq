@@ -19,7 +19,7 @@ def solve_ode(inits, num):
     def vf_ode(y, /, *, t):
         del t
         beta, gamma = 2.0, 0.5  # infection and recovery rates
-        S, I, _R = y  # noqa: E741 ("I" is a good variable name in an SIR model)
+        S, I, _R = y  # noqa: E741 ("I" is in fact a good variable name in SIR models)
 
         f0 = -beta * S * I
         f1 = beta * S * I - gamma * I

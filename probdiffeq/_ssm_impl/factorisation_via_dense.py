@@ -450,7 +450,7 @@ class DenseLinearizationFactory(interfaces.AbstractLinearizationFactory):
         return DenseRoot(residual, linearization=linearization)
 
     def dae(self, *, dae, linearization):
-        return DenseDAEPosteriorLinearization(dae=dae, linearization=linearization)
+        return DenseDAE(dae=dae, linearization=linearization)
 
     def ode_taylor_0th(self, *, ode):
         return DenseOdeTs0(ode=ode)
@@ -589,7 +589,7 @@ class DenseRoot(interfaces.AbstractRoot):
         return cond, state
 
 
-class DenseDAEPosteriorLinearization(interfaces.AbstractDAEPosteriorLinearization):
+class DenseDAE(interfaces.AbstractDAE):
     def init_linearization(self):
         # Skip the algebraic Jacobian because constraints get stacked
         # TODO: handle Jacobians separately and combine later

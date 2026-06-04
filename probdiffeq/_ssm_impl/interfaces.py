@@ -111,7 +111,7 @@ class AbstractRoot(AbstractLinearization):
         return f"{self.__class__.__name__}(residual={self.residual})"
 
 
-class AbstractDAEPosteriorLinearization(AbstractLinearization):
+class AbstractDAE(AbstractLinearization):
     """Interface for linearizations of general residuals."""
 
     def __init__(self, *, dae, linearization) -> None:
@@ -149,7 +149,7 @@ class AbstractLinearizationFactory(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def dae(self, *, dae, linearization) -> AbstractDAEPosteriorLinearization:
+    def dae(self, *, dae, linearization) -> AbstractDAE:
         raise NotImplementedError
 
     @abc.abstractmethod
