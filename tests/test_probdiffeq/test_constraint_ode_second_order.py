@@ -5,7 +5,7 @@ from probdiffeq.backend import func, np, testing
 
 
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def test_solution_matches_first_order(fact):
+def test_solution_is_accurate(fact):
 
     @probdiffeq.ode_second_order
     def vf(u, du, /, *, t):
