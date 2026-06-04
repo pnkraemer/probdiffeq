@@ -1,12 +1,5 @@
 from probdiffeq.backend import abc, func, np, tree
-from probdiffeq.backend.typing import (
-    Array,
-    Callable,
-    Generic,
-    Literal,
-    Sequence,
-    TypeVar,
-)
+from probdiffeq.backend.typing import Array, Callable, Generic, Sequence, TypeVar
 
 __all__ = [
     "AbstractConditional",
@@ -104,30 +97,44 @@ class AbstractLinearization(abc.ABC):
 
 
 class AbstractRoot(AbstractLinearization):
-    """Interface for linearizations of general roots."""
+    """Interface for linearizations of general residuals."""
 
-    def __init__(self, root, /, *, root_order: int | Literal["max"]) -> None:
-        self.root = root
-        self.root_order = root_order
+    def __init__(self, residual, /) -> None:
+        self.residual = residual
+
+    @property
+    def residual_order(self):
+        """The order of the residual constraint."""
+        return self.residual.num_derivatives_in_args
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(root_order={self.root_order})"
+        return f"{self.__class__.__name__}(residual={self.residual})"
+
+
+class AbstractDAEPosteriorLinearization(AbstractLinearization):
+    """Interface for linearizations of general residuals."""
+
+    def __init__(self, *, dae, linearization) -> None:
+        self.dae = dae
+        self.linearization = linearization
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(dae={self.dae}, linearization={self.linearization})"
 
 
 class AbstractOde(AbstractLinearization):
     """Interface for linearizations of ODEs."""
 
-    def __init__(self, vf, /, *, ode_order) -> None:
-        self.vector_field = vf
-        self.ode_order = ode_order
+    def __init__(self, *, ode) -> None:
+        self.ode = ode
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(ode_order={self.ode_order})"
+        return f"{self.__class__.__name__}(ode={self.ode})"
 
     @property
-    def root_order(self):
-        """The order of the root constraint."""
-        return self.ode_order + 1
+    def residual_order(self):
+        """The order of the residual constraint."""
+        return self.ode.num_derivatives_in_args + 1
 
 
 class AbstractLinearizationFactory(abc.ABC):
@@ -137,24 +144,21 @@ class AbstractLinearizationFactory(abc.ABC):
         return f"{self.__class__.__name__}()"
 
     @abc.abstractmethod
-    def root(
-        self,
-        root,
-        *,
-        jacobian,
-        root_order: int | Literal["max"],
-        linearization: Callable | None,
-    ) -> AbstractRoot:
-        """Construct an implementation of 1st-order Taylor-linearization for roots."""
+    def residual(self, residual, *, linearization: Callable | None) -> AbstractRoot:
+        """Construct an implementation of 1st-order Taylor-linearization for residuals."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_taylor_0th(self, ode_order: int) -> AbstractOde:
+    def dae(self, *, dae, linearization) -> AbstractDAEPosteriorLinearization:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def ode_taylor_0th(self, *, ode) -> AbstractOde:
         """Construct an implementation of 0th-order Taylor-linearization for ODEs."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ode_taylor_1st(self, vf, *, ode_order: int) -> AbstractOde:
+    def ode_taylor_1st(self, *, ode) -> AbstractOde:
         """Construct an implementation of 1st-order Taylor-linearization for ODEs."""
         raise NotImplementedError
 

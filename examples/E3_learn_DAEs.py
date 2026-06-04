@@ -1,11 +1,13 @@
 """Learn a DAE."""
 
+import functools
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optax
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -41,6 +43,8 @@ def main(
 ) -> None:
     """Run the script."""
 
+    @functools.partial(probdiffeq.jet_lift, lift_by=2)
+    @probdiffeq.residual_state_velocity
     def differential(u, du, /, *, t):
         del t
         return du[:2] - dynamics(u)
@@ -51,9 +55,13 @@ def main(
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
         return jnp.stack([f0, f1])
 
+    @functools.partial(probdiffeq.jet_lift, lift_by=3)
+    @probdiffeq.residual_state
     def algebraic(u, *, t):
         del t
         return u[0] + u[1] + u[2] - 1
+
+    dae = probdiffeq.dae_system(differential, algebraic)
 
     def while_loop(cond, body, init):
         """Evaluate a bounded while loop."""
@@ -67,7 +75,7 @@ def main(
 
     # Linear spacing on a log-scale
     save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=num_data)
-    solve = solver(differential, algebraic, tol=tol, while_loop=while_loop, trafo=trafo)
+    solve = solver(dae, tol=tol, while_loop=while_loop, trafo=trafo)
 
     # True condition
     key = jax.random.PRNGKey(seed)
@@ -138,7 +146,7 @@ def loss_data_fit(solve, *, ssm, inputs, labels):
     return loss
 
 
-def solver(differential, algebraic, tol, while_loop, trafo):
+def solver(dae, tol, while_loop, trafo):
     """Create a reverse-mode differentiable probabilistic solver."""
 
     @jax.jit
@@ -147,18 +155,11 @@ def solver(differential, algebraic, tol, while_loop, trafo):
         y0 = trafo.latent_to_observed(p_sqrt)
         t0, _t1 = save_at[0], save_at[-1]
 
-        def differential_auto(u, du):
-            return differential(u, du, t=t0)
-
-        def algebraic_auto(u):
-            return algebraic(u, t=t0)
-
         nlstsq = probdiffeq.wlstsq_nc_gauss_newton(
             maxiter=10, tol=tol, while_loop=while_loop
         )
-        y0, _info = diffeqjet.daejet_nlstsq(
-            differential_auto, algebraic_auto, [y0], num=3, nlstsq=nlstsq
-        )
+        jetexpand = probdiffeq.jetexpand_dae_nlstsq(num=3, nlstsq=nlstsq)
+        y0, _info = jetexpand(dae, [y0], t=t0)
         ssm = probdiffeq.state_space_model()
 
         init, prior = probdiffeq.prior_wiener_integrated(
@@ -167,9 +168,7 @@ def solver(differential, algebraic, tol, while_loop, trafo):
 
         # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
         linearization = probdiffeq.linearization_map(nlstsq)
-        jet = probdiffeq.constraint_dae(
-            differential, algebraic, ssm=ssm, linearization=linearization
-        )
+        jet = probdiffeq.constraint_dae(dae, ssm=ssm, linearization=linearization)
         strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
         solver = probdiffeq.solver_dynamic(
             strategy=strategy, prior=prior, constraint=jet, ssm=ssm

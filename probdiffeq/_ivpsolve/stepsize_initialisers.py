@@ -1,13 +1,14 @@
 from probdiffeq.backend import linalg, np, tree
+from probdiffeq.backend.typing import Sequence
 
 __all__ = ["dt0", "dt0_adaptive"]
 
 
-def dt0(vf_autonomous, initial_values, /, scale=0.01, nugget=1e-5):
+def dt0(vf, initial_values: Sequence, /, scale=0.01, nugget=1e-5, **vf_kwargs):
     """Propose an initial time-step."""
-    u0, *_ = initial_values
-    f0 = vf_autonomous(*initial_values)
+    f0 = vf(*initial_values, **vf_kwargs)
 
+    u0, *_ = initial_values
     u0, _ = tree.ravel_pytree(u0)
     f0, _ = tree.ravel_pytree(f0)
 
@@ -17,7 +18,9 @@ def dt0(vf_autonomous, initial_values, /, scale=0.01, nugget=1e-5):
     return scale * norm_y0 / norm_dy0
 
 
-def dt0_adaptive(vf, initial_values, /, t0, *, error_contraction_rate, rtol, atol):
+def dt0_adaptive(
+    vf, initial_values: Sequence, /, t0, *, error_contraction_rate, rtol, atol
+):
     """Propose an initial time-step as a function of the tolerances."""
     # Algorithm from:
     # E. Hairer, S. P. Norsett G. Wanner,
@@ -31,7 +34,7 @@ def dt0_adaptive(vf, initial_values, /, t0, *, error_contraction_rate, rtol, ato
         raise ValueError
     y0 = initial_values[0]
 
-    f0 = vf(y0, t=t0)
+    f0 = vf(*initial_values, t=t0)
 
     y0, unravel = tree.ravel_pytree(y0)
     f0, _ = tree.ravel_pytree(f0)

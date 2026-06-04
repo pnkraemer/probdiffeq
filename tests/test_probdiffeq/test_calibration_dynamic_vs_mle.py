@@ -16,6 +16,7 @@ def test_exponential_approximated_well(fact) -> None:
     tcoeffs = (*u0, vf(*u0, t=t0))
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
+    vf = probdiffeq.ode(vf)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver_dynamic(

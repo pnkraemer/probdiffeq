@@ -10,7 +10,7 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from probdiffeq import diffeqjet
+from probdiffeq import probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -96,7 +96,8 @@ def taylor_mode_scan() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = diffeqjet.odejet_padded_scan(vf_auto, (u0,), num=num)
+        jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num)
+        tcoeffs, _ = jetexpand(vf_auto, (u0,), t=0.0)
         return jnp.asarray(tcoeffs)
 
     return estimate
@@ -108,7 +109,8 @@ def taylor_mode_unroll() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = diffeqjet.odejet_unroll(vf_auto, (u0,), num=num)
+        jetexpand = probdiffeq.jetexpand_ode_unroll(num=num)
+        tcoeffs, _ = jetexpand(vf_auto, (u0,), t=0.0)
         return jnp.asarray(tcoeffs)
 
     return estimate
@@ -120,7 +122,8 @@ def taylor_mode_doubling() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = diffeqjet.odejet_doubling_unroll(vf_auto, (u0,), num_doublings=num)
+        jetexpand = probdiffeq.jetexpand_ode_doubling_unroll(num_doublings=num)
+        tcoeffs, _ = jetexpand(vf_auto, (u0,), t=0.0)
         return jnp.asarray(tcoeffs)
 
     return estimate
@@ -132,7 +135,8 @@ def odejet_via_jvp() -> Callable:
 
     @functools.partial(jax.jit, static_argnames=["num"])
     def estimate(num):
-        tcoeffs = diffeqjet.odejet_via_jvp(vf_auto, (u0,), num=num)
+        jetexpand = probdiffeq.jetexpand_ode_via_jvp(num=num)
+        tcoeffs, _ = jetexpand(vf_auto, (u0,), t=0.0)
         return jnp.asarray(tcoeffs)
 
     return estimate
@@ -154,8 +158,9 @@ def _node():
 
     fun = jnp.tanh
 
-    @jax.jit
-    def vf(x):
+    @probdiffeq.ode
+    def vf(x, *, t):
+        del t
         for (w1, w2), b1, b2 in zip(weights, biases1, biases2):
             x = fun(w2.T @ fun(w1 @ x + b1) + b2)
         return x

@@ -13,7 +13,7 @@ jax.config.update("jax_debug_nans", True)
 def main():
     """Solve a linear ODE with dynamic vs MLE solvers."""
 
-    @jax.jit
+    @probdiffeq.ode
     def vf(y, /, *, t):
         """Evaluate the affine vector field."""
         del t

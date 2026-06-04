@@ -21,10 +21,10 @@ manipulation of square root matrices.
 """
 
 from probdiffeq.backend import flow, linalg, np
-from probdiffeq.backend.typing import Callable
+from probdiffeq.backend.typing import Array, Callable
 
 
-def revert_conditional(R_X_F, R_X, R_YX, *, solve_triu: Callable):
+def revert_conditional(R_X_F: Array, R_X: Array, R_YX: Array, *, solve_triu: Callable):
     r"""Revert the  square-root correlation in a Gaussian transition kernel.
 
     What does this mean? Assume we have two normally-distributed random variables,
@@ -82,11 +82,11 @@ def revert_conditional(R_X_F, R_X, R_YX, *, solve_triu: Callable):
     return R_Y, (R_XY, G)
 
 
-def _is_matrix(mat, matrix_ndim=2):
+def _is_matrix(mat: Array, matrix_ndim=2):
     return np.ndim(mat) == matrix_ndim
 
 
-def sum_of_sqrtm_factors(R_stack: tuple):
+def sum_of_sqrtm_factors(R_stack: tuple[Array, ...]):
     r"""Compute the square root $R^\top R = R_1^\top R_1 + R_2^\top R_2 + ...$."""
     R = np.concatenate(R_stack)
     uppertri = triu_via_qr(R)
@@ -95,7 +95,7 @@ def sum_of_sqrtm_factors(R_stack: tuple):
     return uppertri
 
 
-def triu_via_qr(R, /):
+def triu_via_qr(R: Array, /):
     """Upper-triangularise a matrix using a QR-decomposition."""
     # TODO: enforce positive diagonals?
     #  (or expose this option; some equivalence tests might fail

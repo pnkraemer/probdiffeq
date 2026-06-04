@@ -3,7 +3,7 @@
 That is, when called with correct adaptive- and checkpoint-setups.
 """
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, testing, tree
 from probdiffeq.util import test_util
 
@@ -12,8 +12,9 @@ from probdiffeq.util import test_util
 @testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
 def fixture_solver_setup(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
-
-    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
+    vf = probdiffeq.ode(vf)
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
+    tcoeffs, _ = jetexpand(vf, [u0], t=t0)
     return {"vf": vf, "tcoeffs": tcoeffs, "t0": t0, "t1": t1, "fact": fact}
 
 

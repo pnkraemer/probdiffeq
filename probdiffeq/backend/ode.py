@@ -27,7 +27,7 @@ def ivp_lotka_volterra():
     u0 = {"U": PredPrey(predators=jnp.asarray([[[20.0]]]), prey=jnp.asarray(20.0))}
 
     @jax.jit
-    def vf(x: dict, *, t) -> dict:  # noqa: ARG001
+    def vf(x: dict, /, *, t) -> dict:  # noqa: ARG001
         """Lotka--Volterra dynamics."""
         y0, y1 = f((x["U"].predators.squeeze(), x["U"].prey.squeeze()))
         return {"U": PredPrey(predators=y0.reshape((1, 1, 1)), prey=y1.reshape(()))}
@@ -51,7 +51,7 @@ def ivp_three_body_1st():
     f, u0, (t0, t1), f_args = ivps.three_body_restricted_first_order()
 
     # Dictionary to ensure pytree compatibility
-    def vf(u, *, t):  # noqa: ARG001
+    def vf(u, /, *, t):  # noqa: ARG001
         return {"u": f(u["u"], *f_args)}
 
     return vf, ({"u": u0},), (t0, t1)
@@ -66,7 +66,7 @@ def ivp_van_der_pol_2nd():
 
     f, (u0, du0), (t0, t1), f_args = ivps.van_der_pol()
 
-    def vf(u, du, *, t):  # noqa: ARG001
+    def vf(u, du, /, *, t):  # noqa: ARG001
         return {"u": f(u["u"], du["u"], *f_args)}
 
     return vf, ({"u": u0}, {"u": du0}), (t0, t1)

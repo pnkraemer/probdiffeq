@@ -29,33 +29,11 @@ def main():
     save_at = jnp.linspace(t0, t1, endpoint=True, num=500)
     atol, rtol = 1e-2, 1e-2
 
-    @jax.jit
-    def vf_1st(y, /, *, t):
-        """Evaluate the harmonic oscillator dynamics."""
-        u, du = jnp.split(y, 2)
-        return jnp.concatenate([du, vf_2nd(u, du, t=t)])
-
-    def hamiltonian_1st(y):
-        """Evaluate the Hamiltonian of the harmonic oscillator."""
-        u, du = jnp.split(y, 2)
-        return hamiltonian_2nd(u, du)
-
     u0_1st = jnp.array([1.0, 0.0, 0.0, 1.0])
-
-    @jax.jit
-    def vf_2nd(y, dy, *, t):  # noqa: ARG001
-        """Evaluate the harmonic oscillator as a 2nd-order problem."""
-        return -y
-
-    def hamiltonian_2nd(u, du):
-        """Evaluate the Hamiltonian of the harmonic oscillator."""
-        kinetic = 0.5 * jnp.dot(du, du)
-        potential = 0.5 * jnp.dot(u, u)
-        return kinetic + potential
 
     # A good solution conserves the Hamiltonian.
 
-    H0 = hamiltonian_1st(u0_1st)
+    H0 = 1.0
 
     # Set up the first-order solver (for illustration).
     tcoeffs = [u0_1st]
@@ -77,16 +55,10 @@ def main():
     # The harmonic oscillator calls for a custom information operator because
     # we know: (i) the ODE is second order; (ii) the Hamiltonian should be conserved.
 
-    def root(u, du, ddu, /, *, t):
-        """Evaluate a custom root for the harmonic oscillator."""
-        deriv = ddu - vf_2nd(u, du, t=t)
-        hamil = hamiltonian_2nd(u, du) - H0
-        return [deriv, hamil]  # any PyTree goes
-
-    # Set up the custom-root solver.
+    # Set up the custom-residual solver.
     # We don't use high orders because high-order initialisation
     # of custom-information-operator solvers is an open problem.
-    # But for low-order solvers, custom roots work well.
+    # But for low-order solvers, custom residuals work well.
     u0, du0 = jnp.split(u0_1st, 2)
     tcoeffs = [u0, du0]
     ssm = probdiffeq.state_space_model()
@@ -94,17 +66,17 @@ def main():
         tcoeffs, diffuse_derivatives=1, ssm=ssm
     )
 
-    # Use this constraint function for custom roots:
-    ts1 = probdiffeq.constraint(root, ssm=ssm, jet_order=0)
+    # Use this constraint function for custom residuals:
+    ts1 = probdiffeq.constraint_residual(residual, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver_2nd = probdiffeq.solver_mle(
         strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm
     )
 
-    # Custom roots with residual-based error estimates
+    # Custom residuals with residual-based error estimates
     # require norming-then-scaling
     # (instead of scaling-then-norming, which is the default),
-    # because scaling-then-norming assumes that the root pytree
+    # because scaling-then-norming assumes that the residual pytree
     # has the same structure as the target pytree.
 
     error = probdiffeq.error_state_std(constraint=ts1, prior=iwp, ssm=ssm)
@@ -113,7 +85,7 @@ def main():
     ham_2 = jax.vmap(hamiltonian_2nd)(sol_2.u.mean[0], sol_2.u.mean[1])
 
     # Plot both solutions.
-    # See how much better the custom root solver preserves the Hamiltonian?
+    # See how much better the custom residual solver preserves the Hamiltonian?
 
     _fig, ax = plt.subplots(ncols=2, figsize=(8, 3), constrained_layout=True)
 
@@ -121,7 +93,9 @@ def main():
     ax[0].plot(
         sol_1.u.mean[0][:, 0], sol_1.u.mean[0][:, 1], "-", label="Standard solver"
     )
-    ax[0].plot(sol_2.u.mean[0][:, 0], sol_2.u.mean[0][:, 1], "-", label="Custom root")
+    ax[0].plot(
+        sol_2.u.mean[0][:, 0], sol_2.u.mean[0][:, 1], "-", label="Custom residual"
+    )
     ax[0].legend()
     ax[0].set_xlabel("$x_1$")
     ax[0].set_ylabel("$x_2$")
@@ -129,11 +103,44 @@ def main():
     eps = jnp.sqrt(jnp.finfo(sol_2.t).eps)
     ax[1].set_title("Hamiltonian error", fontsize="medium")
     ax[1].semilogy(sol_1.t, eps + jnp.abs(ham_1 - H0), label="Standard solver")
-    ax[1].semilogy(sol_2.t, eps + jnp.abs(ham_2 - H0), label="Custom root")
+    ax[1].semilogy(sol_2.t, eps + jnp.abs(ham_2 - H0), label="Custom residual")
     ax[1].set_xlabel("Time $t$")
     ax[1].set_ylabel("Error")
     ax[1].legend()
     plt.show()
+
+
+@probdiffeq.ode
+def vf_1st(y, /, *, t):
+    """Evaluate the harmonic oscillator dynamics."""
+    u, du = jnp.split(y, 2)
+    return jnp.concatenate([du, vf_2nd(u, du, t=t)])
+
+
+def hamiltonian_1st(y):
+    """Evaluate the Hamiltonian of the harmonic oscillator."""
+    u, du = jnp.split(y, 2)
+    return hamiltonian_2nd(u, du)
+
+
+def hamiltonian_2nd(u, du):
+    """Evaluate the Hamiltonian of the harmonic oscillator."""
+    kinetic = 0.5 * jnp.dot(du, du)
+    potential = 0.5 * jnp.dot(u, u)
+    return kinetic + potential
+
+
+@probdiffeq.residual_state_velocity_acceleration
+def residual(u, du, ddu, /, *, t):
+    """Evaluate a custom residual for the harmonic oscillator."""
+    deriv = ddu - vf_2nd(u, du, t=t)
+    hamil = hamiltonian_2nd(u, du) - 1.0
+    return [deriv, hamil]  # any PyTree goes
+
+
+def vf_2nd(y, dy, *, t):  # noqa: ARG001
+    """Evaluate the harmonic oscillator as a 2nd-order problem."""
+    return -y
 
 
 if __name__ == "__main__":

@@ -1,6 +1,5 @@
 """Walltime | stiff van-der-Pol."""
 
-import functools
 import statistics
 import timeit
 from collections.abc import Callable
@@ -13,7 +12,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -113,13 +112,14 @@ def setup_timeit(*, repeats: int) -> Callable:
 def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
-    @jax.jit
+    @probdiffeq.ode_second_order
     def vf_probdiffeq(u, du, *, t):  # noqa: ARG001
         """Van-der-Pol dynamics as a second-order differential equation."""
         return 1e5 * ((1.0 - u**2) * du - u)
 
-    def root(u, du, ddu, /, *, t):
-        """Evaluate a root to solve the 2nd-order problem directly."""
+    @probdiffeq.residual_state_velocity_acceleration
+    def residual(u, du, ddu, /, *, t):
+        """Evaluate a residual to solve the 2nd-order problem directly."""
         return ddu - vf_probdiffeq(u, du, t=t)
 
     t0, t1 = 0.0, 3.0
@@ -129,14 +129,12 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     @jax.jit
     def param_to_solution(tol):
         # Build a solver
-        vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = diffeqjet.odejet_padded_scan(
-            vf_auto, (u0, du0), num=num_derivatives - 1
-        )
+        jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives - 1)
+        tcoeffs, _ = jetexpand(vf_probdiffeq, (u0, du0), t=t0)
 
         ssm = probdiffeq.state_space_model(ssm_fact="dense")
         init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-        ts = probdiffeq.constraint(root, ssm=ssm, jet_order=0)
+        ts = probdiffeq.constraint_residual(residual, ssm=ssm)
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         solver = probdiffeq.solver_dynamic(

@@ -1,6 +1,5 @@
 """Walltime | Hires."""
 
-import functools
 import statistics
 import timeit
 from collections.abc import Callable
@@ -12,7 +11,7 @@ import numpy as np
 import scipy.integrate
 import tqdm
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -117,7 +116,7 @@ def setup_timeit(*, repeats: int) -> Callable:
 def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
-    @jax.jit
+    @probdiffeq.ode
     def vf_probdiffeq(u, /, *, t):  # noqa: ARG001
         """High irradiance response."""
         du1 = -1.71 * u[0] + 0.43 * u[1] + 8.32 * u[2] + 0.0007
@@ -138,8 +137,8 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     @jax.jit
     def param_to_solution(tol):
         # Build a solver
-        vf_auto = functools.partial(vf_probdiffeq, t=t0)
-        tcoeffs = diffeqjet.odejet_padded_scan(vf_auto, (u0,), num=num_derivatives)
+        jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives)
+        tcoeffs, _ = jetexpand(vf_probdiffeq, (u0,), t=t0)
         ssm = probdiffeq.state_space_model(ssm_fact="dense")
 
         init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
@@ -154,7 +153,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
 
         # Solve
-        dt0 = ivpsolve.dt0(vf_auto, (u0,))
+        dt0 = ivpsolve.dt0(vf_probdiffeq, (u0,), t=t0)
 
         solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-3 * tol, rtol=tol)
 

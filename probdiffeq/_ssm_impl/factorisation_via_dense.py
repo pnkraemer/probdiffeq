@@ -1,6 +1,6 @@
-from probdiffeq._ssm_impl import api, utilities
+from probdiffeq._ssm_impl import interfaces, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
-from probdiffeq.backend.typing import Any, Array, Callable, Literal, Sequence, TypeVar
+from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
 
 __all__ = [
@@ -21,16 +21,16 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class DensePriorFactory(api.AbstractPriorFactory):
+class DensePriorFactory(interfaces.AbstractPriorFactory):
     """Implementation of dense prior constructors."""
 
-    def identity(self, template) -> api.LatentCond:
+    def identity(self, template) -> interfaces.LatentCond:
         (n,) = template.mean_flat.shape
         A = np.eye(n)
         m = np.zeros((n,))
         C = np.zeros((n, n))
         noise = DenseNormal(m, C, template.tree_flatten)
-        return api.LatentCond.from_linop_and_noise(A, noise)
+        return interfaces.LatentCond.from_linop_and_noise(A, noise)
 
     def wiener_integrated(
         self,
@@ -99,7 +99,7 @@ class DensePriorFactory(api.AbstractPriorFactory):
 
             tree_flatten = DenseTreeFlatten.from_example(tcoeffs_mean)
             noise = DenseNormal(q0, output_scale * Q, tree_flatten)
-            return api.LatentCond(A, noise, to_latent=p_inv, to_observed=p)
+            return interfaces.LatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
         # Return the initial variable and the discretisation
         return init, discretise
@@ -209,7 +209,7 @@ class DensePriorFactory(api.AbstractPriorFactory):
             eA, L = exp_gram(A_p, B_p)
             tree_flatten = DenseTreeFlatten.from_example(tcoeffs_mean)
             noise = DenseNormal(q0, output_scale * L, tree_flatten)
-            return api.LatentCond(eA, noise, to_latent=p_inv, to_observed=p)
+            return interfaces.LatentCond(eA, noise, to_latent=p_inv, to_observed=p)
 
         return init, discretise
 
@@ -302,7 +302,7 @@ class DensePriorFactory(api.AbstractPriorFactory):
 
         data_like = all_unravel(x)[0]
         noise = DenseNormal.from_mean_and_std([data_like], [std])
-        return api.LatentCond.from_linop_and_noise(linop, noise)
+        return interfaces.LatentCond.from_linop_and_noise(linop, noise)
 
     def prototype_output_scale_calibrated(self, template):
         del template
@@ -310,7 +310,7 @@ class DensePriorFactory(api.AbstractPriorFactory):
 
 
 @structs.dataclass
-class DenseTreeFlatten(api.AbstractTreeFlatten):
+class DenseTreeFlatten(interfaces.AbstractTreeFlatten):
     """Implementation of flattening information for dense models."""
 
     unravel: Callable
@@ -327,7 +327,7 @@ class DenseTreeFlatten(api.AbstractTreeFlatten):
         return cls(unravel)
 
 
-class DenseNormal(api.AbstractTreeNormal[DenseTreeFlatten]):
+class DenseNormal(interfaces.AbstractTreeNormal[DenseTreeFlatten]):
     """Construct a dense implementation of a normal distribution."""
 
     @classmethod
@@ -430,25 +430,204 @@ class DenseNormal(api.AbstractTreeNormal[DenseTreeFlatten]):
         tree.register_pytree_node(DenseNormal, flatten, unflatten)
 
 
-class DenseLinearizationFactory(api.AbstractLinearizationFactory):
+DenseNormal.register_pytree_node()
+
+
+class DenseLinearizationFactory(interfaces.AbstractLinearizationFactory):
     """Construct a dense linearization factory."""
 
-    def root(self, root, *, jacobian, root_order: int | Literal["max"], linearization):
-        return DenseRoot(
-            root, jacobian=jacobian, root_order=root_order, linearization=linearization
+    def residual(self, residual, *, linearization):
+        return DenseRoot(residual, linearization=linearization)
+
+    def dae(self, *, dae, linearization):
+        return DenseDAEPosteriorLinearization(dae=dae, linearization=linearization)
+
+    def ode_taylor_0th(self, *, ode):
+        return DenseOdeTs0(ode=ode)
+
+    def ode_taylor_1st(self, *, ode):
+        if ode.num_derivatives_in_args > 1:
+            msg = "Not implemented. Try the a residual-based TS1 constraint instead."
+            raise ValueError(msg)
+
+        return DenseOdeTs1(ode=ode)
+
+
+class DenseOdeTs0(interfaces.AbstractOde):
+    """Construct a dense implementation of ODE-TS0 linearization."""
+
+    def init_linearization(self) -> None:
+        return None
+
+    def linearize(self, rv: DenseNormal, state: None, *, damp: float, t):
+        ode_order = self.ode.num_derivatives_in_args
+        del state
+
+        def a1(m: Array) -> Array:
+            """Select the 'n'-th derivative."""
+            m0 = rv.tree_flatten.unflatten_array(m)[ode_order]
+            return tree.ravel_pytree(m0)[0]
+
+        Ms = rv.mean
+
+        fm = self.ode.vector_field(jet_coords=Ms[:ode_order], t=t)
+        fx = tree.tree_map(lambda s: -s, [fm])
+        linop = func.jacrev(a1)(rv.mean_flat)
+        noise = DenseNormal.from_dirac(fx, damp=damp)
+        cond = interfaces.LatentCond.from_linop_and_noise(linop, noise)
+        return cond, None
+
+
+class DenseOdeTs1(interfaces.AbstractOde):
+    """Construct a dense implementation of ODE-TS1 linearization."""
+
+    @property
+    def residual_order(self):
+        return self.ode.num_derivatives_in_args + 1
+
+    def init_linearization(self):
+        return self.ode.jacobian.init_jacobian_handler()
+
+    def linearize(self, rv, state: None, *, damp: float, t):
+        # fun = func.partial(self.ode, t=t)
+        m_tree = rv.mean
+
+        rv0 = DenseNormal.from_dirac([m_tree[0]], damp=0.0)
+
+        def vf_flat(s: Array) -> Array:
+            [s0] = rv0.tree_flatten.unflatten_array(s)
+            fs0 = self.ode.vector_field(jet_coords=[s0], t=t)
+            return rv0.tree_flatten.flatten_tree([fs0])
+
+        def select_i(i) -> Callable[[Array], Array]:
+            def select(s: Array) -> Array:
+                s_tree = rv.tree_flatten.unflatten_array(s)
+                return rv0.tree_flatten.flatten_tree(s_tree[i])
+
+            return select
+
+        E0 = func.jacfwd(select_i(i=0))(rv.mean_flat)
+        E1 = func.jacfwd(select_i(i=1))(rv.mean_flat)
+
+        m0 = rv0.mean_flat
+        fx, J, state = self.ode.jacobian.materialize_dense(vf_flat, m0, state)
+        linop = E1 - J @ E0
+        fx = -(fx - J @ m0)
+        fx = rv0.tree_flatten.unflatten_array(fx)
+        noise = DenseNormal.from_dirac(fx, damp=damp)
+        cond = interfaces.LatentCond.from_linop_and_noise(linop, noise)
+        return cond, state
+
+
+class DenseRoot(interfaces.AbstractRoot):
+    """Construct a dense implementation of residual-TS1 linearization."""
+
+    def __init__(self, residual, *, linearization) -> None:
+        super().__init__(residual)
+        self.linearization_point = linearization
+
+    def init_linearization(self):
+        return self.residual.jacobian.init_jacobian_handler()
+
+    def constraint_flat(self, m: Array, *, t, tree_flatten) -> Array:
+        """Evaluate a flattened version of the residual constraint."""
+        # Unravel the location and extract derivatives
+        m_tree = tree_flatten.unflatten_array(m)
+        relevant_tcoeffs = m_tree[: self.residual.num_derivatives_in_args]
+
+        # Evaluate the residual
+        residual_eval = self.residual.residual_function(
+            jet_coords=relevant_tcoeffs, t=t
         )
 
-    def ode_taylor_0th(self, vf, *, ode_order):
-        return DenseOdeTs0(vf, ode_order=ode_order)
+        # Flatten the output so that the Jacobians are matrices, not Pytrees.
+        return tree.ravel_pytree(residual_eval)[0]
 
-    def ode_taylor_1st(self, vf, *, ode_order, jacobian):
-        if ode_order > 1:
-            raise ValueError
+    def linearize(self, rv, state, *, damp: float, t):
 
-        return DenseOdeTs1(vf, ode_order=ode_order, jacobian=jacobian)
+        # Fix all arguments except the Array ones
+        constraint_flat = func.partial(
+            self.constraint_flat, t=t, tree_flatten=rv.tree_flatten
+        )
+
+        # Get the linearization point (eg prior or posterior linearisation)
+        mean = self.linearization_point(constraint_flat, rv)
+
+        fx, linop, state = self.residual.jacobian.materialize_dense(
+            constraint_flat, mean, state
+        )
+        fx = fx - linop @ mean
+
+        # Find the tree structure of the output constraint
+        # (So that we can unravel the bias term and always work in the correct
+        # pytree structure.)
+        m_tree = rv.mean
+        relevant_tcoeffs = m_tree[: self.residual.num_derivatives_in_args]
+        residual_eval = func.eval_shape(
+            lambda s: [self.residual.residual_function(jet_coords=s, t=t)],
+            relevant_tcoeffs,
+        )
+
+        # Ensure that unravelling does not yield a ShapeDtypeStruct
+        residual_eval = tree.tree_map(np.zeros_like, residual_eval)
+        _, unravel = tree.ravel_pytree(residual_eval)
+
+        # Turn the linearization into a conditional
+        noise = DenseNormal.from_dirac(unravel(fx), damp=damp)
+
+        cond = interfaces.LatentCond.from_linop_and_noise(linop, noise)
+        return cond, state
 
 
-class DenseConditional(api.AbstractConditional):
+class DenseDAEPosteriorLinearization(interfaces.AbstractDAEPosteriorLinearization):
+    def init_linearization(self):
+        # Skip the algebraic Jacobian because constraints get stacked
+        # TODO: handle Jacobians separately and combine later
+        return self.dae.differential.jacobian.init_jacobian_handler()
+
+    def constraint_flat(self, m: Array, *, t, tree_flatten) -> Array:
+        """Evaluate a flattened version of the residual constraint."""
+        # Unravel the location and extract derivatives
+        m_tree = tree_flatten.unflatten_array(m)
+
+        # Evaluate the residual
+
+        jet_order1 = self.dae.differential.num_derivatives_in_args
+        diff_eval1 = self.dae.differential.residual_function(
+            jet_coords=m_tree[:jet_order1], t=t
+        )
+
+        jet_order2 = self.dae.algebraic.num_derivatives_in_args
+        diff_eval2 = self.dae.algebraic.residual_function(
+            jet_coords=m_tree[:jet_order2], t=t
+        )
+
+        # Flatten the output so that the Jacobians are matrices, not Pytrees.
+        return tree.ravel_pytree([diff_eval1, diff_eval2])[0]
+
+    def linearize(self, rv, state, *, damp: float, t):
+
+        # Fix all arguments except the Array ones
+        constraint_flat = func.partial(
+            self.constraint_flat, t=t, tree_flatten=rv.tree_flatten
+        )
+
+        # Get the linearization point (eg prior or posterior linearisation)
+        mean = self.linearization(constraint_flat, rv)
+
+        fx, linop, state = self.dae.differential.jacobian.materialize_dense(
+            constraint_flat, mean, state
+        )
+        fx = fx - linop @ mean
+
+        # Turn the linearization into a conditional
+        noise = DenseNormal.from_dirac([fx], damp=damp)
+
+        cond = interfaces.LatentCond.from_linop_and_noise(linop, noise)
+        return cond, state
+
+
+class DenseConditional(interfaces.AbstractConditional):
     """Construct a dense implementation of manipulating conditionals."""
 
     def apply_flat(self, x, cond, /):
@@ -468,7 +647,9 @@ class DenseConditional(api.AbstractConditional):
         cholesky_new = cond.to_observed[:, None] * cholesky_new
         return DenseNormal(mean_new, cholesky_new, cond.noise.tree_flatten)
 
-    def merge(self, cond1: api.LatentCond, cond2: api.LatentCond, /) -> api.LatentCond:
+    def merge(
+        self, cond1: interfaces.LatentCond, cond2: interfaces.LatentCond, /
+    ) -> interfaces.LatentCond:
         # Transform: latent (2) to latent (1)
         T = cond1.to_latent * cond2.to_observed
 
@@ -485,11 +666,13 @@ class DenseConditional(api.AbstractConditional):
 
         # Gather and return
         noise = DenseNormal(xi, Xi.T, cond1.noise.tree_flatten)
-        return api.LatentCond(
+        return interfaces.LatentCond(
             g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
         )
 
-    def revert(self, rv: DenseNormal, cond: api.LatentCond, /, *, solve_triu: Callable):
+    def revert(
+        self, rv: DenseNormal, cond: interfaces.LatentCond, /, *, solve_triu: Callable
+    ):
         # Pull RV into the latent space
         mean = cond.to_latent * rv.mean_flat
         cholesky = cond.to_latent[:, None] * rv.cholesky_flat
@@ -506,7 +689,7 @@ class DenseConditional(api.AbstractConditional):
         mean_corrected = mean - gain @ mean_observed
         cholesky_corrected = r_cor.T
         corrected = DenseNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
-        cond_new = api.LatentCond(
+        cond_new = interfaces.LatentCond(
             gain,
             corrected,
             to_latent=1 / cond.to_observed,
@@ -524,146 +707,4 @@ class DenseConditional(api.AbstractConditional):
         mean = cond.to_observed * cond.noise.mean_flat
         cholesky = cond.to_observed[:, None] * cond.noise.cholesky_flat
         noise = DenseNormal(mean, cholesky, cond.noise.tree_flatten)
-        return api.LatentCond.from_linop_and_noise(A, noise)
-
-
-class DenseOdeTs0(api.AbstractOde):
-    """Construct a dense implementation of ODE-TS0 linearization."""
-
-    def __init__(self, vf, *, ode_order: int) -> None:
-        super().__init__(vf, ode_order=ode_order)
-
-    def init_linearization(self) -> None:
-        return None
-
-    def linearize(self, rv: DenseNormal, state: None, *, damp: float, t):
-        fun = func.partial(self.vector_field, t=t)
-        del state
-
-        def a1(m: Array) -> Array:
-            """Select the 'n'-th derivative."""
-            m0 = rv.tree_flatten.unflatten_array(m)[self.ode_order]
-            return tree.ravel_pytree(m0)[0]
-
-        Ms = rv.mean
-
-        fm = fun(*Ms[: self.ode_order])
-        fx = tree.tree_map(lambda s: -s, [fm])
-        linop = func.jacrev(a1)(rv.mean_flat)
-        noise = DenseNormal.from_dirac(fx, damp=damp)
-        cond = api.LatentCond.from_linop_and_noise(linop, noise)
-        return cond, None
-
-
-class DenseOdeTs1(api.AbstractOde):
-    """Construct a dense implementation of ODE-TS1 linearization."""
-
-    def __init__(self, vf: Callable, ode_order: int, jacobian: Any) -> None:
-        if ode_order > 1:
-            msg = "Not implemented. Try the a root-based TS1 constraint instead."
-            raise ValueError(msg)
-        super().__init__(vf, ode_order=ode_order)
-        self.jacobian = jacobian
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(ode_order={self.ode_order}, jacobian={self.jacobian})"
-
-    @property
-    def root_order(self):
-        return self.ode_order + 1
-
-    def init_linearization(self):
-        return self.jacobian.init_jacobian_handler()
-
-    def linearize(self, rv, state: None, *, damp: float, t):
-        fun = func.partial(self.vector_field, t=t)
-        m_tree = rv.mean
-
-        rv0 = DenseNormal.from_dirac([m_tree[0]], damp=0.0)
-
-        def vf_flat(s: Array) -> Array:
-            s0 = rv0.tree_flatten.unflatten_array(s)
-            fs0 = fun(*s0)
-            return rv0.tree_flatten.flatten_tree([fs0])
-
-        def select_i(i) -> Callable[[Array], Array]:
-            def select(s: Array) -> Array:
-                s_tree = rv.tree_flatten.unflatten_array(s)
-                return rv0.tree_flatten.flatten_tree(s_tree[i])
-
-            return select
-
-        E0 = func.jacfwd(select_i(i=0))(rv.mean_flat)
-        E1 = func.jacfwd(select_i(i=1))(rv.mean_flat)
-
-        m0 = rv0.mean_flat
-        fx, J, state = self.jacobian.materialize_dense(vf_flat, m0, state)
-        linop = E1 - J @ E0
-        fx = -(fx - J @ m0)
-        fx = rv0.tree_flatten.unflatten_array(fx)
-        noise = DenseNormal.from_dirac(fx, damp=damp)
-        cond = api.LatentCond.from_linop_and_noise(linop, noise)
-        return cond, state
-
-
-class DenseRoot(api.AbstractRoot):
-    """Construct a dense implementation of root-TS1 linearization."""
-
-    def __init__(
-        self, root, *, root_order: int | Literal["max"], jacobian, linearization
-    ) -> None:
-        super().__init__(root, root_order=root_order)
-        self.jacobian = jacobian
-        self.linearization_point = linearization
-
-    def init_linearization(self):
-        return self.jacobian.init_jacobian_handler()
-
-    def constraint_flat(self, m: Array, *, t, tree_flatten) -> Array:
-        """Evaluate a flattened version of the root constraint."""
-        # Unravel the location and extract derivatives
-        m_tree = tree_flatten.unflatten_array(m)
-        relevant_tcoeffs = (
-            m_tree if self.root_order == "max" else m_tree[: self.root_order]
-        )
-
-        # Evaluate the root
-        root_eval = self.root(*relevant_tcoeffs, t=t)
-
-        # Flatten the output so that the Jacobians are matrices, not Pytrees.
-        return tree.ravel_pytree(root_eval)[0]
-
-    def linearize(self, rv, state, *, damp: float, t):
-
-        # Fix all arguments except the Array ones
-        constraint_flat = func.partial(
-            self.constraint_flat, t=t, tree_flatten=rv.tree_flatten
-        )
-
-        # Get the linearization point (eg prior or posterior linearisation)
-        mean = self.linearization_point(constraint_flat, rv)
-
-        fx, linop, state = self.jacobian.materialize_dense(constraint_flat, mean, state)
-        fx = fx - linop @ mean
-
-        # Find the tree structure of the output constraint
-        # (So that we can unravel the bias term and always work in the correct
-        # pytree structure.)
-        m_tree = rv.mean
-        relevant_tcoeffs = (
-            m_tree if self.root_order == "max" else m_tree[: self.root_order]
-        )
-        root_eval = func.eval_shape(lambda s: [self.root(*s, t=t)], relevant_tcoeffs)
-
-        # Ensure that unravelling does not yield a ShapeDtypeStruct
-        root_eval = tree.tree_map(np.zeros_like, root_eval)
-        _, unravel = tree.ravel_pytree(root_eval)
-
-        # Turn the linearization into a conditional
-        noise = DenseNormal.from_dirac(unravel(fx), damp=damp)
-
-        cond = api.LatentCond.from_linop_and_noise(linop, noise)
-        return cond, state
-
-
-DenseNormal.register_pytree_node()
+        return interfaces.LatentCond.from_linop_and_noise(A, noise)

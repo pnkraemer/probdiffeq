@@ -1,6 +1,6 @@
 """Tests for log-marginal-likelihood functionality."""
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, testing, tree
 
 
@@ -9,7 +9,9 @@ from probdiffeq.backend import func, np, ode, testing, tree
 def fixture_solution(fact):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
-    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=2)
+    vf = probdiffeq.ode(vf)
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
+    tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
 

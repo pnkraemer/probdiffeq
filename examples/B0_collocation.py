@@ -1,12 +1,10 @@
 """ProbNum as collocation."""
 
-import functools
-
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -16,7 +14,7 @@ def main():
     """Sample from a probabilistic solution and plot residuals."""
     # Create an ODE problem.
 
-    @jax.jit
+    @probdiffeq.ode
     def vector_field(y, /, *, t):
         """Evaluate the logistic ODE vector field."""
         del t
@@ -37,9 +35,9 @@ def main():
     mseq_prior = probdiffeq.MarkovSequence.from_grid(init, iwp, grid=ts, reverse=False)
 
     # "Good" prior (Taylor coefficients)
-    tcoeffs = diffeqjet.odejet_padded_scan(
-        lambda y: vector_field(y, t=t0), (u0,), num=2
-    )
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
+    tcoeffs, _ = jetexpand(vector_field, (u0,), t=t0)
+
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=10.0)
     mseq_tcoeffs = probdiffeq.MarkovSequence.from_grid(
         init, iwp, grid=ts, reverse=False
@@ -66,8 +64,8 @@ def main():
 
     def residual(x, t):
         """Evaluate the ODE residual."""
-        vf_wrapped = functools.partial(vector_field, t=t)
-        return x[1] - jax.vmap(jax.vmap(vf_wrapped))(x[0])
+        fx = jax.vmap(jax.vmap(lambda s: vector_field(s, t=t)))(x[0])
+        return x[1] - fx
 
     residual_prior = residual(samples_prior, ts)
     residual_tcoeffs = residual(samples_tcoeffs, ts)

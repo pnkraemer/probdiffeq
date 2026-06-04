@@ -16,7 +16,7 @@ import jax.experimental.ode
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from probdiffeq import diffeqjet, ivpsolve, probdiffeq
+from probdiffeq import ivpsolve, probdiffeq
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -25,6 +25,7 @@ jax.config.update("jax_debug_nans", True)
 def main():
     """Plot the solution of a semilinear ODE with different solvers and priors."""
 
+    @probdiffeq.ode
     def vf(u, *, t):
         """Evaluate a linear vector field."""
         del t
@@ -41,7 +42,8 @@ def main():
     ssm = probdiffeq.state_space_model()
 
     # Build a solver
-    tcoeffs = diffeqjet.odejet_padded_scan(lambda y: vf(y, t=t0), (u0,), num=3)
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=3)
+    tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
     _init, ioup = probdiffeq.prior_ornstein_uhlenbeck_integrated(

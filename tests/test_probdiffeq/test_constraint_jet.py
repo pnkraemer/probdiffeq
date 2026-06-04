@@ -1,44 +1,44 @@
 """Assert that all jet-linearisation constraints are correct."""
 
-from probdiffeq import diffeqjet, probdiffeq
+from probdiffeq import probdiffeq
 from probdiffeq.backend import linalg, np, structs, testing
 from probdiffeq.backend.typing import Array, Callable, Literal
 
 
 @structs.dataclass
 class Root:
-    """Different APIs for one and the same root-finding problem.
+    """Different APIs for one and the same residual-finding problem.
 
     Its purpose is to enable different jet-constraints to solve the same
-    problem but work with different roots.
+    problem but work with different residuals.
     """
 
-    root: Callable
-    root_dae_algebraic: Callable
-    root_dae_differential: Callable
+    residual: Callable
+    residual_dae_algebraic: Callable
+    residual_dae_differential: Callable
     ode_vf: Callable
     t0: float
     u0: Array
 
 
-@testing.fixture(name="root")
-def fixture_root_sir():
+@testing.fixture(name="residual")
+def fixture_residual_sir():
 
-    def root(u, du, *, t):
+    def residual(u, du, /, *, t):
         linear = imex_linear(u, du, t=t)
         nonlinear = imex_nonlinear(u, du, t=t)
         return linear + nonlinear
 
-    def imex_linear(u, du, *, t):
+    def imex_linear(u, du, /, *, t):
         del t
         del u
         return du
 
-    def imex_nonlinear(u, du, *, t):
+    def imex_nonlinear(u, du, /, *, t):
         del du
         return -vf(u, t=t)
 
-    def vf(y, *, t):
+    def vf(y, /, *, t):
         del t
         # infection and recovery rates
         beta, gamma = 2.0, 0.5
@@ -73,9 +73,9 @@ def fixture_root_sir():
     u0 = np.asarray([0.99, 0.01, 0.0])
     t0 = 0.0
     return Root(
-        root=root,
-        root_dae_differential=dae_differential,
-        root_dae_algebraic=dae_algebraic,
+        residual=residual,
+        residual_dae_differential=dae_differential,
+        residual_dae_algebraic=dae_algebraic,
         ode_vf=vf,
         t0=t0,
         u0=u0,
@@ -84,107 +84,94 @@ def fixture_root_sir():
 
 @testing.fixture(name="expected")
 @testing.parametrize("derivatives", [1, 5])
-def fixture_expected(root, derivatives):
-    def vf_autonomous(y, /):
-        return root.ode_vf(y, t=root.t0)
+def fixture_expected(residual, derivatives):
+    @probdiffeq.ode
+    def vf(y, /, *, t):
+        return residual.ode_vf(y, t=t)
 
-    return diffeqjet.odejet_padded_scan(vf_autonomous, [root.u0], num=derivatives)
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=derivatives)
+    coeffs, _ = jetexpand(vf, [residual.u0], t=residual.t0)
+    return coeffs
 
 
-def case_jet_iterated_dae(root):
+def case_jet_dae_iterated(residual):
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     linearization = probdiffeq.linearization_map(nlstsq)
 
-    def constraint(ssm, jet_order):
-        return probdiffeq.constraint_dae(
-            differential=root.root_dae_differential,
-            algebraic=root.root_dae_algebraic,
-            ssm=ssm,
-            linearization=linearization,
-            jet_order_differential=jet_order,
-            jet_order_algebraic=jet_order + 1 if jet_order != "max" else "max",
+    def constraint_residual(ssm, lift_by: int):
+        differential = probdiffeq.residual_state_velocity(
+            residual.residual_dae_differential
         )
+        differential = probdiffeq.jet_lift(differential, lift_by=lift_by)
 
-    return constraint
+        algebraic = probdiffeq.residual_state(residual.residual_dae_algebraic)
+        algebraic = probdiffeq.jet_lift(algebraic, lift_by=lift_by + 1)
+        dae = probdiffeq.dae_system(differential, algebraic)
+
+        return probdiffeq.constraint_dae(dae, ssm=ssm, linearization=linearization)
+
+    return constraint_residual
 
 
-def case_jet_iterated(root):
+def case_jet_constraint_iterated(residual):
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     linearization = probdiffeq.linearization_map(nlstsq)
 
-    def constraint(ssm, jet_order):
-        return probdiffeq.constraint(
-            root.root, ssm=ssm, linearization=linearization, jet_order=jet_order
+    def constraint_residual(ssm, lift_by: int):
+        implicit = probdiffeq.residual_state_velocity(residual.residual)
+        implicit = probdiffeq.jet_lift(implicit, lift_by=lift_by)
+        return probdiffeq.constraint_residual(
+            implicit, ssm=ssm, linearization=linearization
         )
 
-    return constraint
+    return constraint_residual
 
 
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
-@testing.parametrize("jet_order", [0, "max"])
+@testing.parametrize("lift_by", [0, "max"])
 @testing.parametrize("ssm_fact", ["dense"])
 def test_posterior_linearisation_matches_closed_form_recursion(
-    root: Root,
+    residual: Root,
     jet_factory: Callable,
     expected: list,
-    jet_order: int | Literal["max"],
+    lift_by: int | Literal["max"],
     ssm_fact,
 ):
     derivatives = len(expected) - 1
     ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
     init, _iwp = probdiffeq.prior_wiener_integrated(
-        [root.u0], diffuse_derivatives=derivatives, ssm=ssm
+        [residual.u0], diffuse_derivatives=derivatives, ssm=ssm
     )
-    constraint = jet_factory(ssm=ssm, jet_order=jet_order)
+
+    lift_by = len(expected) - 2 if lift_by == "max" else lift_by
+    constraint = jet_factory(ssm=ssm, lift_by=lift_by)
 
     cstate = constraint.init_linearization()
-    fx, cstate = constraint.linearize(init, cstate, damp=0.0, t=root.t0)
+    fx, cstate = constraint.linearize(init, cstate, damp=0.0, t=residual.t0)
 
     _observed, reverted = ssm.conditional.revert(init, fx, solve_triu=linalg.lstsq_svd)
 
     updated = ssm.conditional.apply_flat(0.0, reverted)
     received = updated.mean
-    if jet_order == "max":
+    if lift_by == "max":
         assert testing.allclose(received, expected)
     else:
-        assert testing.allclose(received[: 2 + jet_order], expected[: 2 + jet_order])
+        assert testing.allclose(received[: 2 + lift_by], expected[: 2 + lift_by])
 
 
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
-@testing.parametrize("wrong_jet_order", [-1, 4, 100])
+@testing.parametrize("wrong_lift_by", [-1, 4, 100])
 @testing.parametrize("ssm_fact", ["dense"])
-def test_wrong_jet_order_raises_error(
-    root: Root, jet_factory: Callable, wrong_jet_order, ssm_fact
+def test_wrong_lift_by_raises_error(
+    residual: Root, jet_factory: Callable, wrong_lift_by, ssm_fact
 ):
-    # 5 Taylor coefficients + root-orders of 2 (constraints depend on u and du).
+    # 5 Taylor coefficients + residual-orders of 2 (constraints depend on u and du).
     ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
     init, _ = probdiffeq.prior_wiener_integrated(
-        [root.u0], diffuse_derivatives=4, ssm=ssm
+        [residual.u0], diffuse_derivatives=4, ssm=ssm
     )
-    constraint = jet_factory(ssm=ssm, jet_order=wrong_jet_order)
+    constraint = jet_factory(ssm=ssm, lift_by=wrong_lift_by)
 
     cstate = constraint.init_linearization()
     with testing.raises(ValueError, match="Received"):
-        _ = constraint.linearize(init, cstate, damp=0.0, t=root.t0)
-
-
-@testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
-@testing.parametrize("ssm_fact", ["dense"])
-def test_max_jet_order_is_tight(root: Root, jet_factory: Callable, ssm_fact):
-    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
-    init, _ = probdiffeq.prior_wiener_integrated(
-        [root.u0], diffuse_derivatives=4, ssm=ssm
-    )
-    c1 = jet_factory(ssm=ssm, jet_order="max")
-    cstate = c1.init_linearization()
-    output1 = c1.linearize(init, cstate, damp=0.0, t=root.t0)
-
-    # 5 Taylor coefficients (u, du, ddu, dddu)
-    # and a root-order of 2 (constraints depend on u and du)
-    # implies the max feasible jet order is 3
-    c2 = jet_factory(ssm=ssm, jet_order=3)
-    cstate = c2.init_linearization()
-    output2 = c2.linearize(init, cstate, damp=0.0, t=root.t0)
-
-    # The outputs should be identical
-    assert testing.allclose(output1, output2)
+        _ = constraint.linearize(init, cstate, damp=0.0, t=residual.t0)
