@@ -126,9 +126,7 @@ class IsotropicNormal(interfaces.AbstractTreeNormal[IsotropicTreeFlatten]):
     def _std_batched(self):
         if self.mean_flat.ndim > 2:
             return func.vmap(IsotropicNormal._std_batched)(self)
-        # TODO: use QR decomp instead of einsum to avoid sqrts
-        diag = np.einsum("ij,ji->i", self.cholesky_flat, self.cholesky_flat)
-        std_flat = np.sqrt(diag)
+        std_flat = func.vmap(linalg.vector_norm)(self.cholesky_flat)
         return self.tree_flatten.unflatten_array_scalar(std_flat)
 
     def residual_white_rms_tree(self, u):

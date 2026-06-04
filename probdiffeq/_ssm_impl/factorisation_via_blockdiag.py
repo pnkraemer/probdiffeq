@@ -526,10 +526,8 @@ class BlockDiagNormal(interfaces.AbstractTreeNormal[BlockDiagTreeFlatten]):
         if self.mean_flat.ndim > 2:
             return func.vmap(BlockDiagNormal._std_batched)(self)
 
-        # TODO: use QR decomp instead of einsum to avoid sqrts
-        diag = np.einsum("ijk,ikj->ij", self.cholesky_flat, self.cholesky_flat)
-        std = np.sqrt(diag)
-        return self.tree_flatten.unflatten_array(std)
+        std_flat = func.vmap(func.vmap(linalg.vector_norm))(self.cholesky_flat)
+        return self.tree_flatten.unflatten_array(std_flat)
 
     def residual_white_rms_tree(self, u, /):
         # todo: add sth like an "axis" argument to make it more obvious
