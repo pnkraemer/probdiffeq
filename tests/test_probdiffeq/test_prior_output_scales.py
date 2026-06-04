@@ -1,7 +1,7 @@
 """Tests for output scales."""
 
 from probdiffeq import probdiffeq
-from probdiffeq.backend import func, np, structs, testing
+from probdiffeq.backend import func, np, structs, testing, tree
 from probdiffeq.backend.typing import Callable, Literal
 
 
@@ -31,7 +31,9 @@ def case_scale_rules_iwp_dense() -> ScaleShapeRules:
 
 
 def case_scale_rules_ioup_dense() -> ScaleShapeRules:
-    linop = np.zeros_like
+    def linop(s):
+        return tree.tree_map(np.zeros_like, s)
+
     prior = func.partial(probdiffeq.prior_ornstein_uhlenbeck_integrated, linop)
     return ScaleShapeRules(
         ssm_fact="dense",
@@ -126,3 +128,25 @@ def test_output_scales_wrong_shape_raises_error_at_calling(rules: ScaleShapeRule
     for shapes in rules.calibrated_baddies:
         with testing.raises(ValueError, match="wrong shape"):
             _ = iwp(1.0, np.ones(shapes))
+
+
+@testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
+def test_output_scales_wrong_type_raises_error(rules: ScaleShapeRules):
+    ssm = probdiffeq.state_space_model(ssm_fact=rules.ssm_fact)
+
+    # Sanity check: assert that the same error does not happen with the correct shape
+    tcoeffs = [{"u": np.ones(rules.ode)}, {"u": np.ones(rules.ode)}]
+
+    # output scale should inherit pytree structure
+    if rules.ssm_fact == "isotropic":
+        scale_good = np.ones(rules.base)  # bad: not a dict
+        scale_bad = {"u": scale_good}  # good: dict
+    else:
+        scale_bad = np.ones(rules.base)  # bad: not a dict
+        scale_good = {"u": scale_bad}  # good: dict
+
+    _ = rules.prior(tcoeffs, output_scale=scale_good, ssm=ssm)
+
+    # Test that for the wrong shape or type, an error is raised during construction
+    with testing.raises(TypeError, match="unexpected PyTree structure"):
+        _ = rules.prior(tcoeffs, output_scale=scale_bad, ssm=ssm)

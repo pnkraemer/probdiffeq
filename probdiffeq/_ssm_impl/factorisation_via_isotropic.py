@@ -264,6 +264,12 @@ class IsotropicPriorFactory(interfaces.AbstractPriorFactory):
         if base_scale is None:
             base_scale = np.ones(())
         else:
+            if tree.tree_structure(base_scale) != tree.tree_structure(1.0):
+                msg = "The 'base_scale' argument has an unexpected PyTree structure."
+                msg += f" Expected: {tree.tree_structure(1.0)}."
+                msg += f" Received: {tree.tree_structure(base_scale)}."
+                raise TypeError(msg)
+
             base_scale = np.asarray(base_scale)
             if base_scale.shape != ():
                 msg = "The base-scale has the wrong shape."
