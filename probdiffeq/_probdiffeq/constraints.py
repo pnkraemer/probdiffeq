@@ -51,7 +51,7 @@ from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeV
 __all__ = [
     "Constraint",
     "LstSqConstrained",
-    "TaylorPointFinder",
+    "TaylorPoint",
     "constraint_ode_ts0",
     "constraint_ode_ts1",
     "constraint_residual",
@@ -67,7 +67,7 @@ Used to type marginals, for example.
 """
 
 
-class TaylorPointFinder:
+class TaylorPoint:
     """Find a linearization point for the Taylor expansion.
 
     Use this API to distinguish iterated filtering from extended filtering.
@@ -167,8 +167,8 @@ class lstsq_constrained_gauss_newton(LstSqConstrained):
         return final.x, {"iters": final.i}
 
 
-class taylor_point_prior(TaylorPointFinder):
-    """TaylorPointFinder point is the prior mean."""
+class taylor_point_prior(TaylorPoint):
+    """TaylorPoint point is the prior mean."""
 
     def __call__(self, constraint_flat: Callable, rv, **constraint_kwargs) -> Array:
         del constraint_flat
@@ -176,8 +176,8 @@ class taylor_point_prior(TaylorPointFinder):
         return rv.mean_flat
 
 
-class taylor_point_maximum_a_posteriori(TaylorPointFinder):
-    """TaylorPointFinder point is the maximum-a-posteriori estimate."""
+class taylor_point_maximum_a_posteriori(TaylorPoint):
+    """TaylorPoint point is the maximum-a-posteriori estimate."""
 
     def __init__(self, wlstsq_nc: LstSqConstrained | None = None) -> None:
         if wlstsq_nc is None:
@@ -269,7 +269,7 @@ def constraint_residual(
     residual: problem_types.Residual,
     *,
     ssm: ssm_impl.FactSsmImpl,
-    taylor_point: TaylorPointFinder | None = None,
+    taylor_point: TaylorPoint | None = None,
 ):
     r"""Construct a general constraint.
 
