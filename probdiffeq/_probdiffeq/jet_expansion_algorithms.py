@@ -368,12 +368,11 @@ def _allow_pytree_inits(expand):
 
 
 def jetexpand_residual(
-    num: int,
-    nlstsq: constraints.WeightedLeastSquaresNonlinearlyConstrained | None = None,
+    num: int, nlstsq: constraints.LstSqConstrained | None = None
 ) -> JetExpansionAlg[problem_types.Residual]:
     """Evaluate the Taylor series of a differential-algebraic equation system."""
     if nlstsq is None:
-        nlstsq = constraints.wlstsq_nc_gauss_newton()
+        nlstsq = constraints.lstsq_constrained_gauss_newton()
 
     # TODO: don't try too hard to refactor this one here, I dont think it'll be around for long
     # TODO: enable pytree inputs/outputs

@@ -212,7 +212,7 @@ def solver_residual(*, num_derivatives: int, time_span) -> Callable:
     def param_to_solution(tol):
         t0, t1 = time_span
         y0 = [jnp.array([1.0, 0.0, 0.0])]
-        nlstsq = probdiffeq.wlstsq_nc_gauss_newton(
+        nlstsq = probdiffeq.lstsq_constrained_gauss_newton(
             maxiter=10, tol=jnp.finfo(y0[0].dtype).eps ** 0.5
         )
         jetexpand = probdiffeq.jetexpand_residual(nlstsq=nlstsq, num=num_derivatives)

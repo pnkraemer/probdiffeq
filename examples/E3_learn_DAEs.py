@@ -155,7 +155,7 @@ def solver(residual, tol, while_loop, trafo):
         y0 = trafo.latent_to_observed(p_sqrt)
         t0, _t1 = save_at[0], save_at[-1]
 
-        nlstsq = probdiffeq.wlstsq_nc_gauss_newton(
+        nlstsq = probdiffeq.lstsq_constrained_gauss_newton(
             maxiter=10, tol=tol, while_loop=while_loop
         )
         jetexpand = probdiffeq.jetexpand_residual(num=3, nlstsq=nlstsq)

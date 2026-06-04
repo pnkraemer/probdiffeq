@@ -51,13 +51,13 @@ from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeV
 __all__ = [
     "Constraint",
     "Linearization",
-    "WeightedLeastSquaresNonlinearlyConstrained",
+    "LstSqConstrained",
     "constraint_ode_ts0",
     "constraint_ode_ts1",
     "constraint_residual",
     "linearization_map",
     "linearization_prior_mean",
-    "wlstsq_nc_gauss_newton",
+    "lstsq_constrained_gauss_newton",
 ]
 
 N = TypeVar("N", bound=ssm_impl.AbstractTreeNormal)
@@ -93,8 +93,8 @@ class Linearization:
         raise NotImplementedError
 
 
-class WeightedLeastSquaresNonlinearlyConstrained:
-    r"""Solve nonlinearly constrained least-squares problems.
+class LstSqConstrained:
+    r"""Solve nonlinearly-constrained, weighted least-squares problems.
 
     Concretely, solve problems of the form
 
@@ -109,8 +109,8 @@ class WeightedLeastSquaresNonlinearlyConstrained:
         raise NotImplementedError
 
 
-class wlstsq_nc_gauss_newton(WeightedLeastSquaresNonlinearlyConstrained):
-    """Solve the weighted lstsq problem with nonlinear constraints using Gauss--Newton."""
+class lstsq_constrained_gauss_newton(LstSqConstrained):
+    """Solve the constrained LstSq problem using Gauss--Newton."""
 
     def __init__(
         self,
@@ -179,11 +179,9 @@ class linearization_prior_mean(Linearization):
 class linearization_map(Linearization):
     """Linearization point is the maximum-a-posteriori estimate."""
 
-    def __init__(
-        self, wlstsq_nc: WeightedLeastSquaresNonlinearlyConstrained | None = None
-    ) -> None:
+    def __init__(self, wlstsq_nc: LstSqConstrained | None = None) -> None:
         if wlstsq_nc is None:
-            wlstsq_nc = wlstsq_nc_gauss_newton()
+            wlstsq_nc = lstsq_constrained_gauss_newton()
         self.wlstsq_nc = wlstsq_nc
 
     def __call__(self, constraint_flat: Callable, rv, **constraint_kwargs) -> Array:
