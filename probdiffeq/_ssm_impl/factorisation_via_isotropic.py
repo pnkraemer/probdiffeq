@@ -1,6 +1,6 @@
 from probdiffeq._ssm_impl import interfaces, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
-from probdiffeq.backend.typing import Any, Array, Callable, Sequence, TypeVar
+from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
 
 T = TypeVar("T", bound=Array)
@@ -416,7 +416,7 @@ class IsotropicPriorFactory(interfaces.AbstractPriorFactory):
 class IsotropicLinearizationFactory(interfaces.AbstractLinearizationFactory):
     """Construct an isotropic linearization-factory."""
 
-    def residual(self, *, residual, linearization: Callable | None):
+    def residual(self, *, residual, taylor_point):
         raise NotImplementedError
 
     def ode_taylor_1st(self, *, ode):

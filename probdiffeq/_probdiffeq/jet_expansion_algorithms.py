@@ -374,9 +374,7 @@ def jetexpand_residual(
     if nlstsq is None:
         nlstsq = constraints.lstsq_constrained_gauss_newton()
 
-    # TODO: don't try too hard to refactor this one here, I dont think it'll be around for long
     # TODO: enable pytree inputs/outputs
-    # TODO: raise error if DAE has the wrong type
     def expand(
         residual: problem_types.Residual, inits: Sequence[T], /, *, t: float
     ) -> tuple[list[T], dict]:
