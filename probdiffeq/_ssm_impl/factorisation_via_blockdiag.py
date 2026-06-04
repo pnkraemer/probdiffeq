@@ -78,12 +78,20 @@ class BlockDiagPriorFactory(interfaces.AbstractPriorFactory):
         single_flat, single_unravel = tree.ravel_pytree(tcoeffs_mean[0])
         coeff_like = np.ones_like(single_flat)
         base_scale_expected = single_unravel(coeff_like)
+
         if base_scale is None:
             base_scale = base_scale_expected
         else:
-            if base_scale.shape != base_scale_expected.shape:
+            base_scale = tree.tree_map(np.asarray, base_scale)
+
+            def shape_equal(A, B):
+                return tree.tree_map(lambda a, b: np.shape(a) == np.shape(b), A, B)
+
+            if not tree.tree_all(
+                shape_equal(base_scale.shape, base_scale_expected.shape)
+            ):
                 msg = "The base-scale has the wrong shape."
-                msg += f" Expected: {base_scale_expected.shape}."
+                msg += f" Expected: {tree.tree_map(np.shape, base_scale_expected)}."
                 msg += f" Received: {base_scale.shape}."
                 raise ValueError(msg)
 
