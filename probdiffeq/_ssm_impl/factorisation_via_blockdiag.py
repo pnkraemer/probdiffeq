@@ -1,6 +1,6 @@
 from probdiffeq._ssm_impl import interfaces, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
-from probdiffeq.backend.typing import Any, Array, Callable, Sequence, TypeVar
+from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
 
 __all__ = [
@@ -254,10 +254,7 @@ class BlockDiagPriorFactory(interfaces.AbstractPriorFactory):
 class BlockDiagLinearizationFactory(interfaces.AbstractLinearizationFactory):
     """Construct a block-diagonal linearization-factory."""
 
-    def residual(self, *, residual, linearization: Callable | None):
-        raise NotImplementedError
-
-    def dae(self, *, dae, linearization):
+    def residual(self, *, residual, taylor_point):
         raise NotImplementedError
 
     def ode_taylor_0th(self, *, ode):

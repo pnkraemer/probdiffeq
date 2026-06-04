@@ -12,6 +12,8 @@ __all__ = [
     "prior_wiener_integrated",
     "prior_wiener_integrated_diffuse",
 ]
+
+
 C = TypeVar("C", bound=Sequence)
 """A type-variable to describe sequences.
 

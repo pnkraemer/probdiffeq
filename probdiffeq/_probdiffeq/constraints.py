@@ -50,15 +50,14 @@ from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeV
 
 __all__ = [
     "Constraint",
-    "Linearization",
-    "WeightedLeastSquaresNonlinearlyConstrained",
-    "constraint_dae",
+    "LstSqConstrained",
+    "TaylorPoint",
     "constraint_ode_ts0",
     "constraint_ode_ts1",
     "constraint_residual",
-    "linearization_map",
-    "linearization_prior_mean",
-    "wlstsq_nc_gauss_newton",
+    "lstsq_constrained_gauss_newton",
+    "taylor_point_maximum_a_posteriori",
+    "taylor_point_prior",
 ]
 
 N = TypeVar("N", bound=ssm_impl.AbstractTreeNormal)
@@ -68,14 +67,14 @@ Used to type marginals, for example.
 """
 
 
-class Linearization:
-    """Find a linearization point.
+class TaylorPoint:
+    """Find a linearization point for the Taylor expansion.
 
-    Note how this object handles *where* to linearize, but not *how* to linearize.
+    Use this API to distinguish iterated filtering from extended filtering.
     """
 
-    def __call__(self, constraint_flat: Callable, rv: N) -> Array:
-        """Find a linearization point.
+    def __call__(self, constraint_flat: Callable, rv: N, **constraint_kwargs) -> Array:
+        """Find a linearization point for the Taylor expansion.
 
         Parameters
         ----------
@@ -83,6 +82,8 @@ class Linearization:
             The constraint to linearize, flattened to work with the raveled mean.
         rv
             The distribution to linearize around. The mean of this distribution is typically used as the linearization point.
+        **constraint_kwargs
+            Additional keyword-arguments to pass to the constraint function.
 
         Returns
         -------
@@ -92,8 +93,8 @@ class Linearization:
         raise NotImplementedError
 
 
-class WeightedLeastSquaresNonlinearlyConstrained:
-    r"""Solve nonlinearly constrained least-squares problems.
+class LstSqConstrained:
+    r"""Solve nonlinearly-constrained, weighted least-squares problems.
 
     Concretely, solve problems of the form
 
@@ -108,8 +109,8 @@ class WeightedLeastSquaresNonlinearlyConstrained:
         raise NotImplementedError
 
 
-class wlstsq_nc_gauss_newton(WeightedLeastSquaresNonlinearlyConstrained):
-    """Solve the weighted lstsq problem with nonlinear constraints using Gauss--Newton."""
+class lstsq_constrained_gauss_newton(LstSqConstrained):
+    """Solve the constrained LstSq problem using Gauss--Newton."""
 
     def __init__(
         self,
@@ -124,7 +125,8 @@ class wlstsq_nc_gauss_newton(WeightedLeastSquaresNonlinearlyConstrained):
         self.lstsq = lstsq
         self.while_loop = while_loop
 
-    def __call__(self, constraint, x0, mean, cholesky):
+    def __call__(self, constraint, x0, mean, cholesky, **constraint_kwargs):
+
         @tree.register_dataclass
         @structs.dataclass
         class State:
@@ -149,7 +151,7 @@ class wlstsq_nc_gauss_newton(WeightedLeastSquaresNonlinearlyConstrained):
             return np.logical_and(np.logical_and(cond1, cond2), cond3)
 
         def body_fun(state: State) -> State:
-            Jx = func.jacfwd(constraint)(state.x)
+            Jx = func.jacfwd(lambda s: constraint(s, **constraint_kwargs))(state.x)
 
             H = Jx @ cholesky
             r = state.fx + Jx @ (mean - state.x)
@@ -157,32 +159,35 @@ class wlstsq_nc_gauss_newton(WeightedLeastSquaresNonlinearlyConstrained):
             dx = mean - state.x - cholesky @ dy
             xnew = state.x + dx
 
-            fxnew = constraint(xnew)
+            fxnew = constraint(xnew, **constraint_kwargs)
             return State(xnew, fxnew, dx=xnew - state.x, i=state.i + 1)
 
-        init = State(x0, constraint(x0), dx=np.ones_like(x0), i=0)
+        init = State(x0, constraint(x0, **constraint_kwargs), dx=np.ones_like(x0), i=0)
         final = self.while_loop(cond_fun, body_fun, init=init)
         return final.x, {"iters": final.i}
 
 
-class linearization_prior_mean(Linearization):
-    """Linearization point is the prior mean."""
+class taylor_point_prior(TaylorPoint):
+    """TaylorPoint point is the prior mean."""
 
-    def __call__(self, constraint_flat: Callable, rv) -> Array:
+    def __call__(self, constraint_flat: Callable, rv, **constraint_kwargs) -> Array:
         del constraint_flat
+        del constraint_kwargs
         return rv.mean_flat
 
 
-class linearization_map(Linearization):
-    """Linearization point is the maximum-a-posteriori estimate."""
+class taylor_point_maximum_a_posteriori(TaylorPoint):
+    """TaylorPoint point is the maximum-a-posteriori estimate."""
 
-    def __init__(self, wlstsq_nc: WeightedLeastSquaresNonlinearlyConstrained) -> None:
+    def __init__(self, wlstsq_nc: LstSqConstrained | None = None) -> None:
+        if wlstsq_nc is None:
+            wlstsq_nc = lstsq_constrained_gauss_newton()
         self.wlstsq_nc = wlstsq_nc
 
-    def __call__(self, constraint_flat: Callable, rv) -> Array:
+    def __call__(self, constraint_flat: Callable, rv, **constraint_kwargs) -> Array:
         mean = rv.mean_flat
         mean, _info = self.wlstsq_nc(
-            constraint_flat, mean, rv.mean_flat, rv.cholesky_flat
+            constraint_flat, mean, rv.mean_flat, rv.cholesky_flat, **constraint_kwargs
         )
         return mean
 
@@ -264,7 +269,7 @@ def constraint_residual(
     residual: problem_types.Residual,
     *,
     ssm: ssm_impl.FactSsmImpl,
-    linearization: Linearization | None = None,
+    taylor_point: TaylorPoint | None = None,
 ):
     r"""Construct a general constraint.
 
@@ -289,56 +294,15 @@ def constraint_residual(
         The residual to apply linearization to.
     ssm
         The state-space model to use for the constraint.
-    linearization
-        The strategy to use for finding the linearization point. If None, the prior mean is used as the linearization point.
+    taylor_point
+        The strategy to use for finding the linearization point for the Taylor expansion.
+        If None, the prior mean is used as the linearization point.
         Adjust this variable to use posterior linearization (also known as iterated filtering).
 
     """
     if not isinstance(residual, problem_types.Residual):
         raise TypeError(residual)
 
-    if linearization is None:
-        linearization = linearization_prior_mean()
-    return ssm.linearize.residual(residual=residual, linearization=linearization)
-
-
-def constraint_dae(
-    dae: problem_types.dae_system,
-    *,
-    ssm: ssm_impl.FactSsmImpl,
-    linearization: Linearization | None = None,
-):
-    r"""Like `constraint`, but for DAEs.
-
-    The advantage of a dedicated DAE constraint is that algebraic and differential
-    roots can enjoy different jet-orders, which increases accuracy.
-
-    This constraint handles problems of the form
-
-    $$
-    f\left(u(t), \frac{du}{dt}(t), ..., \frac{d^k u}{dt^k}(t), t\right) = 0,
-    ~~~
-    g\left(u(t), \frac{du}{dt}(t), ..., \frac{d^{k-1} u}{dt^{k-1}}(t), t\right) = 0
-    $$
-
-    where $f$ is the differential part and $g$ the algebraic part of the DAE. The order of the problem is read off the number of positional arguments in the algebraic root $g$ (argument `algebraic`), plus one. For instance, if the algebraic root has two positional arguments, then the problem is a second-order DAE. The differential root (argument `differential`) is expected to have one positional argument more than the algebraic root; in the previous example, the differential root would be expected to have three positional arguments.
-
-
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This function is highly experimental and not safe to use.
-        There is no guarantee that it works correctly (or at all).
-        It might be deleted tomorrow and without any deprecation policy.
-
-    Parameters
-    ----------
-    dae
-        The differential-algebraic equation system.
-    ssm
-        The state-space model to use for the constraint.
-    linearization
-        The strategy to use for finding the linearization point. If None, the prior mean is used as the linearization point.
-    """
-    if linearization is None:
-        linearization = linearization_prior_mean()
-
-    return ssm.linearize.dae(dae=dae, linearization=linearization)
+    if taylor_point is None:
+        taylor_point = taylor_point_prior()
+    return ssm.linearize.residual(residual=residual, taylor_point=taylor_point)

@@ -5,22 +5,22 @@ from probdiffeq.backend import func, np, testing
 
 
 @testing.parametrize("num", [0, 1, 10])
-def test_daejet_matches_expectation_on_sir_model(num):
-
+def test_residual_init_matches_expectation_on_sir_model(num):
+    # todo: rename linearization to meanfinding or so
+    # Baseline
     y0 = [np.asarray([0.99, 0.01, 0.0])]
     jetexpand_ode = probdiffeq.jetexpand_ode_unroll(num=num)
     expected, _ = jetexpand_ode(vf_ode, y0, t=0.0)
 
+    # Residual via DAE
     differential_lifted = probdiffeq.jet_lift(differential, lift_by=len(expected) - 2)
     algebraic_lifted = probdiffeq.jet_lift(algebraic, lift_by=len(expected) - 1)
-    dae = probdiffeq.dae_system(
-        differential=differential_lifted, algebraic=algebraic_lifted
-    )
-    eps = np.finfo_eps(y0[0].dtype)
-    nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=10, tol=eps)
-    jetexpand = probdiffeq.jetexpand_dae_nlstsq(num=num, nlstsq=nlstsq)
+    residual = probdiffeq.residual_from_stack(differential_lifted, algebraic_lifted)
+
+    # Jet expansion
+    jetexpand = probdiffeq.jetexpand_residual(num=num)
     jetexpand = func.jit(jetexpand, static_argnums=(0,))
-    received, _info = jetexpand(dae, y0, t=0.0)
+    received, _info = jetexpand(residual, y0, t=0.0)
     assert testing.allclose(received, expected)
 
 

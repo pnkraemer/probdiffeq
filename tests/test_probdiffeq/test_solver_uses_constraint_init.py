@@ -56,11 +56,11 @@ def test_output_matches_reference(ivp, solver_factory, derivatives, ssm_fact) ->
     )
 
     # Build a solver
-    nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
+    nlstsq = probdiffeq.lstsq_constrained_gauss_newton(maxiter=50, tol=1e-10)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
-    linearization = probdiffeq.linearization_map(nlstsq)
+    taylor_point = probdiffeq.taylor_point_maximum_a_posteriori(nlstsq)
     constraint = probdiffeq.constraint_residual(
-        residual, ssm=ssm, linearization=linearization
+        residual, ssm=ssm, taylor_point=taylor_point
     )
     solver = solver_factory(
         strategy=strategy,

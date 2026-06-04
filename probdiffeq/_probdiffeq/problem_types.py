@@ -68,13 +68,13 @@ __all__ = [
     "ProtocolResidualState",
     "ProtocolResidualVelocity",
     "Residual",
-    "dae_system",
     "jacobian_hutchinson_fwd",
     "jacobian_hutchinson_rev",
     "jacobian_materialize",
     "jet_lift",
     "ode",
     "ode_second_order",
+    "residual_from_stack",
     "residual_state",
     "residual_state_velocity",
     "residual_state_velocity_acceleration",
@@ -92,7 +92,7 @@ class JacobianHandler:
         """
         raise NotImplementedError
 
-    def materialize_dense(self, fun, x, state, /):
+    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
         """Materialize a dense Jacobian.
 
         This is typically used for first-order linearization in dense
@@ -100,7 +100,7 @@ class JacobianHandler:
         """
         raise NotImplementedError
 
-    def calculate_trace(self, fun, x, state, /):
+    def calculate_trace(self, fun, x, state, /, **fun_kwargs):
         """Calculate the trace of a Jacobian.
 
         This is typically used for first-order linearization in isotropic
@@ -108,7 +108,7 @@ class JacobianHandler:
         """
         raise NotImplementedError
 
-    def calculate_diagonal(self, fun, x, state, /):
+    def calculate_diagonal(self, fun, x, state, /, **fun_kwargs):
         """Calculate the diagonal of a Jacobian.
 
         This is typically used for first-order linearization in block-diagonal
@@ -132,23 +132,23 @@ class jacobian_materialize(JacobianHandler):
     def init_jacobian_handler(self):
         return ()
 
-    def materialize_dense(self, fun, x, state, /):
+    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
         del state
-        fx = fun(x)
-        dfx = func.jacfwd(fun)(x)
+        fx = fun(x, **fun_kwargs)
+        dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, ()
 
-    def calculate_trace(self, fun, x, state, /):
+    def calculate_trace(self, fun, x, state, /, **fun_kwargs):
         del state
-        fx = fun(x)
-        dfx = func.jacfwd(fun)(x)
+        fx = fun(x, **fun_kwargs)
+        dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         dfx_trace = linalg.trace(dfx)
         return fx, dfx_trace, ()
 
-    def calculate_diagonal(self, fun, x, state, /):
+    def calculate_diagonal(self, fun, x, state, /, **fun_kwargs):
         del state
         fx = fun(x)
-        dfx = func.jacfwd(fun)(x)
+        dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         dfx_diagonal = linalg.diagonal(dfx)
         return fx, dfx_diagonal, ()
 
@@ -179,29 +179,29 @@ class jacobian_hutchinson_fwd(JacobianHandler):
     def init_jacobian_handler(self):
         return random.prng_key(seed=self.seed)
 
-    def materialize_dense(self, fun, x, state, /):
+    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
         # TODO: approximate Jacobian with outer products instead of forming?
         # What is the "correct" thing to do?
-        fx = fun(x)
-        dfx = func.jacfwd(fun)(x)
+        fx = fun(x, **fun_kwargs)
+        dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, state
 
-    def calculate_trace(self, fun, x, key, /):
+    def calculate_trace(self, fun, x, key, /, **fun_kwargs):
         key, subkey = random.split(key, num=2)
         sample_shape = (self.num_probes, *x.shape)
         v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
 
-        fx, Jvp = func.linearize(fun, x)
+        fx, Jvp = func.linearize(lambda s: fun(s, **fun_kwargs), x)
         J_trace = func.vmap(lambda s: linalg.vector_dot(s, Jvp(s)))(v)
         J_trace = J_trace.mean(axis=0)
         return fx, J_trace, key
 
-    def calculate_diagonal(self, fun, x, key, /):
+    def calculate_diagonal(self, fun, x, key, /, **fun_kwargs):
         key, subkey = random.split(key, num=2)
         sample_shape = (self.num_probes, *x.shape)
         v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
 
-        fx, Jvp = func.linearize(fun, x)
+        fx, Jvp = func.linearize(lambda s: fun(s, **fun_kwargs), x)
         vJv = func.vmap(lambda s: s * Jvp(s))(v)
         J_diagonal = vJv.mean(axis=0)
         return fx, J_diagonal, key
@@ -233,29 +233,29 @@ class jacobian_hutchinson_rev(JacobianHandler):
     def init_jacobian_handler(self):
         return random.prng_key(seed=self.seed)
 
-    def materialize_dense(self, fun, x, state, /):
+    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
         # TODO: approximate Jacobian with outer products instead of forming?
         # What is the "correct" thing to do?
-        fx = fun(x)
-        dfx = func.jacrev(fun)(x)
+        fx = fun(x, **fun_kwargs)
+        dfx = func.jacrev(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, state
 
-    def calculate_trace(self, fun, x, key, /):
+    def calculate_trace(self, fun, x, key, /, **fun_kwargs):
         key, subkey = random.split(key, num=2)
         sample_shape = (self.num_probes, *x.shape)
         v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
 
-        fx, vjp = func.vjp(fun, x)
+        fx, vjp = func.vjp(lambda s: fun(s, **fun_kwargs), x)
         J_trace = func.vmap(lambda s: linalg.vector_dot(s, vjp(s)[0]))(v)
         J_trace = J_trace.mean(axis=0)
         return fx, J_trace, key
 
-    def calculate_diagonal(self, fun, x, key, /):
+    def calculate_diagonal(self, fun, x, key, /, **fun_kwargs):
         key, subkey = random.split(key, num=2)
         sample_shape = (self.num_probes, *x.shape)
         v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
 
-        fx, vjp = func.vjp(fun, x)
+        fx, vjp = func.vjp(lambda s: fun(s, **fun_kwargs), x)
         vJv = func.vmap(lambda s: s * vjp(s)[0])(v)
         J_diagonal = vJv.mean(axis=0)
         return fx, J_diagonal, key
@@ -373,6 +373,21 @@ def residual_state(
     return Residual(jetfunc, jacobian=jacobian, num_derivatives_in_args=1)
 
 
+def residual_from_stack(*residual_stack: *tuple[Residual, ...]) -> Residual:
+    """Construct a description of a residual by stacking other residuals."""
+
+    def jetfunc(*, jet_coords: Sequence[T], t: float) -> list[T]:
+        return [
+            r.residual_function(jet_coords=jet_coords[: r.num_derivatives_in_args], t=t)
+            for r in residual_stack
+        ]
+
+    nums = [r.num_derivatives_in_args for r in residual_stack]
+    num_args = max(nums)
+    jacobian = residual_stack[0].jacobian
+    return Residual(jetfunc, jacobian=jacobian, num_derivatives_in_args=num_args)
+
+
 class ProtocolResidualVelocity(Protocol[T_contra]):
     def __call__(self, u: T_contra, du: T_contra, /, *, t: float) -> Any: ...
 
@@ -417,22 +432,6 @@ def residual_state_velocity_acceleration(
         jacobian = jacobian_hutchinson_fwd()
 
     return Residual(jetfunc, jacobian=jacobian, num_derivatives_in_args=3)
-
-
-class dae_system:
-    """Differential-algebraic equations."""
-
-    def __init__(self, differential: Residual, algebraic: Residual):
-        if not isinstance(differential, Residual):
-            raise TypeError(differential)
-        if not isinstance(algebraic, Residual):
-            raise TypeError(algebraic)
-
-        self.differential = differential
-        self.algebraic = algebraic
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}(differential={self.differential}, algebraic={self.algebraic})"
 
 
 def jet_lift(residual: Residual, lift_by: int) -> Residual:

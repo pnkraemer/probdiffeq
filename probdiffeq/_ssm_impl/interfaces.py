@@ -1,5 +1,5 @@
 from probdiffeq.backend import abc, func, np, tree
-from probdiffeq.backend.typing import Array, Callable, Generic, Sequence, TypeVar
+from probdiffeq.backend.typing import Array, Generic, Sequence, TypeVar
 
 __all__ = [
     "AbstractConditional",
@@ -111,17 +111,6 @@ class AbstractRoot(AbstractLinearization):
         return f"{self.__class__.__name__}(residual={self.residual})"
 
 
-class AbstractDAEPosteriorLinearization(AbstractLinearization):
-    """Interface for linearizations of general residuals."""
-
-    def __init__(self, *, dae, linearization) -> None:
-        self.dae = dae
-        self.linearization = linearization
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(dae={self.dae}, linearization={self.linearization})"
-
-
 class AbstractOde(AbstractLinearization):
     """Interface for linearizations of ODEs."""
 
@@ -144,12 +133,8 @@ class AbstractLinearizationFactory(abc.ABC):
         return f"{self.__class__.__name__}()"
 
     @abc.abstractmethod
-    def residual(self, residual, *, linearization: Callable | None) -> AbstractRoot:
+    def residual(self, residual, *, taylor_point) -> AbstractRoot:
         """Construct an implementation of 1st-order Taylor-linearization for residuals."""
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def dae(self, *, dae, linearization) -> AbstractDAEPosteriorLinearization:
         raise NotImplementedError
 
     @abc.abstractmethod

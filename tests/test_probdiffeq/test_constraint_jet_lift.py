@@ -14,8 +14,8 @@ class Root:
     """
 
     residual: Callable
-    residual_dae_algebraic: Callable
-    residual_dae_differential: Callable
+    residual_algebraic: Callable
+    residual_differential: Callable
     ode_vf: Callable
     t0: float
     u0: Array
@@ -74,8 +74,8 @@ def fixture_residual_sir():
     t0 = 0.0
     return Root(
         residual=residual,
-        residual_dae_differential=dae_differential,
-        residual_dae_algebraic=dae_algebraic,
+        residual_differential=dae_differential,
+        residual_algebraic=dae_algebraic,
         ode_vf=vf,
         t0=t0,
         u0=u0,
@@ -95,33 +95,33 @@ def fixture_expected(residual, derivatives):
 
 
 def case_jet_lift_dae(residual):
-    nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
-    linearization = probdiffeq.linearization_map(nlstsq)
+    taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
 
     def constraint_residual(ssm, lift_by: int):
         differential = probdiffeq.residual_state_velocity(
-            residual.residual_dae_differential
+            residual.residual_differential
         )
         differential = probdiffeq.jet_lift(differential, lift_by=lift_by)
 
-        algebraic = probdiffeq.residual_state(residual.residual_dae_algebraic)
+        algebraic = probdiffeq.residual_state(residual.residual_algebraic)
         algebraic = probdiffeq.jet_lift(algebraic, lift_by=lift_by + 1)
-        dae = probdiffeq.dae_system(differential, algebraic)
+        residual_stack = probdiffeq.residual_from_stack(differential, algebraic)
 
-        return probdiffeq.constraint_dae(dae, ssm=ssm, linearization=linearization)
+        return probdiffeq.constraint_residual(
+            residual_stack, ssm=ssm, taylor_point=taylor_point
+        )
 
     return constraint_residual
 
 
 def case_jet_lift_residual(residual):
-    nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
-    linearization = probdiffeq.linearization_map(nlstsq)
+    taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
 
     def constraint_residual(ssm, lift_by: int):
         implicit = probdiffeq.residual_state_velocity(residual.residual)
         implicit = probdiffeq.jet_lift(implicit, lift_by=lift_by)
         return probdiffeq.constraint_residual(
-            implicit, ssm=ssm, linearization=linearization
+            implicit, ssm=ssm, taylor_point=taylor_point
         )
 
     return constraint_residual
