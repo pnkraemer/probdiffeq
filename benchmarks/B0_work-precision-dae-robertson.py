@@ -48,8 +48,8 @@ def main(start=3.0, stop=10.0, step=0.5, repeats=2, time_span=(1e-6, 1e5)) -> No
 
     # Assemble algorithms
     algorithms = {
-        "DAE | Jet(3)": solver_dae_iwp(num_derivatives=3, time_span=time_span),
-        "DAE | Jet(4)": solver_dae_iwp(num_derivatives=4, time_span=time_span),
+        "DAE | Jet(3)": solver_residual(num_derivatives=3, time_span=time_span),
+        "DAE | Jet(4)": solver_residual(num_derivatives=4, time_span=time_span),
         "ODE | TS1(3)": solver_ode(num_derivatives=3, time_span=time_span),
         "ODE | TS1(4)": solver_ode(num_derivatives=4, time_span=time_span),
         "ODE | TS1(7)": solver_ode(num_derivatives=7, time_span=time_span),
@@ -185,7 +185,7 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
     return param_to_solution
 
 
-def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
+def solver_residual(*, num_derivatives: int, time_span) -> Callable:
     """Construct a method that solves Robertson as a DAE."""
 
     @functools.partial(probdiffeq.jet_lift, lift_by=num_derivatives - 1)
@@ -206,7 +206,7 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
         del t
         return u[0] + u[1] + u[2] - 1
 
-    dae = probdiffeq.dae_system(differential, algebraic)
+    residual = probdiffeq.residual_from_stack(differential, algebraic)
 
     @jax.jit
     def param_to_solution(tol):
@@ -215,8 +215,8 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
         nlstsq = probdiffeq.wlstsq_nc_gauss_newton(
             maxiter=10, tol=jnp.finfo(y0[0].dtype).eps ** 0.5
         )
-        jetexpand = probdiffeq.jetexpand_dae_nlstsq(nlstsq=nlstsq, num=num_derivatives)
-        tcoeffs, _ = jetexpand(dae, y0, t=t0)
+        jetexpand = probdiffeq.jetexpand_residual(nlstsq=nlstsq, num=num_derivatives)
+        tcoeffs, _ = jetexpand(residual, y0, t=t0)
 
         ssm = probdiffeq.state_space_model()
 
@@ -227,7 +227,9 @@ def solver_dae_iwp(*, num_derivatives: int, time_span) -> Callable:
 
         # We build a Jet constraint
         linearization = probdiffeq.linearization_map(nlstsq)
-        jet = probdiffeq.constraint_dae(dae, ssm=ssm, linearization=linearization)
+        jet = probdiffeq.constraint_residual(
+            residual, ssm=ssm, linearization=linearization
+        )
         strategy = probdiffeq.strategy_filter(ssm=ssm)
 
         # For proper DAEs, non-iterated solver's simply don't cut it

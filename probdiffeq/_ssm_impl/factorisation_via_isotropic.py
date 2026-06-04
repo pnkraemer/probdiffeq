@@ -419,9 +419,6 @@ class IsotropicLinearizationFactory(interfaces.AbstractLinearizationFactory):
     def residual(self, *, residual, linearization: Callable | None):
         raise NotImplementedError
 
-    def dae(self, *, dae, linearization):
-        raise NotImplementedError
-
     def ode_taylor_1st(self, *, ode):
         if ode.num_derivatives_in_args > 1:
             msg = "This linearization is not compatible with high-order ODEs as of yet."

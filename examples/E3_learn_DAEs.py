@@ -61,7 +61,7 @@ def main(
         del t
         return u[0] + u[1] + u[2] - 1
 
-    dae = probdiffeq.dae_system(differential, algebraic)
+    residual = probdiffeq.residual_from_stack(differential, algebraic)
 
     def while_loop(cond, body, init):
         """Evaluate a bounded while loop."""
@@ -75,7 +75,7 @@ def main(
 
     # Linear spacing on a log-scale
     save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=num_data)
-    solve = solver(dae, tol=tol, while_loop=while_loop, trafo=trafo)
+    solve = solver(residual, tol=tol, while_loop=while_loop, trafo=trafo)
 
     # True condition
     key = jax.random.PRNGKey(seed)
@@ -146,7 +146,7 @@ def loss_data_fit(solve, *, ssm, inputs, labels):
     return loss
 
 
-def solver(dae, tol, while_loop, trafo):
+def solver(residual, tol, while_loop, trafo):
     """Create a reverse-mode differentiable probabilistic solver."""
 
     @jax.jit
@@ -158,8 +158,8 @@ def solver(dae, tol, while_loop, trafo):
         nlstsq = probdiffeq.wlstsq_nc_gauss_newton(
             maxiter=10, tol=tol, while_loop=while_loop
         )
-        jetexpand = probdiffeq.jetexpand_dae_nlstsq(num=3, nlstsq=nlstsq)
-        y0, _info = jetexpand(dae, [y0], t=t0)
+        jetexpand = probdiffeq.jetexpand_residual(num=3, nlstsq=nlstsq)
+        y0, _info = jetexpand(residual, [y0], t=t0)
         ssm = probdiffeq.state_space_model()
 
         init, prior = probdiffeq.prior_wiener_integrated(
@@ -168,7 +168,9 @@ def solver(dae, tol, while_loop, trafo):
 
         # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
         linearization = probdiffeq.linearization_map(nlstsq)
-        jet = probdiffeq.constraint_dae(dae, ssm=ssm, linearization=linearization)
+        jet = probdiffeq.constraint_residual(
+            residual, ssm=ssm, linearization=linearization
+        )
         strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
         solver = probdiffeq.solver_dynamic(
             strategy=strategy, prior=prior, constraint=jet, ssm=ssm

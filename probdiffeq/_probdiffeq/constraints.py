@@ -52,7 +52,6 @@ __all__ = [
     "Constraint",
     "Linearization",
     "WeightedLeastSquaresNonlinearlyConstrained",
-    "constraint_dae",
     "constraint_ode_ts0",
     "constraint_ode_ts1",
     "constraint_residual",
@@ -176,7 +175,11 @@ class linearization_prior_mean(Linearization):
 class linearization_map(Linearization):
     """Linearization point is the maximum-a-posteriori estimate."""
 
-    def __init__(self, wlstsq_nc: WeightedLeastSquaresNonlinearlyConstrained) -> None:
+    def __init__(
+        self, wlstsq_nc: WeightedLeastSquaresNonlinearlyConstrained | None = None
+    ) -> None:
+        if wlstsq_nc is None:
+            wlstsq_nc = wlstsq_nc_gauss_newton()
         self.wlstsq_nc = wlstsq_nc
 
     def __call__(self, constraint_flat: Callable, rv) -> Array:
@@ -302,43 +305,43 @@ def constraint_residual(
     return ssm.linearize.residual(residual=residual, linearization=linearization)
 
 
-def constraint_dae(
-    dae: problem_types.dae_system,
-    *,
-    ssm: ssm_impl.FactSsmImpl,
-    linearization: Linearization | None = None,
-):
-    r"""Like `constraint`, but for DAEs.
+# def constraint_dae(
+#     dae: problem_types.residual_from_stack,
+#     *,
+#     ssm: ssm_impl.FactSsmImpl,
+#     linearization: Linearization | None = None,
+# ):
+#     r"""Like `constraint`, but for DAEs.
 
-    The advantage of a dedicated DAE constraint is that algebraic and differential
-    roots can enjoy different jet-orders, which increases accuracy.
+#     The advantage of a dedicated DAE constraint is that algebraic and differential
+#     roots can enjoy different jet-orders, which increases accuracy.
 
-    This constraint handles problems of the form
+#     This constraint handles problems of the form
 
-    $$
-    f\left(u(t), \frac{du}{dt}(t), ..., \frac{d^k u}{dt^k}(t), t\right) = 0,
-    ~~~
-    g\left(u(t), \frac{du}{dt}(t), ..., \frac{d^{k-1} u}{dt^{k-1}}(t), t\right) = 0
-    $$
+#     $$
+#     f\left(u(t), \frac{du}{dt}(t), ..., \frac{d^k u}{dt^k}(t), t\right) = 0,
+#     ~~~
+#     g\left(u(t), \frac{du}{dt}(t), ..., \frac{d^{k-1} u}{dt^{k-1}}(t), t\right) = 0
+#     $$
 
-    where $f$ is the differential part and $g$ the algebraic part of the DAE. The order of the problem is read off the number of positional arguments in the algebraic root $g$ (argument `algebraic`), plus one. For instance, if the algebraic root has two positional arguments, then the problem is a second-order DAE. The differential root (argument `differential`) is expected to have one positional argument more than the algebraic root; in the previous example, the differential root would be expected to have three positional arguments.
+#     where $f$ is the differential part and $g$ the algebraic part of the DAE. The order of the problem is read off the number of positional arguments in the algebraic root $g$ (argument `algebraic`), plus one. For instance, if the algebraic root has two positional arguments, then the problem is a second-order DAE. The differential root (argument `differential`) is expected to have one positional argument more than the algebraic root; in the previous example, the differential root would be expected to have three positional arguments.
 
 
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This function is highly experimental and not safe to use.
-        There is no guarantee that it works correctly (or at all).
-        It might be deleted tomorrow and without any deprecation policy.
+#     !!! warning "Warning: highly EXPERIMENTAL feature!"
+#         This function is highly experimental and not safe to use.
+#         There is no guarantee that it works correctly (or at all).
+#         It might be deleted tomorrow and without any deprecation policy.
 
-    Parameters
-    ----------
-    dae
-        The differential-algebraic equation system.
-    ssm
-        The state-space model to use for the constraint.
-    linearization
-        The strategy to use for finding the linearization point. If None, the prior mean is used as the linearization point.
-    """
-    if linearization is None:
-        linearization = linearization_prior_mean()
+#     Parameters
+#     ----------
+#     dae
+#         The differential-algebraic equation system.
+#     ssm
+#         The state-space model to use for the constraint.
+#     linearization
+#         The strategy to use for finding the linearization point. If None, the prior mean is used as the linearization point.
+#     """
+#     if linearization is None:
+#         linearization = linearization_prior_mean()
 
-    return ssm.linearize.dae(dae=dae, linearization=linearization)
+#     return ssm.linearize.dae(dae=dae, linearization=linearization)

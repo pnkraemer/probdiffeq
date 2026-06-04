@@ -68,13 +68,13 @@ __all__ = [
     "ProtocolResidualState",
     "ProtocolResidualVelocity",
     "Residual",
-    "dae_system",
     "jacobian_hutchinson_fwd",
     "jacobian_hutchinson_rev",
     "jacobian_materialize",
     "jet_lift",
     "ode",
     "ode_second_order",
+    "residual_from_stack",
     "residual_state",
     "residual_state_velocity",
     "residual_state_velocity_acceleration",
@@ -373,6 +373,21 @@ def residual_state(
     return Residual(jetfunc, jacobian=jacobian, num_derivatives_in_args=1)
 
 
+def residual_from_stack(*residual_stack: *tuple[Residual, ...]) -> Residual:
+    """Construct a description of a residual by stacking other residuals."""
+
+    def jetfunc(*, jet_coords: Sequence[T], t: float) -> list[T]:
+        return [
+            r.residual_function(jet_coords=jet_coords[: r.num_derivatives_in_args], t=t)
+            for r in residual_stack
+        ]
+
+    nums = [r.num_derivatives_in_args for r in residual_stack]
+    num_args = max(nums)
+    jacobian = residual_stack[0].jacobian
+    return Residual(jetfunc, jacobian=jacobian, num_derivatives_in_args=num_args)
+
+
 class ProtocolResidualVelocity(Protocol[T_contra]):
     def __call__(self, u: T_contra, du: T_contra, /, *, t: float) -> Any: ...
 
@@ -417,22 +432,6 @@ def residual_state_velocity_acceleration(
         jacobian = jacobian_hutchinson_fwd()
 
     return Residual(jetfunc, jacobian=jacobian, num_derivatives_in_args=3)
-
-
-class dae_system:
-    """Differential-algebraic equations."""
-
-    def __init__(self, differential: Residual, algebraic: Residual):
-        if not isinstance(differential, Residual):
-            raise TypeError(differential)
-        if not isinstance(algebraic, Residual):
-            raise TypeError(algebraic)
-
-        self.differential = differential
-        self.algebraic = algebraic
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}(differential={self.differential}, algebraic={self.algebraic})"
 
 
 def jet_lift(residual: Residual, lift_by: int) -> Residual:

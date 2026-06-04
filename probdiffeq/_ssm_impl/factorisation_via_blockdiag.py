@@ -257,9 +257,6 @@ class BlockDiagLinearizationFactory(interfaces.AbstractLinearizationFactory):
     def residual(self, *, residual, linearization: Callable | None):
         raise NotImplementedError
 
-    def dae(self, *, dae, linearization):
-        raise NotImplementedError
-
     def ode_taylor_0th(self, *, ode):
         return BlockDiagOdeTs0(ode=ode)
 

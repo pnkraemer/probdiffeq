@@ -7,17 +7,17 @@ from probdiffeq.backend.typing import Array, Protocol, Sequence, TypeVar
 
 __all__ = [
     "JetExpansionAlg",
-    "jetexpand_dae_nlstsq",
     "jetexpand_ode_doubling_unroll",
     "jetexpand_ode_padded_scan",
     "jetexpand_ode_unroll",
     "jetexpand_ode_via_jvp",
+    "jetexpand_residual",
 ]
 
 
 T = TypeVar("T")
 F = TypeVar(
-    "F", bound=problem_types.ODEFunction | problem_types.dae_system, contravariant=True
+    "F", bound=problem_types.ODEFunction | problem_types.Residual, contravariant=True
 )
 
 
@@ -367,10 +367,10 @@ def _allow_pytree_inits(expand):
     return expand_wrapped
 
 
-def jetexpand_dae_nlstsq(
+def jetexpand_residual(
     num: int,
     nlstsq: constraints.WeightedLeastSquaresNonlinearlyConstrained | None = None,
-) -> JetExpansionAlg[problem_types.dae_system]:
+) -> JetExpansionAlg[problem_types.Residual]:
     """Evaluate the Taylor series of a differential-algebraic equation system."""
     if nlstsq is None:
         nlstsq = constraints.wlstsq_nc_gauss_newton()
@@ -379,7 +379,7 @@ def jetexpand_dae_nlstsq(
     # TODO: enable pytree inputs/outputs
     # TODO: raise error if DAE has the wrong type
     def expand(
-        dae: problem_types.dae_system, inits: Sequence[T], /, *, t: float
+        residual: problem_types.Residual, inits: Sequence[T], /, *, t: float
     ) -> tuple[list[T], dict]:
         """Evaluate the Taylor series of a differential-algebraic equation system.
 
@@ -411,19 +411,11 @@ def jetexpand_dae_nlstsq(
 
         def residual_jet(tcoeffs_flat):
             tcoeffs_all = unravel(tcoeffs_flat)
-
-            jet_order1 = dae.differential.num_derivatives_in_args
-            diff_eval1 = dae.differential.residual_function(
-                jet_coords=tcoeffs_all[:jet_order1], t=t
-            )
-
-            jet_order2 = dae.algebraic.num_derivatives_in_args
-            diff_eval2 = dae.algebraic.residual_function(
-                jet_coords=tcoeffs_all[:jet_order2], t=t
-            )
+            coords = tcoeffs_all[: residual.num_derivatives_in_args]
+            output = residual.residual_function(jet_coords=coords, t=t)
 
             # Flatten the output so that the Jacobians are matrices, not Pytrees.
-            return tree.ravel_pytree([diff_eval1, diff_eval2])[0]
+            return tree.ravel_pytree(output)[0]
 
         x1, info = nlstsq(residual_jet, x0, rv.mean_flat, rv.cholesky_flat)
         return list(unravel(x1)), info

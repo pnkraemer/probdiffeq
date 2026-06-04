@@ -68,14 +68,14 @@ def solve_dae(inits, num):
 
         return np.stack([F1, F2])
 
-    dae = probdiffeq.dae_system(differential=differential, algebraic=algebraic)
+    residual = probdiffeq.residual_from_stack(differential, algebraic)
 
-    jetexpand = probdiffeq.jetexpand_dae_nlstsq(num=num)
-    tcoeffs, _ = jetexpand(dae, inits, t=0.0)
+    jetexpand = probdiffeq.jetexpand_residual(num=num)
+    tcoeffs, _ = jetexpand(residual, inits, t=0.0)
 
     ssm = probdiffeq.state_space_model(ssm_fact="dense")
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_dae(dae, ssm=ssm)
+    ts0 = probdiffeq.constraint_residual(residual, ssm=ssm)
     strategy = probdiffeq.strategy_filter(ssm=ssm)
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
     error = probdiffeq.error_state_std(constraint=ts0, prior=iwp, ssm=ssm)

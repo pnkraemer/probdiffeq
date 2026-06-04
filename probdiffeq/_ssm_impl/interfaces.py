@@ -111,17 +111,6 @@ class AbstractRoot(AbstractLinearization):
         return f"{self.__class__.__name__}(residual={self.residual})"
 
 
-class AbstractDAE(AbstractLinearization):
-    """Interface for linearizations of general residuals."""
-
-    def __init__(self, *, dae, linearization) -> None:
-        self.dae = dae
-        self.linearization = linearization
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(dae={self.dae}, linearization={self.linearization})"
-
-
 class AbstractOde(AbstractLinearization):
     """Interface for linearizations of ODEs."""
 
@@ -146,10 +135,6 @@ class AbstractLinearizationFactory(abc.ABC):
     @abc.abstractmethod
     def residual(self, residual, *, linearization: Callable | None) -> AbstractRoot:
         """Construct an implementation of 1st-order Taylor-linearization for residuals."""
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def dae(self, *, dae, linearization) -> AbstractDAE:
         raise NotImplementedError
 
     @abc.abstractmethod

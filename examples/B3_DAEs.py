@@ -46,10 +46,9 @@ def main(t0=1e-6, t1=1e5) -> None:
 
     ssm = probdiffeq.state_space_model()
 
-    nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=10, tol=1e-8)
-    jetexpand = probdiffeq.jetexpand_dae_nlstsq(num=4, nlstsq=nlstsq)
-    dae = probdiffeq.dae_system(differential, algebraic)
-    y0, _info = jetexpand(dae, [jnp.array([1.0, 0.0, 0.0])], t=t0)
+    jetexpand = probdiffeq.jetexpand_residual(num=4)
+    residual = probdiffeq.residual_from_stack(differential, algebraic)
+    y0, _info = jetexpand(residual, [jnp.array([1.0, 0.0, 0.0])], t=t0)
 
     # This base scale is critical to Robertson, because
     # the solutions live on vastly different scales
@@ -60,8 +59,8 @@ def main(t0=1e-6, t1=1e5) -> None:
     )
 
     # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
-    linearization = probdiffeq.linearization_map(nlstsq)
-    jet = probdiffeq.constraint_dae(dae, ssm=ssm, linearization=linearization)
+    linearization = probdiffeq.linearization_map()
+    jet = probdiffeq.constraint_residual(residual, ssm=ssm, linearization=linearization)
     strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
     solver = probdiffeq.solver_dynamic(
         strategy=strategy, prior=ioup, constraint=jet, ssm=ssm
