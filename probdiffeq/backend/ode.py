@@ -51,7 +51,8 @@ def ivp_three_body_1st():
     f, u0, (t0, t1), f_args = ivps.three_body_restricted_first_order()
 
     # Dictionary to ensure pytree compatibility
-    def vf(u, /, *, t):  # noqa: ARG001
+    def vf(u, /, *, t):
+        del t
         return {"u": f(u["u"], *f_args)}
 
     return vf, ({"u": u0},), (t0, t1)

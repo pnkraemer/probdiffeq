@@ -271,10 +271,20 @@ class DensePriorFactory(interfaces.AbstractPriorFactory):
             return linalg.diagonal_matrix(base_scale)
 
         # Otherwise, check the shape and turn the scale into a matrix
-        base_scale = np.asarray(base_scale)
-        if base_scale.shape != base_scale_expected.shape:
+        base_scale = tree.tree_map(np.asarray, base_scale)
+
+        def shape_equal(A, B):
+            return tree.tree_map(lambda a, b: np.shape(a) == np.shape(b), A, B)
+
+        if tree.tree_structure(base_scale) != tree.tree_structure(base_scale_expected):
+            msg = "The 'base_scale' argument has an unexpected PyTree structure."
+            msg += f" Expected: {tree.tree_structure(base_scale_expected)}."
+            msg += f" Received: {tree.tree_structure(base_scale)}."
+            raise TypeError(msg)
+
+        if not tree.tree_all(shape_equal(base_scale, base_scale_expected)):
             msg = "The base-scale has the wrong shape."
-            msg += f" Expected: {base_scale_expected.shape}."
+            msg += f" Expected: {tree.tree_map(np.shape, base_scale_expected)}."
             msg += f" Received: {base_scale.shape}."
             raise ValueError(msg)
 

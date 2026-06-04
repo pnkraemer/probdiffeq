@@ -1,9 +1,9 @@
 r"""Evaluate jet-recursions in differential equations."""
 
 from probdiffeq import probdiffeq
-from probdiffeq._probdiffeq import problem_types, utilities
+from probdiffeq._probdiffeq import constraints, problem_types, utilities
 from probdiffeq.backend import flow, func, np, tree
-from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeVar
+from probdiffeq.backend.typing import Array, Protocol, Sequence, TypeVar
 
 __all__ = [
     "JetExpansionAlg",
@@ -368,9 +368,12 @@ def _allow_pytree_inits(expand):
 
 
 def jetexpand_dae_nlstsq(
-    num: int, nlstsq: Callable
+    num: int,
+    nlstsq: constraints.WeightedLeastSquaresNonlinearlyConstrained | None = None,
 ) -> JetExpansionAlg[problem_types.dae_system]:
     """Evaluate the Taylor series of a differential-algebraic equation system."""
+    if nlstsq is None:
+        nlstsq = constraints.wlstsq_nc_gauss_newton()
 
     # TODO: don't try too hard to refactor this one here, I dont think it'll be around for long
     # TODO: enable pytree inputs/outputs

@@ -94,7 +94,7 @@ def fixture_expected(residual, derivatives):
     return coeffs
 
 
-def case_jet_dae_iterated(residual):
+def case_jet_lift_dae(residual):
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     linearization = probdiffeq.linearization_map(nlstsq)
 
@@ -113,7 +113,7 @@ def case_jet_dae_iterated(residual):
     return constraint_residual
 
 
-def case_jet_constraint_iterated(residual):
+def case_jet_lift_residual(residual):
     nlstsq = probdiffeq.wlstsq_nc_gauss_newton(maxiter=50, tol=1e-10)
     linearization = probdiffeq.linearization_map(nlstsq)
 
