@@ -250,3 +250,11 @@ def hypot(x1, x2, /):
 
 def cos(x, /):
     return jnp.cos(x)
+
+
+def mean(arr, /):
+    return jnp.mean(arr)
+
+
+def std(arr, /, *, ddof=0):
+    return jnp.std(arr, ddof=ddof)
