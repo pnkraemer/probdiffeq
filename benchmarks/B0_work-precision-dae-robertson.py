@@ -2,7 +2,6 @@
 
 import functools
 import statistics
-import timeit
 from collections.abc import Callable
 
 import jax
@@ -13,6 +12,7 @@ import scipy.integrate
 import tqdm
 
 from probdiffeq import ivpsolve, probdiffeq
+from probdiffeq.util.benchmark_utils import setup_timeit, setup_tolerances
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -122,20 +122,6 @@ def solve_ivp_once(*, save_at, method, tol):
         method=method,
     )
     return solution.t, solution.y.T
-
-
-def setup_tolerances(*, start: float, stop: float, step: float) -> jax.Array:
-    """Choose vector of tolerances from the command-line arguments."""
-    return 0.1 ** jnp.arange(start, stop, step=step)
-
-
-def setup_timeit(*, repeats: int) -> Callable:
-    """Construct a timeit-function from the command-line arguments."""
-
-    def timer(fun, /):
-        return list(timeit.repeat(fun, number=1, repeat=repeats))
-
-    return timer
 
 
 def solver_ode(*, num_derivatives: int, time_span) -> Callable:

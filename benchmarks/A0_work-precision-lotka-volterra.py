@@ -1,7 +1,5 @@
 """Walltime | Lotka-Volterra."""
 
-import statistics
-import timeit
 from collections.abc import Callable
 
 import diffrax
@@ -13,6 +11,12 @@ import scipy.integrate
 import tqdm
 
 from probdiffeq import ivpsolve, probdiffeq
+from probdiffeq.util.benchmark_utils import (
+    rmse_relative,
+    setup_timeit,
+    setup_tolerances,
+    workprec,
+)
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -93,20 +97,6 @@ def solve_ivp_once():
         vf_scipy, y0=u0, t_span=time_span, atol=1e-3 * tol, rtol=tol, method="LSODA"
     )
     return solution.t, solution.y.T
-
-
-def setup_tolerances(*, start: float, stop: float, step: float) -> jax.Array:
-    """Choose vector of tolerances from the command-line arguments."""
-    return 0.1 ** jnp.arange(start, stop, step=step)
-
-
-def setup_timeit(*, repeats: int) -> Callable:
-    """Construct a timeit-function from the command-line arguments."""
-
-    def timer(fun, /):
-        return list(timeit.repeat(fun, number=1, repeat=repeats))
-
-    return timer
 
 
 def solver_probdiffeq(num_derivatives: int, implementation, constraint) -> Callable:
@@ -210,42 +200,6 @@ def solver_scipy(*, method: str) -> Callable:
         return jnp.asarray(solution.y[:, -1])
 
     return param_to_solution
-
-
-def rmse_relative(expected: jax.Array, *, nugget=1e-5) -> Callable:
-    """Compute the relative RMSE."""
-    expected = jnp.asarray(expected)
-
-    def rmse(received):
-        received = jnp.asarray(received)
-        error_absolute = jnp.abs(expected - received)
-        error_relative = error_absolute / jnp.abs(nugget + expected)
-        return jnp.linalg.norm(error_relative) / jnp.sqrt(error_relative.size)
-
-    return rmse
-
-
-def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
-    """Turn a parameter-to-solution function into parameter-to-workprecision."""
-
-    def parameter_list_to_workprecision(list_of_args, /):
-        works_mean = []
-        works_std = []
-        precisions = []
-        for arg in list_of_args:
-            precision = precision_fun(fun(arg).block_until_ready())
-            times = timeit_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
-
-            precisions.append(precision)
-            works_mean.append(statistics.mean(times))
-            works_std.append(statistics.stdev(times))
-        return {
-            "work_mean": jnp.asarray(works_mean),
-            "work_std": jnp.asarray(works_std),
-            "precision": jnp.asarray(precisions),
-        }
-
-    return parameter_list_to_workprecision
 
 
 main()

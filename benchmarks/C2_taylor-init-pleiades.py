@@ -1,9 +1,6 @@
 """Taylor recursions | Pleiades."""
 
 import functools
-import statistics
-import time
-import timeit
 from collections.abc import Callable
 
 import jax
@@ -11,6 +8,11 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 from probdiffeq import probdiffeq
+from probdiffeq.util.benchmark_utils import (
+    _adaptive_repeat,
+    adaptive_benchmark,
+    setup_timeit,
+)
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -28,7 +30,7 @@ def main(max_time=0.5, repeats=2) -> None:
     }
 
     # Compute a reference solution
-    timeit_fun = timeit_fun_from_args(repeats=repeats)
+    timeit_fun = setup_timeit(repeats=repeats)
 
     # Compute all work-precision diagrams
     results = {}
@@ -70,23 +72,6 @@ def main(max_time=0.5, repeats=2) -> None:
 
     plt.tight_layout()
     plt.show()
-
-
-def _adaptive_repeat(xs, ys):
-    """Repeat the doubling values correctly to create a comprehensible plot."""
-    zs = []
-    for x, y in zip(xs, ys):
-        zs.extend([x] * int(y))
-    return jnp.asarray(zs)
-
-
-def timeit_fun_from_args(*, repeats: int) -> Callable:
-    """Construct a timeit-function from the command-line arguments."""
-
-    def timer(fun, /):
-        return list(timeit.repeat(fun, number=1, repeat=repeats))
-
-    return timer
 
 
 def taylor_mode_scan() -> Callable:
@@ -160,38 +145,6 @@ def _pleiades():
         return jnp.concatenate((ddx, ddy))
 
     return vf_probdiffeq, (u0, du0)
-
-
-def adaptive_benchmark(fun, *, timeit_fun: Callable, max_time) -> dict:
-    """Benchmark a function iteratively until a max-time threshold is exceeded."""
-    work_compile = []
-    work_mean = []
-    work_std = []
-    arguments = []
-
-    t0 = time.perf_counter()
-    arg = 1
-    while (elapsed := time.perf_counter() - t0) < max_time:
-        print(f"num = {arg} | elapsed = {elapsed:.2f} | max_time = {max_time}")
-        t0 = time.perf_counter()
-        tcoeffs = fun(arg).block_until_ready()
-        t1 = time.perf_counter()
-        time_compile = t1 - t0
-
-        time_execute = timeit_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
-
-        arguments.append(len(tcoeffs))
-        work_compile.append(time_compile)
-        work_mean.append(statistics.mean(time_execute))
-        work_std.append(statistics.stdev(time_execute))
-        arg += 1
-    print(f"num = {arg} | elapsed = {elapsed:.2f} | max_time = {max_time}")
-    return {
-        "work_mean": jnp.asarray(work_mean),
-        "work_std": jnp.asarray(work_std),
-        "work_compile": jnp.asarray(work_compile),
-        "arguments": jnp.asarray(arguments),
-    }
 
 
 main()
