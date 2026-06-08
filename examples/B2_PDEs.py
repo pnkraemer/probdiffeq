@@ -72,8 +72,8 @@ def simulator(save_at, error, solver):
 
     @jax.jit
     def solve(init):
-        solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
-        solution = solve(init, save_at=save_at, atol=1e-4, rtol=1e-2)
+        solve_fn = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
+        solution = solve_fn(init, save_at=save_at, atol=1e-4, rtol=1e-2)
         return (solution.u.mean[0], solution.u.std[0])
 
     return solve
