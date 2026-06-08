@@ -19,7 +19,7 @@ def main():
         del t
         return 2 * y
 
-    t0, t1 = 0.0, 1.0
+    t0, t1 = 0.0, 3.0
     u0 = jnp.asarray(1.0)
 
     tcoeffs = (u0, vf(u0, t=t0))
@@ -31,8 +31,6 @@ def main():
         strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm
     )
     mle = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm)
-
-    t0, t1 = 0.0, 3.0
     num_pts = 200
 
     ts = jnp.linspace(t0, t1, num=num_pts, endpoint=True)

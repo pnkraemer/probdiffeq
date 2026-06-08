@@ -29,10 +29,12 @@ def main():
 
     # "Bad" prior (no Taylor coefficients)
     ssm = probdiffeq.state_space_model()
-    init, iwp = probdiffeq.prior_wiener_integrated(
+    init_diffuse, iwp_diffuse = probdiffeq.prior_wiener_integrated(
         [u0], diffuse_derivatives=2, ssm=ssm, output_scale=10.0
     )
-    mseq_prior = probdiffeq.MarkovSequence.from_grid(init, iwp, grid=ts, reverse=False)
+    mseq_prior = probdiffeq.MarkovSequence.from_grid(
+        init_diffuse, iwp_diffuse, grid=ts, reverse=False
+    )
 
     # "Good" prior (Taylor coefficients)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
@@ -80,7 +82,7 @@ def main():
         constrained_layout=True,
         figsize=(8, 5),
     )
-    axes_state[0].set_title("IOUP w/ Initial condition", fontsize="medium")
+    axes_state[0].set_title("IWP w/ diffuse initialisation", fontsize="medium")
     axes_state[1].set_title("IOUP w/ Taylor coefficients", fontsize="medium")
     axes_state[2].set_title("Posterior", fontsize="medium")
 
