@@ -10,12 +10,7 @@ import scipy.integrate
 import tqdm
 
 from probdiffeq import ivpsolve, probdiffeq
-from probdiffeq.util.benchmark_util import (
-    rmse_relative,
-    setup_timeit,
-    setup_tolerances,
-    workprec,
-)
+from probdiffeq.util import benchmark_util
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -38,8 +33,8 @@ def main(start=1.0, stop=10.0, step=1.0, repeats=3) -> None:
     plt.show()
 
     # Read configuration from command line
-    tolerances = setup_tolerances(start=start, stop=stop, step=step)
-    timeit_fun = setup_timeit(repeats=repeats)
+    tolerances = benchmark_util.setup_tolerances(start=start, stop=stop, step=step)
+    timeit_fun = benchmark_util.setup_timeit(repeats=repeats)
 
     # Assemble algorithms
     algorithms = {
@@ -52,14 +47,16 @@ def main(start=1.0, stop=10.0, step=1.0, repeats=3) -> None:
 
     # Compute a reference solution
     reference = solver_scipy(method="BDF")(1e-13)
-    precision_fun = rmse_relative(reference)
+    precision_fun = benchmark_util.rmse_relative(reference)
 
     # Compute all work-precision diagrams
     results = {}
     pbar = tqdm.tqdm(algorithms.items())
     for label, algo in pbar:
         pbar.set_description(label)
-        param_to_wp = workprec(algo, precision_fun=precision_fun, timeit_fun=timeit_fun)
+        param_to_wp = benchmark_util.workprec(
+            algo, precision_fun=precision_fun, timeit_fun=timeit_fun
+        )
         results[label] = param_to_wp(tolerances)
 
     _fig, ax = plt.subplots(figsize=(5, 3))

@@ -12,7 +12,7 @@ import scipy.integrate
 import tqdm
 
 from probdiffeq import ivpsolve, probdiffeq
-from probdiffeq.util.benchmark_util import setup_timeit, setup_tolerances
+from probdiffeq.util import benchmark_util
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -43,8 +43,8 @@ def main(start=3.0, stop=10.0, step=0.5, repeats=2, time_span=(1e-6, 1e5)) -> No
     plt.show()
 
     # Read configuration from command line
-    tolerances = setup_tolerances(start=start, stop=stop, step=step)
-    timeit_fun = setup_timeit(repeats=repeats)
+    tolerances = benchmark_util.setup_tolerances(start=start, stop=stop, step=step)
+    timeit_fun = benchmark_util.setup_timeit(repeats=repeats)
 
     # Assemble algorithms
     algorithms = {

@@ -110,7 +110,7 @@ def adaptive_benchmark(
     }
 
 
-def _adaptive_repeat(xs, ys):
+def adaptive_repeat(xs, ys):
     """Repeat doubling values to create a comprehensible plot."""
     zs = []
     for x, y in zip(xs, ys):

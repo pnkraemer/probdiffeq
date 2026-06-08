@@ -8,11 +8,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 from probdiffeq import probdiffeq
-from probdiffeq.util.benchmark_util import (
-    _adaptive_repeat,
-    adaptive_benchmark,
-    setup_timeit,
-)
+from probdiffeq.util import benchmark_util
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -30,14 +26,14 @@ def main(max_time=0.5, repeats=2) -> None:
     }
 
     # Compute a reference solution
-    timeit_fun = setup_timeit(repeats=repeats)
+    timeit_fun = benchmark_util.setup_timeit(repeats=repeats)
 
     # Compute all work-precision diagrams
     results = {}
     for label, algo in algorithms.items():
         print("\n")
         print(label)
-        results[label] = adaptive_benchmark(
+        results[label] = benchmark_util.adaptive_benchmark(
             algo, timeit_fun=timeit_fun, max_time=max_time
         )
 
@@ -53,9 +49,9 @@ def main(max_time=0.5, repeats=2) -> None:
         if "doubling" in label:
             num_repeats = jnp.diff(jnp.concatenate((jnp.ones((1,)), inputs)))
             inputs = jnp.arange(1, jnp.amax(inputs) * 1)
-            work_compile = _adaptive_repeat(work_compile, num_repeats)
-            work_mean = _adaptive_repeat(work_mean, num_repeats)
-            work_std = _adaptive_repeat(work_std, num_repeats)
+            work_compile = benchmark_util.adaptive_repeat(work_compile, num_repeats)
+            work_mean = benchmark_util.adaptive_repeat(work_mean, num_repeats)
+            work_std = benchmark_util.adaptive_repeat(work_std, num_repeats)
 
         axis_compile.semilogy(inputs, work_compile, label=label)
         axis_perform.semilogy(inputs, work_mean, label=label)
