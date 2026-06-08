@@ -11,7 +11,7 @@ import scipy.integrate
 import tqdm
 
 from probdiffeq import ivpsolve, probdiffeq
-from probdiffeq.util.benchmark_utils import (
+from probdiffeq.util.benchmark_util import (
     rmse_relative,
     setup_timeit,
     setup_tolerances,

@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 from probdiffeq import probdiffeq
-from probdiffeq.util.benchmark_utils import (
+from probdiffeq.util.benchmark_util import (
     _adaptive_repeat,
     adaptive_benchmark,
     setup_timeit,

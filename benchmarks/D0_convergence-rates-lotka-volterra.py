@@ -12,11 +12,7 @@ import scipy.integrate
 import tqdm
 
 from probdiffeq import ivpsolve, probdiffeq
-from probdiffeq.util.benchmark_utils import (
-    rmse_relative,
-    setup_timeit,
-    setup_tolerances,
-)
+from probdiffeq.util.benchmark_util import rmse_relative, setup_timeit, setup_tolerances
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
