@@ -188,13 +188,6 @@ class taylor_point_maximum_a_posteriori(TaylorPoint):
         mean, _info = self.nlstsq(
             constraint_flat, mean, rv.mean_flat, rv.cholesky_flat, **constraint_kwargs
         )
-        import jax
-
-        jax.debug.print(
-            "{} {}",
-            _info["iters"],
-            jax.numpy.amax(jax.numpy.abs(_info["final_residual"])),
-        )
         return mean
 
 
