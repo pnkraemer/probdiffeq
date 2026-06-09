@@ -7,7 +7,7 @@ __all__ = [
     "AbstractLinearizationFactory",
     "AbstractOde",
     "AbstractPriorFactory",
-    "AbstractRoot",
+    "AbstractResidual",
     "AbstractTreeFlatten",
     "AbstractTreeNormal",
 ]
@@ -144,7 +144,7 @@ class AbstractLinearization(abc.ABC):
         raise NotImplementedError
 
 
-class AbstractRoot(AbstractLinearization):
+class AbstractResidual(AbstractLinearization):
     """Interface for linearizations of general residuals."""
 
     def __init__(self, residual, /) -> None:
@@ -181,7 +181,7 @@ class AbstractLinearizationFactory(abc.ABC):
         return f"{self.__class__.__name__}()"
 
     @abc.abstractmethod
-    def residual(self, residual, *, taylor_point) -> AbstractRoot:
+    def residual(self, residual, *, taylor_point) -> AbstractResidual:
         """Construct an implementation of 1st-order Taylor-linearization for residuals."""
         raise NotImplementedError
 

@@ -152,7 +152,6 @@ class lstsq_constrained_gauss_newton(LstSqConstrained):
 
         def body_fun(state: State) -> State:
             Jx = func.jacfwd(lambda s: constraint(s, **constraint_kwargs))(state.x)
-
             H = Jx @ cholesky
             r = state.fx + Jx @ (mean - state.x)
             dy = self.lstsq(H, r)
@@ -188,6 +187,13 @@ class taylor_point_maximum_a_posteriori(TaylorPoint):
         mean = rv.mean_flat
         mean, _info = self.nlstsq(
             constraint_flat, mean, rv.mean_flat, rv.cholesky_flat, **constraint_kwargs
+        )
+        import jax
+
+        jax.debug.print(
+            "{} {}",
+            _info["iters"],
+            jax.numpy.amax(jax.numpy.abs(_info["final_residual"])),
         )
         return mean
 
