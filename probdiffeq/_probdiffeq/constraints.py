@@ -164,7 +164,7 @@ class lstsq_constrained_gauss_newton(LstSqConstrained):
 
         init = State(x0, constraint(x0, **constraint_kwargs), dx=np.ones_like(x0), i=0)
         final = self.while_loop(cond_fun, body_fun, init=init)
-        return final.x, {"iters": final.i}
+        return final.x, {"iters": final.i, "final_residual": final.fx}
 
 
 class taylor_point_prior(TaylorPoint):
@@ -179,14 +179,14 @@ class taylor_point_prior(TaylorPoint):
 class taylor_point_maximum_a_posteriori(TaylorPoint):
     """TaylorPoint point is the maximum-a-posteriori estimate."""
 
-    def __init__(self, wlstsq_nc: LstSqConstrained | None = None) -> None:
-        if wlstsq_nc is None:
-            wlstsq_nc = lstsq_constrained_gauss_newton()
-        self.wlstsq_nc = wlstsq_nc
+    def __init__(self, nlstsq: LstSqConstrained | None = None) -> None:
+        if nlstsq is None:
+            nlstsq = lstsq_constrained_gauss_newton()
+        self.nlstsq = nlstsq
 
     def __call__(self, constraint_flat: Callable, rv, **constraint_kwargs) -> Array:
         mean = rv.mean_flat
-        mean, _info = self.wlstsq_nc(
+        mean, _info = self.nlstsq(
             constraint_flat, mean, rv.mean_flat, rv.cholesky_flat, **constraint_kwargs
         )
         return mean
