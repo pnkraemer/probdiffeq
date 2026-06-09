@@ -16,12 +16,12 @@ def test_output_matches_reference(fact) -> None:
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
 
-    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint()
     constraint = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
     solver = probdiffeq.solver_dynamic(
-        strategy=strategy, prior=iwp, constraint=constraint, ssm=ssm
+        strategy=strategy, prior=iwp, constraint=constraint
     )
-    error = probdiffeq.error_residual_std(constraint=constraint, prior=iwp, ssm=ssm)
+    error = probdiffeq.error_residual_std(constraint=constraint, prior=iwp)
 
     # Compute the PN solution
     dt0 = ivpsolve.dt0_adaptive(

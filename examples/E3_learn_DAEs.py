@@ -171,14 +171,14 @@ def solver(residual, tol, while_loop, trafo):
         jet = probdiffeq.constraint_residual(
             residual, ssm=ssm, taylor_point=taylor_point
         )
-        strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
+        strategy = probdiffeq.strategy_smoother_fixedpoint()
         solver_obj = probdiffeq.solver_dynamic(
-            strategy=strategy, prior=prior, constraint=jet, ssm=ssm
+            strategy=strategy, prior=prior, constraint=jet
         )
 
         # The state-error-estimate doesn't care about the dimension
         # of the DAE, which is exactly what we need here
-        error = probdiffeq.error_state_std(constraint=jet, prior=prior, ssm=ssm)
+        error = probdiffeq.error_state_std(constraint=jet, prior=prior)
 
         solve_fn = ivpsolve.solve_adaptive_save_at(
             solver=solver_obj, error=error, while_loop=while_loop

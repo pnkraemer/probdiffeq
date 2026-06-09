@@ -14,17 +14,13 @@ class FactSsmImpl:
     prior: interfaces.AbstractPriorFactory
     """An implementation of constructing prior distributions."""
 
-    conditional: interfaces.AbstractConditional
-    """An implementation of manipulating conditionals."""
-
     @classmethod
     def from_dense(cls, /):
         from probdiffeq._ssm_impl import factorisation_via_dense as dense
 
         prior = dense.DensePriorFactory()
         linearize = dense.DenseLinearizationFactory()
-        conditional = dense.DenseConditional()
-        return cls(linearize=linearize, conditional=conditional, prior=prior)
+        return cls(linearize=linearize, prior=prior)
 
     @classmethod
     def from_isotropic(cls, /):
@@ -32,8 +28,7 @@ class FactSsmImpl:
 
         prior = isotropic.IsotropicPriorFactory()
         linearize = isotropic.IsotropicLinearizationFactory()
-        conditional = isotropic.IsotropicConditional()
-        return cls(linearize=linearize, conditional=conditional, prior=prior)
+        return cls(linearize=linearize, prior=prior)
 
     @classmethod
     def from_blockdiag(cls, /):
@@ -41,5 +36,4 @@ class FactSsmImpl:
 
         prior = blockdiag.BlockDiagPriorFactory()
         linearize = blockdiag.BlockDiagLinearizationFactory()
-        conditional = blockdiag.BlockDiagConditional()
-        return cls(linearize=linearize, conditional=conditional, prior=prior)
+        return cls(linearize=linearize, prior=prior)

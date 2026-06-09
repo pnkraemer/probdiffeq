@@ -153,15 +153,13 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
         init, iwp = probdiffeq.prior_wiener_integrated(
-            tcoeffs, ssm=ssm, output_scale=base_scale
+            tcoeffs, output_scale=base_scale, ssm=ssm
         )
         ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
-        strategy = probdiffeq.strategy_filter(ssm=ssm)
+        strategy = probdiffeq.strategy_filter()
 
-        solver = probdiffeq.solver_dynamic(
-            strategy=strategy, prior=iwp, constraint=ts, ssm=ssm
-        )
-        error = probdiffeq.error_state_std(constraint=ts, prior=iwp, ssm=ssm)
+        solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts)
+        error = probdiffeq.error_state_std(constraint=ts, prior=iwp)
 
         solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
         solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
@@ -208,24 +206,22 @@ def solver_residual(*, num_derivatives: int, time_span) -> Callable:
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
         init, iwp = probdiffeq.prior_wiener_integrated(
-            tcoeffs, ssm=ssm, output_scale=base_scale
+            tcoeffs, output_scale=base_scale, ssm=ssm
         )
 
         # We build a Jet constraint
         taylor_point = probdiffeq.taylor_point_maximum_a_posteriori(nlstsq)
         jet = probdiffeq.constraint_residual(
-            residual, ssm=ssm, taylor_point=taylor_point
+            residual, taylor_point=taylor_point, ssm=ssm
         )
-        strategy = probdiffeq.strategy_filter(ssm=ssm)
+        strategy = probdiffeq.strategy_filter()
 
         # For proper DAEs, non-iterated solver's simply don't cut it
-        solver = probdiffeq.solver_dynamic(
-            strategy=strategy, prior=iwp, constraint=jet, ssm=ssm
-        )
+        solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=jet)
 
         # The state-error-estimate doesn't care about the dimension
         # of the DAE, which is exactly what we need here
-        error = probdiffeq.error_state_std(constraint=jet, prior=iwp, ssm=ssm)
+        error = probdiffeq.error_state_std(constraint=jet, prior=iwp)
 
         # TODO: build PID controllers (is this "gustafsson"?) for iterated solvers?
         solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)

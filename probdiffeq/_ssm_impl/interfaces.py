@@ -2,7 +2,6 @@ from probdiffeq.backend import abc, func, np, tree
 from probdiffeq.backend.typing import Array, Generic, Sequence, TypeVar
 
 __all__ = [
-    "AbstractConditional",
     "AbstractLinearization",
     "AbstractLinearizationFactory",
     "AbstractOde",
@@ -29,7 +28,10 @@ For example, this variable is used to type Taylor coefficients.
 
 
 class LatentCond:
-    """Conditional distributions in latent space."""
+    """Conditional distributions in latent space.
+
+    Subclasses implement the SSM-specific operations (marginalise, revert, etc.).
+    """
 
     def __init__(self, A, noise, to_latent, to_observed) -> None:
         self.A = A
@@ -42,19 +44,19 @@ class LatentCond:
         msg += f", to_latent={self.to_latent}, to_observed={self.to_observed})"
         return msg
 
-    @staticmethod
-    def register_pytree_node() -> None:
-        """Register the conditional as a pytree."""
+    @classmethod
+    def _register_as_pytree(cls) -> None:
+        """Register this class (or a subclass) as a JAX pytree."""
 
-        def flatten(normal):
-            children = normal.A, normal.noise, normal.to_latent, normal.to_observed
+        def flatten(cond):
+            children = cond.A, cond.noise, cond.to_latent, cond.to_observed
             return children, ()
 
         def unflatten(_aux, children):
             A, noise, to_latent, to_observed = children
-            return LatentCond(A, noise, to_latent, to_observed)
+            return cls(A, noise, to_latent, to_observed)
 
-        tree.register_pytree_node(LatentCond, flatten, unflatten)
+        tree.register_pytree_node(cls, flatten, unflatten)
 
     @classmethod
     def from_linop_and_noise(cls, A, noise):
@@ -71,15 +73,61 @@ class LatentCond:
     def rescale_noise(self, factor, /):
         """Rescale the noise in a conditional."""
         noise = self.noise.rescale_cholesky(factor)
-        return LatentCond(
+        return self.__class__(
             A=self.A,
             noise=noise,
             to_latent=self.to_latent,
             to_observed=self.to_observed,
         )
 
+    # --- SSM-specific operations (implemented by subclasses) ---
 
-LatentCond.register_pytree_node()
+    def marginalise(self, rv, /):
+        """Compute the marginal distribution p(y) given rv ~ p(x) and self = p(y|x)."""
+        raise NotImplementedError
+
+    def revert(self, rv, /, *, solve_triu):
+        """Revert the parametrisation: return (observed, backward_conditional)."""
+        raise NotImplementedError
+
+    def apply_flat(self, x, /):
+        """Apply this conditional to a flat mean vector x; return a Normal."""
+        raise NotImplementedError
+
+    def merge(self, other, /):
+        """Merge this conditional with another: compose p(z|y) with p(y|x)."""
+        raise NotImplementedError
+
+    def preconditioner_apply(self, /):
+        """Apply the preconditioner encoded in to_latent / to_observed."""
+        raise NotImplementedError
+
+    # --- Concrete composites built from the abstract ops above ---
+
+    def bayes_rule_tree(self, data, rv, /, *, solve_triu):
+        """Apply Bayes' rule and return the posterior (tree-structured data)."""
+        _, reverted = self.revert(rv, solve_triu=solve_triu)
+        data_flat = self.noise.tree_flatten.flatten_tree(data)
+        return reverted.apply_flat(data_flat)
+
+    def bayes_rule_and_logpdf_tree(self, data, rv, /, *, solve_triu):
+        """Apply Bayes' rule; also return the log-pdf (tree-structured data)."""
+        observed, reverted = self.revert(rv, solve_triu=solve_triu)
+        logpdf = observed.logpdf_tree(data)
+        data_flat = observed.tree_flatten.flatten_tree(data)
+        updated = reverted.apply_flat(data_flat)
+        return logpdf, updated
+
+    def bayes_rule_and_residual_white_rms_tree(self, data, rv, /, *, solve_triu):
+        """Apply Bayes' rule; also return the whitened residual RMS."""
+        observed, reverted = self.revert(rv, solve_triu=solve_triu)
+        mahalanobis = observed.residual_white_rms_tree(data)
+        data_flat = observed.tree_flatten.flatten_tree(data)
+        updated = reverted.apply_flat(data_flat)
+        return mahalanobis, updated
+
+
+LatentCond._register_as_pytree()
 
 
 class AbstractLinearization(abc.ABC):
@@ -236,58 +284,14 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
         """Construct a normal distribution from a Dirac distribution."""
         raise NotImplementedError
 
-
-class AbstractConditional(abc.ABC):
-    """Interface for implementations of manipulating conditionals."""
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}()"
-
-    def bayes_rule_tree(self, data, rv, conditional, /, *, solve_triu):
-        _, reverted = self.revert(rv, conditional, solve_triu=solve_triu)
-        data_flat = conditional.noise.tree_flatten.flatten_tree(data)
-        return self.apply_flat(data_flat, reverted)
-
-    def bayes_rule_and_logpdf_tree(self, data, rv, conditional, /, *, solve_triu):
-        observed, reverted = self.revert(rv, conditional, solve_triu=solve_triu)
-        logpdf = observed.logpdf_tree(data)
-        data_flat = observed.tree_flatten.flatten_tree(data)
-        updated = self.apply_flat(data_flat, reverted)
-        return logpdf, updated
-
-    def bayes_rule_and_residual_white_rms_tree(
-        self, data, rv, conditional, /, *, solve_triu
-    ):
-        observed, reverted = self.revert(rv, conditional, solve_triu=solve_triu)
-        mahalanobis = observed.residual_white_rms_tree(data)
-
-        data_flat = observed.tree_flatten.flatten_tree(data)
-        updated = self.apply_flat(data_flat, reverted)
-        return mahalanobis, updated
-
     @abc.abstractmethod
-    def marginalise(self, rv, conditional, /):
-        """Compute a marginal of a random variable and conditional."""
+    def identity_conditional(self) -> LatentCond:
+        """Return the identity transition compatible with this distribution."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def revert(self, rv, conditional, /):
-        """Revert a parametrisation of a joint distribution."""
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def apply_flat(self, x, conditional, /):
-        """Apply a conditional to a target."""
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def merge(self, cond1, cond2, /):
-        """Merge two conditionals."""
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def preconditioner_apply(self, cond: LatentCond, /) -> LatentCond:
-        """Apply a preconditioner to a conditional."""
+    def prototype_output_scale_calibrated(self):
+        """Return a prototype (zero-valued) array for the calibrated output scale."""
         raise NotImplementedError
 
 
@@ -296,11 +300,6 @@ class AbstractPriorFactory(abc.ABC):
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
-
-    @abc.abstractmethod
-    def identity(self, /):
-        """Construct an identity conditional (unit linop, zero noise)."""
-        raise NotImplementedError
 
     @abc.abstractmethod
     def wiener_integrated(
@@ -363,15 +362,4 @@ class AbstractPriorFactory(abc.ABC):
     @abc.abstractmethod
     def to_derivative(self, i, std) -> LatentCond:
         """Construct an observation model for the i'th derivative."""
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def prototype_output_scale_calibrated(self):
-        """Prototype the calibrated output scale.
-
-        Note how this may differ from the base-output scale.
-        For example, base output scales for dense factorisations
-        are vector-valued even though the calibrations are scalar.
-        See the Robertson DAE examples for why this is helpful.
-        """
         raise NotImplementedError

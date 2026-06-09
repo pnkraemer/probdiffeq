@@ -16,9 +16,9 @@ def test_warning_for_fixedpoint_in_save_every_step_mode(fact) -> None:
     _init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
 
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint()
+    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
 
     with testing.warns():
         _ = test_util.solve_adaptive_save_every_step(error=error, solver=solver)
@@ -34,8 +34,8 @@ def test_warning_for_smoother_in_save_at_mode(fact) -> None:
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
     _init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedinterval()
+    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
     with testing.warns():
         _ = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)

@@ -34,9 +34,9 @@ def main():
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_filter(ssm=ssm)
-    solver = probdiffeq.solver_mle(ssm=ssm, strategy=strategy, prior=iwp, constraint=ts)
-    error = probdiffeq.error_residual_std(constraint=ts, prior=iwp, ssm=ssm)
+    strategy = probdiffeq.strategy_filter()
+    solver = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts)
+    error = probdiffeq.error_residual_std(constraint=ts, prior=iwp)
 
     # Solve the ODE. Try different solution routines.
 

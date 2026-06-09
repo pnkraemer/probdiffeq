@@ -131,11 +131,9 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
         ts1 = probdiffeq.constraint_ode_ts1(vf_probdiffeq, ssm=ssm)
 
-        strategy = probdiffeq.strategy_filter(ssm=ssm)
-        solver = probdiffeq.solver_dynamic(
-            strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm
-        )
-        error = probdiffeq.error_residual_std(constraint=ts1, prior=iwp, ssm=ssm)
+        strategy = probdiffeq.strategy_filter()
+        solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts1)
+        error = probdiffeq.error_residual_std(constraint=ts1, prior=iwp)
 
         solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
 

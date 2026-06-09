@@ -45,7 +45,7 @@ def main():
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=3)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedinterval()
     _init, ioup = probdiffeq.prior_ornstein_uhlenbeck_integrated(
         lambda s: A @ s, tcoeffs, ssm=ssm
     )
@@ -65,7 +65,7 @@ def main():
     ):
         # Set up the solver and solve the ODE
         solver = probdiffeq.solver_mle(
-            strategy=strategy, prior=prior, constraint=constraint, ssm=ssm
+            strategy=strategy, prior=prior, constraint=constraint
         )
         solve = ivpsolve.solve_fixed_grid(solver=solver)
         grid = jnp.linspace(t0, t1, num=num, endpoint=True)

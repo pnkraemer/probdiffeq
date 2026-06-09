@@ -47,9 +47,9 @@ def main():
 
     # Posterior
     ts1 = probdiffeq.constraint_ode_ts1(vector_field, ssm=ssm)
-    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm)
-    error = probdiffeq.error_residual_std(constraint=ts1, prior=iwp, ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint()
+    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts1)
+    error = probdiffeq.error_residual_std(constraint=ts1, prior=iwp)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
     sol = solve(init, save_at=ts, atol=1e-1, rtol=1e-1)
     mseq_posterior = sol.solution_full

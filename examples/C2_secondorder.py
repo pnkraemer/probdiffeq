@@ -32,12 +32,10 @@ def main():
     tcoeffs, _ = jetexpand(vf_1, (u0,), t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=1.0)
-    strategy = probdiffeq.strategy_filter(ssm=ssm)
+    strategy = probdiffeq.strategy_filter()
     ts0 = probdiffeq.constraint_ode_ts0(vf_1, ssm=ssm)
-    solver_1st = probdiffeq.solver_mle(
-        strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm
-    )
-    error_1st = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
+    solver_1st = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts0)
+    error_1st = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, error=error_1st)
 
     # Plot the result
@@ -62,11 +60,9 @@ def main():
     ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=1.0)
     ts0 = probdiffeq.constraint_ode_ts0(vf_2, ssm=ssm)
-    strategy = probdiffeq.strategy_filter(ssm=ssm)
-    solver_2nd = probdiffeq.solver_mle(
-        strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm
-    )
-    error_2nd = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
+    strategy = probdiffeq.strategy_filter()
+    solver_2nd = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts0)
+    error_2nd = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, error=error_2nd)
 
     # Plot the result

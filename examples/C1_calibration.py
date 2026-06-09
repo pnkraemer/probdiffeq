@@ -26,11 +26,9 @@ def main():
     ssm = probdiffeq.state_space_model(ssm_fact="dense")
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=1.0)
     ts1 = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_filter(ssm=ssm)
-    dynamic = probdiffeq.solver_dynamic(
-        strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm
-    )
-    mle = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm)
+    strategy = probdiffeq.strategy_filter()
+    dynamic = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts1)
+    mle = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts1)
     num_pts = 200
 
     ts = jnp.linspace(t0, t1, num=num_pts, endpoint=True)

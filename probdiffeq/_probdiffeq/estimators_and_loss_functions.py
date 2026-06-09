@@ -40,7 +40,7 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
             raise ValueError(msg)
 
         model = ssm.prior.to_derivative(tcoeff_index, std, template=marginals)
-        marg = ssm.conditional.marginalise(marginals, model)
+        marg = model.marginalise(marginals)
 
         # Wrap into list because blockdiag & isotropic models
         # expect sequences of states (even if the length is one)
@@ -98,7 +98,7 @@ def loss_lml_timeseries(
         # of the ODE solution tends to be noise-free,
         # which clashes and returns NaNs if we use exact solvers.
         return posterior.evaluate_lml(
-            [u], model=model, ssm=ssm, average_pdfs=average_pdfs, solve_triu=solve_triu
+            [u], model=model, average_pdfs=average_pdfs, solve_triu=solve_triu
         )
 
     return loss
@@ -146,7 +146,7 @@ class MarkovSequence(Generic[N]):
         cond = self.conditional.rescale_noise(factor)
         return MarkovSequence(marg, cond, reverse=self.reverse)
 
-    def evaluate_marginals(self, *, ssm):
+    def evaluate_marginals(self):
         """Extract the (time-)marginals from a Markov sequence.
 
         This is only needed in combination with smoothing-based strategies.
@@ -154,10 +154,10 @@ class MarkovSequence(Generic[N]):
         if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
             # TODO: do this in the postprocessing of the solver...
             markov_seq = self.remove_filtering_distributions()
-            return markov_seq.evaluate_marginals(ssm=ssm)
+            return markov_seq.evaluate_marginals()
 
         def step(x, cond):
-            extrapolated = ssm.conditional.marginalise(x, cond)
+            extrapolated = cond.marginalise(x)
             return extrapolated, extrapolated
 
         _, marginals = flow.scan(
@@ -170,22 +170,14 @@ class MarkovSequence(Generic[N]):
 
         return tree.tree_array_prepend(self.marginal, marginals)
 
-    def evaluate_lml(
-        self,
-        u,
-        *,
-        model,
-        ssm: ssm_impl.FactSsmImpl,
-        average_pdfs: bool,
-        solve_triu: Callable,
-    ):
+    def evaluate_lml(self, u, *, model, average_pdfs: bool, solve_triu: Callable):
         assert self.reverse
 
         # Process the terminal value
         u0 = tree.tree_map(lambda s: s[-1], u)
         model0 = tree.tree_map(lambda s: s[-1], model)
-        pdf0, updated = ssm.conditional.bayes_rule_and_logpdf_tree(
-            u0, self.marginal, model0, solve_triu=solve_triu
+        pdf0, updated = model0.bayes_rule_and_logpdf_tree(
+            u0, self.marginal, solve_triu=solve_triu
         )
 
         # Process the remaining values
@@ -193,10 +185,10 @@ class MarkovSequence(Generic[N]):
             rv, logpdf, num_data = rv_and_logpdf
             prior, observation, data = prior_and_observation_and_data
 
-            predicted = ssm.conditional.marginalise(rv, prior)
+            predicted = prior.marginalise(rv)
 
-            logpdf_n, corrected = ssm.conditional.bayes_rule_and_logpdf_tree(
-                data, predicted, observation, solve_triu=solve_triu
+            logpdf_n, corrected = observation.bayes_rule_and_logpdf_tree(
+                data, predicted, solve_triu=solve_triu
             )
 
             # The mean of the PDFs (as opposed to their sum) usually
@@ -231,18 +223,18 @@ class MarkovSequence(Generic[N]):
             return MarkovSequence(init, self.conditional, reverse=self.reverse)
         return self
 
-    def sample(self, key, *, ssm: ssm_impl.FactSsmImpl, shape: tuple = ()):
+    def sample(self, key, *, shape: tuple = ()):
         """Sample from a Markov sequence."""
         # If the MarkovSequence carries unnecessary filtering marginals, remove them
         if self.marginal.mean_flat.ndim == self.conditional.noise.mean_flat.ndim:
             markov_seq = self.remove_filtering_distributions()
-            return markov_seq.sample(key, ssm=ssm, shape=shape)
+            return markov_seq.sample(key, shape=shape)
 
         # If many samples are required, vmap over recursive calls to sample()
         if len(shape) > 0:
             n, *shape_remaining = shape
             keys = random.split(key, num=n)
-            sample_partial = func.partial(self.sample, ssm=ssm, shape=shape_remaining)
+            sample_partial = func.partial(self.sample, shape=shape_remaining)
             return func.vmap(sample_partial)(keys)
 
         # Compute a single sample from the Markov sequence
@@ -251,7 +243,7 @@ class MarkovSequence(Generic[N]):
             smp_flat, key = sample_and_key
 
             # Propagate the previous sample
-            predicted = ssm.conditional.apply_flat(smp_flat, cond)
+            predicted = cond.apply_flat(smp_flat)
 
             # Sample the propagated variable
             key, subkey = random.split(key, num=2)
@@ -289,12 +281,10 @@ class MarkovStrategy(Generic[T]):
 
     def __init__(
         self,
-        ssm: ssm_impl.FactSsmImpl,
         is_suitable_for_save_at: int,
         is_suitable_for_save_every_step: int,
         is_suitable_for_offgrid_marginals: int,
     ) -> None:
-        self.ssm = ssm
         self.is_suitable_for_save_at = is_suitable_for_save_at
         self.is_suitable_for_save_every_step = is_suitable_for_save_every_step
         self.is_suitable_for_offgrid_marginals = is_suitable_for_offgrid_marginals
@@ -339,22 +329,21 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
     [`MarkovStrategy`](#probdiffeq.probdiffeq.MarkovStrategy).
     """
 
-    def __init__(self, ssm) -> None:
+    def __init__(self) -> None:
         super().__init__(
-            ssm=ssm,
             is_suitable_for_save_at=False,
             is_suitable_for_save_every_step=True,
             is_suitable_for_offgrid_marginals=True,
         )
 
     def init_posterior(self, *, u):
-        cond = self.ssm.prior.identity(template=u)
+        cond = u.identity_conditional()
         posterior = MarkovSequence(marginal=u, conditional=cond, reverse=True)
         return u, posterior
 
     def predict(self, posterior: MarkovSequence, *, transition) -> tuple:
-        marginals, cond = self.ssm.conditional.revert(
-            posterior.marginal, transition, solve_triu=linalg.solve_triu
+        marginals, cond = transition.revert(
+            posterior.marginal, solve_triu=linalg.solve_triu
         )
         posterior = MarkovSequence(
             marginal=marginals, conditional=cond, reverse=posterior.reverse
@@ -372,15 +361,13 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
     ):
-        prototype = self.ssm.prior.prototype_output_scale_calibrated(
-            template=posterior0.marginal
-        )
+        prototype = posterior0.marginal.prototype_output_scale_calibrated()
         assert output_scale.shape == prototype.shape
         posterior0 = posterior0.rescale_cholesky(output_scale)
         posterior = posterior.rescale_cholesky(output_scale)
 
         # Marginalise
-        marginals = posterior.evaluate_marginals(ssm=self.ssm)
+        marginals = posterior.evaluate_marginals()
 
         # Prepend the initial condition to the filtering distributions
         init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
@@ -432,7 +419,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         # Marginalise backwards from t1 to t to obtain the interpolated solution.
         marginal_t1 = posterior_t1.marginal
         conditional_t1_to_t = extrapolated_t1.conditional
-        rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
+        rv_at_t = conditional_t1_to_t.marginalise(marginal_t1)
         solution_at_t = MarkovSequence(
             rv_at_t, extrapolated_t.conditional, reverse=extrapolated_t.reverse
         )
@@ -473,9 +460,8 @@ class strategy_filter(MarkovStrategy):
     [`MarkovStrategy`](#probdiffeq.probdiffeq.MarkovStrategy).
     """
 
-    def __init__(self, ssm) -> None:
+    def __init__(self) -> None:
         super().__init__(
-            ssm=ssm,
             is_suitable_for_save_at=True,
             is_suitable_for_save_every_step=True,
             is_suitable_for_offgrid_marginals=True,
@@ -485,7 +471,7 @@ class strategy_filter(MarkovStrategy):
         return u, u
 
     def predict(self, posterior: T, *, transition) -> tuple:
-        marginals = self.ssm.conditional.marginalise(posterior, transition)
+        marginals = transition.marginalise(posterior)
         return marginals, marginals
 
     def apply_updates(self, prediction, *, updates):
@@ -494,7 +480,7 @@ class strategy_filter(MarkovStrategy):
         return marginals, marginals
 
     def finalize(self, *, posterior0, posterior, output_scale):
-        expected = self.ssm.prior.prototype_output_scale_calibrated(template=posterior0)
+        expected = posterior0.prototype_output_scale_calibrated()
         assert output_scale.shape == expected.shape
 
         # No rescaling because no calibration at the initial step
@@ -576,26 +562,23 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
 
     """
 
-    def __init__(self, ssm) -> None:
+    def __init__(self) -> None:
         super().__init__(
-            ssm=ssm,
             is_suitable_for_save_at=True,
             is_suitable_for_save_every_step=False,
             is_suitable_for_offgrid_marginals=False,
         )
 
     def init_posterior(self, *, u):
-        cond = self.ssm.prior.identity(template=u)
+        cond = u.identity_conditional()
         posterior = MarkovSequence(u, cond, reverse=True)
         return u, posterior
 
     def predict(self, posterior: MarkovSequence, *, transition) -> tuple:
         rv = posterior.marginal
         bw0 = posterior.conditional
-        marginals, cond = self.ssm.conditional.revert(
-            rv, transition, solve_triu=linalg.solve_triu
-        )
-        cond = self.ssm.conditional.merge(bw0, cond)
+        marginals, cond = transition.revert(rv, solve_triu=linalg.solve_triu)
+        cond = bw0.merge(cond)
         predicted = MarkovSequence(marginals, cond, reverse=posterior.reverse)
 
         return marginals, predicted
@@ -610,15 +593,13 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
     def finalize(
         self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
     ):
-        expected = self.ssm.prior.prototype_output_scale_calibrated(
-            template=posterior0.marginal
-        )
+        expected = posterior0.marginal.prototype_output_scale_calibrated()
         assert output_scale.shape == expected.shape
         posterior0 = posterior0.rescale_cholesky(output_scale)
         posterior = posterior.rescale_cholesky(output_scale)
 
         # Marginalise
-        marginals = posterior.evaluate_marginals(ssm=self.ssm)
+        marginals = posterior.evaluate_marginals()
 
         # Prepend the initial condition to the filtering distributions
         init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
@@ -630,7 +611,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         return marginals, posterior
 
     def interpolate_at_t1(self, *, posterior_t1: MarkovSequence):
-        cond_identity = self.ssm.prior.identity(template=posterior_t1.marginal)
+        cond_identity = posterior_t1.marginal.identity_conditional()
         resume_from = MarkovSequence(
             posterior_t1.marginal,
             conditional=cond_identity,
@@ -717,7 +698,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         _, extrapolated_t = self.predict(
             posterior=posterior_t0, transition=transition_t0_t
         )
-        conditional_id = self.ssm.prior.identity(template=posterior_t0.marginal)
+        conditional_id = posterior_t0.marginal.identity_conditional()
         previous_new = MarkovSequence(
             extrapolated_t.marginal, conditional_id, reverse=extrapolated_t.reverse
         )
@@ -728,7 +709,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         # Marginalise from t1 to t to obtain the interpolated solution.
         marginal_t1 = posterior_t1.marginal
         conditional_t1_to_t = extrapolated_t1.conditional
-        rv_at_t = self.ssm.conditional.marginalise(marginal_t1, conditional_t1_to_t)
+        rv_at_t = conditional_t1_to_t.marginalise(marginal_t1)
 
         # Return the right combination of marginals and conditionals.
         interpolated = MarkovSequence(

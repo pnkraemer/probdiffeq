@@ -94,7 +94,7 @@ def test_exponential_transition_as_expected(ode_shape, ssm_fact):
 
     dt = 0.123456
     cond = func.jit(exponential)(dt)
-    cond = ssm.conditional.preconditioner_apply(cond)
+    cond = cond.preconditioner_apply()
     A_received = cond.A
 
     (d,) = tree.ravel_pytree(u)[0].shape
@@ -103,7 +103,7 @@ def test_exponential_transition_as_expected(ode_shape, ssm_fact):
     ssm = probdiffeq.state_space_model(ssm_fact="dense")
     _init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs[:-1], ssm=ssm)
     cond = func.jit(iwp)(dt)
-    cond = ssm.conditional.preconditioner_apply(cond)
+    cond = cond.preconditioner_apply()
     phi_iwp_smaller = cond.A
     assert testing.allclose(A_received[:-d, :-d], phi_iwp_smaller)
 

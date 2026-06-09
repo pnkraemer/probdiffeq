@@ -108,7 +108,7 @@ def case_jet_lift_dae(residual):
         residual_stack = probdiffeq.residual_from_stack(differential, algebraic)
 
         return probdiffeq.constraint_residual(
-            residual_stack, ssm=ssm, taylor_point=taylor_point
+            residual_stack, taylor_point=taylor_point, ssm=ssm
         )
 
     return constraint_residual
@@ -121,7 +121,7 @@ def case_jet_lift_residual(residual):
         implicit = probdiffeq.residual_state_velocity(residual.residual)
         implicit = probdiffeq.jet_lift(implicit, lift_by=lift_by)
         return probdiffeq.constraint_residual(
-            implicit, ssm=ssm, taylor_point=taylor_point
+            implicit, taylor_point=taylor_point, ssm=ssm
         )
 
     return constraint_residual
@@ -149,9 +149,9 @@ def test_posterior_linearisation_matches_closed_form_recursion(
     cstate = constraint.init_linearization()
     fx, cstate = constraint.linearize(init, cstate, damp=0.0, t=residual.t0)
 
-    _observed, reverted = ssm.conditional.revert(init, fx, solve_triu=linalg.lstsq_svd)
+    _observed, reverted = fx.revert(init, solve_triu=linalg.lstsq_svd)
 
-    updated = ssm.conditional.apply_flat(0.0, reverted)
+    updated = reverted.apply_flat(0.0)
     received = updated.mean
     if lift_by == "max":
         assert testing.allclose(received, expected)

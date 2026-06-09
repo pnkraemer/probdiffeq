@@ -92,7 +92,7 @@ def test_output_scales_covariances_scaled_correctly_custom(rules: ScaleShapeRule
     # 1d problem, but "unusual" shapes. Values don't matter.
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
     scale = 123.45 * np.ones(rules.base)
-    _init, iwp = rules.prior(tcoeffs, ssm=ssm, output_scale=scale)
+    _init, iwp = rules.prior(tcoeffs, output_scale=scale, ssm=ssm)
 
     cond = iwp(1.0, 9.876 * np.ones(rules.calibrated))
     Q_expected = (9.876 * 123.45) ** 2.0 * 1.0 / np.asarray([[3.0, 2.0], [2.0, 1.0]])

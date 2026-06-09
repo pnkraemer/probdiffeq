@@ -102,10 +102,8 @@ def solver(vf, u0, *, grid):
             return vf(y, t=t, p=p)
 
         ts0 = probdiffeq.constraint_ode_ts0(vf_p, ssm=ssm)
-        strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-        solver_obj = probdiffeq.solver(
-            strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm
-        )
+        strategy = probdiffeq.strategy_smoother_fixedinterval()
+        solver_obj = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
         solve_fn = ivpsolve.solve_fixed_grid(solver=solver_obj)
         return solve_fn(init, grid=grid)
 

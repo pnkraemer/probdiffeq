@@ -37,12 +37,10 @@ def main():
     ssm = probdiffeq.state_space_model(ssm_fact="blockdiag")
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts1 = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint()
 
-    solver = probdiffeq.solver_mle(
-        strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm
-    )
-    error = probdiffeq.error_residual_std(constraint=ts1, prior=iwp, ssm=ssm)
+    solver = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts1)
+    error = probdiffeq.error_residual_std(constraint=ts1, prior=iwp)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
 
     # Solve the ODE.

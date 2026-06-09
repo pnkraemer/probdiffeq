@@ -42,9 +42,9 @@ def main():
     ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
     _init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=10.0)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_filter(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
+    strategy = probdiffeq.strategy_filter()
+    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
 
     save_at = jnp.linspace(t0, t1, num=250, endpoint=True)
     solve_save_at = solve_adaptive(vf, solver=solver, error=error, save_at=save_at)

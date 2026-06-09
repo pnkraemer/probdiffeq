@@ -138,10 +138,8 @@ def loss_log_marginal_likelihood(vf, *, t0):
             return vf(y, t=t, p=p)
 
         ts0 = probdiffeq.constraint_ode_ts0(vf_p, ssm=ssm)
-        strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-        solver_ts0 = probdiffeq.solver(
-            strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm
-        )
+        strategy = probdiffeq.strategy_smoother_fixedinterval()
+        solver_ts0 = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
 
         # Solve
         solve = ivpsolve.solve_fixed_grid(solver=solver_ts0)

@@ -17,7 +17,7 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 __all__ = [
-    "IsotropicConditional",
+    "IsotropicLatentCond",
     "IsotropicLinearizationFactory",
     "IsotropicNormal",
     "IsotropicOdeTs0",
@@ -74,6 +74,80 @@ class IsotropicTreeFlatten(interfaces.AbstractTreeFlatten):
         leaves, treedef = tree.tree_flatten_depth_one(x)
         _, unravel_leaf = tree.ravel_pytree(leaves[0])
         return cls(treedef, unravel_leaf)
+
+
+class IsotropicLatentCond(interfaces.LatentCond):
+    """Isotropic (scalar-variance) implementation of LatentCond operations."""
+
+    def apply_flat(self, x, /):
+        x = self.to_latent[:, None] * x
+        mean_new = self.to_observed[:, None] * self.A @ x + self.noise.mean_flat
+        cholesky_new = self.to_observed[:, None] * self.noise.cholesky_flat
+        return IsotropicNormal(mean_new, cholesky_new, self.noise.tree_flatten)
+
+    def marginalise(self, rv, /):
+        mean = self.to_latent[:, None] * rv.mean_flat
+        cholesky = self.to_latent[:, None] * rv.cholesky_flat
+        R_stack = ((self.A @ cholesky).T, self.noise.cholesky_flat.T)
+        cholesky_new = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
+
+        mean_new = self.to_observed[:, None] * (self.A @ mean + self.noise.mean_flat)
+        cholesky_new = self.to_observed[:, None] * cholesky_new
+        return IsotropicNormal(mean_new, cholesky_new, self.noise.tree_flatten)
+
+    def merge(self, other: "IsotropicLatentCond", /) -> "IsotropicLatentCond":
+        # self = cond1 (outer), other = cond2 (inner)
+        T = self.to_latent * other.to_observed
+
+        g = self.A @ (T[:, None] * other.A)
+        xi = self.A @ (T[:, None] * other.noise.mean_flat) + self.noise.mean_flat
+
+        R1 = (self.A @ (T[:, None] * other.noise.cholesky_flat)).T
+        R2 = self.noise.cholesky_flat.T
+        Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
+
+        noise = IsotropicNormal(xi, Xi.T, self.noise.tree_flatten)
+        return IsotropicLatentCond(
+            g, noise, to_latent=other.to_latent, to_observed=self.to_observed
+        )
+
+    def revert(self, rv, /, *, solve_triu):
+        mean = self.to_latent[:, None] * rv.mean_flat
+        cholesky = self.to_latent[:, None] * rv.cholesky_flat
+
+        R_X_F = (self.A @ cholesky).T
+        R_X = cholesky.T
+        R_YX = self.noise.cholesky_flat.T
+        tmp = cholesky_util.revert_conditional(
+            R_X_F=R_X_F, R_X=R_X, R_YX=R_YX, solve_triu=solve_triu
+        )
+        r_obs, (r_cor, gain) = tmp
+
+        mean_observed = self.A @ mean + self.noise.mean_flat
+        mean_corrected = mean - gain @ mean_observed
+        cholesky_corrected = r_cor.T
+        corrected = IsotropicNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
+        cond_new = IsotropicLatentCond(
+            gain,
+            corrected,
+            to_latent=1 / self.to_observed,
+            to_observed=1 / self.to_latent,
+        )
+
+        mean = self.to_observed[:, None] * mean_observed
+        cholesky = self.to_observed[:, None] * r_obs.T
+        observed = IsotropicNormal(mean, cholesky, self.noise.tree_flatten)
+        return observed, cond_new
+
+    def preconditioner_apply(self, /):
+        A = self.to_observed[:, None] * self.A * self.to_latent[None, :]
+        mean = self.to_observed[:, None] * self.noise.mean_flat
+        cholesky = self.to_observed[:, None] * self.noise.cholesky_flat
+        noise = IsotropicNormal(mean, cholesky, self.noise.tree_flatten)
+        return IsotropicLatentCond.from_linop_and_noise(A, noise)
+
+
+IsotropicLatentCond._register_as_pytree()
 
 
 class IsotropicNormal(interfaces.AbstractTreeNormal[IsotropicTreeFlatten]):
@@ -190,6 +264,17 @@ class IsotropicNormal(interfaces.AbstractTreeNormal[IsotropicTreeFlatten]):
         base = random.normal(key, shape=(n,))
         return self.mean_flat + (self.cholesky_flat @ base)[:, None]
 
+    def identity_conditional(self) -> IsotropicLatentCond:
+        num, d = self.mean_flat.shape
+        m0 = np.zeros((num, d))
+        c0 = np.zeros((num, num))
+        noise = IsotropicNormal(m0, c0, self.tree_flatten)
+        matrix = np.eye(num)
+        return IsotropicLatentCond.from_linop_and_noise(matrix, noise)
+
+    def prototype_output_scale_calibrated(self):
+        return np.ones(())
+
     @staticmethod
     def register_pytree_node() -> None:
         def flatten(normal):
@@ -205,16 +290,11 @@ class IsotropicNormal(interfaces.AbstractTreeNormal[IsotropicTreeFlatten]):
         tree.register_pytree_node(IsotropicNormal, flatten, unflatten)
 
 
+IsotropicNormal.register_pytree_node()
+
+
 class IsotropicPriorFactory(interfaces.AbstractPriorFactory):
     """Implementation of isotropic prior constructors."""
-
-    def identity(self, template) -> interfaces.LatentCond:
-        num, d = template.mean_flat.shape
-        m0 = np.zeros((num, d))
-        c0 = np.zeros((num, num))
-        noise = IsotropicNormal(m0, c0, template.tree_flatten)
-        matrix = np.eye(num)
-        return interfaces.LatentCond.from_linop_and_noise(matrix, noise)
 
     def wiener_integrated(
         self,
@@ -295,7 +375,7 @@ class IsotropicPriorFactory(interfaces.AbstractPriorFactory):
             tree_flatten = IsotropicTreeFlatten.from_example(tcoeffs_mean)
             noise = IsotropicNormal(q0, scale * q_sqrtm, tree_flatten)
 
-            return interfaces.LatentCond(A, noise, to_latent=p_inv, to_observed=p)
+            return IsotropicLatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
         return init, discretise
 
@@ -404,11 +484,7 @@ class IsotropicPriorFactory(interfaces.AbstractPriorFactory):
         # Wrap u_like and std into a list because the random variable
         # expects TaylorCoefficients.
         noise = IsotropicNormal.from_mean_and_std([u_like], [std])
-        return interfaces.LatentCond.from_linop_and_noise(linop, noise)
-
-    def prototype_output_scale_calibrated(self, template):
-        del template
-        return np.ones(())
+        return IsotropicLatentCond.from_linop_and_noise(linop, noise)
 
 
 class IsotropicLinearizationFactory(interfaces.AbstractLinearizationFactory):
@@ -446,7 +522,7 @@ class IsotropicOdeTs0(interfaces.AbstractOde):
         linop = func.jacrev(lambda s: s[[self.ode.num_derivatives_in_args], ...])(
             rv.mean_flat[..., 0]
         )
-        cond = interfaces.LatentCond.from_linop_and_noise(linop, bias)
+        cond = IsotropicLatentCond.from_linop_and_noise(linop, bias)
         return cond, None
 
 
@@ -485,86 +561,5 @@ class IsotropicOdeTs1(interfaces.AbstractOde):
 
         # Turn fx and J_trace into an observation model
         noise = IsotropicNormal.from_dirac(fx, damp=damp)
-        cond = interfaces.LatentCond.from_linop_and_noise(linop, noise)
+        cond = IsotropicLatentCond.from_linop_and_noise(linop, noise)
         return cond, state
-
-
-class IsotropicConditional(interfaces.AbstractConditional):
-    """Construct an isotropic implementation of manipulating conditionals."""
-
-    def apply_flat(self, x, cond, /):
-        x = cond.to_latent[:, None] * x
-        mean_new = cond.to_observed[:, None] * cond.A @ x + cond.noise.mean_flat
-        cholesky_new = cond.to_observed[:, None] * cond.noise.cholesky_flat
-        return IsotropicNormal(mean_new, cholesky_new, cond.noise.tree_flatten)
-
-    def marginalise(self, rv, cond, /):
-        mean = cond.to_latent[:, None] * rv.mean_flat
-        cholesky = cond.to_latent[:, None] * rv.cholesky_flat
-        R_stack = ((cond.A @ cholesky).T, cond.noise.cholesky_flat.T)
-        cholesky_new = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
-
-        mean_new = cond.to_observed[:, None] * (cond.A @ mean + cond.noise.mean_flat)
-        cholesky_new = cond.to_observed[:, None] * cholesky_new
-        return IsotropicNormal(mean_new, cholesky_new, cond.noise.tree_flatten)
-
-    def merge(self, cond1, cond2, /):
-        # Transform: latent (2) to latent (1)
-        T = cond1.to_latent * cond2.to_observed
-
-        # Linear operator
-        g = cond1.A @ (T[:, None] * cond2.A)
-
-        # Combined mean
-        xi = cond1.A @ (T[:, None] * cond2.noise.mean_flat) + cond1.noise.mean_flat
-
-        # Cholesky factor of combined covariance
-        R1 = (cond1.A @ (T[:, None] * cond2.noise.cholesky_flat)).T
-        R2 = cond1.noise.cholesky_flat.T
-        Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
-
-        # Gather and return
-        noise = IsotropicNormal(xi, Xi.T, cond1.noise.tree_flatten)
-        return interfaces.LatentCond(
-            g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
-        )
-
-    def revert(self, rv, cond, /, *, solve_triu):
-        # Pull RV into the latent space
-        mean = cond.to_latent[:, None] * rv.mean_flat
-        cholesky = cond.to_latent[:, None] * rv.cholesky_flat
-
-        # QR-decomposition
-        R_X_F, R_X, R_YX = (cond.A @ cholesky).T, cholesky.T, cond.noise.cholesky_flat.T
-        tmp = cholesky_util.revert_conditional(
-            R_X_F=R_X_F, R_X=R_X, R_YX=R_YX, solve_triu=solve_triu
-        )
-        r_obs, (r_cor, gain) = tmp
-
-        # Push correction into observed space
-        mean_observed = cond.A @ mean + cond.noise.mean_flat
-        mean_corrected = mean - gain @ mean_observed
-        cholesky_corrected = r_cor.T
-        corrected = IsotropicNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
-        cond_new = interfaces.LatentCond(
-            gain,
-            corrected,
-            to_latent=1 / cond.to_observed,
-            to_observed=1 / cond.to_latent,
-        )
-
-        # Gather the observed variable
-        mean = cond.to_observed[:, None] * mean_observed
-        cholesky = cond.to_observed[:, None] * r_obs.T
-        observed = IsotropicNormal(mean, cholesky, cond.noise.tree_flatten)
-        return observed, cond_new
-
-    def preconditioner_apply(self, cond, /):
-        A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
-        mean = cond.to_observed[:, None] * cond.noise.mean_flat
-        cholesky = cond.to_observed[:, None] * cond.noise.cholesky_flat
-        noise = IsotropicNormal(mean, cholesky, cond.noise.tree_flatten)
-        return interfaces.LatentCond.from_linop_and_noise(A, noise)
-
-
-IsotropicNormal.register_pytree_node()

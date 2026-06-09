@@ -34,11 +34,9 @@ def main() -> None:
 
     # Build a solver
     ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver = probdiffeq.solver_dynamic(
-        ssm=ssm, strategy=strategy, prior=iwp, constraint=ts
-    )
-    error = probdiffeq.error_residual_std(constraint=ts, prior=iwp, ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint()
+    solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts)
+    error = probdiffeq.error_residual_std(constraint=ts, prior=iwp)
 
     # Solve the ODE
     save_at = jnp.linspace(t0, t1, num=5, endpoint=True)

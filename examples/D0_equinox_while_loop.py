@@ -56,9 +56,9 @@ def solution_routine(while_loop):
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
 
-    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint()
+    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
     solve_adaptive = ivpsolve.solve_adaptive_terminal_values(
         solver=solver, error=error, while_loop=while_loop
     )

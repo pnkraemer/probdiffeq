@@ -42,11 +42,9 @@ def main():
         tcoeffs, diffuse_derivatives=2, ssm=ssm
     )
     ts1 = probdiffeq.constraint_ode_ts1(vf_1st, ssm=ssm)
-    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver_1st = probdiffeq.solver_mle(
-        strategy=strategy, prior=iwp, constraint=ts1, ssm=ssm
-    )
-    error = probdiffeq.error_state_std(constraint=ts1, prior=iwp, ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint()
+    solver_1st = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts1)
+    error = probdiffeq.error_state_std(constraint=ts1, prior=iwp)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, error=error)
 
     sol_1 = jax.jit(solve)(init, save_at=save_at, atol=atol, rtol=rtol)
@@ -68,9 +66,9 @@ def main():
 
     # Use this constraint function for custom residuals:
     residual_constraint = probdiffeq.constraint_residual(residual, ssm=ssm)
-    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint()
     solver_2nd = probdiffeq.solver_mle(
-        strategy=strategy, prior=iwp, constraint=residual_constraint, ssm=ssm
+        strategy=strategy, prior=iwp, constraint=residual_constraint
     )
 
     # Custom residuals with residual-based error estimates
@@ -79,9 +77,7 @@ def main():
     # because scaling-then-norming assumes that the residual pytree
     # has the same structure as the target pytree.
 
-    error = probdiffeq.error_state_std(
-        constraint=residual_constraint, prior=iwp, ssm=ssm
-    )
+    error = probdiffeq.error_state_std(constraint=residual_constraint, prior=iwp)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, error=error)
     sol_2 = jax.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
     ham_2 = jax.vmap(hamiltonian_2nd)(sol_2.u.mean[0], sol_2.u.mean[1])
