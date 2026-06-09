@@ -23,8 +23,8 @@ def case_solve_fixed_grid(fact):
     grid = np.linspace(t0, t1, endpoint=True, num=5)
 
     def solver_to_solution(solver_fun, strategy_fun):
-        strategy = strategy_fun(ssm=ssm)
-        solver = solver_fun(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
+        strategy = strategy_fun()
+        solver = solver_fun(strategy=strategy, prior=iwp, constraint=ts0)
         solve = ivpsolve.solve_fixed_grid(solver=solver)
         return func.jit(solve)(init, grid=grid)
 
@@ -47,9 +47,9 @@ def case_simulate_terminal_values(fact):
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
 
     def solver_to_solution(solver_fun, strategy_fun):
-        strategy = strategy_fun(ssm=ssm)
-        solver = solver_fun(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
-        error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
+        strategy = strategy_fun()
+        solver = solver_fun(strategy=strategy, prior=iwp, constraint=ts0)
+        error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
         solve = ivpsolve.solve_adaptive_terminal_values(error=error, solver=solver)
         return func.jit(solve)(init, t0=t0, t1=t1, dt0=dt0, atol=1e-2, rtol=1e-2)
 

@@ -4,7 +4,7 @@ from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
 
 __all__ = [
-    "BlockDiagConditional",
+    "BlockDiagLatentCond",
     "BlockDiagLinearizationFactory",
     "BlockDiagNormal",
     "BlockDiagOdeTs0",
@@ -21,16 +21,112 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
+class BlockDiagLatentCond(interfaces.AbstractLatentCond):
+    """Block-diagonal implementation of LatentCond operations."""
+
+    def apply_flat(self, x, /):
+        def apply_unbatch(s, c):
+            s = c.to_latent * s
+            m_new = c.to_observed * (c.A @ s + c.noise.mean_flat)
+            c_new = c.to_observed[:, None] * c.noise.cholesky_flat
+            return BlockDiagNormal(m_new, c_new, self.noise.tree_flatten)
+
+        return func.vmap(apply_unbatch)(x, self)
+
+    def marginalise(self, rv, /):
+        matrix, noise = self.A, self.noise
+        assert matrix.ndim == 3
+        mean = self.to_latent * rv.mean_flat
+        cholesky = self.to_latent[:, :, None] * rv.cholesky_flat
+
+        mean_marg = np.einsum("ijk,ik->ij", matrix, mean) + noise.mean_flat
+
+        chol1 = _transpose(matrix @ cholesky)
+        chol2 = _transpose(noise.cholesky_flat)
+        R_stack = (chol1, chol2)
+        cholesky = func.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack)
+
+        mean_new = self.to_observed * mean_marg
+        cholesky_new = self.to_observed[:, :, None] * _transpose(cholesky)
+        return BlockDiagNormal(mean_new, cholesky_new, self.noise.tree_flatten)
+
+    def merge(self, other: "BlockDiagLatentCond", /) -> "BlockDiagLatentCond":
+        # self = cond1 (outer), other = cond2 (inner)
+        T = self.to_latent * other.to_observed
+
+        A1, A2 = self.A, T[:, :, None] * other.A
+        g = func.vmap(lambda a, b: a @ b)(A1, A2)
+
+        m1, m2 = T * other.noise.mean_flat, self.noise.mean_flat
+        xi = func.vmap(lambda a, b, c: a @ b + c)(A1, m1, m2)
+
+        C1, C2 = self.noise.cholesky_flat, T[:, :, None] * other.noise.cholesky_flat
+        R1 = _transpose(func.vmap(lambda a, b: a @ b)(A1, C2))
+        R2 = _transpose(C1)
+        Xi = func.vmap(cholesky_util.sum_of_sqrtm_factors)((R1, R2))
+        Xi = _transpose(Xi)
+
+        noise = BlockDiagNormal(xi, Xi, self.noise.tree_flatten)
+        return BlockDiagLatentCond(
+            g, noise, to_latent=other.to_latent, to_observed=self.to_observed
+        )
+
+    def revert(self, rv, /, *, solve_triu):
+        mean = self.to_latent * rv.mean_flat
+        cholesky = self.to_latent[:, :, None] * rv.cholesky_flat
+
+        rv_chol_upper = _transpose(cholesky)
+        noise_chol_upper = _transpose(self.noise.cholesky_flat)
+        A_rv_chol_upper = _transpose(self.A @ cholesky)
+
+        revert_conditional = func.partial(
+            cholesky_util.revert_conditional, solve_triu=solve_triu
+        )
+        revert_vmap = func.vmap(revert_conditional)
+        r_obs, (r_cor, gain) = revert_vmap(
+            A_rv_chol_upper, rv_chol_upper, noise_chol_upper
+        )
+        cholesky_obs = np.transpose(r_obs, axes=(0, 2, 1))
+        cholesky_cor = np.transpose(r_cor, axes=(0, 2, 1))
+
+        mean_observed = (self.A @ mean[..., None])[..., 0] + self.noise.mean_flat
+        mean_corrected = mean - (gain @ (mean_observed[..., None]))[..., 0]
+        corrected = BlockDiagNormal(mean_corrected, cholesky_cor, rv.tree_flatten)
+        bwd = BlockDiagLatentCond(
+            gain,
+            corrected,
+            to_latent=1 / self.to_observed,
+            to_observed=1 / self.to_latent,
+        )
+
+        mean_observed = self.to_observed * mean_observed
+        cholesky_observed = self.to_observed[:, :, None] * cholesky_obs
+        observed = BlockDiagNormal(
+            mean_observed, cholesky_observed, self.noise.tree_flatten
+        )
+        return observed, bwd
+
+    def preconditioner_apply(self, /):
+        A = self.to_observed[:, :, None] * self.A * self.to_latent[:, None, :]
+        mean = self.to_observed * self.noise.mean_flat
+        cholesky = self.to_observed[:, :, None] * self.noise.cholesky_flat
+        noise = BlockDiagNormal(mean, cholesky, self.noise.tree_flatten)
+        to_observed = np.ones_like(self.to_observed)
+        to_latent = np.ones_like(self.to_latent)
+        return BlockDiagLatentCond(
+            A, noise, to_observed=to_observed, to_latent=to_latent
+        )
+
+
+BlockDiagLatentCond._register_as_pytree()
+
+
+def _transpose(matrix):
+    return np.transpose(matrix, axes=(0, 2, 1))
+
+
 class BlockDiagPriorFactory(interfaces.AbstractPriorFactory):
     """Implementation of block-diagonal prior constructors."""
-
-    def identity(self, template) -> interfaces.LatentCond:
-        (d, ndim) = template.mean_flat.shape
-        m0 = np.zeros((d, ndim))
-        c0 = np.zeros((d, ndim, ndim))
-        noise = BlockDiagNormal(m0, c0, template.tree_flatten)
-        matrix = np.ones((d, 1, 1)) * np.eye(ndim, ndim)[None, ...]
-        return interfaces.LatentCond.from_linop_and_noise(matrix, noise)
 
     def wiener_integrated(
         self,
@@ -133,7 +229,7 @@ class BlockDiagPriorFactory(interfaces.AbstractPriorFactory):
             noise = BlockDiagNormal(mean, cholesky, tree_flatten)
             p = np.ones((d, 1)) * p[None, :]
             p_inv = np.ones((d, 1)) * p_inv[None, :]
-            return interfaces.LatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
+            return BlockDiagLatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
 
         return init, discretise
 
@@ -230,26 +326,6 @@ class BlockDiagPriorFactory(interfaces.AbstractPriorFactory):
         tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
         return tcoeffs_mean, tcoeffs_std
 
-    def to_derivative(self, i, std, template):
-
-        def select(a):
-            return np.asarray([a[i]])
-
-        (d, n) = template.mean_flat.shape
-        x = np.zeros((d, n))
-        linop = func.vmap(func.jacrev(select))(x)
-
-        u_like = tree.tree_map(np.zeros_like, template.mean[0])
-        noise = BlockDiagNormal.from_mean_and_std([u_like], [std])
-        return interfaces.LatentCond.from_linop_and_noise(linop, noise)
-
-    def prototype_output_scale_calibrated(self, template):
-        single_flat, _ = tree.ravel_pytree(template.mean[0])
-
-        # TODO: technically, these should be pytrees according
-        # to the leaf structure, right?
-        return np.ones(single_flat.shape)
-
 
 class BlockDiagLinearizationFactory(interfaces.AbstractLinearizationFactory):
     """Construct a block-diagonal linearization-factory."""
@@ -287,7 +363,7 @@ class BlockDiagOdeTs0(interfaces.AbstractOde):
 
         linop = func.vmap(func.jacrev(a1))(rv.mean_flat)
 
-        cond = interfaces.LatentCond.from_linop_and_noise(linop, bias)
+        cond = BlockDiagLatentCond.from_linop_and_noise(linop, bias)
         return cond, None
 
 
@@ -325,118 +401,8 @@ class BlockDiagOdeTs1(interfaces.AbstractOde):
         fx = fx - diff
         fx = rv0.tree_flatten.unflatten_array(fx)
         bias = BlockDiagNormal.from_dirac([fx], damp=damp)
-        cond = interfaces.LatentCond.from_linop_and_noise(linop, bias)
+        cond = BlockDiagLatentCond.from_linop_and_noise(linop, bias)
         return cond, state
-
-
-class BlockDiagConditional(interfaces.AbstractConditional):
-    """Construct a block-diagonal implementation of manipulating conditionals."""
-
-    def apply_flat(self, x, cond, /):
-
-        def apply_unbatch(s, c):
-            s = c.to_latent * s
-            m_new = c.to_observed * (c.A @ s + c.noise.mean_flat)
-            c_new = c.to_observed[:, None] * c.noise.cholesky_flat
-            return BlockDiagNormal(m_new, c_new, cond.noise.tree_flatten)
-
-        return func.vmap(apply_unbatch)(x, cond)
-
-    def marginalise(self, rv, cond, /):
-        matrix, noise = cond.A, cond.noise
-        assert matrix.ndim == 3
-        mean = cond.to_latent * rv.mean_flat
-        cholesky = cond.to_latent[:, :, None] * rv.cholesky_flat
-
-        mean_marg = np.einsum("ijk,ik->ij", matrix, mean) + noise.mean_flat
-
-        chol1 = _transpose(matrix @ cholesky)
-        chol2 = _transpose(noise.cholesky_flat)
-        R_stack = (chol1, chol2)
-        cholesky = func.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack)
-
-        mean_new = cond.to_observed * mean_marg
-        cholesky_new = cond.to_observed[:, :, None] * _transpose(cholesky)
-        return BlockDiagNormal(mean_new, cholesky_new, cond.noise.tree_flatten)
-
-    def merge(self, cond1, cond2, /):
-        # Transform: latent (2) to latent (1)
-        T = cond1.to_latent * cond2.to_observed
-
-        # Linear operator
-        A1, A2 = cond1.A, T[:, :, None] * cond2.A
-        g = func.vmap(lambda a, b: a @ b)(A1, A2)
-
-        # Combined mean
-        m1, m2 = T * cond2.noise.mean_flat, cond1.noise.mean_flat
-        xi = func.vmap(lambda a, b, c: a @ b + c)(A1, m1, m2)
-
-        # Cholesky factor of combined covariance
-        C1, C2 = cond1.noise.cholesky_flat, T[:, :, None] * cond2.noise.cholesky_flat
-        R1 = _transpose(func.vmap(lambda a, b: a @ b)(A1, C2))
-        R2 = _transpose(C1)
-        Xi = func.vmap(cholesky_util.sum_of_sqrtm_factors)((R1, R2))
-        Xi = _transpose(Xi)
-
-        # Gather and return
-        noise = BlockDiagNormal(xi, Xi, cond1.noise.tree_flatten)
-        return interfaces.LatentCond(
-            g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
-        )
-
-    def revert(self, rv, cond, /, *, solve_triu):
-        # Pull RV into latent space
-        mean = cond.to_latent * rv.mean_flat
-        cholesky = cond.to_latent[:, :, None] * rv.cholesky_flat
-
-        # QR decomposition
-        rv_chol_upper = _transpose(cholesky)
-        noise_chol_upper = _transpose(cond.noise.cholesky_flat)
-        A_rv_chol_upper = _transpose(cond.A @ cholesky)
-
-        revert_conditional = func.partial(
-            cholesky_util.revert_conditional, solve_triu=solve_triu
-        )
-        revert_vmap = func.vmap(revert_conditional)
-        r_obs, (r_cor, gain) = revert_vmap(
-            A_rv_chol_upper, rv_chol_upper, noise_chol_upper
-        )
-        cholesky_obs = np.transpose(r_obs, axes=(0, 2, 1))
-        cholesky_cor = np.transpose(r_cor, axes=(0, 2, 1))
-
-        # New backward conditional
-        mean_observed = (cond.A @ mean[..., None])[..., 0] + cond.noise.mean_flat
-        mean_corrected = mean - (gain @ (mean_observed[..., None]))[..., 0]
-        corrected = BlockDiagNormal(mean_corrected, cholesky_cor, rv.tree_flatten)
-        bwd = interfaces.LatentCond(
-            gain,
-            corrected,
-            to_latent=1 / cond.to_observed,
-            to_observed=1 / cond.to_latent,
-        )
-
-        # Gather observed RV
-        mean_observed = cond.to_observed * mean_observed
-        cholesky_observed = cond.to_observed[:, :, None] * cholesky_obs
-        observed = BlockDiagNormal(
-            mean_observed, cholesky_observed, cond.noise.tree_flatten
-        )
-        return observed, bwd
-
-    def preconditioner_apply(self, cond, /):
-        A = cond.to_observed[:, :, None] * cond.A * cond.to_latent[:, None, :]
-        mean = cond.to_observed * cond.noise.mean_flat
-        cholesky = cond.to_observed[:, :, None] * cond.noise.cholesky_flat
-        noise = BlockDiagNormal(mean, cholesky, cond.noise.tree_flatten)
-        to_observed = np.ones_like(cond.to_observed)
-        to_latent = np.ones_like(cond.to_latent)
-        return interfaces.LatentCond(
-            A, noise, to_observed=to_observed, to_latent=to_latent
-        )
-
-
-def _transpose(matrix):
-    return np.transpose(matrix, axes=(0, 2, 1))
 
 
 @structs.dataclass
@@ -595,6 +561,32 @@ class BlockDiagNormal(interfaces.AbstractTreeNormal[BlockDiagTreeFlatten]):
         d, _n, n = self.cholesky_flat.shape
         base = random.normal(key, shape=(d, n))
         return self.mean_flat + np.einsum("ijk,ij->ik", self.cholesky_flat, base)
+
+    def identity_conditional(self) -> BlockDiagLatentCond:
+        (d, ndim) = self.mean_flat.shape
+        m0 = np.zeros((d, ndim))
+        c0 = np.zeros((d, ndim, ndim))
+        noise = BlockDiagNormal(m0, c0, self.tree_flatten)
+        matrix = np.ones((d, 1, 1)) * np.eye(ndim, ndim)[None, ...]
+        return BlockDiagLatentCond.from_linop_and_noise(matrix, noise)
+
+    def prototype_output_scale_calibrated(self):
+        single_flat, _ = tree.ravel_pytree(self.mean[0])
+        # TODO: technically, these should be pytrees according
+        # to the leaf structure, right?
+        return np.ones(single_flat.shape)
+
+    def to_derivative(self, i, std):
+        def select(a):
+            return np.asarray([a[i]])
+
+        (d, n) = self.mean_flat.shape
+        x = np.zeros((d, n))
+        linop = func.vmap(func.jacrev(select))(x)
+
+        u_like = tree.tree_map(np.zeros_like, self.mean[0])
+        noise = BlockDiagNormal.from_mean_and_std([u_like], [std])
+        return BlockDiagLatentCond.from_linop_and_noise(linop, noise)
 
     @staticmethod
     def register_pytree_node() -> None:

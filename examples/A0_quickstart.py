@@ -25,23 +25,24 @@ def main():
     u0 = jnp.asarray(0.1)
     t0, t1 = 0.0, 5.0
 
-    # Set up a state-space model over Taylor coefficients
-
-    ssm = probdiffeq.state_space_model()
-
-    # Build a solver
+    # Initialize Taylor coefficients
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=1)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
+
+    # Construct a state-space model factorisation
+    ssm = probdiffeq.state_space_model()
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_filter(ssm=ssm)
-    solver = probdiffeq.solver_mle(ssm=ssm, strategy=strategy, prior=iwp, constraint=ts)
-    error = probdiffeq.error_residual_std(constraint=ts, prior=iwp, ssm=ssm)
+    ode_ts1 = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
+
+    # Build the rest of the solver
+    strategy = probdiffeq.strategy_filter()
+    solver = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ode_ts1)
+    error = probdiffeq.error_residual_std(constraint=ode_ts1, prior=iwp)
+    solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
 
     # Solve the ODE. Try different solution routines.
 
     save_at = jnp.linspace(t0, t1, num=100, endpoint=True)
-    solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
     solution = jax.jit(solve)(init, save_at, atol=1e-3, rtol=1e-3)
 
     print(f"\ninitial = {jax.tree.map(jnp.shape, init)}")

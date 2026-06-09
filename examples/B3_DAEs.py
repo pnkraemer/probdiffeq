@@ -61,14 +61,12 @@ def main(t0=1e-6, t1=1e5) -> None:
     # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
     taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
     jet = probdiffeq.constraint_residual(residual, ssm=ssm, taylor_point=taylor_point)
-    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver = probdiffeq.solver_dynamic(
-        strategy=strategy, prior=ioup, constraint=jet, ssm=ssm
-    )
+    strategy = probdiffeq.strategy_smoother_fixedpoint()
+    solver = probdiffeq.solver_dynamic(strategy=strategy, prior=ioup, constraint=jet)
 
     # The state-error-estimate doesn't care about the dimension
     # of the DAE, which is exactly what we need here
-    error = probdiffeq.error_state_std(constraint=jet, prior=ioup, ssm=ssm)
+    error = probdiffeq.error_state_std(constraint=jet, prior=ioup)
 
     # Linear spacing on a log-scale
     save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=200)

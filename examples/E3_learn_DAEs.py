@@ -91,9 +91,7 @@ def main(
     labels = solution_true.u.mean[0]
 
     # Build a loss
-    # Includes a "fake" SSM (to get the conditioning-functions to build a loss)
-    ssm = probdiffeq.state_space_model()
-    loss = loss_data_fit(solve, ssm=ssm, inputs=inputs, labels=labels)
+    loss = loss_data_fit(solve, inputs=inputs, labels=labels)
     value_and_grad = jax.jit(jax.value_and_grad(loss, has_aux=True))
 
     # Initialise the optimiser
@@ -130,14 +128,14 @@ def main(
     assert jnp.allclose(y_guess, y_true, atol=1e-4, rtol=1e-4)
 
 
-def loss_data_fit(solve, *, ssm, inputs, labels):
+def loss_data_fit(solve, *, inputs, labels):
     """Create a loss that measures the data fit."""
 
     def loss(y0, std_log, output_scale):
         std = jnp.exp(std_log) * output_scale
         std_ts = jnp.ones_like(inputs)[:, None] * std[None, ...]
 
-        loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
+        loss_lml = probdiffeq.loss_lml_timeseries()
         sol = solve(y0, save_at=inputs, output_scale=output_scale)
 
         lml = loss_lml(labels, std=std_ts, posterior=sol.solution_full)
@@ -171,14 +169,14 @@ def solver(residual, tol, while_loop, trafo):
         jet = probdiffeq.constraint_residual(
             residual, ssm=ssm, taylor_point=taylor_point
         )
-        strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
+        strategy = probdiffeq.strategy_smoother_fixedpoint()
         solver_obj = probdiffeq.solver_dynamic(
-            strategy=strategy, prior=prior, constraint=jet, ssm=ssm
+            strategy=strategy, prior=prior, constraint=jet
         )
 
         # The state-error-estimate doesn't care about the dimension
         # of the DAE, which is exactly what we need here
-        error = probdiffeq.error_state_std(constraint=jet, prior=prior, ssm=ssm)
+        error = probdiffeq.error_state_std(constraint=jet, prior=prior)
 
         solve_fn = ivpsolve.solve_adaptive_save_at(
             solver=solver_obj, error=error, while_loop=while_loop

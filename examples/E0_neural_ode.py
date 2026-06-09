@@ -138,17 +138,15 @@ def loss_log_marginal_likelihood(vf, *, t0):
             return vf(y, t=t, p=p)
 
         ts0 = probdiffeq.constraint_ode_ts0(vf_p, ssm=ssm)
-        strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-        solver_ts0 = probdiffeq.solver(
-            strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm
-        )
+        strategy = probdiffeq.strategy_smoother_fixedinterval()
+        solver_ts0 = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
 
         # Solve
         solve = ivpsolve.solve_fixed_grid(solver=solver_ts0)
         sol = solve(init, grid=grid)
 
         # Evaluate loss
-        loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
+        loss_lml = probdiffeq.loss_lml_timeseries()
         std_array = jnp.ones_like(grid) * std[None]
         lml = loss_lml(data, std=std_array, posterior=sol.solution_full)
         return -lml, {"sol": sol}

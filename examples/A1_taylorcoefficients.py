@@ -62,10 +62,9 @@ def main():
     # For example, the standard deviation or samples from the solution object:
 
     key = jax.random.PRNGKey(seed=15)
-    ssm = probdiffeq.state_space_model(ssm_fact="dense")
     posterior = solution.solution_full
-    sample_one = posterior.sample(key, ssm=ssm)
-    sample_many = posterior.sample(key, ssm=ssm, shape=(1, 2, 3))
+    sample_one = posterior.sample(key)
+    sample_many = posterior.sample(key, shape=(1, 2, 3))
 
     print()
     print("Samples inherit structure:")
@@ -84,12 +83,10 @@ def solve(vf, tc, *, t0, t1):
     ssm = probdiffeq.state_space_model(ssm_fact="dense")
     init, prior = probdiffeq.prior_wiener_integrated(tc, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver = probdiffeq.solver_mle(
-        strategy=strategy, prior=prior, constraint=ts0, ssm=ssm
-    )
+    strategy = probdiffeq.strategy_smoother_fixedpoint()
+    solver = probdiffeq.solver_mle(strategy=strategy, prior=prior, constraint=ts0)
     ts = jnp.linspace(t0, t1, endpoint=True, num=10)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=prior, ssm=ssm)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=prior)
     solve_fn = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
     return solve_fn(init, save_at=ts, atol=1e-2, rtol=1e-2)
 

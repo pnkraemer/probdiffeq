@@ -85,10 +85,8 @@ class ProbabilisticSolver:
         strategy: estimators_and_loss_functions.MarkovStrategy,
         prior: Callable,
         constraint: constraints.Constraint,
-        ssm: ssm_impl.FactSsmImpl,
         constraint_init: constraints.Constraint | None,
     ) -> None:
-        self.ssm = ssm
         self.strategy = strategy
         self.prior = prior
         self.constraint = constraint
@@ -304,14 +302,12 @@ class solver_mle(ProbabilisticSolver):
         *,
         constraint: constraints.Constraint,
         prior: Callable,
-        ssm: ssm_impl.FactSsmImpl,
         strategy: estimators_and_loss_functions.MarkovStrategy,
         constraint_init: constraints.Constraint | None = None,
         correct_asymptotic_underconfidence: bool = True,
     ) -> None:
         super().__init__(
             strategy=strategy,
-            ssm=ssm,
             prior=prior,
             constraint=constraint,
             constraint_init=constraint_init,
@@ -322,7 +318,7 @@ class solver_mle(ProbabilisticSolver):
         u_pred, prediction = self.strategy.init_posterior(u=u)
         cstate = self.constraint.init_linearization()
 
-        prototype = self.ssm.prior.prototype_output_scale_calibrated(template=u)
+        prototype = u.prototype_output_scale_calibrated()
         output_scale_prior = np.ones_like(prototype)
 
         # Update
@@ -336,10 +332,11 @@ class solver_mle(ProbabilisticSolver):
                 u_pred, cstate_init, damp=damp, t=t
             )
             zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean)
-            tmp = self.ssm.conditional.bayes_rule_and_residual_white_rms_tree(
-                zeros, u_pred, fx_init, solve_triu=linalg.lstsq_svd
+            output_scale_running, updates = (
+                fx_init.bayes_rule_and_residual_white_rms_tree(
+                    zeros, u_pred, solve_triu=linalg.lstsq_svd
+                )
             )
-            output_scale_running, updates = tmp
 
             u, posterior = self.strategy.apply_updates(prediction, updates=updates)
             num_data = 1.0
@@ -364,7 +361,7 @@ class solver_mle(ProbabilisticSolver):
 
     def step(self, state, *, dt: float, damp: float):
         # Discretize
-        prototype = self.ssm.prior.prototype_output_scale_calibrated(state.u)
+        prototype = state.u.prototype_output_scale_calibrated()
         output_scale = np.ones_like(prototype)
         transition = self.prior(dt, output_scale)
 
@@ -381,8 +378,8 @@ class solver_mle(ProbabilisticSolver):
 
         # Do the full correction step
         zeros = tree.tree_map(np.zeros_like, fx.noise.mean)
-        new_term, updates = self.ssm.conditional.bayes_rule_and_residual_white_rms_tree(
-            zeros, u, fx, solve_triu=linalg.solve_triu
+        new_term, updates = fx.bayes_rule_and_residual_white_rms_tree(
+            zeros, u, solve_triu=linalg.solve_triu
         )
         u, posterior = self.strategy.apply_updates(
             prediction=prediction, updates=updates
@@ -456,14 +453,12 @@ class solver_dynamic(ProbabilisticSolver):
         strategy: estimators_and_loss_functions.MarkovStrategy,
         prior: Callable,
         constraint: constraints.Constraint,
-        ssm: ssm_impl.FactSsmImpl,
         constraint_init: constraints.Constraint | None = None,
         re_linearize_after_calibration=False,
         stop_gradient_through_calibration=True,
     ) -> None:
         super().__init__(
             strategy=strategy,
-            ssm=ssm,
             prior=prior,
             constraint=constraint,
             constraint_init=constraint_init,
@@ -475,7 +470,7 @@ class solver_dynamic(ProbabilisticSolver):
         u_pred, prediction = self.strategy.init_posterior(u=u)
         lin_state = self.constraint.init_linearization()
 
-        prototype = self.ssm.prior.prototype_output_scale_calibrated(template=u_pred)
+        prototype = u_pred.prototype_output_scale_calibrated()
         output_scale = np.ones_like(prototype)
         lin_fun = func.partial(self.constraint.linearize, damp=damp, t=t)
         fx, _lin_state = func.eval_shape(lin_fun, u_pred, lin_state)
@@ -487,8 +482,8 @@ class solver_dynamic(ProbabilisticSolver):
                 u_pred, cstate_init, damp=damp, t=t
             )
             zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean)
-            updates = self.ssm.conditional.bayes_rule_tree(
-                zeros, u_pred, fx_init, solve_triu=linalg.lstsq_svd
+            updates = fx_init.bayes_rule_tree(
+                zeros, u_pred, solve_triu=linalg.lstsq_svd
             )
             u, posterior = self.strategy.apply_updates(prediction, updates=updates)
         else:
@@ -507,18 +502,18 @@ class solver_dynamic(ProbabilisticSolver):
         lin_state = state.auxiliary
 
         # Calibrate the output scale
-        prototype = self.ssm.prior.prototype_output_scale_calibrated(template=state.u)
+        prototype = state.u.prototype_output_scale_calibrated()
         ones = np.ones_like(prototype)
         transition = self.prior(dt, ones)
         mean = state.u.mean_flat
-        u = self.ssm.conditional.apply_flat(mean, transition)
+        u = transition.apply_flat(mean)
 
         # Linearize
 
         fx, lin_state = self.constraint.linearize(
             u, state=lin_state, damp=damp, t=state.t + dt
         )
-        observed = self.ssm.conditional.marginalise(u, fx)
+        observed = fx.marginalise(u)
         zeros = tree.tree_map(np.zeros_like, fx.noise.mean)
         output_scale = observed.residual_white_rms_tree(zeros)
 
@@ -540,9 +535,7 @@ class solver_dynamic(ProbabilisticSolver):
 
         # Complete the update
         zeros = tree.tree_map(np.zeros_like, fx.noise.mean)
-        updates = self.ssm.conditional.bayes_rule_tree(
-            zeros, u, fx, solve_triu=linalg.solve_triu
-        )
+        updates = fx.bayes_rule_tree(zeros, u, solve_triu=linalg.solve_triu)
         u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
         # Return solution
@@ -606,13 +599,11 @@ class solver(ProbabilisticSolver):
         *,
         constraint: constraints.Constraint,
         prior: Callable,
-        ssm: ssm_impl.FactSsmImpl,
         strategy: estimators_and_loss_functions.MarkovStrategy,
         constraint_init: constraints.Constraint | None = None,
     ) -> None:
         super().__init__(
             strategy=strategy,
-            ssm=ssm,
             prior=prior,
             constraint=constraint,
             constraint_init=constraint_init,
@@ -627,8 +618,8 @@ class solver(ProbabilisticSolver):
                 u_pred, cstate_init, damp=damp, t=t
             )
             zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean)
-            updates = self.ssm.conditional.bayes_rule_tree(
-                zeros, u_pred, fx_init, solve_triu=linalg.lstsq_svd
+            updates = fx_init.bayes_rule_tree(
+                zeros, u_pred, solve_triu=linalg.lstsq_svd
             )
             u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
@@ -640,7 +631,7 @@ class solver(ProbabilisticSolver):
         fx, _cstate = func.eval_shape(lin_fun, u_pred, cstate)
         fx = tree.tree_map(np.zeros_like, fx)
 
-        prototype = self.ssm.prior.prototype_output_scale_calibrated(template=u)
+        prototype = u.prototype_output_scale_calibrated()
         output_scale = np.ones_like(prototype)
         return ProbabilisticSolution(
             t=t,
@@ -670,9 +661,7 @@ class solver(ProbabilisticSolver):
         )
         # Update
         zeros = tree.tree_map(np.zeros_like, fx.noise.mean)
-        updates = self.ssm.conditional.bayes_rule_tree(
-            zeros, u_pred, fx, solve_triu=linalg.solve_triu
-        )
+        updates = fx.bayes_rule_tree(zeros, u_pred, solve_triu=linalg.solve_triu)
         u, posterior = self.strategy.apply_updates(prediction, updates=updates)
 
         # Return solution
@@ -856,7 +845,6 @@ class error_residual_std(ErrorEstimator):
         *,
         constraint: constraints.Constraint,
         prior: Any,
-        ssm: ssm_impl.FactSsmImpl,
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default
         error_per_unit_step: bool = False,
@@ -867,7 +855,6 @@ class error_residual_std(ErrorEstimator):
         self.error_norm = error_norm
         self.constraint = constraint
         self.prior = prior
-        self.ssm = ssm
         self.re_linearize_before_error = re_linearize_before_error
         self.error_per_unit_step = error_per_unit_step
 
@@ -887,13 +874,13 @@ class error_residual_std(ErrorEstimator):
     ) -> tuple[float, tuple]:
         # Discretize; The output scale is set to one
         # since the error is multiplied with a local scale estimate anyway
-        prototype = self.ssm.prior.prototype_output_scale_calibrated(proposed.u)
+        prototype = proposed.u.prototype_output_scale_calibrated()
         output_scale = np.ones_like(prototype)
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
         mean = previous.u.mean_flat
-        rv = self.ssm.conditional.apply_flat(mean, transition)
+        rv = transition.apply_flat(mean)
 
         # Optionally: re-linearize
         if self.re_linearize_before_error:
@@ -904,7 +891,7 @@ class error_residual_std(ErrorEstimator):
             linearized = proposed.fun_evals
 
         # Extract the local residual std from the linearization
-        observed = self.ssm.conditional.marginalise(rv, linearized)
+        observed = linearized.marginalise(rv)
         zeros = tree.tree_map(np.zeros_like, linearized.noise.mean)
         output_scale = observed.residual_white_rms_tree(zeros)
         observed = observed.rescale_cholesky(output_scale)
@@ -955,7 +942,6 @@ class error_state_std(ErrorEstimator):
         *,
         constraint: constraints.Constraint,
         prior: Any,
-        ssm: ssm_impl.FactSsmImpl,
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default
         derivative_idx: int = 0,
@@ -967,7 +953,6 @@ class error_state_std(ErrorEstimator):
         self.error_norm = error_norm
         self.constraint = constraint
         self.prior = prior
-        self.ssm = ssm
         self.re_linearize_before_error = re_linearize_before_error
         self.derivative_idx = derivative_idx
         self.error_per_unit_step = error_per_unit_step
@@ -988,15 +973,13 @@ class error_state_std(ErrorEstimator):
     ) -> tuple[float, tuple]:
         # Discretize; The output scale is set to one
         # since the error is multiplied with a local scale estimate anyway
-        prototype = self.ssm.prior.prototype_output_scale_calibrated(
-            template=proposed.u
-        )
+        prototype = proposed.u.prototype_output_scale_calibrated()
         output_scale = np.ones_like(prototype)
         transition = self.prior(dt, output_scale)
 
         # Extrapolate from the zero-error state
         mean = previous.u.mean_flat
-        rv = self.ssm.conditional.apply_flat(mean, transition)
+        rv = transition.apply_flat(mean)
 
         mean = previous.u.mean
         mean_leaves = tree.tree_leaves_depth_one(mean)
@@ -1012,10 +995,8 @@ class error_state_std(ErrorEstimator):
 
         # Extract the local residual std from the linearization
         zeros = tree.tree_map(np.zeros_like, linearized.noise.mean)
-        output_scale, conditional = (
-            self.ssm.conditional.bayes_rule_and_residual_white_rms_tree(
-                zeros, rv, linearized, solve_triu=linalg.solve_triu
-            )
+        output_scale, conditional = linearized.bayes_rule_and_residual_white_rms_tree(
+            zeros, rv, solve_triu=linalg.solve_triu
         )
 
         # Measure error on the n-th state (usually, n=0 because why not)

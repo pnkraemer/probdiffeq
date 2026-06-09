@@ -34,7 +34,7 @@ def main():
         return f(y, *p)
 
     grid = jnp.linspace(t0, t1, endpoint=True, num=200)
-    solve, ssm = solver(vf, u0, grid=grid)
+    solve = solver(vf, u0, grid=grid)
 
     parameter_true = f_args + 0.05
     parameter_guess = f_args
@@ -45,7 +45,7 @@ def main():
     initial = solve(parameter_guess)
 
     # Use probdiffeq to compute a parameter-to-data fit function.
-    loss = loss_marginal_likelihood(solve=solve, data=data, ssm=ssm)
+    loss = loss_marginal_likelihood(solve=solve, data=data)
     value_and_grad = jax.jit(jax.value_and_grad(loss))
 
     # We can differentiate the function forward- and reverse-mode
@@ -102,19 +102,17 @@ def solver(vf, u0, *, grid):
             return vf(y, t=t, p=p)
 
         ts0 = probdiffeq.constraint_ode_ts0(vf_p, ssm=ssm)
-        strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-        solver_obj = probdiffeq.solver(
-            strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm
-        )
+        strategy = probdiffeq.strategy_smoother_fixedinterval()
+        solver_obj = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
         solve_fn = ivpsolve.solve_fixed_grid(solver=solver_obj)
         return solve_fn(init, grid=grid)
 
-    return solve, ssm
+    return solve
 
 
-def loss_marginal_likelihood(*, data, solve, ssm, std=1e-1):
+def loss_marginal_likelihood(*, data, solve, std=1e-1):
     """Create a loss function."""
-    loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
+    loss_lml = probdiffeq.loss_lml_timeseries()
 
     @jax.jit
     def loss(params, /):

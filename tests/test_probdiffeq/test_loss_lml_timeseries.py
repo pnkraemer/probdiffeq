@@ -16,16 +16,16 @@ def fixture_solution(fact):
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
 
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint()
 
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
+    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
 
     save_at = np.linspace(t0, t1, endpoint=True, num=13)
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
     sol = func.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
 
-    loss = probdiffeq.loss_lml_timeseries(ssm=ssm)
+    loss = probdiffeq.loss_lml_timeseries()
     data = sol.u.mean[0]
     std = (
         tree.tree_map(np.ones_like, data)

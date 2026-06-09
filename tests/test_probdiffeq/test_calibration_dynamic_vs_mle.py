@@ -18,10 +18,8 @@ def test_exponential_approximated_well(fact) -> None:
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     vf = probdiffeq.ode(vf)
     ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
-    strategy = probdiffeq.strategy_filter(ssm=ssm)
-    solver = probdiffeq.solver_dynamic(
-        strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm
-    )
+    strategy = probdiffeq.strategy_filter()
+    solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts0)
 
     grid = np.linspace(t0, t1, num=20)
     solve = ivpsolve.solve_fixed_grid(solver=solver)

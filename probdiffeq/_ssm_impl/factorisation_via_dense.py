@@ -4,7 +4,7 @@ from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
 
 __all__ = [
-    "DenseConditional",
+    "DenseLatentCond",
     "DenseLinearizationFactory",
     "DenseNormal",
     "DenseOdeTs0",
@@ -21,16 +21,83 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
+class DenseLatentCond(interfaces.AbstractLatentCond):
+    """Dense (full-covariance) implementation of LatentCond operations."""
+
+    def apply_flat(self, x, /):
+        x = self.to_latent * x
+        mean = self.to_observed * (self.A @ x + self.noise.mean_flat)
+        cholesky = self.to_observed[:, None] * self.noise.cholesky_flat
+        return DenseNormal(mean, cholesky, self.noise.tree_flatten)
+
+    def marginalise(self, rv, /):
+        mean = self.to_latent * rv.mean_flat
+        cholesky = self.to_latent[:, None] * rv.cholesky_flat
+
+        R_stack = ((self.A @ cholesky).T, self.noise.cholesky_flat.T)
+        cholesky_new = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
+
+        mean_new = self.to_observed * (self.A @ mean + self.noise.mean_flat)
+        cholesky_new = self.to_observed[:, None] * cholesky_new
+        return DenseNormal(mean_new, cholesky_new, self.noise.tree_flatten)
+
+    def merge(self, other: "DenseLatentCond", /) -> "DenseLatentCond":
+        # self = cond1 (outer), other = cond2 (inner)
+        T = self.to_latent * other.to_observed
+
+        g = self.A @ (T[:, None] * other.A)
+        xi = self.A @ (T * other.noise.mean_flat) + self.noise.mean_flat
+
+        R1 = (self.A @ (T[:, None] * other.noise.cholesky_flat)).T
+        R2 = self.noise.cholesky_flat.T
+        Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
+
+        noise = DenseNormal(xi, Xi.T, self.noise.tree_flatten)
+        return DenseLatentCond(
+            g, noise, to_latent=other.to_latent, to_observed=self.to_observed
+        )
+
+    def revert(self, rv: "DenseNormal", /, *, solve_triu: Callable):
+        mean = self.to_latent * rv.mean_flat
+        cholesky = self.to_latent[:, None] * rv.cholesky_flat
+
+        R_X_F = (self.A @ cholesky).T
+        R_X = cholesky.T
+        R_YX = self.noise.cholesky_flat.T
+        tmp = cholesky_util.revert_conditional(
+            R_X_F=R_X_F, R_X=R_X, R_YX=R_YX, solve_triu=solve_triu
+        )
+        r_obs, (r_cor, gain) = tmp
+
+        mean_observed = self.A @ mean + self.noise.mean_flat
+        mean_corrected = mean - gain @ mean_observed
+        cholesky_corrected = r_cor.T
+        corrected = DenseNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
+        cond_new = DenseLatentCond(
+            gain,
+            corrected,
+            to_latent=1 / self.to_observed,
+            to_observed=1 / self.to_latent,
+        )
+
+        mean = self.to_observed * mean_observed
+        cholesky = self.to_observed[:, None] * r_obs.T
+        observed = DenseNormal(mean, cholesky, self.noise.tree_flatten)
+        return observed, cond_new
+
+    def preconditioner_apply(self, /):
+        A = self.to_observed[:, None] * self.A * self.to_latent[None, :]
+        mean = self.to_observed * self.noise.mean_flat
+        cholesky = self.to_observed[:, None] * self.noise.cholesky_flat
+        noise = DenseNormal(mean, cholesky, self.noise.tree_flatten)
+        return DenseLatentCond.from_linop_and_noise(A, noise)
+
+
+DenseLatentCond._register_as_pytree()
+
+
 class DensePriorFactory(interfaces.AbstractPriorFactory):
     """Implementation of dense prior constructors."""
-
-    def identity(self, template) -> interfaces.LatentCond:
-        (n,) = template.mean_flat.shape
-        A = np.eye(n)
-        m = np.zeros((n,))
-        C = np.zeros((n, n))
-        noise = DenseNormal(m, C, template.tree_flatten)
-        return interfaces.LatentCond.from_linop_and_noise(A, noise)
 
     def wiener_integrated(
         self,
@@ -99,7 +166,7 @@ class DensePriorFactory(interfaces.AbstractPriorFactory):
 
             tree_flatten = DenseTreeFlatten.from_example(tcoeffs_mean)
             noise = DenseNormal(q0, output_scale * Q, tree_flatten)
-            return interfaces.LatentCond(A, noise, to_latent=p_inv, to_observed=p)
+            return DenseLatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
         # Return the initial variable and the discretisation
         return init, discretise
@@ -209,7 +276,7 @@ class DensePriorFactory(interfaces.AbstractPriorFactory):
             eA, L = exp_gram(A_p, B_p)
             tree_flatten = DenseTreeFlatten.from_example(tcoeffs_mean)
             noise = DenseNormal(q0, output_scale * L, tree_flatten)
-            return interfaces.LatentCond(eA, noise, to_latent=p_inv, to_observed=p)
+            return DenseLatentCond(eA, noise, to_latent=p_inv, to_observed=p)
 
         return init, discretise
 
@@ -300,23 +367,6 @@ class DensePriorFactory(interfaces.AbstractPriorFactory):
             msg += f" Received: {output_scale.shape}."
             raise ValueError(msg)
         return output_scale
-
-    def to_derivative(self, i, std, template):
-        all_flat, all_unravel = tree.ravel_pytree(template.mean)
-
-        def select(a):
-            return tree.ravel_pytree(all_unravel(a)[i])[0]
-
-        x = np.zeros(all_flat.shape)
-        linop = func.jacfwd(select)(x)
-
-        data_like = all_unravel(x)[0]
-        noise = DenseNormal.from_mean_and_std([data_like], [std])
-        return interfaces.LatentCond.from_linop_and_noise(linop, noise)
-
-    def prototype_output_scale_calibrated(self, template):
-        del template
-        return np.ones(())
 
 
 @structs.dataclass
@@ -425,6 +475,28 @@ class DenseNormal(interfaces.AbstractTreeNormal[DenseTreeFlatten]):
         base = random.normal(key, shape=self.mean_flat.shape)
         return self.mean_flat + self.cholesky_flat @ base
 
+    def identity_conditional(self) -> DenseLatentCond:
+        (n,) = self.mean_flat.shape
+        A = np.eye(n)
+        noise = DenseNormal(np.zeros((n,)), np.zeros((n, n)), self.tree_flatten)
+        return DenseLatentCond.from_linop_and_noise(A, noise)
+
+    def prototype_output_scale_calibrated(self):
+        return np.ones(())
+
+    def to_derivative(self, i, std):
+        all_flat, all_unravel = tree.ravel_pytree(self.mean)
+
+        def select(a):
+            return tree.ravel_pytree(all_unravel(a)[i])[0]
+
+        x = np.zeros(all_flat.shape)
+        linop = func.jacfwd(select)(x)
+
+        data_like = all_unravel(x)[0]
+        noise = DenseNormal.from_mean_and_std([data_like], [std])
+        return DenseLatentCond.from_linop_and_noise(linop, noise)
+
     @staticmethod
     def register_pytree_node() -> None:
         def flatten(normal):
@@ -482,7 +554,7 @@ class DenseOdeTs0(interfaces.AbstractOde):
         fx = tree.tree_map(lambda s: -s, [fm])
         linop = func.jacrev(a1)(rv.mean_flat)
         noise = DenseNormal.from_dirac(fx, damp=damp)
-        cond = interfaces.LatentCond.from_linop_and_noise(linop, noise)
+        cond = DenseLatentCond.from_linop_and_noise(linop, noise)
         return cond, None
 
 
@@ -497,7 +569,6 @@ class DenseOdeTs1(interfaces.AbstractOde):
         return self.ode.jacobian.init_jacobian_handler()
 
     def linearize(self, rv, state: None, *, damp: float, t):
-        # fun = func.partial(self.ode, t=t)
         m_tree = rv.mean
 
         rv0 = DenseNormal.from_dirac([m_tree[0]], damp=0.0)
@@ -523,7 +594,7 @@ class DenseOdeTs1(interfaces.AbstractOde):
         fx = -(fx - J @ m0)
         fx = rv0.tree_flatten.unflatten_array(fx)
         noise = DenseNormal.from_dirac(fx, damp=damp)
-        cond = interfaces.LatentCond.from_linop_and_noise(linop, noise)
+        cond = DenseLatentCond.from_linop_and_noise(linop, noise)
         return cond, state
 
 
@@ -571,88 +642,5 @@ class DenseRoot(interfaces.AbstractRoot):
         # Turn the linearization into a conditional
         noise = DenseNormal.from_dirac([fx], damp=damp)
 
-        cond = interfaces.LatentCond.from_linop_and_noise(linop, noise)
+        cond = DenseLatentCond.from_linop_and_noise(linop, noise)
         return cond, state
-
-
-class DenseConditional(interfaces.AbstractConditional):
-    """Construct a dense implementation of manipulating conditionals."""
-
-    def apply_flat(self, x, cond, /):
-        x = cond.to_latent * x
-        mean = cond.to_observed * (cond.A @ x + cond.noise.mean_flat)
-        cholesky = cond.to_observed[:, None] * cond.noise.cholesky_flat
-        return DenseNormal(mean, cholesky, cond.noise.tree_flatten)
-
-    def marginalise(self, rv, cond, /):
-        mean = cond.to_latent * rv.mean_flat
-        cholesky = cond.to_latent[:, None] * rv.cholesky_flat
-
-        R_stack = ((cond.A @ cholesky).T, cond.noise.cholesky_flat.T)
-        cholesky_new = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
-
-        mean_new = cond.to_observed * (cond.A @ mean + cond.noise.mean_flat)
-        cholesky_new = cond.to_observed[:, None] * cholesky_new
-        return DenseNormal(mean_new, cholesky_new, cond.noise.tree_flatten)
-
-    def merge(
-        self, cond1: interfaces.LatentCond, cond2: interfaces.LatentCond, /
-    ) -> interfaces.LatentCond:
-        # Transform: latent (2) to latent (1)
-        T = cond1.to_latent * cond2.to_observed
-
-        # Linear operator
-        g = cond1.A @ (T[:, None] * cond2.A)
-
-        # Combined mean
-        xi = cond1.A @ (T * cond2.noise.mean_flat) + cond1.noise.mean_flat
-
-        # Cholesky factor of combined covariance
-        R1 = (cond1.A @ (T[:, None] * cond2.noise.cholesky_flat)).T
-        R2 = cond1.noise.cholesky_flat.T
-        Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
-
-        # Gather and return
-        noise = DenseNormal(xi, Xi.T, cond1.noise.tree_flatten)
-        return interfaces.LatentCond(
-            g, noise, to_latent=cond2.to_latent, to_observed=cond1.to_observed
-        )
-
-    def revert(
-        self, rv: DenseNormal, cond: interfaces.LatentCond, /, *, solve_triu: Callable
-    ):
-        # Pull RV into the latent space
-        mean = cond.to_latent * rv.mean_flat
-        cholesky = cond.to_latent[:, None] * rv.cholesky_flat
-
-        # QR-decomposition
-        R_X_F, R_X, R_YX = (cond.A @ cholesky).T, cholesky.T, cond.noise.cholesky_flat.T
-        tmp = cholesky_util.revert_conditional(
-            R_X_F=R_X_F, R_X=R_X, R_YX=R_YX, solve_triu=solve_triu
-        )
-        r_obs, (r_cor, gain) = tmp
-
-        # Push correction into observed space
-        mean_observed = cond.A @ mean + cond.noise.mean_flat
-        mean_corrected = mean - gain @ mean_observed
-        cholesky_corrected = r_cor.T
-        corrected = DenseNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
-        cond_new = interfaces.LatentCond(
-            gain,
-            corrected,
-            to_latent=1 / cond.to_observed,
-            to_observed=1 / cond.to_latent,
-        )
-
-        # Gather the observed variable
-        mean = cond.to_observed * mean_observed
-        cholesky = cond.to_observed[:, None] * r_obs.T
-        observed = DenseNormal(mean, cholesky, cond.noise.tree_flatten)
-        return observed, cond_new
-
-    def preconditioner_apply(self, cond, /):
-        A = cond.to_observed[:, None] * cond.A * cond.to_latent[None, :]
-        mean = cond.to_observed * cond.noise.mean_flat
-        cholesky = cond.to_observed[:, None] * cond.noise.cholesky_flat
-        noise = DenseNormal(mean, cholesky, cond.noise.tree_flatten)
-        return interfaces.LatentCond.from_linop_and_noise(A, noise)

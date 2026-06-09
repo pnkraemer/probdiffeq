@@ -181,16 +181,12 @@ def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
 
     tcoeffs, _ = jetexpand(vf, u0, t=t0)
     init, prior = factory.prior(tcoeffs, ssm=ssm)
-    strategy = factory.strategy(ssm=ssm)
+    strategy = factory.strategy()
     constraint = factory.constraint(vf, ssm=ssm)
-    solver = factory.solver(
-        strategy=strategy, prior=prior, constraint=constraint, ssm=ssm
-    )
+    solver = factory.solver(strategy=strategy, prior=prior, constraint=constraint)
     # not all constraints have shape (d,):
     error_norm = probdiffeq.error_norm_rms_then_scale()
-    error = factory.error(
-        prior=prior, ssm=ssm, constraint=constraint, error_norm=error_norm
-    )
+    error = factory.error(prior=prior, constraint=constraint, error_norm=error_norm)
 
     # Compute the PN solution
     save_at = np.linspace(t0, t1, endpoint=True, num=7)

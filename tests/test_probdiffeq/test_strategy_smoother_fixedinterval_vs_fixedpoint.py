@@ -24,9 +24,9 @@ def fixture_solution_smoother(solver_setup):
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
-    strategy = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedinterval()
+    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
     solve = test_util.solve_adaptive_save_every_step(error=error, solver=solver)
     t0, t1 = solver_setup["t0"], solver_setup["t1"]
     return solve(init, t0=t0, t1=t1, dt0=0.1, atol=1e-3, rtol=1e-3)
@@ -40,9 +40,9 @@ def test_fixedpoint_smoother_equivalent_same_grid(
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
-    strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
+    strategy = probdiffeq.strategy_smoother_fixedpoint()
+    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
 
     save_at = solution_smoother.t
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
@@ -66,8 +66,8 @@ def test_fixedpoint_smoother_equivalent_same_grid(
         sol_fp.solution_full.conditional,
         sol_sm.solution_full.conditional,
     )
-    cond_fp = func.vmap(ssm.conditional.preconditioner_apply)(cond_fp)
-    cond_sm = func.vmap(ssm.conditional.preconditioner_apply)(cond_sm)
+    cond_fp = func.vmap(lambda c: c.preconditioner_apply())(cond_fp)
+    cond_sm = func.vmap(lambda c: c.preconditioner_apply())(cond_sm)
     assert testing.allclose(cond_fp, cond_sm)
 
 
@@ -82,10 +82,8 @@ def test_fixedpoint_smoother_equivalent_different_grid(
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
-    strategy_sm = probdiffeq.strategy_smoother_fixedinterval(ssm=ssm)
-    solver_smoother = probdiffeq.solver(
-        strategy=strategy_sm, prior=iwp, constraint=ts0, ssm=ssm
-    )
+    strategy_sm = probdiffeq.strategy_smoother_fixedinterval()
+    solver_smoother = probdiffeq.solver(strategy=strategy_sm, prior=iwp, constraint=ts0)
 
     # Compute the offgrid-marginals
     ts = np.linspace(save_at[0], save_at[-1], num=7, endpoint=True)
@@ -99,9 +97,9 @@ def test_fixedpoint_smoother_equivalent_different_grid(
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
     init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
     ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
-    strategy_fp = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-    solver = probdiffeq.solver(strategy=strategy_fp, prior=iwp, constraint=ts0, ssm=ssm)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp, ssm=ssm)
+    strategy_fp = probdiffeq.strategy_smoother_fixedpoint()
+    solver = probdiffeq.solver(strategy=strategy_fp, prior=iwp, constraint=ts0)
+    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
     solution_fixedpoint = func.jit(solve)(
         init, save_at=ts, dt0=0.1, atol=1e-3, rtol=1e-3
