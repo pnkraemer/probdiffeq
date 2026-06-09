@@ -163,7 +163,12 @@ class lstsq_constrained_gauss_newton(LstSqConstrained):
 
         init = State(x0, constraint(x0, **constraint_kwargs), dx=np.ones_like(x0), i=0)
         final = self.while_loop(cond_fun, body_fun, init=init)
-        return final.x, {"iters": final.i, "final_residual": final.fx}
+        stats = {
+            "iters": final.i,
+            "final_constraint": final.fx,
+            "final_increment": final.dx,
+        }
+        return final.x, stats
 
 
 class taylor_point_prior(TaylorPoint):
