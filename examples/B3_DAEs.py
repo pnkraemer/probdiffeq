@@ -15,7 +15,7 @@ The Robertson problem is interesting for many reasons:
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-import scipy.integrate
+import scipy.special
 
 from probdiffeq import ivpsolve, probdiffeq
 
@@ -48,14 +48,14 @@ def main(t0=1e-6, t1=1e5) -> None:
 
     jetexpand = probdiffeq.jetexpand_residual(num=4)
     residual = probdiffeq.residual_from_stack(differential, algebraic)
-    y0, _info = jetexpand(residual, [jnp.array([1.0, 0.0, 0.0])], t=t0)
+    tcoeffs, _ = jetexpand(residual, [jnp.array([1.0, 0.0, 0.0])], t=t0)
 
     # This base scale is critical to Robertson, because
     # the solutions live on vastly different scales
     # (but don't vary much within these scales).
     base_scale = jnp.asarray([0.8, 2e-05, 0.2])
     init, ioup = probdiffeq.prior_wiener_integrated(
-        y0, ssm=ssm, output_scale=base_scale
+        tcoeffs, ssm=ssm, output_scale=base_scale
     )
 
     # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.

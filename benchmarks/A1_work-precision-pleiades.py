@@ -1,7 +1,5 @@
 """Walltime | Pleiades."""
 
-import statistics
-import timeit
 from collections.abc import Callable
 
 import diffrax
@@ -14,6 +12,7 @@ import scipy.integrate
 import tqdm
 
 from probdiffeq import ivpsolve, probdiffeq
+from probdiffeq.util import benchmark_util
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -39,8 +38,8 @@ def main(start=3.0, stop=11.0, step=0.5, repeats=2) -> None:
     plt.show()
 
     # Read configuration from command line
-    tolerances = setup_tolerances(start=start, stop=stop, step=step)
-    timeit_fun = setup_timeit(repeats=repeats)
+    tolerances = benchmark_util.setup_tolerances(start=start, stop=stop, step=step)
+    timeit_fun = benchmark_util.setup_timeit(repeats=repeats)
 
     # Assemble algorithms
     algorithms = {
@@ -60,14 +59,16 @@ def main(start=3.0, stop=11.0, step=0.5, repeats=2) -> None:
 
     # Compute a reference solution
     reference = solver_scipy(method="LSODA", use_numba=False)(1e-14)
-    precision_fun = rmse_absolute(reference)
+    precision_fun = benchmark_util.rmse_absolute(reference)
 
     # Compute all work-precision diagrams
     results = {}
     pbar = tqdm.tqdm(algorithms.items())
     for label, algo in pbar:
         pbar.set_description(label)
-        param_to_wp = workprec(algo, precision_fun=precision_fun, timeit_fun=timeit_fun)
+        param_to_wp = benchmark_util.workprec(
+            algo, precision_fun=precision_fun, timeit_fun=timeit_fun
+        )
         results[label] = param_to_wp(tolerances)
     _fig, ax = plt.subplots(figsize=(7, 3))
     for label, wp in results.items():
@@ -120,20 +121,6 @@ def solve_ivp_once():
     )
 
     return solution.t, solution.y.T
-
-
-def setup_tolerances(*, start: float, stop: float, step: float) -> jax.Array:
-    """Choose vector of tolerances from the command-line arguments."""
-    return 0.1 ** jnp.arange(start, stop, step=step)
-
-
-def setup_timeit(*, repeats: int) -> Callable:
-    """Construct a timeit-function from the command-line arguments."""
-
-    def timer(fun, /):
-        return list(timeit.repeat(fun, number=1, repeat=repeats))
-
-    return timer
 
 
 def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
@@ -294,41 +281,6 @@ def solver_scipy(*, method: str, use_numba: bool) -> Callable:
         return jnp.asarray(solution.y[:14, -1])
 
     return param_to_solution
-
-
-def rmse_absolute(expected: jax.Array) -> Callable:
-    """Compute the absolute RMSE."""
-    expected = jnp.asarray(expected)
-
-    def rmse(received):
-        received = jnp.asarray(received)
-        error_absolute = jnp.abs(expected - received)
-        return jnp.linalg.norm(error_absolute) / jnp.sqrt(error_absolute.size)
-
-    return rmse
-
-
-def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
-    """Turn a parameter-to-solution function into parameter-to-workprecision."""
-
-    def parameter_list_to_workprecision(list_of_args, /):
-        works_mean = []
-        works_std = []
-        precisions = []
-        for arg in list_of_args:
-            precision = precision_fun(fun(arg).block_until_ready())
-            times = timeit_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
-
-            precisions.append(precision)
-            works_mean.append(statistics.mean(times))
-            works_std.append(statistics.stdev(times))
-        return {
-            "work_mean": jnp.asarray(works_mean),
-            "work_std": jnp.asarray(works_std),
-            "precision": jnp.asarray(precisions),
-        }
-
-    return parameter_list_to_workprecision
 
 
 main()

@@ -90,8 +90,8 @@ def solve(vf, tc, *, t0, t1):
     )
     ts = jnp.linspace(t0, t1, endpoint=True, num=10)
     error = probdiffeq.error_residual_std(constraint=ts0, prior=prior, ssm=ssm)
-    solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    return solve(init, save_at=ts, atol=1e-2, rtol=1e-2)
+    solve_fn = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
+    return solve_fn(init, save_at=ts, atol=1e-2, rtol=1e-2)
 
 
 if __name__ == "__main__":

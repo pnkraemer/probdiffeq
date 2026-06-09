@@ -159,11 +159,11 @@ def solver(residual, tol, while_loop, trafo):
             maxiter=10, tol=tol, while_loop=while_loop
         )
         jetexpand = probdiffeq.jetexpand_residual(num=3, nlstsq=nlstsq)
-        y0, _info = jetexpand(residual, [y0], t=t0)
+        tcoeffs, _ = jetexpand(residual, [y0], t=t0)
         ssm = probdiffeq.state_space_model()
 
         init, prior = probdiffeq.prior_wiener_integrated(
-            y0, ssm=ssm, output_scale=output_scale
+            tcoeffs, ssm=ssm, output_scale=output_scale
         )
 
         # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
@@ -172,7 +172,7 @@ def solver(residual, tol, while_loop, trafo):
             residual, ssm=ssm, taylor_point=taylor_point
         )
         strategy = probdiffeq.strategy_smoother_fixedpoint(ssm=ssm)
-        solver = probdiffeq.solver_dynamic(
+        solver_obj = probdiffeq.solver_dynamic(
             strategy=strategy, prior=prior, constraint=jet, ssm=ssm
         )
 
@@ -180,10 +180,10 @@ def solver(residual, tol, while_loop, trafo):
         # of the DAE, which is exactly what we need here
         error = probdiffeq.error_state_std(constraint=jet, prior=prior, ssm=ssm)
 
-        solve = ivpsolve.solve_adaptive_save_at(
-            solver=solver, error=error, while_loop=while_loop
+        solve_fn = ivpsolve.solve_adaptive_save_at(
+            solver=solver_obj, error=error, while_loop=while_loop
         )
-        return solve(init, save_at=save_at, atol=tol, rtol=tol)
+        return solve_fn(init, save_at=save_at, atol=tol, rtol=tol)
 
     return solve
 

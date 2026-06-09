@@ -1,7 +1,6 @@
 """Convergence rates | Lotka-Volterra."""
 
 import statistics
-import timeit
 from collections.abc import Callable
 
 import jax
@@ -13,6 +12,7 @@ import scipy.integrate
 import tqdm
 
 from probdiffeq import ivpsolve, probdiffeq
+from probdiffeq.util import benchmark_util
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -46,9 +46,9 @@ def main() -> None:
 
     # Set up the benchmark (compute a reference etc.)
     reference = solver_scipy(method="LSODA")(1e-12)
-    tolerances = 0.1 ** jnp.arange(2, 8, step=0.5)
-    precision_fun = rmse_relative(reference)
-    timeit_fun = timer()
+    tolerances = benchmark_util.setup_tolerances(start=2, stop=8, step=0.5)
+    precision_fun = benchmark_util.rmse_relative(reference)
+    timeit_fun = benchmark_util.setup_timeit(repeats=1)
 
     # Compute all work-precision diagrams
     results = {}
@@ -121,28 +121,6 @@ def solver_scipy(*, method: str) -> Callable:
         return jnp.asarray(solution.y[..., -1])
 
     return param_to_solution
-
-
-def rmse_relative(expected: jax.Array, *, nugget=1e-5) -> Callable:
-    """Compute the relative RMSE."""
-    expected = jnp.asarray(expected)
-
-    def rmse(received):
-        received = jnp.asarray(received)
-        error_absolute = jnp.abs(expected - received)
-        error_relative = error_absolute / jnp.abs(nugget + expected)
-        return jnp.linalg.norm(error_relative) / jnp.sqrt(error_relative.size)
-
-    return rmse
-
-
-def timer():
-    """Construct a timing function."""
-
-    def timeit_fun(fun, /):
-        return list(timeit.repeat(fun, number=1, repeat=1))
-
-    return timeit_fun
 
 
 def solver_probdiffeq(num_derivatives: int) -> Callable:

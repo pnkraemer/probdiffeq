@@ -163,8 +163,8 @@ def solve_adaptive(vf, *, solver, error, save_at):
 
         ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
         init, _iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-        solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-        return solve(init, save_at=save_at, dt0=0.1, atol=1e-4, rtol=1e-2)
+        solve_fn = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
+        return solve_fn(init, save_at=save_at, dt0=0.1, atol=1e-4, rtol=1e-2)
 
     return solve
 
