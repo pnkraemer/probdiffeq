@@ -163,7 +163,7 @@ def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
 
         ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
         init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-        ts = constraint_ode_fun(vf_probdiffeq)
+        ts = constraint_ode_fun(vf_probdiffeq, ssm=ssm)
         strategy = probdiffeq.strategy_filter()
         solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts)
         error = probdiffeq.error_residual_std(constraint=ts, prior=iwp)

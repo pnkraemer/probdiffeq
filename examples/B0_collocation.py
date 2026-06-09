@@ -58,9 +58,9 @@ def main():
 
     num_samples = 20
     key = jax.random.PRNGKey(seed=1)
-    samples_prior = mseq_prior.sample(key, ssm=ssm, shape=(num_samples,))
-    samples_tcoeffs = mseq_tcoeffs.sample(key, ssm=ssm, shape=(num_samples,))
-    samples_posterior = mseq_posterior.sample(key, ssm=ssm, shape=(num_samples,))
+    samples_prior = mseq_prior.sample(key, shape=(num_samples,))
+    samples_tcoeffs = mseq_tcoeffs.sample(key, shape=(num_samples,))
+    samples_posterior = mseq_posterior.sample(key, shape=(num_samples,))
 
     # Plot the results.
 

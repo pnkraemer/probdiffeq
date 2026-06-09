@@ -117,7 +117,7 @@ def solver_probdiffeq(num_derivatives: int, implementation, constraint) -> Calla
         ssm = probdiffeq.state_space_model(ssm_fact=implementation)
         init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
         strategy = probdiffeq.strategy_filter()
-        ts = constraint(vf_probdiffeq)
+        ts = constraint(vf_probdiffeq, ssm=ssm)
         solver = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts)
         error = probdiffeq.error_residual_std(constraint=ts, prior=iwp)
 

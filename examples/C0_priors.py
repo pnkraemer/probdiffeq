@@ -50,10 +50,10 @@ def main():
 
         num_samples = 3
         key = jax.random.PRNGKey(i)
-        sample_fun = jax.jit(mseq.sample, static_argnames=["shape", "ssm"])
-        samples_prior = sample_fun(key, ssm=ssm, shape=(num_samples,))
+        sample_fun = jax.jit(mseq.sample, static_argnames=["shape"])
+        samples_prior = sample_fun(key, shape=(num_samples,))
 
-        margs = mseq.evaluate_marginals(ssm=ssm)
+        margs = mseq.evaluate_marginals()
         means = margs.mean
         stds = margs.std
 
