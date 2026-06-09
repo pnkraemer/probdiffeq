@@ -76,7 +76,7 @@ class IsotropicTreeFlatten(interfaces.AbstractTreeFlatten):
         return cls(treedef, unravel_leaf)
 
 
-class IsotropicLatentCond(interfaces.LatentCond):
+class IsotropicLatentCond(interfaces.AbstractLatentCond):
     """Isotropic (scalar-variance) implementation of LatentCond operations."""
 
     def apply_flat(self, x, /):

@@ -21,7 +21,7 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class BlockDiagLatentCond(interfaces.LatentCond):
+class BlockDiagLatentCond(interfaces.AbstractLatentCond):
     """Block-diagonal implementation of LatentCond operations."""
 
     def apply_flat(self, x, /):

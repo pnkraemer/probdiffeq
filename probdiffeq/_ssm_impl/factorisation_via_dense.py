@@ -21,7 +21,7 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class DenseLatentCond(interfaces.LatentCond):
+class DenseLatentCond(interfaces.AbstractLatentCond):
     """Dense (full-covariance) implementation of LatentCond operations."""
 
     def apply_flat(self, x, /):

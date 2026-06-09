@@ -2,6 +2,7 @@ from probdiffeq.backend import abc, func, np, tree
 from probdiffeq.backend.typing import Array, Generic, Sequence, TypeVar
 
 __all__ = [
+    "AbstractLatentCond",
     "AbstractLinearization",
     "AbstractLinearizationFactory",
     "AbstractOde",
@@ -9,7 +10,6 @@ __all__ = [
     "AbstractRoot",
     "AbstractTreeFlatten",
     "AbstractTreeNormal",
-    "LatentCond",
 ]
 
 
@@ -27,7 +27,7 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class LatentCond:
+class AbstractLatentCond:
     """Conditional distributions in latent space.
 
     Subclasses implement the SSM-specific operations (marginalise, revert, etc.).
@@ -40,7 +40,7 @@ class LatentCond:
         self.to_observed = to_observed
 
     def __repr__(self) -> str:
-        msg = f"LatentCond(A={self.A}, noise={self.noise}"
+        msg = f"{self.__class__.__name__}(A={self.A}, noise={self.noise}"
         msg += f", to_latent={self.to_latent}, to_observed={self.to_observed})"
         return msg
 
@@ -127,7 +127,7 @@ class LatentCond:
         return mahalanobis, updated
 
 
-LatentCond._register_as_pytree()
+AbstractLatentCond._register_as_pytree()
 
 
 class AbstractLinearization(abc.ABC):
@@ -285,7 +285,7 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def identity_conditional(self) -> LatentCond:
+    def identity_conditional(self) -> AbstractLatentCond:
         """Return the identity transition compatible with this distribution."""
         raise NotImplementedError
 
@@ -360,6 +360,6 @@ class AbstractPriorFactory(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def to_derivative(self, i, std) -> LatentCond:
+    def to_derivative(self, i, std) -> AbstractLatentCond:
         """Construct an observation model for the i'th derivative."""
         raise NotImplementedError
