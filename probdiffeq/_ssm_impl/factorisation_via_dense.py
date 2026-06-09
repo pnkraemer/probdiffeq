@@ -1,5 +1,5 @@
 from probdiffeq._ssm_impl import interfaces, utilities
-from probdiffeq.backend import func, linalg, np, random, structs, tree
+from probdiffeq.backend import func, linalg, np, random, structs, tree, warnings
 from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
 
@@ -10,7 +10,7 @@ __all__ = [
     "DenseOdeTs0",
     "DenseOdeTs1",
     "DensePriorFactory",
-    "DenseRoot",
+    "DenseResidual",
     "DenseTreeFlatten",
 ]
 
@@ -519,7 +519,7 @@ class DenseLinearizationFactory(interfaces.AbstractLinearizationFactory):
     """Construct a dense linearization factory."""
 
     def residual(self, residual, *, taylor_point):
-        return DenseRoot(residual, taylor_point=taylor_point)
+        return DenseResidual(residual, taylor_point=taylor_point)
 
     def ode_taylor_0th(self, *, ode):
         return DenseOdeTs0(ode=ode)
@@ -598,7 +598,7 @@ class DenseOdeTs1(interfaces.AbstractOde):
         return cond, state
 
 
-class DenseRoot(interfaces.AbstractRoot):
+class DenseResidual(interfaces.AbstractResidual):
     """Construct a dense implementation of residual-TS1 linearization."""
 
     def __init__(self, residual, *, taylor_point) -> None:
@@ -638,6 +638,11 @@ class DenseRoot(interfaces.AbstractRoot):
         jacobian = self.residual.jacobian.materialize_dense
         fx, linop, state = jacobian(constraint_flat, xi, state, t=t)
         fx = fx - linop @ xi
+
+        if linop.shape[0] > linop.shape[1]:
+            msg = f"There are more constraints ({linop.shape[0]}) than variables ({linop.shape[1]})."
+            msg += " This will likely cause an error in the conditioning."
+            warnings.warn(msg, stacklevel=1)
 
         # Turn the linearization into a conditional
         noise = DenseNormal.from_dirac([fx], damp=damp)
