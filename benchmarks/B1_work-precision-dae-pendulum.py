@@ -1,5 +1,6 @@
 """Walltime | Simple pendulum DAE (index-3)."""
 
+import functools
 import statistics
 from collections.abc import Callable
 
@@ -16,7 +17,7 @@ jax.config.update("jax_debug_nans", True)
 jax.config.update("jax_enable_x64", True)
 
 
-def main(start=2.0, stop=10.0, step=0.5, repeats=2, time_span=(0.0, 1.0)) -> None:
+def main(start=3.0, stop=12.0, step=0.5, repeats=2, time_span=(0.0, 1.0)) -> None:
     """Run the script."""
     jax.config.update("jax_enable_x64", True)
 
@@ -24,10 +25,8 @@ def main(start=2.0, stop=10.0, step=0.5, repeats=2, time_span=(0.0, 1.0)) -> Non
     timeit_fun = benchmark_util.setup_timeit(repeats=repeats)
 
     algorithms = {
-        "index-3 | Jet(3)": solver_index3(num_derivatives=3, time_span=time_span),
-        "index-1 | Jet(3)": solver_index1(num_derivatives=3, time_span=time_span),
-        "index-3 | Jet(5)": solver_index3(num_derivatives=5, time_span=time_span),
-        "index-1 | Jet(5)": solver_index1(num_derivatives=5, time_span=time_span),
+        "index-3 | Jet(4)": solver_index3(num_derivatives=4, time_span=time_span),
+        "index-1 | Jet(4)": solver_index1(num_derivatives=4, time_span=time_span),
     }
 
     reference = solver_index1(num_derivatives=5, time_span=time_span)(
@@ -73,60 +72,10 @@ def main(start=2.0, stop=10.0, step=0.5, repeats=2, time_span=(0.0, 1.0)) -> Non
     plt.show()
 
 
-def solver_index3(*, num_derivatives: int, time_span) -> Callable:
-    """Construct a first-order DAE solver for the pendulum (index-3)."""
-
-    @probdiffeq.residual_state_velocity
-    def dynamics(u, du, /, *, t):
-        del t
-        x, y, vx, vy, lam = u
-        dx, dy, dvx, dvy, _ = du
-        return jnp.array([dx - vx, dy - vy, dvx + x * lam, dvy + y * lam + 9.81])
-
-    @probdiffeq.residual_state
-    def constraint(u, /, *, t):
-        del t
-        return jnp.array([u[0] ** 2 + u[1] ** 2 - 1.0])  # <-- was wrapped in a list []
-
-    residual = probdiffeq.residual_from_stack(dynamics, constraint)
-
-    @jax.jit
-    def param_to_solution(tol):
-        t0, t1 = time_span
-        inits = _y0_first_order_dae()
-
-        nlstsq = probdiffeq.lstsq_constrained_gauss_newton(maxiter=100, tol=1e-16)
-        jetexpand = probdiffeq.jetexpand_residual(nlstsq=nlstsq, num=num_derivatives)
-        tcoeffs, _ = jetexpand(residual, (inits,), t=t0)
-
-        ssm = probdiffeq.state_space_model()
-        output_scale = jnp.array([1.0, 1.0, 1.0, 1.0, 9.81 + 1.0])
-        init, iwp = probdiffeq.prior_wiener_integrated(
-            tcoeffs, output_scale=output_scale, ssm=ssm
-        )
-
-        taylor_point = probdiffeq.taylor_point_maximum_a_posteriori(nlstsq=nlstsq)
-        jet = probdiffeq.constraint_residual(
-            residual, taylor_point=taylor_point, ssm=ssm
-        )
-        strategy = probdiffeq.strategy_filter()
-
-        solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=jet)
-        error = probdiffeq.error_state_std(constraint=jet, prior=iwp)
-
-        solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
-        solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
-
-        xy = solution.u.mean[0][:2]
-        vxvy = solution.u.mean[0][2:4]
-        return jnp.concatenate([xy, vxvy])
-
-    return param_to_solution
-
-
 def solver_index1(*, num_derivatives: int, time_span) -> Callable:
     """Construct a first-order DAE solver for the pendulum (index-1)."""
 
+    @functools.partial(probdiffeq.jet_lift, lift_by=0)
     @probdiffeq.residual_state_velocity
     def dynamics(u, du, /, *, t):
         del t
@@ -134,15 +83,16 @@ def solver_index1(*, num_derivatives: int, time_span) -> Callable:
         dx, dy, dvx, dvy, _ = du
         return jnp.array([dx - vx, dy - vy, dvx + x * lam, dvy + y * lam + 9.81])
 
-    @probdiffeq.residual_state_velocity
-    def constraint(u, du, /, *, t):
+    @functools.partial(probdiffeq.jet_lift, lift_by=0)
+    @probdiffeq.residual_state
+    def constraint(u, /, *, t):
         del t
         x, y, vx, vy, lam = u
-        dx, dy, dvx, dvy, _ = du
+        # dx, dy, dvx, dvy, dlam = du
+        # gdot = x * vx + y * vy
         g = x**2 + y**2 - 1.0
-        gdot = x * vx + y * vy
-        gddot = dvx * x + dvy * y + vx**2 + vy**2
-        return jnp.array([g, gdot, gddot])
+        # gddot = dvx * x + dvy * y + vx**2 + vy**2
+        return jnp.array([g])
 
     residual = probdiffeq.residual_from_stack(dynamics, constraint)
 
@@ -156,21 +106,83 @@ def solver_index1(*, num_derivatives: int, time_span) -> Callable:
         t0, t1 = time_span
         inits = _y0_first_order_dae()
 
-        nlstsq = probdiffeq.lstsq_constrained_gauss_newton()
+        nlstsq = probdiffeq.lstsq_constrained_gauss_newton(tol=1e-12, maxiter=10)
         jetexpand = probdiffeq.jetexpand_residual(nlstsq=nlstsq, num=num_derivatives)
         tcoeffs, _ = jetexpand(residual, (inits,), t=t0)
 
         ssm = probdiffeq.state_space_model()
         output_scale = jnp.array([1.0, 1.0, 1.0, 1.0, 9.81 + 1.0])
+        is_exact = jnp.asarray([True, True, True, True, False])
         init, iwp = probdiffeq.prior_wiener_integrated(
-            tcoeffs, output_scale=output_scale, ssm=ssm
+            tcoeffs,
+            output_scale=output_scale,
+            ssm=ssm,
+            is_exact=[is_exact for _ in range(len(tcoeffs))],
         )
 
-        taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
+        taylor_point = probdiffeq.taylor_point_maximum_a_posteriori(nlstsq=nlstsq)
         jet = probdiffeq.constraint_residual(
             residual, taylor_point=taylor_point, ssm=ssm
         )
         strategy = probdiffeq.strategy_filter()
+        solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=jet)
+        error = probdiffeq.error_state_std(constraint=jet, prior=iwp)
+
+        solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
+        solution = solve(init, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
+
+        xy = solution.u.mean[0][:2]
+        vxvy = solution.u.mean[0][2:4]
+        return jnp.concatenate([xy, vxvy])
+
+    return param_to_solution
+
+
+def solver_index3(*, num_derivatives: int, time_span) -> Callable:
+    """Construct a first-order DAE solver for the pendulum (index-3)."""
+
+    @functools.partial(probdiffeq.jet_lift, lift_by=0)
+    @probdiffeq.residual_state_velocity
+    def dynamics(u, du, /, *, t):
+        del t
+        x, y, vx, vy, lam = u
+        dx, dy, dvx, dvy, _ = du
+        return jnp.array([dx - vx, dy - vy, dvx + x * lam, dvy + y * lam + 9.81])
+
+    @functools.partial(probdiffeq.jet_lift, lift_by=0)
+    @probdiffeq.residual_state
+    def constraint(u, /, *, t):
+        del t
+        return jnp.array([u[0] ** 2 + u[1] ** 2 - 1.0])  # <-- was wrapped in a list []
+
+    residual = probdiffeq.residual_from_stack(dynamics, constraint)
+
+    @jax.jit
+    def param_to_solution(tol):
+        t0, t1 = time_span
+        inits = _y0_first_order_dae()
+
+        nlstsq = probdiffeq.lstsq_constrained_gauss_newton(tol=1e-12, maxiter=10)
+        jetexpand = probdiffeq.jetexpand_residual(nlstsq=nlstsq, num=num_derivatives)
+        tcoeffs, _ = jetexpand(residual, (inits,), t=t0)
+
+        ssm = probdiffeq.state_space_model()
+
+        output_scale = jnp.array([1.0, 1.0, 1.0, 1.0, 9.81 + 1.0])
+        is_exact = jnp.asarray([True, True, True, True, False])
+        init, iwp = probdiffeq.prior_wiener_integrated(
+            tcoeffs,
+            output_scale=output_scale,
+            ssm=ssm,
+            is_exact=[is_exact for _ in range(len(tcoeffs))],
+        )
+
+        taylor_point = probdiffeq.taylor_point_maximum_a_posteriori(nlstsq=nlstsq)
+        jet = probdiffeq.constraint_residual(
+            residual, taylor_point=taylor_point, ssm=ssm
+        )
+        strategy = probdiffeq.strategy_filter()
+
         solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=jet)
         error = probdiffeq.error_state_std(constraint=jet, prior=iwp)
 
