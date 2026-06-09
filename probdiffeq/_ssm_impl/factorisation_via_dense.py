@@ -368,19 +368,6 @@ class DensePriorFactory(interfaces.AbstractPriorFactory):
             raise ValueError(msg)
         return output_scale
 
-    def to_derivative(self, i, std, template):
-        all_flat, all_unravel = tree.ravel_pytree(template.mean)
-
-        def select(a):
-            return tree.ravel_pytree(all_unravel(a)[i])[0]
-
-        x = np.zeros(all_flat.shape)
-        linop = func.jacfwd(select)(x)
-
-        data_like = all_unravel(x)[0]
-        noise = DenseNormal.from_mean_and_std([data_like], [std])
-        return DenseLatentCond.from_linop_and_noise(linop, noise)
-
 
 @structs.dataclass
 class DenseTreeFlatten(interfaces.AbstractTreeFlatten):
@@ -496,6 +483,19 @@ class DenseNormal(interfaces.AbstractTreeNormal[DenseTreeFlatten]):
 
     def prototype_output_scale_calibrated(self):
         return np.ones(())
+
+    def to_derivative(self, i, std):
+        all_flat, all_unravel = tree.ravel_pytree(self.mean)
+
+        def select(a):
+            return tree.ravel_pytree(all_unravel(a)[i])[0]
+
+        x = np.zeros(all_flat.shape)
+        linop = func.jacfwd(select)(x)
+
+        data_like = all_unravel(x)[0]
+        noise = DenseNormal.from_mean_and_std([data_like], [std])
+        return DenseLatentCond.from_linop_and_noise(linop, noise)
 
     @staticmethod
     def register_pytree_node() -> None:

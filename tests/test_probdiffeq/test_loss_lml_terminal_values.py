@@ -37,7 +37,7 @@ def fixture_solution_and_loss_and_data(strategy_func, fact):
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
     sol = func.jit(solve)(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2)
 
-    loss = probdiffeq.loss_lml_terminal_values(ssm=ssm)
+    loss = probdiffeq.loss_lml_terminal_values()
     data = sol.u.mean[0]
     std = (
         tree.tree_map(np.ones_like, data)

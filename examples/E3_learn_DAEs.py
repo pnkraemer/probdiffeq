@@ -91,9 +91,7 @@ def main(
     labels = solution_true.u.mean[0]
 
     # Build a loss
-    # Includes a "fake" SSM (to get the conditioning-functions to build a loss)
-    ssm = probdiffeq.state_space_model()
-    loss = loss_data_fit(solve, ssm=ssm, inputs=inputs, labels=labels)
+    loss = loss_data_fit(solve, inputs=inputs, labels=labels)
     value_and_grad = jax.jit(jax.value_and_grad(loss, has_aux=True))
 
     # Initialise the optimiser
@@ -130,14 +128,14 @@ def main(
     assert jnp.allclose(y_guess, y_true, atol=1e-4, rtol=1e-4)
 
 
-def loss_data_fit(solve, *, ssm, inputs, labels):
+def loss_data_fit(solve, *, inputs, labels):
     """Create a loss that measures the data fit."""
 
     def loss(y0, std_log, output_scale):
         std = jnp.exp(std_log) * output_scale
         std_ts = jnp.ones_like(inputs)[:, None] * std[None, ...]
 
-        loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
+        loss_lml = probdiffeq.loss_lml_timeseries()
         sol = solve(y0, save_at=inputs, output_scale=output_scale)
 
         lml = loss_lml(labels, std=std_ts, posterior=sol.solution_full)

@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 
-def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
+def loss_lml_terminal_values(*, tcoeff_index=0):
     """Construct a log-marginal-likelihood loss for the terminal value."""
 
     def loss(u, /, *, marginals, std):
@@ -39,7 +39,7 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
         if not tree.tree_all(shapes_equal):
             raise ValueError(msg)
 
-        model = ssm.prior.to_derivative(tcoeff_index, std, template=marginals)
+        model = marginals.to_derivative(tcoeff_index, std)
         marg = model.marginalise(marginals)
 
         # Wrap into list because blockdiag & isotropic models
@@ -50,11 +50,7 @@ def loss_lml_terminal_values(*, ssm: ssm_impl.FactSsmImpl, tcoeff_index=0):
 
 
 def loss_lml_timeseries(
-    *,
-    ssm: ssm_impl.FactSsmImpl,
-    average_pdfs: bool = True,
-    tcoeff_index=0,
-    solve_triu=linalg.lstsq_svd,
+    *, average_pdfs: bool = True, tcoeff_index=0, solve_triu=linalg.lstsq_svd
 ):
     """Construct a log-marginal-likelihood loss for a time-series."""
 
@@ -90,7 +86,7 @@ def loss_lml_timeseries(
         posterior = posterior.remove_filtering_distributions()
 
         def make_model(s):
-            return ssm.prior.to_derivative(tcoeff_index, s, template=posterior.marginal)
+            return posterior.marginal.to_derivative(tcoeff_index, s)
 
         model = func.vmap(make_model)(std)
 

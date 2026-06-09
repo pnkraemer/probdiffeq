@@ -326,19 +326,6 @@ class BlockDiagPriorFactory(interfaces.AbstractPriorFactory):
         tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
         return tcoeffs_mean, tcoeffs_std
 
-    def to_derivative(self, i, std, template):
-
-        def select(a):
-            return np.asarray([a[i]])
-
-        (d, n) = template.mean_flat.shape
-        x = np.zeros((d, n))
-        linop = func.vmap(func.jacrev(select))(x)
-
-        u_like = tree.tree_map(np.zeros_like, template.mean[0])
-        noise = BlockDiagNormal.from_mean_and_std([u_like], [std])
-        return BlockDiagLatentCond.from_linop_and_noise(linop, noise)
-
 
 class BlockDiagLinearizationFactory(interfaces.AbstractLinearizationFactory):
     """Construct a block-diagonal linearization-factory."""
@@ -588,6 +575,18 @@ class BlockDiagNormal(interfaces.AbstractTreeNormal[BlockDiagTreeFlatten]):
         # TODO: technically, these should be pytrees according
         # to the leaf structure, right?
         return np.ones(single_flat.shape)
+
+    def to_derivative(self, i, std):
+        def select(a):
+            return np.asarray([a[i]])
+
+        (d, n) = self.mean_flat.shape
+        x = np.zeros((d, n))
+        linop = func.vmap(func.jacrev(select))(x)
+
+        u_like = tree.tree_map(np.zeros_like, self.mean[0])
+        noise = BlockDiagNormal.from_mean_and_std([u_like], [std])
+        return BlockDiagLatentCond.from_linop_and_noise(linop, noise)
 
     @staticmethod
     def register_pytree_node() -> None:

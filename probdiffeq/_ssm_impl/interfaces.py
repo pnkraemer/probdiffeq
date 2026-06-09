@@ -294,6 +294,11 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
         """Return a prototype (zero-valued) array for the calibrated output scale."""
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def to_derivative(self, i, std) -> "AbstractLatentCond":
+        """Construct an observation model that extracts the i-th Taylor coefficient."""
+        raise NotImplementedError
+
 
 class AbstractPriorFactory(abc.ABC):
     """Interface for prior constructions."""
@@ -357,9 +362,4 @@ class AbstractPriorFactory(abc.ABC):
         diffuse_eps: float,
         base_scale: Array | None,
     ):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def to_derivative(self, i, std) -> AbstractLatentCond:
-        """Construct an observation model for the i'th derivative."""
         raise NotImplementedError

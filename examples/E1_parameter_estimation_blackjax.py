@@ -199,7 +199,7 @@ def log_posterior(vf, theta_true, *, solver, ts, mean, cov, obs_std=0.1):
         solve = ivpsolve.solve_fixed_grid(solver=solver)
         solution = solve(init, grid=ts)
         y_T = jax.tree.map(lambda s: s[-1], solution.u)
-        loss = probdiffeq.loss_lml_terminal_values(ssm=ssm)
+        loss = probdiffeq.loss_lml_terminal_values()
         logpdf_data = loss(data, std=obs_std, marginals=y_T)
         logpdf_prior = jax.scipy.stats.multivariate_normal.logpdf(
             theta, mean=mean, cov=cov

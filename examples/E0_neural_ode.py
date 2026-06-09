@@ -146,7 +146,7 @@ def loss_log_marginal_likelihood(vf, *, t0):
         sol = solve(init, grid=grid)
 
         # Evaluate loss
-        loss_lml = probdiffeq.loss_lml_timeseries(ssm=ssm)
+        loss_lml = probdiffeq.loss_lml_timeseries()
         std_array = jnp.ones_like(grid) * std[None]
         lml = loss_lml(data, std=std_array, posterior=sol.solution_full)
         return -lml, {"sol": sol}

@@ -275,6 +275,15 @@ class IsotropicNormal(interfaces.AbstractTreeNormal[IsotropicTreeFlatten]):
     def prototype_output_scale_calibrated(self):
         return np.ones(())
 
+    def to_derivative(self, i, std):
+        ndim, _d = self.mean_flat.shape
+        m = np.zeros((ndim,))
+        linop = func.jacfwd(lambda s: np.asarray([s[i]]))(m)
+
+        u_like = tree.tree_map(np.zeros_like, self.mean[0])
+        noise = IsotropicNormal.from_mean_and_std([u_like], [std])
+        return IsotropicLatentCond.from_linop_and_noise(linop, noise)
+
     @staticmethod
     def register_pytree_node() -> None:
         def flatten(normal):
@@ -472,19 +481,6 @@ class IsotropicPriorFactory(interfaces.AbstractPriorFactory):
         )
         tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
         return tcoeffs_mean, tcoeffs_std
-
-    def to_derivative(self, i, std, template):
-
-        ndim, _d = template.mean_flat.shape
-        m = np.zeros((ndim,))
-        linop = func.jacfwd(lambda s: np.asarray([s[i]]))(m)
-
-        u_like = tree.tree_map(np.zeros_like, template.mean[0])
-
-        # Wrap u_like and std into a list because the random variable
-        # expects TaylorCoefficients.
-        noise = IsotropicNormal.from_mean_and_std([u_like], [std])
-        return IsotropicLatentCond.from_linop_and_noise(linop, noise)
 
 
 class IsotropicLinearizationFactory(interfaces.AbstractLinearizationFactory):

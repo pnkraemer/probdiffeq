@@ -25,7 +25,7 @@ def fixture_solution(fact):
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
     sol = func.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
 
-    loss = probdiffeq.loss_lml_timeseries(ssm=ssm)
+    loss = probdiffeq.loss_lml_timeseries()
     data = sol.u.mean[0]
     std = (
         tree.tree_map(np.ones_like, data)
