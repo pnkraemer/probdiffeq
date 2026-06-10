@@ -115,7 +115,7 @@ def solver_probdiffeq(
         jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives)
         tcoeffs, _ = jetexpand(vf_probdiffeq, (u0,), t=t0)
 
-        ssm = getattr(probdiffeq, f"state_space_model_{implementation}")()
+        ssm = state_space_model(implementation)
         init, iwp = ssm.prior_wiener_integrated(tcoeffs)
         strategy = probdiffeq.strategy_filter()
         if constraint_order == 0:
@@ -136,6 +136,15 @@ def solver_probdiffeq(
 
         # Return the terminal value
         return jax.block_until_ready(solution.u.mean[0])
+
+    def state_space_model(implementation):
+        match implementation:
+            case "blockdiag":
+                return probdiffeq.state_space_model_blockdiag()
+            case "dense":
+                return probdiffeq.state_space_model_dense()
+            case "isotropic":
+                return probdiffeq.state_space_model_isotropic()
 
     return param_to_solution
 
