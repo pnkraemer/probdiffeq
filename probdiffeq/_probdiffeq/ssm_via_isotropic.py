@@ -384,9 +384,9 @@ class state_space_model_isotropic(interfaces.StateSpaceModel):
 
         return init, discretise
 
-    def _prior_exponential_impl(
+    def prior_exponential(
         self,
-        vf_linear,
+        ode,
         tcoeffs_mean: C,
         /,
         *,
@@ -396,15 +396,15 @@ class state_space_model_isotropic(interfaces.StateSpaceModel):
         diffuse_eps: float = 1.0,
         output_scale: Array | None = None,
     ):
-        del vf_linear, tcoeffs_mean, is_exact, inexact_eps, diffuse_derivatives
+        del ode, tcoeffs_mean, is_exact, inexact_eps, diffuse_derivatives
         del diffuse_eps, output_scale
         msg = "Isotropic exponential priors have not been implemented (yet.)."
         msg += " If you need them, reach out."
         raise NotImplementedError(msg)
 
-    def _prior_exponential_diffuse_impl(
+    def prior_exponential_diffuse(
         self,
-        vf_linear,
+        ode,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
@@ -413,7 +413,7 @@ class state_space_model_isotropic(interfaces.StateSpaceModel):
         diffuse_eps: float = 1.0,
         output_scale: Array | None = None,
     ):
-        del vf_linear, tcoeffs_mean, tcoeffs_std, diffuse_derivatives
+        del ode, tcoeffs_mean, tcoeffs_std, diffuse_derivatives
         del diffuse_eps, output_scale
         msg = "Isotropic exponential priors have not been implemented (yet.)."
         msg += " If you need them, reach out."

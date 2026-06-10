@@ -10,7 +10,8 @@ def test_exponential_prior_matches_ioup(ssm_factory):
     M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
     tcoeffs = [u, u, u, u]
 
-    def vf_exponential(u, du, ddu, dddu):
+    @func.partial(probdiffeq.ode_autonomous_arbitrary_order, num_derivatives_in_args=4)
+    def vf_exponential(u, du, ddu, dddu, /):
         del u
         del du
         del ddu
@@ -35,7 +36,8 @@ def test_exponential_prior_matches_iwp(ssm_factory):
     u = np.ones((2,))
     tcoeffs = [u, u, u, u]
 
-    def vf_linear(u, du, ddu, dddu):
+    @func.partial(probdiffeq.ode_autonomous_arbitrary_order, num_derivatives_in_args=4)
+    def vf_linear(u, du, ddu, dddu, /):
         del du
         del ddu
         del dddu
@@ -59,7 +61,8 @@ def test_exponential_raises_error_if_vf_linear_is_bad(ssm_factory):
     M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
     tcoeffs = [u] * 2
 
-    def vf_linear(u, du, ddu):
+    @func.partial(probdiffeq.ode_autonomous_arbitrary_order, num_derivatives_in_args=3)
+    def vf_linear(u, du, ddu, /):
         del u
         del du
         return M @ ddu.ravel()
@@ -83,7 +86,8 @@ def test_exponential_transition_as_expected(ode_shape, ssm_factory):
     M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
     tcoeffs = [u] * 3
 
-    def vf_linear(u, du, ddu):
+    @func.partial(probdiffeq.ode_autonomous_arbitrary_order, num_derivatives_in_args=3)
+    def vf_linear(u, du, ddu, /):
         del u
         del du
         return M @ ddu.ravel()
@@ -114,7 +118,8 @@ def test_exponential_not_implemented_for_isotropic_or_blockdiag(ssm_factory):
 
     ssm = ssm_factory()
 
-    def vf_linear(u, du, ddu):
+    @func.partial(probdiffeq.ode_autonomous_arbitrary_order, num_derivatives_in_args=3)
+    def vf_linear(u, du, ddu, /):
         del du
         del ddu
         return np.zeros_like(u)

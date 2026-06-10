@@ -1,8 +1,18 @@
 from probdiffeq._probdiffeq import problem_types
-from probdiffeq.backend import abc, func, inspect, np, tree
-from probdiffeq.backend.typing import Array, Callable, Generic, Sequence, TypeVar
+from probdiffeq.backend import abc, func, np, tree
+from probdiffeq.backend.typing import (
+    TYPE_CHECKING,
+    Array,
+    Callable,
+    Generic,
+    Sequence,
+    TypeVar,
+)
 
-__all__ = ["LinearizationPoint", "StateSpaceModel"]
+if TYPE_CHECKING:
+    from probdiffeq._probdiffeq import linearization_points
+
+__all__ = ["StateSpaceModel"]
 
 
 T = TypeVar("T", bound=Array)
@@ -270,96 +280,6 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
         raise NotImplementedError
 
 
-def _verify_ioup_signature_and_parse_order(vf) -> int:
-    """Parse the vector-field structure from its signature."""
-    sig = inspect.signature(vf)
-    params = list(sig.parameters.values())
-
-    msg = f"""The dynamics' signature is not compatible with the constraint.
-
-    More precisely, the dynamics are expected to look like
-
-      - f(u, /),
-      - f(u, du, /),
-      - f(u, du, ddu, /),
-
-    and so on, where the number of positional arguments
-    specifies the order of the problem.
-    Replace `u`, `du`, and so on with any variable name of your choosing
-    but mind the keyword-only argument 't' in the signatures above.
-
-    That said, the arguments
-
-    {[(p.name, p.kind) for p in params]}
-
-    have been detected in the dynamics function.
-
-    Try wrapping the vector field through a pure Python function
-    with the correct arguments before passing it to the ODE constraint.
-
-      - No *args or **kwargs
-      - No functools.partial
-
-    """
-
-    POSITIONAL = (
-        inspect.Parameter.POSITIONAL_ONLY,
-        inspect.Parameter.POSITIONAL_OR_KEYWORD,
-    )
-    KEYWORD = (inspect.Parameter.KEYWORD_ONLY,)
-
-    def is_positional(p):
-        return p.kind in POSITIONAL
-
-    def is_keyword(p):
-        return p.kind in KEYWORD
-
-    state_args = [p for p in params if is_positional(p)]
-    contains_no_positional = len(state_args) == 0
-    contains_keyword = len([p for p in params if is_keyword(p)]) > 0
-
-    if contains_no_positional or contains_keyword:
-        raise TypeError(msg)
-
-    return len(state_args)
-
-
-N = TypeVar("N", bound=AbstractTreeNormal)
-"""A type-variable to describe normal distributions.
-
-Used to type the 'rv' argument of LinearizationPoint, for example.
-"""
-
-
-class LinearizationPoint:
-    """Choose the point at which to linearize a constraint.
-
-    Use this API to distinguish iterated filtering from extended Kalman filtering.
-    """
-
-    def __call__(self, constraint_flat: Callable, rv: N, **constraint_kwargs) -> Array:
-        """Find a linearization point.
-
-        Parameters
-        ----------
-        constraint_flat
-            The constraint to linearize, flattened to work with the raveled mean.
-        rv
-            The distribution to linearize around.
-        **constraint_kwargs
-            Additional keyword-arguments to pass to the constraint function.
-
-        Returns
-        -------
-        Array
-            The point at which to linearize the constraint.
-        """
-        raise NotImplementedError
-
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}()"
-
-
 class StateSpaceModel(abc.ABC):
     """Abstract base for factorised Markovian state-space model implementations.
 
@@ -401,9 +321,10 @@ class StateSpaceModel(abc.ABC):
         """Construct a diffuse integrated Wiener process prior."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def prior_exponential(
         self,
-        vf_linear: Callable,
+        ode: problem_types.AutonomousODEFunction,
         tcoeffs: C,
         /,
         *,
@@ -418,48 +339,12 @@ class StateSpaceModel(abc.ABC):
         According to https://arxiv.org/abs/2305.14978, but following the numerical
         methods from https://arxiv.org/abs/2310.13462.
         """
-        prior_order = _verify_ioup_signature_and_parse_order(vf_linear)
-        if prior_order != len(tcoeffs):
-            msg = f"""The exponential prior does not match the Taylor coefficients in the SSM.
-
-        Concretely:
-
-        - For two Taylor coefficients, we expect `f(u, du, /)`.
-        - For three Taylor coefficients, we expect `f(u, du, ddu, /)`.
-        - For four Taylor coefficients, we expect `f(u, du, ddu, dddu, /)`.
-
-        and so on. The passed dynamics correspond to **{prior_order}** Taylor
-        coefficients, whereas the state-space model includes **{len(tcoeffs)}**
-        Taylor coefficients.
-        """
-            raise TypeError(msg)
-        return self._prior_exponential_impl(
-            vf_linear,
-            tcoeffs,
-            is_exact=is_exact,
-            inexact_eps=inexact_eps,
-            diffuse_derivatives=diffuse_derivatives,
-            diffuse_eps=diffuse_eps,
-            output_scale=output_scale,
-        )
-
-    def _prior_exponential_impl(
-        self,
-        vf_linear: Callable,
-        tcoeffs: C,
-        /,
-        *,
-        is_exact: C | bool = True,
-        inexact_eps: float = 1e-6,
-        diffuse_derivatives: int = 0,
-        diffuse_eps: float = 1.0,
-        output_scale: Array | None = None,
-    ):
         raise NotImplementedError
 
+    @abc.abstractmethod
     def prior_exponential_diffuse(
         self,
-        vf_linear: Callable,
+        ode: problem_types.AutonomousODEFunction,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
@@ -473,29 +358,6 @@ class StateSpaceModel(abc.ABC):
         According to https://arxiv.org/abs/2305.14978, but following the numerical
         methods from https://arxiv.org/abs/2310.13462.
         """
-        _verify_ioup_signature_and_parse_order(vf_linear)
-        return self._prior_exponential_diffuse_impl(
-            vf_linear,
-            tcoeffs_mean,
-            tcoeffs_std,
-            diffuse_derivatives=diffuse_derivatives,
-            diffuse_eps=diffuse_eps,
-            output_scale=output_scale,
-        )
-
-    # TODO: if we type this with "ODE" instead of Callable,
-    # we can avoid this stupid _impl pattern.
-    def _prior_exponential_diffuse_impl(
-        self,
-        vf_linear: Callable,
-        tcoeffs_mean: C,
-        tcoeffs_std: C,
-        /,
-        *,
-        diffuse_derivatives: int = 0,
-        diffuse_eps: float = 1.0,
-        output_scale: Array | None = None,
-    ):
         raise NotImplementedError
 
     def prior_ornstein_uhlenbeck_integrated(
@@ -512,11 +374,16 @@ class StateSpaceModel(abc.ABC):
     ):
         """Construct an integrated Ornstein-Uhlenbeck prior."""
 
-        def vf_linear(*tc):
-            return linop(tc[-1])
+        def autonomous_func(*, jet_coords):
+            return linop(jet_coords[-1])
 
-        return self._prior_exponential_impl(
-            vf_linear,
+        ode: problem_types.AutonomousODEFunction = problem_types.AutonomousODEFunction(
+            autonomous_func,
+            jacobian=problem_types.jacobian_materialize(),
+            num_derivatives_in_args=len(tcoeffs),
+        )
+        return self.prior_exponential(
+            ode,
             tcoeffs,
             is_exact=is_exact,
             inexact_eps=inexact_eps,
@@ -538,11 +405,16 @@ class StateSpaceModel(abc.ABC):
     ):
         """Construct a diffuse integrated Ornstein-Uhlenbeck prior."""
 
-        def vf_linear(*tc):
-            return linop(tc[-1])
+        def autonomous_func(*, jet_coords):
+            return linop(jet_coords[-1])
 
-        return self._prior_exponential_diffuse_impl(
-            vf_linear,
+        ode: problem_types.AutonomousODEFunction = problem_types.AutonomousODEFunction(
+            autonomous_func,
+            jacobian=problem_types.jacobian_materialize(),
+            num_derivatives_in_args=len(tcoeffs_mean),
+        )
+        return self.prior_exponential_diffuse(
+            ode,
             tcoeffs_mean,
             tcoeffs_std,
             diffuse_derivatives=diffuse_derivatives,
@@ -589,7 +461,7 @@ class StateSpaceModel(abc.ABC):
         self,
         residual: problem_types.Residual,
         *,
-        linearization_point: LinearizationPoint | None = None,
+        linearization_point: "linearization_points.LinearizationPoint | None" = None,
     ) -> AbstractResidual:
         r"""Construct a general constraint.
 

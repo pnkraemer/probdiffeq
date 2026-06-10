@@ -18,16 +18,52 @@ linearization_point_maximum_a_posteriori(nlstsq=lstsq_constrained_gauss_newton()
 
 """
 
-from probdiffeq._probdiffeq.ssm_via_api import LinearizationPoint
+from probdiffeq._probdiffeq import ssm_via_api
 from probdiffeq.backend import flow, func, linalg, np, structs, tree
-from probdiffeq.backend.typing import Array, Callable
+from probdiffeq.backend.typing import Array, Callable, TypeVar
 
 __all__ = [
+    "LinearizationPoint",
     "LstSqConstrained",
     "linearization_point_maximum_a_posteriori",
     "linearization_point_prior",
     "lstsq_constrained_gauss_newton",
 ]
+
+N = TypeVar("N", bound=ssm_via_api.AbstractTreeNormal)
+"""A type-variable to describe normal distributions.
+
+Used to type the 'rv' argument of LinearizationPoint.
+"""
+
+
+class LinearizationPoint:
+    """Choose the point at which to linearize a constraint.
+
+    Use this API to distinguish iterated filtering from extended Kalman filtering.
+    """
+
+    def __call__(self, constraint_flat: Callable, rv: N, **constraint_kwargs) -> Array:
+        """Find a linearization point.
+
+        Parameters
+        ----------
+        constraint_flat
+            The constraint to linearize, flattened to work with the raveled mean.
+        rv
+            The distribution to linearize around.
+        **constraint_kwargs
+            Additional keyword-arguments to pass to the constraint function.
+
+        Returns
+        -------
+        Array
+            The point at which to linearize the constraint.
+        """
+        raise NotImplementedError
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}()"
 
 
 class LstSqConstrained:

@@ -8,6 +8,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 from probdiffeq import probdiffeq
+from probdiffeq.backend import func
 
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
@@ -17,28 +18,30 @@ def main():
     """Sample from various prior distributions."""
     ts = jnp.linspace(0.0, 5.0, num=100, endpoint=True)
 
-    def vf_matern(u, du, ddu):
-        """Matern 5/2."""
+    @func.partial(probdiffeq.ode_autonomous_arbitrary_order, num_derivatives_in_args=3)
+    def vf_matern(u, du, ddu, /):
         ell = 0.5
         return -(ell**3) * u - 3 * ell**2 * du - 3 * ell * ddu
 
-    def vf_oscillator(_u, du, _ddu):
-        """Oscillating prior."""
+    @func.partial(probdiffeq.ode_autonomous_arbitrary_order, num_derivatives_in_args=3)
+    def vf_oscillator(_u, du, _ddu, /):
         return -5 * du  # always the second highest coefficient
 
-    def vf_ioup(_u, _du, ddu):
-        """Integrated Ornstein-Uhlenbeck."""
+    @func.partial(probdiffeq.ode_autonomous_arbitrary_order, num_derivatives_in_args=3)
+    def vf_ioup(_u, _du, ddu, /):
         return -5 * ddu  # always the highest coefficient
 
-    def vf_iwp(u, _du, _ddu):
-        """Integrated Wiener."""
+    @func.partial(probdiffeq.ode_autonomous_arbitrary_order, num_derivatives_in_args=3)
+    def vf_iwp(u, _du, _ddu, /):
         return 0.0 * u  # always zeros
+
+    vf_titles = ["Oscillating", "Matern 5/2", "IOUP", "IWP"]
 
     _fig, axes = plt.subplots(
         nrows=3, ncols=4, sharex=True, figsize=(8, 5), constrained_layout=True
     )
-    for i, (vf_prior, ax_col) in enumerate(
-        zip([vf_oscillator, vf_matern, vf_ioup, vf_iwp], axes.T)
+    for i, (vf_prior, title, ax_col) in enumerate(
+        zip([vf_oscillator, vf_matern, vf_ioup, vf_iwp], vf_titles, axes.T)
     ):
         # Match initial distribution to stationary distribution of Matern
         ssm = probdiffeq.state_space_model_dense()
@@ -57,8 +60,7 @@ def main():
         means = margs.mean
         stds = margs.std
 
-        # Use the docstring as a title (but remove the period at the final character)
-        ax_col[0].set_title(vf_prior.__doc__[:-1], fontsize="medium")  # type: ignore
+        ax_col[0].set_title(title, fontsize="medium")
 
         for smp, m, std, ax in zip(samples_prior, means, stds, ax_col):
             ax.plot(ts, smp.T, color=f"C{i}", linewidth=1.0)

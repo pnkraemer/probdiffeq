@@ -61,8 +61,11 @@ from probdiffeq.backend import func, linalg, random, tree
 from probdiffeq.backend.typing import Any, Array, Generic, Protocol, Sequence, TypeVar
 
 __all__ = [
+    "AutonomousODEFunction",
     "JacobianHandler",
     "ODEFunction",
+    "ProtocolODEAutonomous",
+    "ProtocolODEAutonomousSecondOrder",
     "ProtocolODEFirstOrder",
     "ProtocolODESecondOrder",
     "ProtocolResidualState",
@@ -73,6 +76,10 @@ __all__ = [
     "jacobian_materialize",
     "jet_lift",
     "ode",
+    "ode_arbitrary_order",
+    "ode_autonomous",
+    "ode_autonomous_arbitrary_order",
+    "ode_autonomous_second_order",
     "ode_second_order",
     "residual_from_stack",
     "residual_state",
@@ -306,6 +313,24 @@ class ODEFunction(_AbstractJetFunction, Generic[T]):
         return self.vector_field(jet_coords=jet_coords, t=t)
 
 
+class AutonomousODEFunction(ODEFunction[T]):
+    """An autonomous ODE y^(k) = f(y, y', ...) where f does not depend on t."""
+
+    def __init__(
+        self, autonomous_func, jacobian: JacobianHandler, num_derivatives_in_args: int
+    ):
+        def vector_field(*, jet_coords, t):
+            del t
+            return autonomous_func(jet_coords=jet_coords)
+
+        super().__init__(
+            vector_field,
+            jacobian=jacobian,
+            num_derivatives_in_args=num_derivatives_in_args,
+        )
+        self.autonomous = autonomous_func
+
+
 def ode(func: ProtocolODEFirstOrder, /, *, jacobian: JacobianHandler | None = None):
     """Construct a description of an  ODE y' = f(y, t)."""
 
@@ -334,6 +359,91 @@ def ode_second_order(
     return ODEFunction(jetfunc, jacobian=jacobian, num_derivatives_in_args=2)
 
 
+def ode_arbitrary_order(
+    func, /, *, num_derivatives_in_args: int, jacobian: JacobianHandler | None = None
+):
+    """Construct a description of an ODE of arbitrary order.
+
+    Prefer ode or ode_second_order when possible.
+    """
+
+    def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
+        return func(*jet_coords[:num_derivatives_in_args], t=t)
+
+    if jacobian is None:
+        jacobian = jacobian_hutchinson_fwd()
+
+    return ODEFunction(
+        jetfunc, jacobian=jacobian, num_derivatives_in_args=num_derivatives_in_args
+    )
+
+
+class ProtocolODEAutonomous(Protocol[T]):
+    def __call__(self, u: T, /) -> T: ...
+
+
+def ode_autonomous(
+    func: ProtocolODEAutonomous, /, *, jacobian: JacobianHandler | None = None
+):
+    """Construct a description of an autonomous ODE y' = f(y)."""
+
+    def autonomous_func(*, jet_coords: Sequence[T]) -> T:
+        (y,) = jet_coords
+        return func(y)
+
+    if jacobian is None:
+        jacobian = jacobian_hutchinson_fwd()
+
+    return AutonomousODEFunction(
+        autonomous_func, jacobian=jacobian, num_derivatives_in_args=1
+    )
+
+
+class ProtocolODEAutonomousSecondOrder(Protocol[T]):
+    def __call__(self, u: T, du: T, /) -> T: ...
+
+
+def ode_autonomous_second_order(
+    func: ProtocolODEAutonomousSecondOrder,
+    /,
+    *,
+    jacobian: JacobianHandler | None = None,
+):
+    """Construct a description of an autonomous ODE y'' = f(y, y')."""
+
+    def autonomous_func(*, jet_coords: Sequence[T]) -> T:
+        (y, dy) = jet_coords
+        return func(y, dy)
+
+    if jacobian is None:
+        jacobian = jacobian_hutchinson_fwd()
+
+    return AutonomousODEFunction(
+        autonomous_func, jacobian=jacobian, num_derivatives_in_args=2
+    )
+
+
+def ode_autonomous_arbitrary_order(
+    func, /, *, num_derivatives_in_args: int, jacobian: JacobianHandler | None = None
+) -> "AutonomousODEFunction":
+    """Construct an autonomous ODE of arbitrary order.
+
+    Prefer ode_autonomous or ode_autonomous_second_order when possible.
+    """
+
+    def autonomous_func(*, jet_coords: Sequence[T]) -> T:
+        return func(*jet_coords[:num_derivatives_in_args])
+
+    if jacobian is None:
+        jacobian = jacobian_hutchinson_fwd()
+
+    return AutonomousODEFunction(
+        autonomous_func,
+        jacobian=jacobian,
+        num_derivatives_in_args=num_derivatives_in_args,
+    )
+
+
 class Residual(_AbstractJetFunction):
     """A residual on jet coordinates, ie a function that operates on (y, y', ..., t)."""
 
@@ -353,6 +463,9 @@ class Residual(_AbstractJetFunction):
 
 class ProtocolResidualState(Protocol[T_contra]):
     def __call__(self, u: T_contra, /, *, t: float) -> Any: ...
+
+
+# TODO: rename _state to _position (as in position, velocity, acceleration)
 
 
 def residual_state(

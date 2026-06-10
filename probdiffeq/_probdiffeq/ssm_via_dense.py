@@ -1,5 +1,5 @@
+from probdiffeq._probdiffeq import problem_types, utilities
 from probdiffeq._probdiffeq import ssm_via_api as interfaces
-from probdiffeq._probdiffeq import utilities
 from probdiffeq._probdiffeq.linearization_points import linearization_point_prior
 from probdiffeq._probdiffeq.problem_types import ODEFunction, Residual
 from probdiffeq.backend import func, linalg, np, random, structs, tree, warnings
@@ -165,9 +165,9 @@ class state_space_model_dense(interfaces.StateSpaceModel):
         # Return the initial variable and the discretisation
         return init, discretise
 
-    def _prior_exponential_impl(
+    def prior_exponential(
         self,
-        vf_linear: Callable,
+        ode: problem_types.AutonomousODEFunction,
         tcoeffs_mean: C,
         /,
         *,
@@ -177,11 +177,26 @@ class state_space_model_dense(interfaces.StateSpaceModel):
         diffuse_eps: float = 1.0,
         output_scale: Array | None = None,
     ):
+        """Construct an exponential integrator prior."""
+        if ode.num_derivatives_in_args != len(tcoeffs_mean):
+            msg = f"""The exponential prior does not match the Taylor coefficients in the SSM.
+
+        Concretely:
+
+        - For two Taylor coefficients, we expect an ODE of order 2.
+        - For three Taylor coefficients, we expect an ODE of order 3.
+        - For four Taylor coefficients, we expect an ODE of order 4.
+
+        and so on. The passed ODE has order **{ode.num_derivatives_in_args}**,
+        whereas the state-space model includes **{len(tcoeffs_mean)}**
+        Taylor coefficients.
+        """
+            raise TypeError(msg)
         tcoeffs_std = self._tcoeffs_standard_deviation(
             tcoeffs_mean, is_exact=is_exact, inexact_eps=inexact_eps
         )
-        return self._prior_exponential_diffuse_impl(
-            vf_linear,
+        return self.prior_exponential_diffuse(
+            ode,
             tcoeffs_mean,
             tcoeffs_std,
             diffuse_derivatives=diffuse_derivatives,
@@ -189,9 +204,9 @@ class state_space_model_dense(interfaces.StateSpaceModel):
             output_scale=output_scale,
         )
 
-    def _prior_exponential_diffuse_impl(
+    def prior_exponential_diffuse(
         self,
-        vf_linear: Callable,
+        ode: problem_types.AutonomousODEFunction,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
@@ -224,7 +239,7 @@ class state_space_model_dense(interfaces.StateSpaceModel):
 
         def vf_flat(tcoeffs_flat):
             tcoeffs_tree = unflatten(tcoeffs_flat)
-            fx = vf_linear(*tcoeffs_tree)
+            fx = ode.autonomous(jet_coords=tcoeffs_tree)
             return tree.ravel_pytree(fx)[0]
 
         bottom_block = func.jacfwd(vf_flat)(leaves_flat)
