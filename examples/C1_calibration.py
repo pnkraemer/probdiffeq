@@ -23,7 +23,7 @@ def main():
     u0 = jnp.asarray(1.0)
 
     tcoeffs = (u0, vf(u0, t=t0))
-    ssm = probdiffeq.state_space_model(ssm_fact="dense")
+    ssm = probdiffeq.state_space_model_dense()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=1.0)
     ts1 = ssm.constraint_ode_ts1(vf)
     strategy = probdiffeq.strategy_filter()

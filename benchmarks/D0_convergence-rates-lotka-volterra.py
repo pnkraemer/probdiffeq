@@ -143,7 +143,7 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
         tcoeffs, _ = jetexpand(vf_probdiffeq, (u0,), t=t0)
 
         # Build a solver
-        ssm = probdiffeq.state_space_model(ssm_fact="dense")
+        ssm = probdiffeq.state_space_model_dense()
         init, iwp = ssm.prior_wiener_integrated(tcoeffs)
         strategy = probdiffeq.strategy_filter()
         ts = ssm.constraint_ode_ts1(vf_probdiffeq)

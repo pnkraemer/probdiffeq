@@ -1,4 +1,6 @@
-from probdiffeq._ssm_impl import interfaces, utilities
+from probdiffeq._probdiffeq import ssm_interfaces as interfaces
+from probdiffeq._probdiffeq import ssm_utilities as utilities
+from probdiffeq._probdiffeq.problem_types import ODEFunction
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
@@ -21,8 +23,8 @@ __all__ = [
     "IsotropicNormal",
     "IsotropicOdeTs0",
     "IsotropicOdeTs1",
-    "IsotropicSsm",
     "IsotropicTreeFlatten",
+    "state_space_model_isotropic",
 ]
 
 
@@ -301,7 +303,7 @@ class IsotropicNormal(interfaces.AbstractTreeNormal[IsotropicTreeFlatten]):
 IsotropicNormal.register_pytree_node()
 
 
-class IsotropicSsm(interfaces.FactSsmImpl):
+class state_space_model_isotropic(interfaces.FactSsmImpl):
     """Isotropic (scalar-variance) state-space model implementation."""
 
     def prior_wiener_integrated(
@@ -475,15 +477,11 @@ class IsotropicSsm(interfaces.FactSsmImpl):
         return tcoeffs_mean, tcoeffs_std
 
     def constraint_ode_ts0(self, ode, /) -> "IsotropicOdeTs0":
-        from probdiffeq._probdiffeq.problem_types import ODEFunction
-
         if not isinstance(ode, ODEFunction):
             raise TypeError(ode)
         return IsotropicOdeTs0(ode=ode)
 
     def constraint_ode_ts1(self, ode, /) -> "IsotropicOdeTs1":
-        from probdiffeq._probdiffeq.problem_types import ODEFunction
-
         if not isinstance(ode, ODEFunction):
             raise TypeError(ode)
         if ode.num_derivatives_in_args > 1:

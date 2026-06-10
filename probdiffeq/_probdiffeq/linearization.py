@@ -2,8 +2,8 @@
 
 Examples
 --------
->>> from probdiffeq import probdiffeq, ssm_impl
->>> ssm = probdiffeq.state_space_model("dense")
+>>> from probdiffeq import probdiffeq
+>>> ssm = probdiffeq.state_space_model_dense()
 
 Use the prior mean as the linearization point (default):
 
@@ -19,7 +19,7 @@ taylor_point_maximum_a_posteriori
 
 """
 
-from probdiffeq import ssm_impl
+from probdiffeq._probdiffeq import ssm_interfaces as ssm_impl
 from probdiffeq.backend import flow, func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeVar
 
@@ -183,17 +183,18 @@ class Constraint(Protocol):
     [`FactSsmImpl.constraint_ode_ts1`](#probdiffeq.ssm_impl.FactSsmImpl.constraint_ode_ts1),
     """
 
-    init_linearization: Callable
-    """Initialize the linearization of the constraint."""
+    def init_linearization(self):
+        """Initialize the linearization of the constraint."""
 
-    linearize: Callable
-    """Linearize the constraint."""
+    def linearize(self, rv, state, *, damp: float, t):
+        """Linearize the constraint."""
 
-    residual_order: int
-    """The order of the root-constraint.
+    @property
+    def residual_order(self) -> int:
+        """The order of the root-constraint.
 
-    Here, 'order' relates to the highest derivative that the
-    constraint depends on; for instance, in first-order ODEs,
-    the residual_order would be two; and in second-order ODEs,
-    the residual_order would be three.
-    """
+        Here, 'order' relates to the highest derivative that the
+        constraint depends on; for instance, in first-order ODEs,
+        the residual_order would be two; and in second-order ODEs,
+        the residual_order would be three.
+        """

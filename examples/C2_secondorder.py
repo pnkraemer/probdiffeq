@@ -30,7 +30,7 @@ def main():
 
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
     tcoeffs, _ = jetexpand(vf_1, (u0,), t=t0)
-    ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
+    ssm = probdiffeq.state_space_model_isotropic()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=1.0)
     strategy = probdiffeq.strategy_filter()
     ts0 = ssm.constraint_ode_ts0(vf_1)
@@ -57,7 +57,7 @@ def main():
     # The goal is to match the number of tracked taylor coefficients.
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=3)
     tcoeffs, _ = jetexpand(vf_2, (u0, du0), t=t0)
-    ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
+    ssm = probdiffeq.state_space_model_isotropic()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=1.0)
     ts0 = ssm.constraint_ode_ts0(vf_2)
     strategy = probdiffeq.strategy_filter()

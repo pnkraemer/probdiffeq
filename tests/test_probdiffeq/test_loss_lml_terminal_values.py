@@ -21,14 +21,21 @@ def case_strategy_smoother_fixedpoint():
 
 @testing.fixture(name="solution_and_loss_and_data")
 @testing.parametrize_with_cases("strategy_func", cases=".", prefix="case_strategy_")
-@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def fixture_solution_and_loss_and_data(strategy_func, fact):
+@testing.parametrize(
+    "ssm_factory",
+    [
+        probdiffeq.state_space_model_dense,
+        probdiffeq.state_space_model_isotropic,
+        probdiffeq.state_space_model_blockdiag,
+    ],
+)
+def fixture_solution_and_loss_and_data(strategy_func, ssm_factory):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     vf = probdiffeq.ode(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
-    ssm = probdiffeq.state_space_model(ssm_fact=fact)
+    ssm = ssm_factory()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf)
     strategy = strategy_func()
@@ -40,9 +47,9 @@ def fixture_solution_and_loss_and_data(strategy_func, fact):
     loss = probdiffeq.loss_lml_terminal_values()
     data = sol.u.mean[0]
     std = (
-        tree.tree_map(np.ones_like, data)
-        if fact in ["dense", "blockdiag"]
-        else np.ones(())
+        np.ones(())
+        if isinstance(ssm, probdiffeq.state_space_model_isotropic)
+        else tree.tree_map(np.ones_like, data)
     )
     return sol, loss, data, std
 

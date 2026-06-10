@@ -14,8 +14,15 @@ class Taylor(structs.NamedTuple):
 
 
 @testing.fixture(name="pn_solution")
-@testing.parametrize("fact", ["dense", "blockdiag", "isotropic"])
-def fixture_pn_solution(fact):
+@testing.parametrize(
+    "ssm_factory",
+    [
+        probdiffeq.state_space_model_dense,
+        probdiffeq.state_space_model_blockdiag,
+        probdiffeq.state_space_model_isotropic,
+    ],
+)
+def fixture_pn_solution(ssm_factory):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     # Generate a solver
@@ -23,7 +30,7 @@ def fixture_pn_solution(fact):
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     coeffs, _ = jetexpand(vf, u0, t=t0)
     tcoeffs = Taylor(*coeffs)
-    ssm = probdiffeq.state_space_model(ssm_fact=fact)
+    ssm = ssm_factory()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs)
 
     ts0 = ssm.constraint_ode_ts0(vf)

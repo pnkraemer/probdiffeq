@@ -28,7 +28,7 @@ def main():
     ts = jnp.linspace(t0, t1, num=500, endpoint=True)
 
     # "Bad" prior (no Taylor coefficients)
-    ssm = probdiffeq.state_space_model()
+    ssm = probdiffeq.state_space_model_dense()
     init_diffuse, iwp_diffuse = ssm.prior_wiener_integrated(
         [u0], diffuse_derivatives=2, output_scale=10.0
     )

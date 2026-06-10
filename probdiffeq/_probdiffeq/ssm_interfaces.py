@@ -334,7 +334,8 @@ def _verify_ioup_signature_and_parse_order(vf) -> int:
 class FactSsmImpl(abc.ABC):
     """Abstract base for factorised Markovian state-space model implementations.
 
-    Construct via :func:`probdiffeq.probdiffeq.state_space_model`.
+    Construct via `state_space_model_dense`, `state_space_model_blockdiag`,
+    or `state_space_model_isotropic`.
     """
 
     def __repr__(self) -> str:
@@ -453,6 +454,8 @@ class FactSsmImpl(abc.ABC):
             output_scale=output_scale,
         )
 
+    # TODO: if we type this with "ODE" instead of Callable,
+    # we can avoid this stupid _impl pattern.
     def _prior_exponential_diffuse_impl(
         self,
         vf_linear: Callable,

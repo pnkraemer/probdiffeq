@@ -9,12 +9,19 @@ from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, linalg, np, ode, testing, tree
 
 
-@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def test_exponential_approximated_well(fact) -> None:
+@testing.parametrize(
+    "ssm_factory",
+    [
+        probdiffeq.state_space_model_dense,
+        probdiffeq.state_space_model_isotropic,
+        probdiffeq.state_space_model_blockdiag,
+    ],
+)
+def test_exponential_approximated_well(ssm_factory) -> None:
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = (*u0, vf(*u0, t=t0))
-    ssm = probdiffeq.state_space_model(ssm_fact=fact)
+    ssm = ssm_factory()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs)
     vf = probdiffeq.ode(vf)
     ts0 = ssm.constraint_ode_ts0(vf)

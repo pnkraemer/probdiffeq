@@ -1,7 +1,8 @@
 r"""Evaluate jet-recursions in differential equations."""
 
-from probdiffeq import probdiffeq
 from probdiffeq._probdiffeq import linearization, problem_types, utilities
+from probdiffeq._probdiffeq.factorisation_via_dense import state_space_model_dense
+from probdiffeq._probdiffeq.problem_types import ode, ode_second_order
 from probdiffeq.backend import flow, func, np, tree
 from probdiffeq.backend.typing import Array, Protocol, Sequence, TypeVar
 
@@ -344,14 +345,14 @@ def _allow_pytree_inits(expand):
 
             if vf.num_derivatives_in_args == 1:
 
-                @probdiffeq.ode
+                @ode
                 def vf_wrapped(y: T, /, *, t: float) -> T:
                     y = tree.tree_map(unravel, y)
                     fy = vf.vector_field(jet_coords=(y,), t=t)
                     return tree.ravel_pytree(fy)[0]
             elif vf.num_derivatives_in_args == 2:
 
-                @probdiffeq.ode_second_order
+                @ode_second_order
                 def vf_wrapped(y: T, dy: T, /, *, t: float) -> T:
                     y = tree.tree_map(unravel, y)
                     dy = tree.tree_map(unravel, dy)
@@ -399,7 +400,7 @@ def jetexpand_residual(
 
         # Determine degrees of freedom ("dof") and initialse all others diffusely
         # Concretely: The provided 'inits' are not DOFs, all added ones are.
-        ssm = probdiffeq.state_space_model()
+        ssm = state_space_model_dense()
         rv, _ = ssm.prior_wiener_integrated(inits, diffuse_derivatives=num)
 
         x0, unravel = tree.ravel_pytree(rv.mean)

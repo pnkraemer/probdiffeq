@@ -10,14 +10,21 @@ from probdiffeq.backend import func, np, ode, testing
 
 
 @testing.case()
-@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def case_solve_fixed_grid(fact):
+@testing.parametrize(
+    "ssm_factory",
+    [
+        probdiffeq.state_space_model_dense,
+        probdiffeq.state_space_model_isotropic,
+        probdiffeq.state_space_model_blockdiag,
+    ],
+)
+def case_solve_fixed_grid(ssm_factory):
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
     vf = probdiffeq.ode(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
     tcoeffs, _ = jetexpand(vf, u0, t=t0)
 
-    ssm = probdiffeq.state_space_model(ssm_fact=fact)
+    ssm = ssm_factory()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf)
     grid = np.linspace(t0, t1, endpoint=True, num=5)
@@ -32,8 +39,15 @@ def case_solve_fixed_grid(fact):
 
 
 @testing.case()
-@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def case_simulate_terminal_values(fact):
+@testing.parametrize(
+    "ssm_factory",
+    [
+        probdiffeq.state_space_model_dense,
+        probdiffeq.state_space_model_isotropic,
+        probdiffeq.state_space_model_blockdiag,
+    ],
+)
+def case_simulate_terminal_values(ssm_factory):
     # Since simulate_terminal_values calls simulate_save_at,
     # this test-case covers both solvers
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
@@ -42,7 +56,7 @@ def case_simulate_terminal_values(fact):
     tcoeffs, _ = jetexpand(vf, u0, t=t0)
     dt0 = ivpsolve.dt0(vf, u0, t=t0)
 
-    ssm = probdiffeq.state_space_model(ssm_fact=fact)
+    ssm = ssm_factory()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf)
 

@@ -2,14 +2,14 @@
 
 from probdiffeq import probdiffeq
 from probdiffeq.backend import np, structs, testing, tree
-from probdiffeq.backend.typing import Callable, Literal
+from probdiffeq.backend.typing import Callable
 
 
 @structs.dataclass
 class ScaleShapeRules:
     """Configuration for the output-scale test cases."""
 
-    ssm_fact: Literal["dense", "isotropic", "blockdiag"]  # noqa: F821
+    ssm_factory: Callable
     prior: Callable
     ode: tuple
     base: tuple
@@ -20,7 +20,7 @@ class ScaleShapeRules:
 
 def case_scale_rules_iwp_dense() -> ScaleShapeRules:
     return ScaleShapeRules(
-        ssm_fact="dense",
+        ssm_factory=probdiffeq.state_space_model_dense,
         prior=lambda ssm, tcoeffs, **kw: ssm.prior_wiener_integrated(tcoeffs, **kw),
         ode=(1, 1),
         base=(1, 1),
@@ -38,7 +38,7 @@ def case_scale_rules_ioup_dense() -> ScaleShapeRules:
         return ssm.prior_ornstein_uhlenbeck_integrated(linop, tcoeffs, **kw)
 
     return ScaleShapeRules(
-        ssm_fact="dense",
+        ssm_factory=probdiffeq.state_space_model_dense,
         prior=prior,
         ode=(1,),
         base=(1,),
@@ -50,7 +50,7 @@ def case_scale_rules_ioup_dense() -> ScaleShapeRules:
 
 def case_scale_rules_iwp_blockdiag() -> ScaleShapeRules:
     return ScaleShapeRules(
-        ssm_fact="blockdiag",
+        ssm_factory=probdiffeq.state_space_model_blockdiag,
         prior=lambda ssm, tcoeffs, **kw: ssm.prior_wiener_integrated(tcoeffs, **kw),
         ode=(1, 1),
         base=(1, 1),
@@ -62,7 +62,7 @@ def case_scale_rules_iwp_blockdiag() -> ScaleShapeRules:
 
 def case_scale_rules_iwp_isotropic() -> ScaleShapeRules:
     return ScaleShapeRules(
-        ssm_fact="isotropic",
+        ssm_factory=probdiffeq.state_space_model_isotropic,
         prior=lambda ssm, tcoeffs, **kw: ssm.prior_wiener_integrated(tcoeffs, **kw),
         ode=(1, 1),
         base=(),
@@ -75,7 +75,7 @@ def case_scale_rules_iwp_isotropic() -> ScaleShapeRules:
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_covariances_scaled_correctly_default(rules: ScaleShapeRules):
     # Test that the transition covariances are scaled correctly
-    ssm = probdiffeq.state_space_model(ssm_fact=rules.ssm_fact)
+    ssm = rules.ssm_factory()
 
     # 1d problem, but "unusual" shapes. Values don't matter.
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
@@ -89,7 +89,7 @@ def test_output_scales_covariances_scaled_correctly_default(rules: ScaleShapeRul
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_covariances_scaled_correctly_custom(rules: ScaleShapeRules):
     # Test that the transition covariances are scaled correctly
-    ssm = probdiffeq.state_space_model(ssm_fact=rules.ssm_fact)
+    ssm = rules.ssm_factory()
 
     # 1d problem, but "unusual" shapes. Values don't matter.
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
@@ -104,7 +104,7 @@ def test_output_scales_covariances_scaled_correctly_custom(rules: ScaleShapeRule
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_wrong_shape_raises_error_at_construction(rules: ScaleShapeRules):
-    ssm = probdiffeq.state_space_model(ssm_fact=rules.ssm_fact)
+    ssm = rules.ssm_factory()
 
     # Sanity check: assert that the same error does not happen with the correct shape
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
@@ -119,7 +119,7 @@ def test_output_scales_wrong_shape_raises_error_at_construction(rules: ScaleShap
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_wrong_shape_raises_error_at_calling(rules: ScaleShapeRules):
-    ssm = probdiffeq.state_space_model(ssm_fact=rules.ssm_fact)
+    ssm = rules.ssm_factory()
 
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
     _init, iwp = rules.prior(ssm, tcoeffs)
@@ -134,13 +134,13 @@ def test_output_scales_wrong_shape_raises_error_at_calling(rules: ScaleShapeRule
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_wrong_type_raises_error(rules: ScaleShapeRules):
-    ssm = probdiffeq.state_space_model(ssm_fact=rules.ssm_fact)
+    ssm = rules.ssm_factory()
 
     # Sanity check: assert that the same error does not happen with the correct shape
     tcoeffs = [{"u": np.ones(rules.ode)}, {"u": np.ones(rules.ode)}]
 
     # output scale should inherit pytree structure
-    if rules.ssm_fact == "isotropic":
+    if isinstance(ssm, probdiffeq.state_space_model_isotropic):
         scale_good = np.ones(rules.base)  # bad: not a dict
         scale_bad = {"u": scale_good}  # good: dict
     else:

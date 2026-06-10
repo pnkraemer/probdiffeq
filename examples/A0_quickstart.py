@@ -30,7 +30,7 @@ def main():
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
 
     # Construct a state-space model factorisation
-    ssm = probdiffeq.state_space_model()
+    ssm = probdiffeq.state_space_model_dense()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs)
     ode_ts1 = ssm.constraint_ode_ts1(vf)
 

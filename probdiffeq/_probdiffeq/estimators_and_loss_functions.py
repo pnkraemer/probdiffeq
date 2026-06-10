@@ -1,6 +1,6 @@
 """Estimation strategies and loss functions."""
 
-from probdiffeq import ssm_impl
+from probdiffeq._probdiffeq import ssm_interfaces as ssm_impl
 from probdiffeq._probdiffeq import utilities
 from probdiffeq.backend import flow, func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Callable, Generic, Sequence, TypeVar

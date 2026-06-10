@@ -158,7 +158,7 @@ def solver(residual, tol, while_loop, trafo):
         )
         jetexpand = probdiffeq.jetexpand_residual(num=3, nlstsq=nlstsq)
         tcoeffs, _ = jetexpand(residual, [y0], t=t0)
-        ssm = probdiffeq.state_space_model()
+        ssm = probdiffeq.state_space_model_dense()
 
         init, prior = ssm.prior_wiener_integrated(tcoeffs, output_scale=output_scale)
 

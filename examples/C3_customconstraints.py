@@ -37,7 +37,7 @@ def main():
 
     # Set up the first-order solver (for illustration).
     tcoeffs = [u0_1st]
-    ssm = probdiffeq.state_space_model()
+    ssm = probdiffeq.state_space_model_dense()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs, diffuse_derivatives=2)
     ts1 = ssm.constraint_ode_ts1(vf_1st)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
@@ -57,7 +57,7 @@ def main():
     # But for low-order solvers, custom residuals work well.
     u0, du0 = jnp.split(u0_1st, 2)
     tcoeffs = [u0, du0]
-    ssm = probdiffeq.state_space_model()
+    ssm = probdiffeq.state_space_model_dense()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs, diffuse_derivatives=1)
 
     # Use this constraint function for custom residuals:

@@ -119,7 +119,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives - 1)
         tcoeffs, _ = jetexpand(vf_probdiffeq, (u0, du0), t=t0)
 
-        ssm = probdiffeq.state_space_model(ssm_fact="dense")
+        ssm = probdiffeq.state_space_model_dense()
         init, iwp = ssm.prior_wiener_integrated(tcoeffs)
         ts = ssm.constraint_residual(residual)
         strategy = probdiffeq.strategy_filter()

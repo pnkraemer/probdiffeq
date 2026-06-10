@@ -34,7 +34,7 @@ def main():
 
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=3)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
-    ssm = probdiffeq.state_space_model(ssm_fact="blockdiag")
+    ssm = probdiffeq.state_space_model_blockdiag()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts1 = ssm.constraint_ode_ts1(vf)
     strategy = probdiffeq.strategy_smoother_fixedpoint()

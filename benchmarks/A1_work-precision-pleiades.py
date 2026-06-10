@@ -157,7 +157,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         jetexpand = probdiffeq.jetexpand_ode_unroll(num=num_derivatives - 1)
         tcoeffs, _ = jetexpand(vf_probdiffeq, (u0, du0), t=t0)
 
-        ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
+        ssm = probdiffeq.state_space_model_isotropic()
         init, iwp = ssm.prior_wiener_integrated(tcoeffs)
         ts = ssm.constraint_ode_ts0(vf_probdiffeq)
         strategy = probdiffeq.strategy_filter()

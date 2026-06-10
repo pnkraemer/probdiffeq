@@ -125,16 +125,16 @@ def case_jet_lift_residual(residual):
 
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
 @testing.parametrize("lift_by", [0, "max"])
-@testing.parametrize("ssm_fact", ["dense"])
+@testing.parametrize("ssm_factory", [probdiffeq.state_space_model_dense])
 def test_posterior_linearisation_matches_closed_form_recursion(
     residual: Root,
     jet_factory: Callable,
     expected: list,
     lift_by: int | Literal["max"],
-    ssm_fact,
+    ssm_factory,
 ):
     derivatives = len(expected) - 1
-    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
+    ssm = ssm_factory()
     init, _iwp = ssm.prior_wiener_integrated(
         [residual.u0], diffuse_derivatives=derivatives
     )
@@ -157,12 +157,12 @@ def test_posterior_linearisation_matches_closed_form_recursion(
 
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
 @testing.parametrize("wrong_lift_by", [-1, 4, 100])
-@testing.parametrize("ssm_fact", ["dense"])
+@testing.parametrize("ssm_factory", [probdiffeq.state_space_model_dense])
 def test_wrong_lift_by_raises_error(
-    residual: Root, jet_factory: Callable, wrong_lift_by, ssm_fact
+    residual: Root, jet_factory: Callable, wrong_lift_by, ssm_factory
 ):
     # 5 Taylor coefficients + residual-orders of 2 (constraints depend on u and du).
-    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
+    ssm = ssm_factory()
     init, _ = ssm.prior_wiener_integrated([residual.u0], diffuse_derivatives=4)
     constraint = jet_factory(ssm=ssm, lift_by=wrong_lift_by)
 

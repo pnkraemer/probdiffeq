@@ -149,7 +149,7 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
         jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives - 1)
         tcoeffs, _ = jetexpand(vf, (y0,), t=t0)
 
-        ssm = probdiffeq.state_space_model()
+        ssm = probdiffeq.state_space_model_dense()
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
         init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=base_scale)
@@ -200,7 +200,7 @@ def solver_residual(*, num_derivatives: int, time_span) -> Callable:
         jetexpand = probdiffeq.jetexpand_residual(nlstsq=nlstsq, num=num_derivatives)
         tcoeffs, _ = jetexpand(residual, y0, t=t0)
 
-        ssm = probdiffeq.state_space_model()
+        ssm = probdiffeq.state_space_model_dense()
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
         init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=base_scale)

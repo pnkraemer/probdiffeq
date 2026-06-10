@@ -170,13 +170,20 @@ def case_factory_error_residual_std_not_cached():
     return Factory(error=error)
 
 
-@testing.parametrize("ssm_fact", ["dense", "isotropic", "blockdiag"])
+@testing.parametrize(
+    "ssm_factory",
+    [
+        probdiffeq.state_space_model_dense,
+        probdiffeq.state_space_model_isotropic,
+        probdiffeq.state_space_model_blockdiag,
+    ],
+)
 @testing.parametrize_with_cases("factory", ".", prefix="case_factory_")
-def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
+def test_output_matches_reference(ivp, ssm_factory, factory: Factory) -> None:
     vf, u0, (t0, t1) = ivp
 
     vf = probdiffeq.ode(vf, jacobian=factory.jacobian)
-    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
+    ssm = ssm_factory()
 
     # Build a solver
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)

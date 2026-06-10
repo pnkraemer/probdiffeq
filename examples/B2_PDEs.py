@@ -29,7 +29,7 @@ def main() -> None:
 
     # Set up a state-space model
     tcoeffs = [u0, vf(u0, t=t0)]
-    ssm = probdiffeq.state_space_model(ssm_fact="blockdiag")
+    ssm = probdiffeq.state_space_model_blockdiag()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs)
 
     # Build a solver

@@ -3,7 +3,6 @@ format-and-lint:
 
 test:
 	python -m doctest probdiffeq/_probdiffeq/problem_types.py
-	python -m doctest probdiffeq/_probdiffeq/state_space_models.py
 	python -m doctest probdiffeq/_probdiffeq/linearization.py
 	pytest -n auto -v -Werror		# parallelise, verbose output, warnings as errors
 

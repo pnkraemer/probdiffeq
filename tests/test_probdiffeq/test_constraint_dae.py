@@ -30,7 +30,7 @@ def solve_ode(inits, num):
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num)
     tcoeffs, _ = jetexpand(vf_ode, inits, t=0.0)
 
-    ssm = probdiffeq.state_space_model(ssm_fact="dense")
+    ssm = probdiffeq.state_space_model_dense()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf_ode)
     strategy = probdiffeq.strategy_filter()
@@ -73,7 +73,7 @@ def solve_dae(inits, num):
     jetexpand = probdiffeq.jetexpand_residual(num=num)
     tcoeffs, _ = jetexpand(residual, inits, t=0.0)
 
-    ssm = probdiffeq.state_space_model(ssm_fact="dense")
+    ssm = probdiffeq.state_space_model_dense()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_residual(residual)
     strategy = probdiffeq.strategy_filter()

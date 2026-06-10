@@ -1,4 +1,6 @@
-from probdiffeq._ssm_impl import interfaces, utilities
+from probdiffeq._probdiffeq import ssm_interfaces as interfaces
+from probdiffeq._probdiffeq import ssm_utilities as utilities
+from probdiffeq._probdiffeq.problem_types import ODEFunction
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
@@ -8,8 +10,8 @@ __all__ = [
     "BlockDiagNormal",
     "BlockDiagOdeTs0",
     "BlockDiagOdeTs1",
-    "BlockDiagSsm",
     "BlockDiagTreeFlatten",
+    "state_space_model_blockdiag",
 ]
 
 
@@ -124,7 +126,7 @@ def _transpose(matrix):
     return np.transpose(matrix, axes=(0, 2, 1))
 
 
-class BlockDiagSsm(interfaces.FactSsmImpl):
+class state_space_model_blockdiag(interfaces.FactSsmImpl):
     """Implementation of block-diagonal SSM constructors."""
 
     def prior_wiener_integrated(
@@ -270,15 +272,11 @@ class BlockDiagSsm(interfaces.FactSsmImpl):
         raise NotImplementedError(msg)
 
     def constraint_ode_ts0(self, ode, /) -> "BlockDiagOdeTs0":
-        from probdiffeq._probdiffeq.problem_types import ODEFunction
-
         if not isinstance(ode, ODEFunction):
             raise TypeError(ode)
         return BlockDiagOdeTs0(ode=ode)
 
     def constraint_ode_ts1(self, ode, /) -> "BlockDiagOdeTs1":
-        from probdiffeq._probdiffeq.problem_types import ODEFunction
-
         if not isinstance(ode, ODEFunction):
             raise TypeError(ode)
         if ode.num_derivatives_in_args > 2:

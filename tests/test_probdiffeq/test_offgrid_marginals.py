@@ -5,8 +5,15 @@ from probdiffeq.backend import func, np, ode, testing, tree
 from probdiffeq.util import test_util
 
 
-@testing.parametrize("fact", ["dense", "blockdiag", "isotropic"])
-def test_save_at_result_matches_interpolated_adaptive_result(fact) -> None:
+@testing.parametrize(
+    "ssm_factory",
+    [
+        probdiffeq.state_space_model_dense,
+        probdiffeq.state_space_model_blockdiag,
+        probdiffeq.state_space_model_isotropic,
+    ],
+)
+def test_save_at_result_matches_interpolated_adaptive_result(ssm_factory) -> None:
     """Test that the save_at result matches the interpolation (using a filter)."""
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
@@ -14,7 +21,7 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact) -> None:
     vf = probdiffeq.ode(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     tcoeffs, _ = jetexpand(vf, u0, t=t0)
-    ssm = probdiffeq.state_space_model(ssm_fact=fact)
+    ssm = ssm_factory()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_filter()
@@ -53,14 +60,21 @@ def test_save_at_result_matches_interpolated_adaptive_result(fact) -> None:
     assert tree.tree_all(match)
 
 
-@testing.parametrize("fact", ["isotropic", "dense", "blockdiag"])
-def test_filter_marginals_close_only_to_left_boundary(fact) -> None:
+@testing.parametrize(
+    "ssm_factory",
+    [
+        probdiffeq.state_space_model_isotropic,
+        probdiffeq.state_space_model_dense,
+        probdiffeq.state_space_model_blockdiag,
+    ],
+)
+def test_filter_marginals_close_only_to_left_boundary(ssm_factory) -> None:
     """Assert that the filter-marginals interpolate well close to the left boundary."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = (u0, vf(u0, t=t0))
     vf = probdiffeq.ode(vf)
-    ssm = probdiffeq.state_space_model(ssm_fact=fact)
+    ssm = ssm_factory()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_filter()
@@ -84,15 +98,22 @@ def test_filter_marginals_close_only_to_left_boundary(fact) -> None:
         assert not testing.allclose(u1_, u2_, atol=1e-3, rtol=1e-3)
 
 
-@testing.parametrize("fact", ["isotropic", "dense", "blockdiag"])
-def test_smoother_marginals_close_to_both_boundaries(fact) -> None:
+@testing.parametrize(
+    "ssm_factory",
+    [
+        probdiffeq.state_space_model_isotropic,
+        probdiffeq.state_space_model_dense,
+        probdiffeq.state_space_model_blockdiag,
+    ],
+)
+def test_smoother_marginals_close_to_both_boundaries(ssm_factory) -> None:
     """Assert that the smoother-marginals interpolate well close to the boundary."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     vf = probdiffeq.ode(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
-    ssm = probdiffeq.state_space_model(ssm_fact=fact)
+    ssm = ssm_factory()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_smoother_fixedinterval()

@@ -1,4 +1,7 @@
-from probdiffeq._ssm_impl import interfaces, utilities
+from probdiffeq._probdiffeq import ssm_interfaces as interfaces
+from probdiffeq._probdiffeq import ssm_utilities as utilities
+from probdiffeq._probdiffeq.linearization import taylor_point_prior
+from probdiffeq._probdiffeq.problem_types import ODEFunction, Residual
 from probdiffeq.backend import func, linalg, np, random, structs, tree, warnings
 from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
@@ -9,8 +12,8 @@ __all__ = [
     "DenseOdeTs0",
     "DenseOdeTs1",
     "DenseResidual",
-    "DenseSsm",
     "DenseTreeFlatten",
+    "state_space_model_dense",
 ]
 
 C = TypeVar("C", bound=Sequence)
@@ -95,7 +98,7 @@ class DenseLatentCond(interfaces.AbstractLatentCond):
 DenseLatentCond._register_as_pytree()
 
 
-class DenseSsm(interfaces.FactSsmImpl):
+class state_space_model_dense(interfaces.FactSsmImpl):
     """Dense (full-covariance) state-space model implementation."""
 
     def prior_wiener_integrated(
@@ -368,15 +371,11 @@ class DenseSsm(interfaces.FactSsmImpl):
         return output_scale
 
     def constraint_ode_ts0(self, ode, /) -> "DenseOdeTs0":
-        from probdiffeq._probdiffeq.problem_types import ODEFunction
-
         if not isinstance(ode, ODEFunction):
             raise TypeError(ode)
         return DenseOdeTs0(ode=ode)
 
     def constraint_ode_ts1(self, ode, /) -> "DenseOdeTs1":
-        from probdiffeq._probdiffeq.problem_types import ODEFunction
-
         if not isinstance(ode, ODEFunction):
             raise TypeError(ode)
         if ode.num_derivatives_in_args > 1:
@@ -386,9 +385,6 @@ class DenseSsm(interfaces.FactSsmImpl):
         return DenseOdeTs1(ode=ode)
 
     def constraint_residual(self, residual, *, taylor_point=None) -> "DenseResidual":
-        from probdiffeq._probdiffeq.linearization import taylor_point_prior
-        from probdiffeq._probdiffeq.problem_types import Residual
-
         if not isinstance(residual, Residual):
             raise TypeError(residual)
         if taylor_point is None:

@@ -5,14 +5,21 @@ from probdiffeq.backend import func, np, ode, testing, tree
 
 
 @testing.fixture(name="solution")
-@testing.parametrize("fact", ["isotropic", "blockdiag", "dense"])
-def fixture_solution(fact):
+@testing.parametrize(
+    "ssm_factory",
+    [
+        probdiffeq.state_space_model_isotropic,
+        probdiffeq.state_space_model_blockdiag,
+        probdiffeq.state_space_model_dense,
+    ],
+)
+def fixture_solution(ssm_factory):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     vf = probdiffeq.ode(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
-    ssm = probdiffeq.state_space_model(ssm_fact=fact)
+    ssm = ssm_factory()
     init, iwp = ssm.prior_wiener_integrated(tcoeffs)
 
     ts0 = ssm.constraint_ode_ts0(vf)
@@ -28,9 +35,9 @@ def fixture_solution(fact):
     loss = probdiffeq.loss_lml_timeseries()
     data = sol.u.mean[0]
     std = (
-        tree.tree_map(np.ones_like, data)
-        if fact in ["dense", "blockdiag"]
-        else np.ones_like(save_at)
+        np.ones_like(save_at)
+        if isinstance(ssm, probdiffeq.state_space_model_isotropic)
+        else tree.tree_map(np.ones_like, data)
     )
     return sol, loss, data, std
 

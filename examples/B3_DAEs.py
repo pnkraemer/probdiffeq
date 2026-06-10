@@ -44,7 +44,7 @@ def main(t0=1e-6, t1=1e5) -> None:
         del t
         return u[0] + u[1] + u[2] - 1
 
-    ssm = probdiffeq.state_space_model()
+    ssm = probdiffeq.state_space_model_dense()
 
     jetexpand = probdiffeq.jetexpand_residual(num=4)
     residual = probdiffeq.residual_from_stack(differential, algebraic)

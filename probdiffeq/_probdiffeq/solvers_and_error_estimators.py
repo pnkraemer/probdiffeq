@@ -1,11 +1,11 @@
 """Solvers."""
 
-from probdiffeq import ssm_impl
 from probdiffeq._probdiffeq import (
     estimators_and_loss_functions,
     linearization,
     utilities,
 )
+from probdiffeq._probdiffeq import ssm_interfaces as ssm_impl
 from probdiffeq.backend import func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, TypeVar
 

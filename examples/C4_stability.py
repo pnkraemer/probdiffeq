@@ -39,7 +39,7 @@ def main():
     A = jnp.asarray([[-0.5, 20], [0, -20]])
 
     # Set up a state-space model over Taylor coefficients
-    ssm = probdiffeq.state_space_model()
+    ssm = probdiffeq.state_space_model_dense()
 
     # Build a solver
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=3)

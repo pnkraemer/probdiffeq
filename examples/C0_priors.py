@@ -41,7 +41,7 @@ def main():
         zip([vf_oscillator, vf_matern, vf_ioup, vf_iwp], axes.T)
     ):
         # Match initial distribution to stationary distribution of Matern
-        ssm = probdiffeq.state_space_model()
+        ssm = probdiffeq.state_space_model_dense()
 
         init, prior = ssm.prior_exponential_diffuse(
             vf_prior, [0.0, 0.0, 0.0], [2.5, 0.7, 0.6], output_scale=1.0
