@@ -1,5 +1,9 @@
-from probdiffeq._probdiffeq import problem_types, ssm_via_api, utilities
-from probdiffeq._probdiffeq.linearization_points import linearization_point_prior
+from probdiffeq._probdiffeq import (
+    linearization_points,
+    problem_types,
+    ssm_via_api,
+    utilities,
+)
 from probdiffeq.backend import func, linalg, np, random, structs, tree, warnings
 from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
@@ -649,10 +653,13 @@ class state_space_model_dense(ssm_via_api.StateSpaceModel):
         return DenseOdeTs1(ode=ode)
 
     def constraint_residual(
-        self, residual: problem_types.Residual, *, linearization_point=None
+        self,
+        residual: problem_types.Residual,
+        *,
+        linearization_point: linearization_points.LinearizationPoint | None = None,
     ) -> DenseResidual:
         if not isinstance(residual, problem_types.Residual):
             raise TypeError(residual)
         if linearization_point is None:
-            linearization_point = linearization_point_prior()
+            linearization_point = linearization_points.linearization_point_prior()
         return DenseResidual(residual, linearization_point=linearization_point)
