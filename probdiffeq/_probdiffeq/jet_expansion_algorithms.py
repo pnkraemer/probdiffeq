@@ -343,14 +343,14 @@ def _allow_pytree_inits(expand):
             _, unravel = tree.ravel_pytree(inits[0])
             inits_flat = [tree.ravel_pytree(m)[0] for m in inits]
 
-            if vf.num_derivatives_in_args == 1:
+            if vf.num_tcoeffs_in_args == 1:
 
                 @ode
                 def vf_wrapped(y: T, /, *, t: float) -> T:
                     y = tree.tree_map(unravel, y)
                     fy = vf.vector_field(jet_coords=(y,), t=t)
                     return tree.ravel_pytree(fy)[0]
-            elif vf.num_derivatives_in_args == 2:
+            elif vf.num_tcoeffs_in_args == 2:
 
                 @ode_order_second
                 def vf_wrapped(y: T, dy: T, /, *, t: float) -> T:
@@ -407,7 +407,7 @@ def jetexpand_residual(
 
         def residual_jet(tcoeffs_flat):
             tcoeffs_all = unravel(tcoeffs_flat)
-            coords = tcoeffs_all[: residual.num_derivatives_in_args]
+            coords = tcoeffs_all[: residual.num_tcoeffs_in_args]
             output = residual.residual_function(jet_coords=coords, t=t)
 
             # Flatten the output so that the Jacobians are matrices, not Pytrees.

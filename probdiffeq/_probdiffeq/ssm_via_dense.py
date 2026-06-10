@@ -178,7 +178,7 @@ class state_space_model_dense(interfaces.StateSpaceModel):
         output_scale: Array | None = None,
     ):
         """Construct an exponential integrator prior."""
-        if ode.num_derivatives_in_args != len(tcoeffs_mean):
+        if ode.num_tcoeffs_in_args != len(tcoeffs_mean):
             msg = f"""The exponential prior does not match the Taylor coefficients in the SSM.
 
         Concretely:
@@ -187,7 +187,7 @@ class state_space_model_dense(interfaces.StateSpaceModel):
         - For three Taylor coefficients, we expect an ODE of order 3.
         - For four Taylor coefficients, we expect an ODE of order 4.
 
-        and so on. The passed ODE has order **{ode.num_derivatives_in_args}**,
+        and so on. The passed ODE has order **{ode.num_tcoeffs_in_args}**,
         whereas the state-space model includes **{len(tcoeffs_mean)}**
         Taylor coefficients.
         """
@@ -385,7 +385,7 @@ class state_space_model_dense(interfaces.StateSpaceModel):
     def constraint_ode_ts1(self, ode, /) -> "DenseOdeTs1":
         if not isinstance(ode, ODEFunction):
             raise TypeError(ode)
-        if ode.num_derivatives_in_args > 1:
+        if ode.num_tcoeffs_in_args > 1:
             msg = "Not implemented."
             msg += " Try zeroth-order methods or residual-based constraints instead."
             raise ValueError(msg)
@@ -554,7 +554,7 @@ class DenseOdeTs0(interfaces.AbstractOde):
         return None
 
     def linearize(self, rv: DenseNormal, state: None, *, damp: float, t):
-        ode_order = self.ode.num_derivatives_in_args
+        ode_order = self.ode.num_tcoeffs_in_args
         del state
 
         def a1(m: Array) -> Array:
@@ -624,7 +624,7 @@ class DenseResidual(interfaces.AbstractResidual):
         def fun(m: Array, *, t):
             # Unravel the location and extract derivatives
             m_tree = tree_flatten.unflatten_array(m)
-            relevant_tcoeffs = m_tree[: self.residual.num_derivatives_in_args]
+            relevant_tcoeffs = m_tree[: self.residual.num_tcoeffs_in_args]
 
             # Evaluate the residual
             residual_eval = self.residual.residual_function(

@@ -272,7 +272,7 @@ class state_space_model_blockdiag(interfaces.StateSpaceModel):
     def constraint_ode_ts1(self, ode, /) -> "BlockDiagOdeTs1":
         if not isinstance(ode, ODEFunction):
             raise TypeError(ode)
-        if ode.num_derivatives_in_args > 2:
+        if ode.num_tcoeffs_in_args > 2:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
             raise ValueError(msg)
         return BlockDiagOdeTs1(ode=ode)
@@ -339,13 +339,13 @@ class BlockDiagOdeTs0(interfaces.AbstractOde):
     def linearize(self, rv, state: None, *, damp: float, t):
         del state
 
-        jet_coords = rv.mean[: self.ode.num_derivatives_in_args]
+        jet_coords = rv.mean[: self.ode.num_tcoeffs_in_args]
         fx = self.ode.vector_field(jet_coords=jet_coords, t=t)
         fx = tree.tree_map(lambda s: -s, fx)
         bias = BlockDiagNormal.from_dirac([fx], damp=damp)
 
         def a1(s):
-            return s[[self.ode.num_derivatives_in_args], ...]
+            return s[[self.ode.num_tcoeffs_in_args], ...]
 
         linop = func.vmap(func.jacrev(a1))(rv.mean_flat)
 

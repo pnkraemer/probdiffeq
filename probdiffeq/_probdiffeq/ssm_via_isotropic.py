@@ -477,7 +477,7 @@ class state_space_model_isotropic(interfaces.StateSpaceModel):
     def constraint_ode_ts1(self, ode, /) -> "IsotropicOdeTs1":
         if not isinstance(ode, ODEFunction):
             raise TypeError(ode)
-        if ode.num_derivatives_in_args > 1:
+        if ode.num_tcoeffs_in_args > 1:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
             raise ValueError(msg)
         return IsotropicOdeTs1(ode=ode)
@@ -495,13 +495,13 @@ class IsotropicOdeTs0(interfaces.AbstractOde):
     def linearize(self, rv, state: None, *, damp: float, t):
         del state
         Ms = rv.mean
-        jet_coords = Ms[: self.ode.num_derivatives_in_args]
+        jet_coords = Ms[: self.ode.num_tcoeffs_in_args]
         fx_tree = self.ode.vector_field(jet_coords=jet_coords, t=t)
         fx = tree.tree_map(lambda s: -s, fx_tree)
 
         bias = IsotropicNormal.from_dirac([fx], damp=damp)
 
-        linop = func.jacrev(lambda s: s[[self.ode.num_derivatives_in_args], ...])(
+        linop = func.jacrev(lambda s: s[[self.ode.num_tcoeffs_in_args], ...])(
             rv.mean_flat[..., 0]
         )
         cond = IsotropicLatentCond.from_linop_and_noise(linop, bias)

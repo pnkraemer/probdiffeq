@@ -159,7 +159,7 @@ class AbstractResidual(AbstractLinearization):
 
     def __init__(self, residual, /) -> None:
         self.residual = residual
-        self.residual_order = self.residual.num_derivatives_in_args
+        self.residual_order = self.residual.num_tcoeffs_in_args
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(residual={self.residual})"
@@ -170,7 +170,7 @@ class AbstractOde(AbstractLinearization):
 
     def __init__(self, *, ode) -> None:
         self.ode = ode
-        self.residual_order = self.ode.num_derivatives_in_args + 1
+        self.residual_order = self.ode.num_tcoeffs_in_args + 1
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(ode={self.ode})"
@@ -380,7 +380,7 @@ class StateSpaceModel(abc.ABC):
         ode: problem_types.ODEFunctionAutonomous = problem_types.ODEFunctionAutonomous(
             autonomous_func,
             jacobian=problem_types.jacobian_materialize(),
-            num_derivatives_in_args=len(tcoeffs),
+            num_tcoeffs_in_args=len(tcoeffs),
         )
         return self.prior_exponential(
             ode,
@@ -411,7 +411,7 @@ class StateSpaceModel(abc.ABC):
         ode: problem_types.ODEFunctionAutonomous = problem_types.ODEFunctionAutonomous(
             autonomous_func,
             jacobian=problem_types.jacobian_materialize(),
-            num_derivatives_in_args=len(tcoeffs_mean),
+            num_tcoeffs_in_args=len(tcoeffs_mean),
         )
         return self.prior_exponential_diffuse(
             ode,
