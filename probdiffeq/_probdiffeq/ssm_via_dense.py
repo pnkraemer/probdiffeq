@@ -6,15 +6,7 @@ from probdiffeq.backend import func, linalg, np, random, structs, tree, warnings
 from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
 
-__all__ = [
-    "DenseLatentCond",
-    "DenseNormal",
-    "DenseOdeTs0",
-    "DenseOdeTs1",
-    "DenseResidual",
-    "DenseTreeFlatten",
-    "state_space_model_dense",
-]
+__all__ = ["state_space_model_dense"]
 
 C = TypeVar("C", bound=Sequence)
 """A type-variable for Sequence types.
@@ -98,7 +90,7 @@ class DenseLatentCond(interfaces.AbstractLatentCond):
 DenseLatentCond._register_as_pytree()
 
 
-class state_space_model_dense(interfaces.FactSsmImpl):
+class state_space_model_dense(interfaces.StateSpaceModel):
     """Dense (full-covariance) state-space model implementation."""
 
     def prior_wiener_integrated(

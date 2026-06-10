@@ -18,14 +18,7 @@ C = TypeVar("C", bound=Sequence)
 For example, this variable is used to type Taylor coefficients.
 """
 
-__all__ = [
-    "IsotropicLatentCond",
-    "IsotropicNormal",
-    "IsotropicOdeTs0",
-    "IsotropicOdeTs1",
-    "IsotropicTreeFlatten",
-    "state_space_model_isotropic",
-]
+__all__ = ["state_space_model_isotropic"]
 
 
 @structs.dataclass
@@ -303,7 +296,7 @@ class IsotropicNormal(interfaces.AbstractTreeNormal[IsotropicTreeFlatten]):
 IsotropicNormal.register_pytree_node()
 
 
-class state_space_model_isotropic(interfaces.FactSsmImpl):
+class state_space_model_isotropic(interfaces.StateSpaceModel):
     """Isotropic (scalar-variance) state-space model implementation."""
 
     def prior_wiener_integrated(

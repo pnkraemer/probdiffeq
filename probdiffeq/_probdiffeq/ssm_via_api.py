@@ -1,15 +1,7 @@
 from probdiffeq.backend import abc, func, inspect, np, tree
 from probdiffeq.backend.typing import Array, Callable, Generic, Sequence, TypeVar
 
-__all__ = [
-    "AbstractLatentCond",
-    "AbstractLinearization",
-    "AbstractOde",
-    "AbstractResidual",
-    "AbstractTreeFlatten",
-    "AbstractTreeNormal",
-    "FactSsmImpl",
-]
+__all__ = ["StateSpaceModel"]
 
 
 T = TypeVar("T", bound=Array)
@@ -331,7 +323,7 @@ def _verify_ioup_signature_and_parse_order(vf) -> int:
     return len(state_args)
 
 
-class FactSsmImpl(abc.ABC):
+class StateSpaceModel(abc.ABC):
     """Abstract base for factorised Markovian state-space model implementations.
 
     Construct via `state_space_model_dense`, `state_space_model_blockdiag`,

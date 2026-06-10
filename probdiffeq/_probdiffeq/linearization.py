@@ -179,8 +179,8 @@ class Constraint(Protocol):
     """An interface for constraints + linearization in probabilistic solvers.
 
     Related:
-    [`FactSsmImpl.constraint_ode_ts0`](#probdiffeq.ssm_via_api.FactSsmImpl.constraint_ode_ts0),
-    [`FactSsmImpl.constraint_ode_ts1`](#probdiffeq.ssm_via_api.FactSsmImpl.constraint_ode_ts1),
+    [`StateSpaceModel.constraint_ode_ts0`](#probdiffeq.ssm_via_api.StateSpaceModel.constraint_ode_ts0),
+    [`StateSpaceModel.constraint_ode_ts1`](#probdiffeq.ssm_via_api.StateSpaceModel.constraint_ode_ts1),
     """
 
     def init_linearization(self):

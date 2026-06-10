@@ -5,14 +5,7 @@ from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
 
-__all__ = [
-    "BlockDiagLatentCond",
-    "BlockDiagNormal",
-    "BlockDiagOdeTs0",
-    "BlockDiagOdeTs1",
-    "BlockDiagTreeFlatten",
-    "state_space_model_blockdiag",
-]
+__all__ = ["state_space_model_blockdiag"]
 
 
 C = TypeVar("C", bound=Sequence)
@@ -126,7 +119,7 @@ def _transpose(matrix):
     return np.transpose(matrix, axes=(0, 2, 1))
 
 
-class state_space_model_blockdiag(interfaces.FactSsmImpl):
+class state_space_model_blockdiag(interfaces.StateSpaceModel):
     """Implementation of block-diagonal SSM constructors."""
 
     def prior_wiener_integrated(
