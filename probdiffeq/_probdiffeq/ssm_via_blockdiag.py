@@ -466,7 +466,7 @@ class state_space_model_blockdiag(ssm_via_api.StateSpaceModel):
         def discretise(dt, scale: Array | None = None):
             p, p_inv = precon_fun(dt)
             if scale is None:
-                scale = np.ones_like(scale)
+                scale = np.ones_like(output_scale)
             else:
                 scale = np.asarray(scale)
 
