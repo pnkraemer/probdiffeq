@@ -8,9 +8,8 @@ from probdiffeq._probdiffeq.jet_expansion_algorithms import *
 from probdiffeq._probdiffeq.linearization import *
 from probdiffeq._probdiffeq.problem_types import *
 from probdiffeq._probdiffeq.solvers_and_error_estimators import *
-from probdiffeq._probdiffeq.ssm_utilities import *
+from probdiffeq._probdiffeq.ssm_via_api import *
 from probdiffeq._probdiffeq.ssm_via_blockdiag import *
 from probdiffeq._probdiffeq.ssm_via_dense import *
-from probdiffeq._probdiffeq.ssm_via_interfaces import *
 from probdiffeq._probdiffeq.ssm_via_isotropic import *
 from probdiffeq._probdiffeq.utilities import *

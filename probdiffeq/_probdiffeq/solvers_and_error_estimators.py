@@ -3,9 +3,9 @@
 from probdiffeq._probdiffeq import (
     estimators_and_loss_functions,
     linearization,
+    ssm_via_api,
     utilities,
 )
-from probdiffeq._probdiffeq import ssm_via_interfaces as ssm_impl
 from probdiffeq.backend import func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, TypeVar
 
@@ -23,7 +23,7 @@ __all__ = [
 ]
 
 
-N = TypeVar("N", bound=ssm_impl.AbstractTreeNormal)
+N = TypeVar("N", bound=ssm_via_api.AbstractTreeNormal)
 """A type-variable to describe normal distributions.
 
 Used to type marginals, for example.
@@ -31,7 +31,7 @@ Used to type marginals, for example.
 
 T = TypeVar(
     "T",
-    bound=estimators_and_loss_functions.MarkovSequence | ssm_impl.AbstractTreeNormal,
+    bound=estimators_and_loss_functions.MarkovSequence | ssm_via_api.AbstractTreeNormal,
 )
 """A type-variable to describe posterior distributions."""
 

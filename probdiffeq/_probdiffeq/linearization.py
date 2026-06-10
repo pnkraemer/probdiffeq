@@ -19,7 +19,7 @@ taylor_point_maximum_a_posteriori
 
 """
 
-from probdiffeq._probdiffeq import ssm_via_interfaces as ssm_impl
+from probdiffeq._probdiffeq import ssm_via_api
 from probdiffeq.backend import flow, func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeVar
 
@@ -32,7 +32,7 @@ __all__ = [
     "taylor_point_prior",
 ]
 
-N = TypeVar("N", bound=ssm_impl.AbstractTreeNormal)
+N = TypeVar("N", bound=ssm_via_api.AbstractTreeNormal)
 """A type-variable to describe normal distributions.
 
 Used to type marginals, for example.
@@ -179,8 +179,8 @@ class Constraint(Protocol):
     """An interface for constraints + linearization in probabilistic solvers.
 
     Related:
-    [`FactSsmImpl.constraint_ode_ts0`](#probdiffeq.ssm_impl.FactSsmImpl.constraint_ode_ts0),
-    [`FactSsmImpl.constraint_ode_ts1`](#probdiffeq.ssm_impl.FactSsmImpl.constraint_ode_ts1),
+    [`FactSsmImpl.constraint_ode_ts0`](#probdiffeq.ssm_via_api.FactSsmImpl.constraint_ode_ts0),
+    [`FactSsmImpl.constraint_ode_ts1`](#probdiffeq.ssm_via_api.FactSsmImpl.constraint_ode_ts1),
     """
 
     def init_linearization(self):

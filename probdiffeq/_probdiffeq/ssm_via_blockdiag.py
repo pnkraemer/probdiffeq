@@ -1,5 +1,5 @@
-from probdiffeq._probdiffeq import ssm_utilities as utilities
-from probdiffeq._probdiffeq import ssm_via_interfaces as interfaces
+from probdiffeq._probdiffeq import ssm_via_api as interfaces
+from probdiffeq._probdiffeq import utilities
 from probdiffeq._probdiffeq.problem_types import ODEFunction
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar

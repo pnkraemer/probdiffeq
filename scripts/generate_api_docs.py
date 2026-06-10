@@ -58,6 +58,7 @@ def main(
                 header = header.replace("_", " ")
                 header = header.capitalize()
                 header = header.replace("Ssm", "SSM")
+                header = header.replace("api", "API")
                 p_as_module = path_as_module(path)
                 content = f"""
 # {header}
