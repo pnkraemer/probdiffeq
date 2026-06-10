@@ -13,9 +13,9 @@ def fixture_solution(fact):
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
 
-    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
+    ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
 
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)

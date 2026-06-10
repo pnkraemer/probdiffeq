@@ -24,9 +24,9 @@ def fixture_pn_solution(fact):
     coeffs, _ = jetexpand(vf, u0, t=t0)
     tcoeffs = Taylor(*coeffs)
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
 
-    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
+    ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_filter()
     solver = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts0)
     error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)

@@ -4,23 +4,21 @@ Examples
 --------
 >>> from probdiffeq import probdiffeq
 
->>> from probdiffeq import probdiffeq
-
 >>> ssm = probdiffeq.state_space_model()
 >>> print(ssm)
-FactSsmImpl(linearize=DenseLinearizationFactory(), prior=DensePriorFactory())
+DenseSsm()
 
 Switching to a different factorisation is easy via the `ssm_fact` argument:
 
 >>> ssm = probdiffeq.state_space_model(probdiffeq.SsmFactName.BLOCKDIAG)
 >>> print(ssm)
-FactSsmImpl(linearize=BlockDiagLinearizationFactory(), prior=BlockDiagPriorFactory())
+BlockDiagSsm()
 
 Instead of the Enum, you can also just pass the string:
 
 >>> ssm = probdiffeq.state_space_model("isotropic")
 >>> print(ssm)
-FactSsmImpl(linearize=IsotropicLinearizationFactory(), prior=IsotropicPriorFactory())
+IsotropicSsm()
 
 """
 
@@ -67,11 +65,11 @@ def state_space_model(
     ssm_fact = SsmFactName(ssm_fact)
 
     if ssm_fact == SsmFactName.DENSE:
-        return ssm_impl.FactSsmImpl.from_dense()
+        return ssm_impl.DenseSsm()
 
     if ssm_fact == SsmFactName.BLOCKDIAG:
-        return ssm_impl.FactSsmImpl.from_blockdiag()
+        return ssm_impl.BlockDiagSsm()
 
     if ssm_fact == SsmFactName.ISOTROPIC:
-        return ssm_impl.FactSsmImpl.from_isotropic()
+        return ssm_impl.IsotropicSsm()
     raise ValueError(ssm_fact)

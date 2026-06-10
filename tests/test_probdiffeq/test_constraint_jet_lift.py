@@ -107,9 +107,7 @@ def case_jet_lift_dae(residual):
         algebraic = probdiffeq.jet_lift(algebraic, lift_by=lift_by + 1)
         residual_stack = probdiffeq.residual_from_stack(differential, algebraic)
 
-        return probdiffeq.constraint_residual(
-            residual_stack, taylor_point=taylor_point, ssm=ssm
-        )
+        return ssm.constraint_residual(residual_stack, taylor_point=taylor_point)
 
     return constraint_residual
 
@@ -120,9 +118,7 @@ def case_jet_lift_residual(residual):
     def constraint_residual(ssm, lift_by: int):
         implicit = probdiffeq.residual_state_velocity(residual.residual)
         implicit = probdiffeq.jet_lift(implicit, lift_by=lift_by)
-        return probdiffeq.constraint_residual(
-            implicit, taylor_point=taylor_point, ssm=ssm
-        )
+        return ssm.constraint_residual(implicit, taylor_point=taylor_point)
 
     return constraint_residual
 
@@ -139,8 +135,8 @@ def test_posterior_linearisation_matches_closed_form_recursion(
 ):
     derivatives = len(expected) - 1
     ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
-    init, _iwp = probdiffeq.prior_wiener_integrated(
-        [residual.u0], diffuse_derivatives=derivatives, ssm=ssm
+    init, _iwp = ssm.prior_wiener_integrated(
+        [residual.u0], diffuse_derivatives=derivatives
     )
 
     lift_by = len(expected) - 2 if lift_by == "max" else lift_by
@@ -167,9 +163,7 @@ def test_wrong_lift_by_raises_error(
 ):
     # 5 Taylor coefficients + residual-orders of 2 (constraints depend on u and du).
     ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
-    init, _ = probdiffeq.prior_wiener_integrated(
-        [residual.u0], diffuse_derivatives=4, ssm=ssm
-    )
+    init, _ = ssm.prior_wiener_integrated([residual.u0], diffuse_derivatives=4)
     constraint = jet_factory(ssm=ssm, lift_by=wrong_lift_by)
 
     cstate = constraint.init_linearization()

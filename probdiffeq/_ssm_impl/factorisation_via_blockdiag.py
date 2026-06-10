@@ -5,11 +5,10 @@ from probdiffeq.util import cholesky_util
 
 __all__ = [
     "BlockDiagLatentCond",
-    "BlockDiagLinearizationFactory",
     "BlockDiagNormal",
     "BlockDiagOdeTs0",
     "BlockDiagOdeTs1",
-    "BlockDiagPriorFactory",
+    "BlockDiagSsm",
     "BlockDiagTreeFlatten",
 ]
 
@@ -125,40 +124,40 @@ def _transpose(matrix):
     return np.transpose(matrix, axes=(0, 2, 1))
 
 
-class BlockDiagPriorFactory(interfaces.AbstractPriorFactory):
-    """Implementation of block-diagonal prior constructors."""
+class BlockDiagSsm(interfaces.FactSsmImpl):
+    """Implementation of block-diagonal SSM constructors."""
 
-    def wiener_integrated(
+    def prior_wiener_integrated(
         self,
         tcoeffs_mean: C,
         /,
         *,
-        is_exact: C | bool,
-        inexact_eps: float,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        is_exact: C | bool = True,
+        inexact_eps: float = 1e-6,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
         tcoeffs_std = self._tcoeffs_standard_deviation(
             tcoeffs_mean, is_exact=is_exact, inexact_eps=inexact_eps
         )
-        return self.wiener_integrated_diffuse(
+        return self.prior_wiener_integrated_diffuse(
             tcoeffs_mean,
             tcoeffs_std,
             diffuse_derivatives=diffuse_derivatives,
             diffuse_eps=diffuse_eps,
-            base_scale=base_scale,
+            output_scale=output_scale,
         )
 
-    def wiener_integrated_diffuse(
+    def prior_wiener_integrated_diffuse(
         self,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
         *,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
         if diffuse_derivatives > 0:
             tcoeffs_mean, tcoeffs_std = self._add_diffuse_derivatives(
@@ -175,50 +174,52 @@ class BlockDiagPriorFactory(interfaces.AbstractPriorFactory):
         coeff_like = np.ones_like(single_flat)
         base_scale_expected = single_unravel(coeff_like)
 
-        if base_scale is None:
-            base_scale = base_scale_expected
+        if output_scale is None:
+            output_scale = base_scale_expected
         else:
-            if tree.tree_structure(base_scale) != tree.tree_structure(
+            if tree.tree_structure(output_scale) != tree.tree_structure(
                 base_scale_expected
             ):
-                msg = "The 'base_scale' argument has an unexpected PyTree structure."
+                msg = "The 'output_scale' argument has an unexpected PyTree structure."
                 msg += f" Expected: {tree.tree_structure(base_scale_expected)}."
-                msg += f" Received: {tree.tree_structure(base_scale)}."
+                msg += f" Received: {tree.tree_structure(output_scale)}."
                 raise TypeError(msg)
 
-            base_scale = tree.tree_map(np.asarray, base_scale)
+            output_scale = tree.tree_map(np.asarray, output_scale)
 
             def shape_equal(A, B):
                 return tree.tree_map(lambda a, b: np.shape(a) == np.shape(b), A, B)
 
-            if not tree.tree_all(shape_equal(base_scale, base_scale_expected)):
-                msg = "The base-scale has the wrong shape."
+            if not tree.tree_all(shape_equal(output_scale, base_scale_expected)):
+                msg = "The output-scale has the wrong shape."
                 msg += f" Expected: {tree.tree_map(np.shape, base_scale_expected)}."
-                msg += f" Received: {base_scale.shape}."
+                msg += f" Received: {output_scale.shape}."
                 raise ValueError(msg)
 
-        base_scale, _ = tree.ravel_pytree(base_scale)
+        output_scale, _ = tree.ravel_pytree(output_scale)
 
         num_derivatives = len(tcoeffs_mean) - 1
         a, q_sqrtm = utilities.system_matrices_1d_iwp(num_derivatives)
         q0 = np.zeros((num_derivatives + 1,))
         precon_fun = utilities.preconditioner_taylor(num_derivatives=num_derivatives)
 
+        _base_scale = output_scale
+
         def discretise(dt, output_scale: Array | None = None):
             p, p_inv = precon_fun(dt)
             if output_scale is None:
-                output_scale = np.ones_like(base_scale)
+                output_scale = np.ones_like(_base_scale)
             else:
                 output_scale = np.asarray(output_scale)
 
-                if output_scale.shape != base_scale.shape:
+                if output_scale.shape != _base_scale.shape:
                     msg = "The output-scale has the wrong shape."
-                    msg += f" Expected: {base_scale.shape}."
+                    msg += f" Expected: {_base_scale.shape}."
                     msg += f" Received: {output_scale.shape}."
                     raise ValueError(msg)
                 output_scale, _ = tree.ravel_pytree(output_scale)
 
-            scale = output_scale * base_scale
+            scale = output_scale * _base_scale
             # Flatten the scale into something compatible with the flattened SSM
             (d,) = scale.shape
 
@@ -233,49 +234,60 @@ class BlockDiagPriorFactory(interfaces.AbstractPriorFactory):
 
         return init, discretise
 
-    def exponential(
+    def _prior_exponential_impl(
         self,
+        vf_linear,
         tcoeffs_mean: C,
         /,
         *,
-        vf_linear,
-        is_exact: C | bool,
-        inexact_eps: float,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        is_exact: C | bool = True,
+        inexact_eps: float = 1e-6,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
-        del tcoeffs_mean
-        del vf_linear
-        del is_exact
-        del inexact_eps
-        del diffuse_derivatives
-        del diffuse_eps
-        del base_scale
+        del vf_linear, tcoeffs_mean, is_exact, inexact_eps, diffuse_derivatives
+        del diffuse_eps, output_scale
         msg = "Block-diagonal exponential priors have not been implemented (yet.)."
         msg += " If you need them, reach out."
         raise NotImplementedError(msg)
 
-    def exponential_diffuse(
+    def _prior_exponential_diffuse_impl(
         self,
+        vf_linear,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
         *,
-        vf_linear,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
-        del tcoeffs_mean
-        del tcoeffs_std
-        del vf_linear
-        del diffuse_derivatives
-        del diffuse_eps
-        del base_scale
+        del vf_linear, tcoeffs_mean, tcoeffs_std, diffuse_derivatives
+        del diffuse_eps, output_scale
         msg = "Block-diagonal exponential priors have not been implemented (yet.)."
         msg += " If you need them, reach out."
         raise NotImplementedError(msg)
+
+    def constraint_ode_ts0(self, ode, /) -> "BlockDiagOdeTs0":
+        from probdiffeq._probdiffeq.problem_types import ODEFunction
+
+        if not isinstance(ode, ODEFunction):
+            raise TypeError(ode)
+        return BlockDiagOdeTs0(ode=ode)
+
+    def constraint_ode_ts1(self, ode, /) -> "BlockDiagOdeTs1":
+        from probdiffeq._probdiffeq.problem_types import ODEFunction
+
+        if not isinstance(ode, ODEFunction):
+            raise TypeError(ode)
+        if ode.num_derivatives_in_args > 2:
+            msg = "This linearization is not compatible with high-order ODEs as of yet."
+            raise ValueError(msg)
+        return BlockDiagOdeTs1(ode=ode)
+
+    def constraint_residual(self, residual, *, taylor_point=None):
+        raise NotImplementedError
 
     def _tcoeffs_standard_deviation(self, tcoeffs_mean, /, *, is_exact, inexact_eps):
 
@@ -325,23 +337,6 @@ class BlockDiagPriorFactory(interfaces.AbstractPriorFactory):
         )
         tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
         return tcoeffs_mean, tcoeffs_std
-
-
-class BlockDiagLinearizationFactory(interfaces.AbstractLinearizationFactory):
-    """Construct a block-diagonal linearization-factory."""
-
-    def residual(self, *, residual, taylor_point):
-        raise NotImplementedError
-
-    def ode_taylor_0th(self, *, ode):
-        return BlockDiagOdeTs0(ode=ode)
-
-    def ode_taylor_1st(self, *, ode):
-        if ode.num_derivatives_in_args > 2:
-            msg = "This linearization is not compatible with high-order ODEs as of yet."
-            raise ValueError(msg)
-
-        return BlockDiagOdeTs1(ode=ode)
 
 
 class BlockDiagOdeTs0(interfaces.AbstractOde):

@@ -1,7 +1,11 @@
 """Solvers."""
 
 from probdiffeq import ssm_impl
-from probdiffeq._probdiffeq import constraints, estimators_and_loss_functions, utilities
+from probdiffeq._probdiffeq import (
+    estimators_and_loss_functions,
+    linearization,
+    utilities,
+)
 from probdiffeq.backend import func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, TypeVar
 
@@ -84,8 +88,8 @@ class ProbabilisticSolver:
         *,
         strategy: estimators_and_loss_functions.MarkovStrategy,
         prior: Callable,
-        constraint: constraints.Constraint,
-        constraint_init: constraints.Constraint | None,
+        constraint: linearization.Constraint,
+        constraint_init: linearization.Constraint | None,
     ) -> None:
         self.strategy = strategy
         self.prior = prior
@@ -300,10 +304,10 @@ class solver_mle(ProbabilisticSolver):
     def __init__(
         self,
         *,
-        constraint: constraints.Constraint,
+        constraint: linearization.Constraint,
         prior: Callable,
         strategy: estimators_and_loss_functions.MarkovStrategy,
-        constraint_init: constraints.Constraint | None = None,
+        constraint_init: linearization.Constraint | None = None,
         correct_asymptotic_underconfidence: bool = True,
     ) -> None:
         super().__init__(
@@ -452,8 +456,8 @@ class solver_dynamic(ProbabilisticSolver):
         *,
         strategy: estimators_and_loss_functions.MarkovStrategy,
         prior: Callable,
-        constraint: constraints.Constraint,
-        constraint_init: constraints.Constraint | None = None,
+        constraint: linearization.Constraint,
+        constraint_init: linearization.Constraint | None = None,
         re_linearize_after_calibration=False,
         stop_gradient_through_calibration=True,
     ) -> None:
@@ -597,10 +601,10 @@ class solver(ProbabilisticSolver):
     def __init__(
         self,
         *,
-        constraint: constraints.Constraint,
+        constraint: linearization.Constraint,
         prior: Callable,
         strategy: estimators_and_loss_functions.MarkovStrategy,
-        constraint_init: constraints.Constraint | None = None,
+        constraint_init: linearization.Constraint | None = None,
     ) -> None:
         super().__init__(
             strategy=strategy,
@@ -732,7 +736,7 @@ def error_norm_rms_then_scale(norm_order=None) -> Callable:
     """Normalize an error by computing the root-mean-square norm followed by scaling.
 
     Use this for residual-based error estimators in combination
-    with custom root constraints.
+    with custom root linearization.
 
     See the custom information operator tutorial for details.
     """
@@ -843,7 +847,7 @@ class error_residual_std(ErrorEstimator):
     def __init__(
         self,
         *,
-        constraint: constraints.Constraint,
+        constraint: linearization.Constraint,
         prior: Any,
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default
@@ -940,7 +944,7 @@ class error_state_std(ErrorEstimator):
     def __init__(
         self,
         *,
-        constraint: constraints.Constraint,
+        constraint: linearization.Constraint,
         prior: Any,
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default

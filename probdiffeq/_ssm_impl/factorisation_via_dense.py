@@ -5,12 +5,11 @@ from probdiffeq.util import cholesky_util, gram_util
 
 __all__ = [
     "DenseLatentCond",
-    "DenseLinearizationFactory",
     "DenseNormal",
     "DenseOdeTs0",
     "DenseOdeTs1",
-    "DensePriorFactory",
     "DenseResidual",
+    "DenseSsm",
     "DenseTreeFlatten",
 ]
 
@@ -96,40 +95,40 @@ class DenseLatentCond(interfaces.AbstractLatentCond):
 DenseLatentCond._register_as_pytree()
 
 
-class DensePriorFactory(interfaces.AbstractPriorFactory):
-    """Implementation of dense prior constructors."""
+class DenseSsm(interfaces.FactSsmImpl):
+    """Dense (full-covariance) state-space model implementation."""
 
-    def wiener_integrated(
+    def prior_wiener_integrated(
         self,
         tcoeffs_mean: C,
         /,
         *,
-        is_exact: C | bool,
-        inexact_eps: float,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        is_exact: C | bool = True,
+        inexact_eps: float = 1e-6,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
         tcoeffs_std = self._tcoeffs_standard_deviation(
             tcoeffs_mean, is_exact=is_exact, inexact_eps=inexact_eps
         )
-        return self.wiener_integrated_diffuse(
+        return self.prior_wiener_integrated_diffuse(
             tcoeffs_mean,
             tcoeffs_std,
             diffuse_derivatives=diffuse_derivatives,
             diffuse_eps=diffuse_eps,
-            base_scale=base_scale,
+            output_scale=output_scale,
         )
 
-    def wiener_integrated_diffuse(
+    def prior_wiener_integrated_diffuse(
         self,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
         *,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
         if diffuse_derivatives > 0:
             tcoeffs_mean, tcoeffs_std = self._add_diffuse_derivatives(
@@ -144,7 +143,7 @@ class DensePriorFactory(interfaces.AbstractPriorFactory):
 
         # Process the base-scale
         single_flat, single_unravel = tree.ravel_pytree(tcoeffs_mean[0])
-        Lambda = self._process_base_scale(base_scale, single_flat, single_unravel)
+        Lambda = self._process_base_scale(output_scale, single_flat, single_unravel)
 
         # Construct the transitions
         num_derivatives = len(tcoeffs_mean) - 1
@@ -171,40 +170,40 @@ class DensePriorFactory(interfaces.AbstractPriorFactory):
         # Return the initial variable and the discretisation
         return init, discretise
 
-    def exponential(
+    def _prior_exponential_impl(
         self,
+        vf_linear: Callable,
         tcoeffs_mean: C,
         /,
         *,
-        vf_linear: Array,
-        is_exact: C | bool,
-        inexact_eps: float,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        is_exact: C | bool = True,
+        inexact_eps: float = 1e-6,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
         tcoeffs_std = self._tcoeffs_standard_deviation(
             tcoeffs_mean, is_exact=is_exact, inexact_eps=inexact_eps
         )
-        return self.exponential_diffuse(
+        return self._prior_exponential_diffuse_impl(
+            vf_linear,
             tcoeffs_mean,
             tcoeffs_std,
             diffuse_derivatives=diffuse_derivatives,
             diffuse_eps=diffuse_eps,
-            base_scale=base_scale,
-            vf_linear=vf_linear,
+            output_scale=output_scale,
         )
 
-    def exponential_diffuse(
+    def _prior_exponential_diffuse_impl(
         self,
+        vf_linear: Callable,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
         *,
-        vf_linear: Array,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
         if diffuse_derivatives > 0:
             tcoeffs_mean, tcoeffs_std = self._add_diffuse_derivatives(
@@ -219,7 +218,7 @@ class DensePriorFactory(interfaces.AbstractPriorFactory):
 
         # Process the base-scale
         single_flat, single_unravel = tree.ravel_pytree(tcoeffs_mean[0])
-        Lambda = self._process_base_scale(base_scale, single_flat, single_unravel)
+        Lambda = self._process_base_scale(output_scale, single_flat, single_unravel)
 
         # Turn the linear vector field into the bottom block of the IOUP
         # by building the matrix-version of the vector field's Jacobian.
@@ -368,6 +367,34 @@ class DensePriorFactory(interfaces.AbstractPriorFactory):
             raise ValueError(msg)
         return output_scale
 
+    def constraint_ode_ts0(self, ode, /) -> "DenseOdeTs0":
+        from probdiffeq._probdiffeq.problem_types import ODEFunction
+
+        if not isinstance(ode, ODEFunction):
+            raise TypeError(ode)
+        return DenseOdeTs0(ode=ode)
+
+    def constraint_ode_ts1(self, ode, /) -> "DenseOdeTs1":
+        from probdiffeq._probdiffeq.problem_types import ODEFunction
+
+        if not isinstance(ode, ODEFunction):
+            raise TypeError(ode)
+        if ode.num_derivatives_in_args > 1:
+            msg = "Not implemented."
+            msg += " Try zeroth-order methods or residual-based constraints instead."
+            raise ValueError(msg)
+        return DenseOdeTs1(ode=ode)
+
+    def constraint_residual(self, residual, *, taylor_point=None) -> "DenseResidual":
+        from probdiffeq._probdiffeq.linearization import taylor_point_prior
+        from probdiffeq._probdiffeq.problem_types import Residual
+
+        if not isinstance(residual, Residual):
+            raise TypeError(residual)
+        if taylor_point is None:
+            taylor_point = taylor_point_prior()
+        return DenseResidual(residual, taylor_point=taylor_point)
+
 
 @structs.dataclass
 class DenseTreeFlatten(interfaces.AbstractTreeFlatten):
@@ -513,24 +540,6 @@ class DenseNormal(interfaces.AbstractTreeNormal[DenseTreeFlatten]):
 
 
 DenseNormal.register_pytree_node()
-
-
-class DenseLinearizationFactory(interfaces.AbstractLinearizationFactory):
-    """Construct a dense linearization factory."""
-
-    def residual(self, residual, *, taylor_point):
-        return DenseResidual(residual, taylor_point=taylor_point)
-
-    def ode_taylor_0th(self, *, ode):
-        return DenseOdeTs0(ode=ode)
-
-    def ode_taylor_1st(self, *, ode):
-        if ode.num_derivatives_in_args > 1:
-            msg = "Not implemented."
-            msg += " Try zeroth-order methods or residual-based constraints instead."
-            raise ValueError(msg)
-
-        return DenseOdeTs1(ode=ode)
 
 
 class DenseOdeTs0(interfaces.AbstractOde):

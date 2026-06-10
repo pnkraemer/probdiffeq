@@ -1,7 +1,7 @@
 r"""Evaluate jet-recursions in differential equations."""
 
 from probdiffeq import probdiffeq
-from probdiffeq._probdiffeq import constraints, problem_types, utilities
+from probdiffeq._probdiffeq import linearization, problem_types, utilities
 from probdiffeq.backend import flow, func, np, tree
 from probdiffeq.backend.typing import Array, Protocol, Sequence, TypeVar
 
@@ -368,11 +368,11 @@ def _allow_pytree_inits(expand):
 
 
 def jetexpand_residual(
-    num: int, nlstsq: constraints.LstSqConstrained | None = None
+    num: int, nlstsq: linearization.LstSqConstrained | None = None
 ) -> JetExpansionAlg[problem_types.Residual]:
     """Evaluate the Taylor series of a differential-algebraic equation system."""
     if nlstsq is None:
-        nlstsq = constraints.lstsq_constrained_gauss_newton()
+        nlstsq = linearization.lstsq_constrained_gauss_newton()
 
     # TODO: enable pytree inputs/outputs
     def expand(
@@ -400,9 +400,7 @@ def jetexpand_residual(
         # Determine degrees of freedom ("dof") and initialse all others diffusely
         # Concretely: The provided 'inits' are not DOFs, all added ones are.
         ssm = probdiffeq.state_space_model()
-        rv, _ = probdiffeq.prior_wiener_integrated(
-            inits, diffuse_derivatives=num, ssm=ssm
-        )
+        rv, _ = ssm.prior_wiener_integrated(inits, diffuse_derivatives=num)
 
         x0, unravel = tree.ravel_pytree(rv.mean)
 

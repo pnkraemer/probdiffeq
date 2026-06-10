@@ -18,8 +18,8 @@ def case_solve_fixed_grid(fact):
     tcoeffs, _ = jetexpand(vf, u0, t=t0)
 
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_ode_ts0(vf)
     grid = np.linspace(t0, t1, endpoint=True, num=5)
 
     def solver_to_solution(solver_fun, strategy_fun):
@@ -43,8 +43,8 @@ def case_simulate_terminal_values(fact):
     dt0 = ivpsolve.dt0(vf, u0, t=t0)
 
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_ode_ts0(vf)
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun()

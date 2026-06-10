@@ -23,33 +23,35 @@ class Factory:
     and make each case only vary one of the parameters.
     """
 
-    prior: Callable = probdiffeq.prior_wiener_integrated
+    prior: Callable = lambda ssm, tcoeffs, **kw: ssm.prior_wiener_integrated(
+        tcoeffs, **kw
+    )
     strategy: Callable = probdiffeq.strategy_filter
     solver: Callable = probdiffeq.solver
     jacobian: probdiffeq.JacobianHandler = probdiffeq.jacobian_materialize()
 
     # ts1 default because it uses more backend functions (eg Jacobians)
     # so the tests gain relevance
-    constraint: Callable = probdiffeq.constraint_ode_ts0
+    constraint: Callable = lambda ssm, ode: ssm.constraint_ode_ts0(ode)
     error: Callable = probdiffeq.error_residual_std
 
 
 @testing.case
 def case_factory_prior_wiener_integrated():
-    return Factory(prior=probdiffeq.prior_wiener_integrated)
+    return Factory(
+        prior=lambda ssm, tcoeffs, **kw: ssm.prior_wiener_integrated(tcoeffs, **kw)
+    )
 
 
 @testing.case
 def case_factory_prior_ioup():
-    def prior(*args, **kwargs):
+    def prior(ssm, tcoeffs, **kwargs):
         try:
 
             def linop(u, /):
                 return tree.tree_map(lambda s: 0.01 * np.flip(s), u)
 
-            return probdiffeq.prior_ornstein_uhlenbeck_integrated(
-                linop, *args, **kwargs
-            )
+            return ssm.prior_ornstein_uhlenbeck_integrated(linop, tcoeffs, **kwargs)
         except NotImplementedError:
             reason = "This prior is not implemented"
             reason += ", likely due to the selected state-space factorisation."
@@ -96,12 +98,12 @@ def case_factory_solver_dynamic_with_relinearization():
 
 @testing.case
 def case_factory_constraint_ode_ts0():
-    return Factory(constraint=probdiffeq.constraint_ode_ts0)
+    return Factory(constraint=lambda ssm, ode: ssm.constraint_ode_ts0(ode))
 
 
 @testing.case
 def case_factory_constraint_ode_ts1():
-    return Factory(constraint=probdiffeq.constraint_ode_ts1)
+    return Factory(constraint=lambda ssm, ode: ssm.constraint_ode_ts1(ode))
 
 
 @testing.case
@@ -132,16 +134,16 @@ def case_factory_constraint_residual_ts1(ivp):
     def residual(u, du, /, *, t):
         return tree.tree_map(lambda a, b: a - b, du, vf(u, t=t))
 
-    def constraint_residual(vf, **kwargs):
+    def constraint_fn(ssm, vf):
         try:
             del vf  # no vector fields, we use the residual instead
-            return probdiffeq.constraint_residual(residual, **kwargs)
+            return ssm.constraint_residual(residual)
         except NotImplementedError:
             reason = "This linearisation is not implemented"
             reason += ", likely due to the selected state-space factorisation."
             testing.skip(reason)
 
-    return Factory(constraint=constraint_residual)
+    return Factory(constraint=constraint_fn)
 
 
 @testing.case
@@ -180,9 +182,9 @@ def test_output_matches_reference(ivp, ssm_fact, factory: Factory) -> None:
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
 
     tcoeffs, _ = jetexpand(vf, u0, t=t0)
-    init, prior = factory.prior(tcoeffs, ssm=ssm)
+    init, prior = factory.prior(ssm, tcoeffs)
     strategy = factory.strategy()
-    constraint = factory.constraint(vf, ssm=ssm)
+    constraint = factory.constraint(ssm, vf)
     solver = factory.solver(strategy=strategy, prior=prior, constraint=constraint)
     # not all constraints have shape (d,):
     error_norm = probdiffeq.error_norm_rms_then_scale()

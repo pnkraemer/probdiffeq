@@ -19,8 +19,8 @@ def fixture_solver_setup(fact):
 def fixture_filter_solution(solver_setup):
     tcoeffs = solver_setup["tcoeffs"]
     ssm = probdiffeq.state_space_model(ssm_fact=solver_setup["fact"])
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_ode_ts0(solver_setup["vf"])
     strategy = probdiffeq.strategy_filter()
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
@@ -31,8 +31,8 @@ def fixture_filter_solution(solver_setup):
 def fixture_smoother_solution(solver_setup):
     tcoeffs = solver_setup["tcoeffs"]
     ssm = probdiffeq.state_space_model(ssm_fact=solver_setup["fact"])
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_ode_ts0(solver_setup["vf"])
     strategy = probdiffeq.strategy_smoother_fixedinterval()
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
     solve = ivpsolve.solve_fixed_grid(solver=solver)

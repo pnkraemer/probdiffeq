@@ -1,50 +1,25 @@
-"""Constraint functions and (posterior) linearization strategies.
+"""Linearization strategies for probabilistic solvers.
 
 Examples
 --------
->>> from probdiffeq import probdiffeq
-
-Construct ODE constraints as such:
-
->>> @probdiffeq.ode
-... def vf(u, /, *, t):
-...     return -u
->>>
+>>> from probdiffeq import probdiffeq, ssm_impl
 >>> ssm = probdiffeq.state_space_model("dense")
->>> constraint = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
->>> print(constraint)
-DenseOdeTs1(ode=ODEFunction(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
 
+Use the prior mean as the linearization point (default):
 
-Implement high-order ODEs by passing a vector field with additional arguments as such:
+>>> tp = probdiffeq.TaylorPoint()
+>>> print(type(tp).__name__)
+TaylorPoint
 
->>> @probdiffeq.ode_second_order
-... def vf(u, du, /, *, t):
-...     return -du
->>>
->>> ssm = probdiffeq.state_space_model("isotropic")
->>> constraint = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
->>> print(constraint)
-IsotropicOdeTs0(ode=ODEFunction(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
+Use the MAP estimate as the linearization point for iterated filtering:
 
-
-Or, use the constraint as a decorator
-
->>> import functools
->>>
->>> @functools.partial(probdiffeq.constraint_ode_ts0, ssm=ssm)
-... @probdiffeq.ode_second_order
-... def ode(u, du, /, *, t):
-...     return -du
->>>
->>> print(ode)
-IsotropicOdeTs0(ode=ODEFunction(num_derivatives_in_args=2, jacobian=jacobian_hutchinson_fwd(seed=1, num_probes=10)))
-
+>>> tp = probdiffeq.taylor_point_maximum_a_posteriori()
+>>> print(type(tp).__name__)
+taylor_point_maximum_a_posteriori
 
 """
 
 from probdiffeq import ssm_impl
-from probdiffeq._probdiffeq import problem_types
 from probdiffeq.backend import flow, func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeVar
 
@@ -52,9 +27,6 @@ __all__ = [
     "Constraint",
     "LstSqConstrained",
     "TaylorPoint",
-    "constraint_ode_ts0",
-    "constraint_ode_ts1",
-    "constraint_residual",
     "lstsq_constrained_gauss_newton",
     "taylor_point_maximum_a_posteriori",
     "taylor_point_prior",
@@ -207,8 +179,8 @@ class Constraint(Protocol):
     """An interface for constraints + linearization in probabilistic solvers.
 
     Related:
-    [`constraint_ode_ts0`](#probdiffeq.probdiffeq.constraint_ode_ts0),
-    [`constraint_ode_ts1`](#probdiffeq.probdiffeq.constraint_ode_ts1),
+    [`FactSsmImpl.constraint_ode_ts0`](#probdiffeq.ssm_impl.FactSsmImpl.constraint_ode_ts0),
+    [`FactSsmImpl.constraint_ode_ts1`](#probdiffeq.ssm_impl.FactSsmImpl.constraint_ode_ts1),
     """
 
     init_linearization: Callable
@@ -225,88 +197,3 @@ class Constraint(Protocol):
     the residual_order would be two; and in second-order ODEs,
     the residual_order would be three.
     """
-
-
-def constraint_ode_ts0(
-    ode: problem_types.ODEFunction, /, *, ssm: ssm_impl.FactSsmImpl
-) -> Constraint:
-    r"""Create an ODE constraint with zeroth-order Taylor linearisation.
-
-    This constraint handles ODEs of the form
-
-    $$
-    \frac{d^k}{dt^k} u(t) = f\left(u(t), \frac{du}{dt}(t), \frac{d^2u}{dt^2}(t), ..., t\right)
-    $$
-
-    where $k$ is the order of the ODE, which is read off the number of positional arguments in the vector field $f$ (argument `vf`).
-
-
-    Related:
-    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
-    """
-    if not isinstance(ode, problem_types.ODEFunction):
-        raise TypeError(ode)
-    return ssm.linearize.ode_taylor_0th(ode=ode)
-
-
-def constraint_ode_ts1(ode: problem_types.ODEFunction, /, *, ssm: ssm_impl.FactSsmImpl):
-    r"""Create an ODE constraint and linearise with a first-order Taylor approximation.
-
-    This constraint handles ODEs of the form
-
-    $$
-    \frac{d^k}{dt^k} u(t) = f\left(u(t), \frac{du}{dt}(t), \frac{d^2u}{dt^2}(t), ..., t\right)
-    $$
-
-    where $k$ is the order of the ODE.
-
-    Related:
-    [`Constraint`](#probdiffeq.probdiffeq.Constraint).
-
-    """
-    if not isinstance(ode, problem_types.ODEFunction):
-        raise TypeError(ode)
-    return ssm.linearize.ode_taylor_1st(ode=ode)
-
-
-def constraint_residual(
-    residual: problem_types.Residual,
-    *,
-    ssm: ssm_impl.FactSsmImpl,
-    taylor_point: TaylorPoint | None = None,
-):
-    r"""Construct a general constraint.
-
-    This constraint handles problems of the form
-
-    $$
-    f\left(u(t), \frac{du}{dt}(t), ..., \frac{d^k u}{dt^k}(t), t\right) = 0
-    $$
-
-    where $k$ is the order of the problem.
-
-
-    !!! warning "Warning: highly EXPERIMENTAL feature!"
-        This function is highly experimental and not safe to use.
-        There is no guarantee that it works correctly (or at all).
-        It might be deleted tomorrow and without any deprecation policy.
-
-
-    Parameters
-    ----------
-    residual
-        The residual to apply linearization to.
-    ssm
-        The state-space model to use for the constraint.
-    taylor_point
-        The strategy to use for finding the linearization point for the Taylor expansion.
-        If None, the prior mean is used as the linearization point.
-        Adjust this variable to use posterior linearization (also known as iterated filtering).
-
-    """
-    if not isinstance(residual, problem_types.Residual):
-        raise TypeError(residual)
-
-    if taylor_point is None:
-        taylor_point = taylor_point_prior()
-    return ssm.linearize.residual(residual=residual, taylor_point=taylor_point)

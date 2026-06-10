@@ -31,8 +31,8 @@ def solve_ode(inits, num):
     tcoeffs, _ = jetexpand(vf_ode, inits, t=0.0)
 
     ssm = probdiffeq.state_space_model(ssm_fact="dense")
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(vf_ode, ssm=ssm)
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_ode_ts0(vf_ode)
     strategy = probdiffeq.strategy_filter()
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
     error = probdiffeq.error_state_std(constraint=ts0, prior=iwp)
@@ -74,8 +74,8 @@ def solve_dae(inits, num):
     tcoeffs, _ = jetexpand(residual, inits, t=0.0)
 
     ssm = probdiffeq.state_space_model(ssm_fact="dense")
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_residual(residual, ssm=ssm)
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_residual(residual)
     strategy = probdiffeq.strategy_filter()
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
     error = probdiffeq.error_state_std(constraint=ts0, prior=iwp)

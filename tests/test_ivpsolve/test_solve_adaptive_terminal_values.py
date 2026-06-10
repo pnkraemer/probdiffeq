@@ -14,10 +14,10 @@ def test_output_matches_reference(fact) -> None:
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
     tcoeffs, _ = jetexpand(vf, u0, t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact=fact)
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
 
     strategy = probdiffeq.strategy_smoother_fixedpoint()
-    constraint = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
+    constraint = ssm.constraint_ode_ts0(vf)
     solver = probdiffeq.solver_dynamic(
         strategy=strategy, prior=iwp, constraint=constraint
     )
