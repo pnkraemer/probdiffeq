@@ -1,7 +1,7 @@
 from probdiffeq._probdiffeq import ssm_via_api as interfaces
 from probdiffeq._probdiffeq import utilities
-from probdiffeq._probdiffeq.linearization import taylor_point_prior
 from probdiffeq._probdiffeq.problem_types import ODEFunction, Residual
+from probdiffeq._probdiffeq.taylor_point import taylor_point_prior
 from probdiffeq.backend import func, linalg, np, random, structs, tree, warnings
 from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
@@ -557,10 +557,6 @@ class DenseOdeTs0(interfaces.AbstractOde):
 
 class DenseOdeTs1(interfaces.AbstractOde):
     """Construct a dense implementation of ODE-TS1 linearization."""
-
-    @property
-    def residual_order(self):
-        return self.ode.num_derivatives_in_args + 1
 
     def init_linearization(self):
         return self.ode.jacobian.init_jacobian_handler()

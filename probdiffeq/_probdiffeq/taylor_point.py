@@ -21,10 +21,9 @@ taylor_point_maximum_a_posteriori
 
 from probdiffeq._probdiffeq import ssm_via_api
 from probdiffeq.backend import flow, func, linalg, np, structs, tree
-from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeVar
+from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 
 __all__ = [
-    "Constraint",
     "LstSqConstrained",
     "TaylorPoint",
     "lstsq_constrained_gauss_newton",
@@ -173,28 +172,3 @@ C = TypeVar("C", bound=Sequence)
 
 Used to type Taylor coefficients, for example.
 """
-
-
-class Constraint(Protocol):
-    """An interface for constraints + linearization in probabilistic solvers.
-
-    Related:
-    [`StateSpaceModel.constraint_ode_ts0`](#probdiffeq.ssm_via_api.StateSpaceModel.constraint_ode_ts0),
-    [`StateSpaceModel.constraint_ode_ts1`](#probdiffeq.ssm_via_api.StateSpaceModel.constraint_ode_ts1),
-    """
-
-    def init_linearization(self):
-        """Initialize the linearization of the constraint."""
-
-    def linearize(self, rv, state, *, damp: float, t):
-        """Linearize the constraint."""
-
-    @property
-    def residual_order(self) -> int:
-        """The order of the root-constraint.
-
-        Here, 'order' relates to the highest derivative that the
-        constraint depends on; for instance, in first-order ODEs,
-        the residual_order would be two; and in second-order ODEs,
-        the residual_order would be three.
-        """

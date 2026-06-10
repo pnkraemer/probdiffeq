@@ -124,6 +124,14 @@ AbstractLatentCond._register_as_pytree()
 class AbstractLinearization(abc.ABC):
     """Interface for linearizations."""
 
+    residual_order: int
+    """The order of the root-constraint.
+
+    Here, 'order' relates to the highest derivative that the constraint depends on;
+    for instance, in first-order ODEs, the residual_order would be two; and in
+    second-order ODEs, the residual_order would be three.
+    """
+
     @abc.abstractmethod
     def init_linearization(self):
         """Initialize a linearization."""
@@ -140,11 +148,7 @@ class AbstractResidual(AbstractLinearization):
 
     def __init__(self, residual, /) -> None:
         self.residual = residual
-
-    @property
-    def residual_order(self):
-        """The order of the residual constraint."""
-        return self.residual.num_derivatives_in_args
+        self.residual_order = self.residual.num_derivatives_in_args
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(residual={self.residual})"
@@ -155,14 +159,10 @@ class AbstractOde(AbstractLinearization):
 
     def __init__(self, *, ode) -> None:
         self.ode = ode
+        self.residual_order = self.ode.num_derivatives_in_args + 1
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(ode={self.ode})"
-
-    @property
-    def residual_order(self):
-        """The order of the residual constraint."""
-        return self.ode.num_derivatives_in_args + 1
 
 
 class AbstractTreeFlatten(abc.ABC):
@@ -513,7 +513,7 @@ class StateSpaceModel(abc.ABC):
             output_scale=output_scale,
         )
 
-    # --- Constraint constructors ---
+    # --- Linearization constructors ---
 
     @abc.abstractmethod
     def constraint_ode_ts0(self, ode, /) -> AbstractOde:
@@ -527,7 +527,7 @@ class StateSpaceModel(abc.ABC):
 
         where $k$ is the order of the ODE.
 
-        Related: :class:`probdiffeq.probdiffeq.Constraint`.
+        Related: :class:`probdiffeq._probdiffeq.ssm_via_api.AbstractLinearization`.
         """
         raise NotImplementedError
 
@@ -543,7 +543,7 @@ class StateSpaceModel(abc.ABC):
 
         where $k$ is the order of the ODE.
 
-        Related: :class:`probdiffeq.probdiffeq.Constraint`.
+        Related: :class:`probdiffeq._probdiffeq.ssm_via_api.AbstractLinearization`.
         """
         raise NotImplementedError
 
