@@ -13,8 +13,6 @@ and slows down the simulation
 
 Examples
 --------
->>> import inspect
->>>
 >>> @ode
 ... def f(y, *, t):
 ...     return y
@@ -313,15 +311,15 @@ class ODEFunction(_AbstractJetFunction, Generic[T]):
 class ODEFunctionAutonomous(ODEFunction[T]):
     """An autonomous ODE y^(k) = f(y, y', ...) where f does not depend on t."""
 
-    def __init__(self, autonomous_func, jacobian: Jacobian, num_tcoeffs_in_args: int):
+    def __init__(self, autonomous, jacobian: Jacobian, num_tcoeffs_in_args: int):
         def vector_field(*, jet_coords, t):
             del t
-            return autonomous_func(jet_coords=jet_coords)
+            return autonomous(jet_coords=jet_coords)
 
         super().__init__(
             vector_field, jacobian=jacobian, num_tcoeffs_in_args=num_tcoeffs_in_args
         )
-        self.autonomous = autonomous_func
+        self.autonomous = autonomous
 
 
 def ode(func: ProtocolODEFirstOrder, /, *, jacobian: Jacobian | None = None):
@@ -378,16 +376,14 @@ class ProtocolODEAutonomous(Protocol[T]):
 def ode_autonomous(func: ProtocolODEAutonomous, /, *, jacobian: Jacobian | None = None):
     """Construct a description of an autonomous ODE y' = f(y)."""
 
-    def autonomous_func(*, jet_coords: Sequence[T]) -> T:
+    def autonomous(*, jet_coords: Sequence[T]) -> T:
         (y,) = jet_coords
         return func(y)
 
     if jacobian is None:
         jacobian = jacobian_monte_carlo_fwd()
 
-    return ODEFunctionAutonomous(
-        autonomous_func, jacobian=jacobian, num_tcoeffs_in_args=1
-    )
+    return ODEFunctionAutonomous(autonomous, jacobian=jacobian, num_tcoeffs_in_args=1)
 
 
 class ProtocolODEAutonomousSecondOrder(Protocol[T]):
@@ -399,16 +395,14 @@ def ode_autonomous_order_second(
 ):
     """Construct a description of an autonomous ODE y'' = f(y, y')."""
 
-    def autonomous_func(*, jet_coords: Sequence[T]) -> T:
+    def autonomous(*, jet_coords: Sequence[T]) -> T:
         (y, dy) = jet_coords
         return func(y, dy)
 
     if jacobian is None:
         jacobian = jacobian_monte_carlo_fwd()
 
-    return ODEFunctionAutonomous(
-        autonomous_func, jacobian=jacobian, num_tcoeffs_in_args=2
-    )
+    return ODEFunctionAutonomous(autonomous, jacobian=jacobian, num_tcoeffs_in_args=2)
 
 
 def ode_autonomous_order_arbitrary(
@@ -419,14 +413,14 @@ def ode_autonomous_order_arbitrary(
     Prefer ode_autonomous or ode_autonomous_order_second when possible.
     """
 
-    def autonomous_func(*, jet_coords: Sequence[T]) -> T:
+    def autonomous(*, jet_coords: Sequence[T]) -> T:
         return func(*jet_coords[:num_tcoeffs_in_args])
 
     if jacobian is None:
         jacobian = jacobian_monte_carlo_fwd()
 
     return ODEFunctionAutonomous(
-        autonomous_func, jacobian=jacobian, num_tcoeffs_in_args=num_tcoeffs_in_args
+        autonomous, jacobian=jacobian, num_tcoeffs_in_args=num_tcoeffs_in_args
     )
 
 

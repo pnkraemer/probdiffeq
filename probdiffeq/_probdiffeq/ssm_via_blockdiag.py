@@ -1,6 +1,4 @@
-from probdiffeq._probdiffeq import ssm_via_api as interfaces
-from probdiffeq._probdiffeq import utilities
-from probdiffeq._probdiffeq.problem_types import ODEFunction
+from probdiffeq._probdiffeq import problem_types, ssm_via_api, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
@@ -15,7 +13,7 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class BlockDiagLatentCond(interfaces.AbstractLatentCond):
+class BlockDiagLatentCond(ssm_via_api.AbstractLatentCond):
     """Block-diagonal implementation of LatentCond operations."""
 
     def apply_flat(self, x, /):
@@ -119,218 +117,7 @@ def _transpose(matrix):
     return np.transpose(matrix, axes=(0, 2, 1))
 
 
-class state_space_model_blockdiag(interfaces.StateSpaceModel):
-    """Implementation of block-diagonal SSM constructors."""
-
-    def prior_wiener_integrated(
-        self,
-        tcoeffs_mean: C,
-        /,
-        *,
-        is_exact: C | bool = True,
-        inexact_eps: float = 1e-6,
-        diffuse_derivatives: int = 0,
-        diffuse_eps: float = 1.0,
-        output_scale: Array | None = None,
-    ):
-        tcoeffs_std = self._tcoeffs_standard_deviation(
-            tcoeffs_mean, is_exact=is_exact, inexact_eps=inexact_eps
-        )
-        return self.prior_wiener_integrated_diffuse(
-            tcoeffs_mean,
-            tcoeffs_std,
-            diffuse_derivatives=diffuse_derivatives,
-            diffuse_eps=diffuse_eps,
-            output_scale=output_scale,
-        )
-
-    def prior_wiener_integrated_diffuse(
-        self,
-        tcoeffs_mean: C,
-        tcoeffs_std: C,
-        /,
-        *,
-        diffuse_derivatives: int = 0,
-        diffuse_eps: float = 1.0,
-        output_scale: Array | None = None,
-    ):
-        if diffuse_derivatives > 0:
-            tcoeffs_mean, tcoeffs_std = self._add_diffuse_derivatives(
-                tcoeffs_mean,
-                tcoeffs_std,
-                diffuse_derivatives=diffuse_derivatives,
-                diffuse_eps=diffuse_eps,
-            )
-
-        # Construct the initial variable from the mean and std
-        init = BlockDiagNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
-
-        single_flat, single_unravel = tree.ravel_pytree(tcoeffs_mean[0])
-        coeff_like = np.ones_like(single_flat)
-        base_scale_expected = single_unravel(coeff_like)
-
-        if output_scale is None:
-            output_scale = base_scale_expected
-        else:
-            if tree.tree_structure(output_scale) != tree.tree_structure(
-                base_scale_expected
-            ):
-                msg = "The 'output_scale' argument has an unexpected PyTree structure."
-                msg += f" Expected: {tree.tree_structure(base_scale_expected)}."
-                msg += f" Received: {tree.tree_structure(output_scale)}."
-                raise TypeError(msg)
-
-            output_scale = tree.tree_map(np.asarray, output_scale)
-
-            def shape_equal(A, B):
-                return tree.tree_map(lambda a, b: np.shape(a) == np.shape(b), A, B)
-
-            if not tree.tree_all(shape_equal(output_scale, base_scale_expected)):
-                msg = "The output-scale has the wrong shape."
-                msg += f" Expected: {tree.tree_map(np.shape, base_scale_expected)}."
-                msg += f" Received: {output_scale.shape}."
-                raise ValueError(msg)
-
-        output_scale, _ = tree.ravel_pytree(output_scale)
-
-        num_derivatives = len(tcoeffs_mean) - 1
-        a, q_sqrtm = utilities.system_matrices_1d_iwp(num_derivatives)
-        q0 = np.zeros((num_derivatives + 1,))
-        precon_fun = utilities.preconditioner_taylor(num_derivatives=num_derivatives)
-
-        _base_scale = output_scale
-
-        def discretise(dt, output_scale: Array | None = None):
-            p, p_inv = precon_fun(dt)
-            if output_scale is None:
-                output_scale = np.ones_like(_base_scale)
-            else:
-                output_scale = np.asarray(output_scale)
-
-                if output_scale.shape != _base_scale.shape:
-                    msg = "The output-scale has the wrong shape."
-                    msg += f" Expected: {_base_scale.shape}."
-                    msg += f" Received: {output_scale.shape}."
-                    raise ValueError(msg)
-                output_scale, _ = tree.ravel_pytree(output_scale)
-
-            scale = output_scale * _base_scale
-            # Flatten the scale into something compatible with the flattened SSM
-            (d,) = scale.shape
-
-            A_batch = np.ones((d, 1, 1)) * a[None, :, :]
-            mean = np.ones((d, 1)) * q0[None, :]
-            cholesky = scale[:, None, None] * q_sqrtm[None, :, :]
-            tree_flatten = BlockDiagTreeFlatten.from_example(tcoeffs_mean)
-            noise = BlockDiagNormal(mean, cholesky, tree_flatten)
-            p = np.ones((d, 1)) * p[None, :]
-            p_inv = np.ones((d, 1)) * p_inv[None, :]
-            return BlockDiagLatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
-
-        return init, discretise
-
-    def prior_exponential(
-        self,
-        ode,
-        tcoeffs_mean: C,
-        /,
-        *,
-        is_exact: C | bool = True,
-        inexact_eps: float = 1e-6,
-        diffuse_derivatives: int = 0,
-        diffuse_eps: float = 1.0,
-        output_scale: Array | None = None,
-    ):
-        del ode, tcoeffs_mean, is_exact, inexact_eps, diffuse_derivatives
-        del diffuse_eps, output_scale
-        msg = "Block-diagonal exponential priors have not been implemented (yet.)."
-        msg += " If you need them, reach out."
-        raise NotImplementedError(msg)
-
-    def prior_exponential_diffuse(
-        self,
-        ode,
-        tcoeffs_mean: C,
-        tcoeffs_std: C,
-        /,
-        *,
-        diffuse_derivatives: int = 0,
-        diffuse_eps: float = 1.0,
-        output_scale: Array | None = None,
-    ):
-        del ode, tcoeffs_mean, tcoeffs_std, diffuse_derivatives
-        del diffuse_eps, output_scale
-        msg = "Block-diagonal exponential priors have not been implemented (yet.)."
-        msg += " If you need them, reach out."
-        raise NotImplementedError(msg)
-
-    def constraint_ode_ts0(self, ode, /) -> "BlockDiagOdeTs0":
-        if not isinstance(ode, ODEFunction):
-            raise TypeError(ode)
-        return BlockDiagOdeTs0(ode=ode)
-
-    def constraint_ode_ts1(self, ode, /) -> "BlockDiagOdeTs1":
-        if not isinstance(ode, ODEFunction):
-            raise TypeError(ode)
-        if ode.num_tcoeffs_in_args > 2:
-            msg = "This linearization is not compatible with high-order ODEs as of yet."
-            raise ValueError(msg)
-        return BlockDiagOdeTs1(ode=ode)
-
-    def constraint_residual(self, residual, *, linearization_point=None):
-        raise NotImplementedError
-
-    def _tcoeffs_standard_deviation(self, tcoeffs_mean, /, *, is_exact, inexact_eps):
-
-        # Construct the initial std.
-        # If is_exact is a boolean, copy the pytree structure from the mean
-        # Otherwise, set the initial std element-wise.
-        if isinstance(is_exact, bool):
-            if is_exact:
-                tcoeffs_std = tree.tree_map(np.zeros_like, tcoeffs_mean)
-            else:
-
-                def eps_like(s):
-                    return inexact_eps * np.ones_like(s)
-
-                tcoeffs_std = tree.tree_map(eps_like, tcoeffs_mean)
-        else:
-
-            def std_init(s: Array) -> Array:
-                if s.dtype != np.dtype(bool):
-                    msg = "Boolean entries expected in `is_exact`."
-                    msg += f" Received: dtype={np.dtype(s)}"
-                    raise TypeError(msg)
-                return np.where(s, 0.0, inexact_eps)
-
-            tcoeffs_std = tree.tree_map(std_init, is_exact)
-
-        def shape_equal(A, B):
-            return tree.tree_map(lambda a, b: np.shape(a) == np.shape(b), A, B)
-
-        if not tree.tree_all(shape_equal(tcoeffs_mean, tcoeffs_std)):
-            msg = "Input 'is_exact' has the wrong PyTree structure."
-            msg += f" Expected: {tree.tree_map(np.shape, tcoeffs_mean)}."
-            msg += f" Received: {tree.tree_map(np.shape, is_exact)}."
-            raise ValueError(msg)
-
-        return tcoeffs_std
-
-    def _add_diffuse_derivatives(
-        self, tcoeffs_mean, tcoeffs_std, /, *, diffuse_derivatives, diffuse_eps
-    ):
-        # Always set the mean to zero (for now at least).
-        zeros = tree.tree_map(np.zeros_like, tcoeffs_mean[0])
-        tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(diffuse_derivatives)]]
-
-        unknowns = tree.tree_map(
-            lambda s: diffuse_eps * np.ones_like(s), tcoeffs_std[0]
-        )
-        tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
-        return tcoeffs_mean, tcoeffs_std
-
-
-class BlockDiagOdeTs0(interfaces.AbstractOde):
+class BlockDiagOdeTs0(ssm_via_api.AbstractOde):
     """Construct a block-diagonal implementation of ODE-TS0 linearization."""
 
     def init_linearization(self) -> None:
@@ -353,7 +140,7 @@ class BlockDiagOdeTs0(interfaces.AbstractOde):
         return cond, None
 
 
-class BlockDiagOdeTs1(interfaces.AbstractOde):
+class BlockDiagOdeTs1(ssm_via_api.AbstractOde):
     """Construct a block-diagonal implementation of ODE-TS1 linearization."""
 
     def init_linearization(self):
@@ -392,7 +179,7 @@ class BlockDiagOdeTs1(interfaces.AbstractOde):
 
 
 @structs.dataclass
-class BlockDiagTreeFlatten(interfaces.AbstractTreeFlatten):
+class BlockDiagTreeFlatten(ssm_via_api.AbstractTreeFlatten):
     """Flattening information for block-diagonal random variables."""
 
     # The treedef of the target
@@ -420,7 +207,7 @@ class BlockDiagTreeFlatten(interfaces.AbstractTreeFlatten):
         return cls(treedef, unravel_leaf)
 
 
-class BlockDiagNormal(interfaces.AbstractTreeNormal[BlockDiagTreeFlatten]):
+class BlockDiagNormal(ssm_via_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
     """Construct a block-diagonal normal distribution.
 
     This assumes that the pytree is of the form [M_1, ..., M_{num_coeffs}],
@@ -590,3 +377,215 @@ class BlockDiagNormal(interfaces.AbstractTreeNormal[BlockDiagTreeFlatten]):
 
 
 BlockDiagNormal.register_pytree_node()
+
+
+class state_space_model_blockdiag(ssm_via_api.StateSpaceModel):
+    """Implementation of block-diagonal SSM constructors."""
+
+    def prior_wiener_integrated(
+        self,
+        tcoeffs_mean: C,
+        /,
+        *,
+        is_exact: C | bool = True,
+        inexact_eps: float = 1e-6,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
+    ):
+        tcoeffs_std = self._tcoeffs_standard_deviation(
+            tcoeffs_mean, is_exact=is_exact, inexact_eps=inexact_eps
+        )
+        return self.prior_wiener_integrated_diffuse(
+            tcoeffs_mean,
+            tcoeffs_std,
+            diffuse_derivatives=diffuse_derivatives,
+            diffuse_eps=diffuse_eps,
+            output_scale=output_scale,
+        )
+
+    def prior_wiener_integrated_diffuse(
+        self,
+        tcoeffs_mean: C,
+        tcoeffs_std: C,
+        /,
+        *,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
+    ):
+        if diffuse_derivatives > 0:
+            tcoeffs_mean, tcoeffs_std = self._add_diffuse_derivatives(
+                tcoeffs_mean,
+                tcoeffs_std,
+                diffuse_derivatives=diffuse_derivatives,
+                diffuse_eps=diffuse_eps,
+            )
+
+        # Construct the initial variable from the mean and std
+        init = BlockDiagNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
+
+        single_flat, single_unravel = tree.ravel_pytree(tcoeffs_mean[0])
+        coeff_like = np.ones_like(single_flat)
+        output_scale_expected = single_unravel(coeff_like)
+
+        if output_scale is None:
+            output_scale = output_scale_expected
+        else:
+            expected_structure = tree.tree_structure(output_scale_expected)
+            received_structure = tree.tree_structure(output_scale)
+            if expected_structure != received_structure:
+                msg = "The 'output_scale' argument has an unexpected PyTree structure."
+                msg += f" Expected: {expected_structure}."
+                msg += f" Received: {received_structure}."
+                raise TypeError(msg)
+
+            output_scale = tree.tree_map(np.asarray, output_scale)
+
+            def shape_equal(A, B):
+                return tree.tree_map(lambda a, b: np.shape(a) == np.shape(b), A, B)
+
+            if not tree.tree_all(shape_equal(output_scale, output_scale_expected)):
+                msg = "The output-scale has the wrong shape."
+                msg += f" Expected: {tree.tree_map(np.shape, output_scale_expected)}."
+                msg += f" Received: {output_scale.shape}."
+                raise ValueError(msg)
+
+        output_scale, _ = tree.ravel_pytree(output_scale)
+
+        num_derivatives = len(tcoeffs_mean) - 1
+        a, q_sqrtm = utilities.system_matrices_1d_iwp(num_derivatives)
+        q0 = np.zeros((num_derivatives + 1,))
+        precon_fun = utilities.preconditioner_taylor(num_derivatives=num_derivatives)
+
+        def discretise(dt, scale: Array | None = None):
+            p, p_inv = precon_fun(dt)
+            if scale is None:
+                scale = np.ones_like(scale)
+            else:
+                scale = np.asarray(scale)
+
+                if scale.shape != output_scale.shape:
+                    msg = "The output-scale has the wrong shape."
+                    msg += f" Expected: {scale.shape}."
+                    msg += f" Received: {output_scale.shape}."
+                    raise ValueError(msg)
+                scale, _ = tree.ravel_pytree(scale)
+
+            scale = output_scale * scale
+
+            # Flatten the scale into something compatible with the flattened SSM
+            (d,) = scale.shape
+
+            A_batch = np.ones((d, 1, 1)) * a[None, :, :]
+            mean = np.ones((d, 1)) * q0[None, :]
+            cholesky = scale[:, None, None] * q_sqrtm[None, :, :]
+            tree_flatten = BlockDiagTreeFlatten.from_example(tcoeffs_mean)
+            noise = BlockDiagNormal(mean, cholesky, tree_flatten)
+            p = np.ones((d, 1)) * p[None, :]
+            p_inv = np.ones((d, 1)) * p_inv[None, :]
+            return BlockDiagLatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
+
+        return init, discretise
+
+    def prior_exponential(
+        self,
+        ode,
+        tcoeffs_mean: C,
+        /,
+        *,
+        is_exact: C | bool = True,
+        inexact_eps: float = 1e-6,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
+    ):
+        del ode, tcoeffs_mean, is_exact, inexact_eps, diffuse_derivatives
+        del diffuse_eps, output_scale
+        msg = "Block-diagonal exponential priors have not been implemented (yet.)."
+        msg += " If you need them, reach out."
+        raise NotImplementedError(msg)
+
+    def prior_exponential_diffuse(
+        self,
+        ode,
+        tcoeffs_mean: C,
+        tcoeffs_std: C,
+        /,
+        *,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
+    ):
+        del ode, tcoeffs_mean, tcoeffs_std, diffuse_derivatives
+        del diffuse_eps, output_scale
+        msg = "Block-diagonal exponential priors have not been implemented (yet.)."
+        msg += " If you need them, reach out."
+        raise NotImplementedError(msg)
+
+    def constraint_ode_ts0(self, ode: problem_types.ODEFunction, /) -> BlockDiagOdeTs0:
+        if not isinstance(ode, problem_types.ODEFunction):
+            raise TypeError(ode)
+        return BlockDiagOdeTs0(ode=ode)
+
+    def constraint_ode_ts1(self, ode: problem_types.ODEFunction, /) -> BlockDiagOdeTs1:
+        if not isinstance(ode, problem_types.ODEFunction):
+            raise TypeError(ode)
+        if ode.num_tcoeffs_in_args > 2:
+            msg = "This linearization is not compatible with high-order ODEs as of yet."
+            raise ValueError(msg)
+        return BlockDiagOdeTs1(ode=ode)
+
+    def constraint_residual(
+        self, residual: problem_types.Residual, *, linearization_point=None
+    ):
+        raise NotImplementedError
+
+    def _tcoeffs_standard_deviation(self, tcoeffs_mean, /, *, is_exact, inexact_eps):
+
+        # Construct the initial std.
+        # If is_exact is a boolean, copy the pytree structure from the mean
+        # Otherwise, set the initial std element-wise.
+        if isinstance(is_exact, bool):
+            if is_exact:
+                tcoeffs_std = tree.tree_map(np.zeros_like, tcoeffs_mean)
+            else:
+
+                def eps_like(s):
+                    return inexact_eps * np.ones_like(s)
+
+                tcoeffs_std = tree.tree_map(eps_like, tcoeffs_mean)
+        else:
+
+            def std_init(s: Array) -> Array:
+                if s.dtype != np.dtype(bool):
+                    msg = "Boolean entries expected in `is_exact`."
+                    msg += f" Received: dtype={np.dtype(s)}"
+                    raise TypeError(msg)
+                return np.where(s, 0.0, inexact_eps)
+
+            tcoeffs_std = tree.tree_map(std_init, is_exact)
+
+        def shape_equal(A, B):
+            return tree.tree_map(lambda a, b: np.shape(a) == np.shape(b), A, B)
+
+        if not tree.tree_all(shape_equal(tcoeffs_mean, tcoeffs_std)):
+            msg = "Input 'is_exact' has the wrong PyTree structure."
+            msg += f" Expected: {tree.tree_map(np.shape, tcoeffs_mean)}."
+            msg += f" Received: {tree.tree_map(np.shape, is_exact)}."
+            raise ValueError(msg)
+
+        return tcoeffs_std
+
+    def _add_diffuse_derivatives(
+        self, tcoeffs_mean, tcoeffs_std, /, *, diffuse_derivatives, diffuse_eps
+    ):
+        # Always set the mean to zero (for now at least).
+        zeros = tree.tree_map(np.zeros_like, tcoeffs_mean[0])
+        tcoeffs_mean = [*tcoeffs_mean, *[zeros for _ in range(diffuse_derivatives)]]
+
+        unknowns = tree.tree_map(
+            lambda s: diffuse_eps * np.ones_like(s), tcoeffs_std[0]
+        )
+        tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
+        return tcoeffs_mean, tcoeffs_std

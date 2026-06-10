@@ -1,6 +1,4 @@
-from probdiffeq._probdiffeq import ssm_via_api as interfaces
-from probdiffeq._probdiffeq import utilities
-from probdiffeq._probdiffeq.problem_types import ODEFunction
+from probdiffeq._probdiffeq import problem_types, ssm_via_api, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
@@ -22,7 +20,7 @@ __all__ = ["state_space_model_isotropic"]
 
 
 @structs.dataclass
-class IsotropicTreeFlatten(interfaces.AbstractTreeFlatten):
+class IsotropicTreeFlatten(ssm_via_api.AbstractTreeFlatten):
     """Flattening information for isotropic random variables."""
 
     # The treedef of the target
@@ -70,7 +68,7 @@ class IsotropicTreeFlatten(interfaces.AbstractTreeFlatten):
         return cls(treedef, unravel_leaf)
 
 
-class IsotropicLatentCond(interfaces.AbstractLatentCond):
+class IsotropicLatentCond(ssm_via_api.AbstractLatentCond):
     """Isotropic (scalar-variance) implementation of LatentCond operations."""
 
     def apply_flat(self, x, /):
@@ -144,7 +142,7 @@ class IsotropicLatentCond(interfaces.AbstractLatentCond):
 IsotropicLatentCond._register_as_pytree()
 
 
-class IsotropicNormal(interfaces.AbstractTreeNormal[IsotropicTreeFlatten]):
+class IsotropicNormal(ssm_via_api.AbstractTreeNormal[IsotropicTreeFlatten]):
     """Construct an isotropic normal distribution."""
 
     @classmethod
@@ -296,7 +294,68 @@ class IsotropicNormal(interfaces.AbstractTreeNormal[IsotropicTreeFlatten]):
 IsotropicNormal.register_pytree_node()
 
 
-class state_space_model_isotropic(interfaces.StateSpaceModel):
+class IsotropicOdeTs0(ssm_via_api.AbstractOde):
+    """Construct an isotropic implementation of ODE-TS0 linearization."""
+
+    def init_linearization(self) -> None:
+        return None
+
+    def linearize(self, rv, state: None, *, damp: float, t):
+        del state
+        Ms = rv.mean
+        jet_coords = Ms[: self.ode.num_tcoeffs_in_args]
+        fx_tree = self.ode.vector_field(jet_coords=jet_coords, t=t)
+        fx = tree.tree_map(lambda s: -s, fx_tree)
+
+        bias = IsotropicNormal.from_dirac([fx], damp=damp)
+
+        linop = func.jacrev(lambda s: s[[self.ode.num_tcoeffs_in_args], ...])(
+            rv.mean_flat[..., 0]
+        )
+        cond = IsotropicLatentCond.from_linop_and_noise(linop, bias)
+        return cond, None
+
+
+class IsotropicOdeTs1(ssm_via_api.AbstractOde):
+    """Construct an isotropic implementation of ODE-TS1 linearization."""
+
+    def init_linearization(self):
+        return self.ode.jacobian.init_jacobian_handler()
+
+    def linearize(self, rv, state, *, damp: float, t):
+
+        # Evaluate the linearisation
+        m0 = rv.mean_flat[0]
+
+        m0_tree = rv.mean[0]
+        rv0 = IsotropicNormal.from_dirac([m0_tree], damp=0.0)
+
+        def vf_ravel(s):
+            s_tree = rv0.tree_flatten.unflatten_array(s[None])
+            fs = self.ode.vector_field(jet_coords=s_tree, t=t)
+            return tree.ravel_pytree(fs)[0]
+
+        # Estimate the trace using Hutchinson's estimator
+        fx, J_trace, state = self.ode.jacobian.calculate_trace(vf_ravel, m0, state)
+
+        # Best Jacobian approximation: mean of diagonal = trace / len(diagonal)
+        J_trace /= len(fx)
+
+        n, _d = rv.mean_flat.shape
+        eye = np.eye(n)
+        E0, E1 = eye[np.asarray([0])], eye[np.asarray([1])]
+        linop = E1 - J_trace * E0
+        fx = rv.mean_flat[1, ...] - fx
+        fx = fx - linop @ rv.mean_flat
+        fx = rv0.tree_flatten.unflatten_array(fx)
+
+        # Turn fx and J_trace into an observation model
+        noise = IsotropicNormal.from_dirac(fx, damp=damp)
+        cond = IsotropicLatentCond.from_linop_and_noise(linop, noise)
+        return cond, state
+
+
+class state_space_model_isotropic(ssm_via_api.StateSpaceModel):
     """Isotropic (scalar-variance) state-space model implementation."""
 
     def prior_wiener_integrated(
@@ -469,79 +528,20 @@ class state_space_model_isotropic(interfaces.StateSpaceModel):
         tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
         return tcoeffs_mean, tcoeffs_std
 
-    def constraint_ode_ts0(self, ode, /) -> "IsotropicOdeTs0":
-        if not isinstance(ode, ODEFunction):
+    def constraint_ode_ts0(self, ode: problem_types.ODEFunction, /) -> IsotropicOdeTs0:
+        if not isinstance(ode, problem_types.ODEFunction):
             raise TypeError(ode)
         return IsotropicOdeTs0(ode=ode)
 
-    def constraint_ode_ts1(self, ode, /) -> "IsotropicOdeTs1":
-        if not isinstance(ode, ODEFunction):
+    def constraint_ode_ts1(self, ode: problem_types.ODEFunction, /) -> IsotropicOdeTs1:
+        if not isinstance(ode, problem_types.ODEFunction):
             raise TypeError(ode)
         if ode.num_tcoeffs_in_args > 1:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
             raise ValueError(msg)
         return IsotropicOdeTs1(ode=ode)
 
-    def constraint_residual(self, residual, *, linearization_point=None):
+    def constraint_residual(
+        self, residual: problem_types.Residual, *, linearization_point=None
+    ):
         raise NotImplementedError
-
-
-class IsotropicOdeTs0(interfaces.AbstractOde):
-    """Construct an isotropic implementation of ODE-TS0 linearization."""
-
-    def init_linearization(self) -> None:
-        return None
-
-    def linearize(self, rv, state: None, *, damp: float, t):
-        del state
-        Ms = rv.mean
-        jet_coords = Ms[: self.ode.num_tcoeffs_in_args]
-        fx_tree = self.ode.vector_field(jet_coords=jet_coords, t=t)
-        fx = tree.tree_map(lambda s: -s, fx_tree)
-
-        bias = IsotropicNormal.from_dirac([fx], damp=damp)
-
-        linop = func.jacrev(lambda s: s[[self.ode.num_tcoeffs_in_args], ...])(
-            rv.mean_flat[..., 0]
-        )
-        cond = IsotropicLatentCond.from_linop_and_noise(linop, bias)
-        return cond, None
-
-
-class IsotropicOdeTs1(interfaces.AbstractOde):
-    """Construct an isotropic implementation of ODE-TS1 linearization."""
-
-    def init_linearization(self):
-        return self.ode.jacobian.init_jacobian_handler()
-
-    def linearize(self, rv, state, *, damp: float, t):
-
-        # Evaluate the linearisation
-        m0 = rv.mean_flat[0]
-
-        m0_tree = rv.mean[0]
-        rv0 = IsotropicNormal.from_dirac([m0_tree], damp=0.0)
-
-        def vf_ravel(s):
-            s_tree = rv0.tree_flatten.unflatten_array(s[None])
-            fs = self.ode.vector_field(jet_coords=s_tree, t=t)
-            return tree.ravel_pytree(fs)[0]
-
-        # Estimate the trace using Hutchinson's estimator
-        fx, J_trace, state = self.ode.jacobian.calculate_trace(vf_ravel, m0, state)
-
-        # Best Jacobian approximation: mean of diagonal = trace / len(diagonal)
-        J_trace /= len(fx)
-
-        n, _d = rv.mean_flat.shape
-        eye = np.eye(n)
-        E0, E1 = eye[np.asarray([0])], eye[np.asarray([1])]
-        linop = E1 - J_trace * E0
-        fx = rv.mean_flat[1, ...] - fx
-        fx = fx - linop @ rv.mean_flat
-        fx = rv0.tree_flatten.unflatten_array(fx)
-
-        # Turn fx and J_trace into an observation model
-        noise = IsotropicNormal.from_dirac(fx, damp=damp)
-        cond = IsotropicLatentCond.from_linop_and_noise(linop, noise)
-        return cond, state

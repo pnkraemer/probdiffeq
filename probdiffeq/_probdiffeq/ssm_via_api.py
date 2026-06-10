@@ -15,6 +15,9 @@ if TYPE_CHECKING:
 __all__ = ["StateSpaceModel"]
 
 
+R = TypeVar("R", bound=Array)
+"""A fallback type-variable to cover what isn't covered by the others."""
+
 T = TypeVar("T", bound=Array)
 """A type-variable for Array types.
 
@@ -362,7 +365,7 @@ class StateSpaceModel(abc.ABC):
 
     def prior_ornstein_uhlenbeck_integrated(
         self,
-        linop: Callable,
+        linop: Callable[[R], R],
         tcoeffs: C,
         /,
         *,
@@ -374,11 +377,11 @@ class StateSpaceModel(abc.ABC):
     ):
         """Construct an integrated Ornstein-Uhlenbeck prior."""
 
-        def autonomous_func(*, jet_coords):
+        def autonomous(*, jet_coords):
             return linop(jet_coords[-1])
 
         ode: problem_types.ODEFunctionAutonomous = problem_types.ODEFunctionAutonomous(
-            autonomous_func,
+            autonomous,
             jacobian=problem_types.jacobian_materialize(),
             num_tcoeffs_in_args=len(tcoeffs),
         )
@@ -394,7 +397,7 @@ class StateSpaceModel(abc.ABC):
 
     def prior_ornstein_uhlenbeck_integrated_diffuse(
         self,
-        linop: Callable,
+        linop: Callable[[R], R],
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
@@ -405,11 +408,11 @@ class StateSpaceModel(abc.ABC):
     ):
         """Construct a diffuse integrated Ornstein-Uhlenbeck prior."""
 
-        def autonomous_func(*, jet_coords):
+        def autonomous(*, jet_coords):
             return linop(jet_coords[-1])
 
         ode: problem_types.ODEFunctionAutonomous = problem_types.ODEFunctionAutonomous(
-            autonomous_func,
+            autonomous,
             jacobian=problem_types.jacobian_materialize(),
             num_tcoeffs_in_args=len(tcoeffs_mean),
         )
