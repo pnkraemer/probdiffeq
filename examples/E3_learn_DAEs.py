@@ -44,7 +44,7 @@ def main(
     """Run the script."""
 
     @functools.partial(probdiffeq.jet_lift, lift_by=2)
-    @probdiffeq.residual_state_velocity
+    @probdiffeq.residual_position_velocity
     def differential(u, du, /, *, t):
         del t
         return du[:2] - dynamics(u)
@@ -56,7 +56,7 @@ def main(
         return jnp.stack([f0, f1])
 
     @functools.partial(probdiffeq.jet_lift, lift_by=3)
-    @probdiffeq.residual_state
+    @probdiffeq.residual_position
     def algebraic(u, *, t):
         del t
         return u[0] + u[1] + u[2] - 1

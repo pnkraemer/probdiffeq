@@ -324,7 +324,7 @@ class StateSpaceModel(abc.ABC):
     @abc.abstractmethod
     def prior_exponential(
         self,
-        ode: problem_types.AutonomousODEFunction,
+        ode: problem_types.ODEFunctionAutonomous,
         tcoeffs: C,
         /,
         *,
@@ -344,7 +344,7 @@ class StateSpaceModel(abc.ABC):
     @abc.abstractmethod
     def prior_exponential_diffuse(
         self,
-        ode: problem_types.AutonomousODEFunction,
+        ode: problem_types.ODEFunctionAutonomous,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
@@ -377,7 +377,7 @@ class StateSpaceModel(abc.ABC):
         def autonomous_func(*, jet_coords):
             return linop(jet_coords[-1])
 
-        ode: problem_types.AutonomousODEFunction = problem_types.AutonomousODEFunction(
+        ode: problem_types.ODEFunctionAutonomous = problem_types.ODEFunctionAutonomous(
             autonomous_func,
             jacobian=problem_types.jacobian_materialize(),
             num_derivatives_in_args=len(tcoeffs),
@@ -408,7 +408,7 @@ class StateSpaceModel(abc.ABC):
         def autonomous_func(*, jet_coords):
             return linop(jet_coords[-1])
 
-        ode: problem_types.AutonomousODEFunction = problem_types.AutonomousODEFunction(
+        ode: problem_types.ODEFunctionAutonomous = problem_types.ODEFunctionAutonomous(
             autonomous_func,
             jacobian=problem_types.jacobian_materialize(),
             num_derivatives_in_args=len(tcoeffs_mean),

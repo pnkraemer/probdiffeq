@@ -127,7 +127,7 @@ def solve_ivp_once(*, save_at, method, tol):
 def solver_ode(*, num_derivatives: int, time_span) -> Callable:
     """Construct a method that solves Robertson as an ODE."""
 
-    @probdiffeq.residual_state_velocity
+    @probdiffeq.residual_position_velocity
     def residual(u, du, /, *, t):
         return du - vf(u, t=t)
 
@@ -171,7 +171,7 @@ def solver_residual(*, num_derivatives: int, time_span) -> Callable:
     """Construct a method that solves Robertson as a DAE."""
 
     @functools.partial(probdiffeq.jet_lift, lift_by=num_derivatives - 1)
-    @probdiffeq.residual_state_velocity
+    @probdiffeq.residual_position_velocity
     def differential(u, du, /, *, t):
         del t
         return du[:2] - dynamics(u)
@@ -183,7 +183,7 @@ def solver_residual(*, num_derivatives: int, time_span) -> Callable:
         return jnp.stack([f0, f1])
 
     @functools.partial(probdiffeq.jet_lift, lift_by=num_derivatives)
-    @probdiffeq.residual_state
+    @probdiffeq.residual_position
     def algebraic(u, *, t):
         del t
         return u[0] + u[1] + u[2] - 1

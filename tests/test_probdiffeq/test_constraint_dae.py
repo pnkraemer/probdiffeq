@@ -47,14 +47,14 @@ def solve_dae(inits, num):
     """Solve the SIR model as a DAE."""
 
     @func.partial(probdiffeq.jet_lift, lift_by=num)
-    @probdiffeq.residual_state
+    @probdiffeq.residual_position
     def algebraic(u, /, *, t):
         del t
         N = 1.0  # total population
         return u[0] + u[1] + u[2] - N
 
     @func.partial(probdiffeq.jet_lift, lift_by=num - 1)
-    @probdiffeq.residual_state_velocity
+    @probdiffeq.residual_position_velocity
     def differential(u, du, /, *, t):
         del t
         beta, gamma = 2.0, 0.5

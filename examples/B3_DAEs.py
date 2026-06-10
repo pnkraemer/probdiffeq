@@ -28,7 +28,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
 
-    @probdiffeq.residual_state_velocity
+    @probdiffeq.residual_position_velocity
     def differential(u, du, /, *, t):
         del t
         return du[:2] - dynamics(u)
@@ -39,7 +39,7 @@ def main(t0=1e-6, t1=1e5) -> None:
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
         return jnp.stack([f0, f1])
 
-    @probdiffeq.residual_state
+    @probdiffeq.residual_position
     def algebraic(u, *, t):
         del t
         return u[0] + u[1] + u[2] - 1

@@ -167,7 +167,7 @@ class state_space_model_dense(interfaces.StateSpaceModel):
 
     def prior_exponential(
         self,
-        ode: problem_types.AutonomousODEFunction,
+        ode: problem_types.ODEFunctionAutonomous,
         tcoeffs_mean: C,
         /,
         *,
@@ -206,7 +206,7 @@ class state_space_model_dense(interfaces.StateSpaceModel):
 
     def prior_exponential_diffuse(
         self,
-        ode: problem_types.AutonomousODEFunction,
+        ode: problem_types.ODEFunctionAutonomous,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,

@@ -98,12 +98,12 @@ def case_jet_lift_dae(residual):
     linearization_point = probdiffeq.linearization_point_maximum_a_posteriori()
 
     def constraint_residual(ssm, lift_by: int):
-        differential = probdiffeq.residual_state_velocity(
+        differential = probdiffeq.residual_position_velocity(
             residual.residual_differential
         )
         differential = probdiffeq.jet_lift(differential, lift_by=lift_by)
 
-        algebraic = probdiffeq.residual_state(residual.residual_algebraic)
+        algebraic = probdiffeq.residual_position(residual.residual_algebraic)
         algebraic = probdiffeq.jet_lift(algebraic, lift_by=lift_by + 1)
         residual_stack = probdiffeq.residual_from_stack(differential, algebraic)
 
@@ -118,7 +118,7 @@ def case_jet_lift_residual(residual):
     linearization_point = probdiffeq.linearization_point_maximum_a_posteriori()
 
     def constraint_residual(ssm, lift_by: int):
-        implicit = probdiffeq.residual_state_velocity(residual.residual)
+        implicit = probdiffeq.residual_position_velocity(residual.residual)
         implicit = probdiffeq.jet_lift(implicit, lift_by=lift_by)
         return ssm.constraint_residual(
             implicit, linearization_point=linearization_point

@@ -130,7 +130,7 @@ def case_factory_constraint_residual_ts1(ivp):
     # Always materialize to stabilise blockdiagonal/isotropic TS1
     jacobian = probdiffeq.jacobian_materialize()
 
-    @func.partial(probdiffeq.residual_state_velocity, jacobian=jacobian)
+    @func.partial(probdiffeq.residual_position_velocity, jacobian=jacobian)
     def residual(u, du, /, *, t):
         return tree.tree_map(lambda a, b: a - b, du, vf(u, t=t))
 

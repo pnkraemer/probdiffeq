@@ -104,7 +104,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         """Van-der-Pol dynamics as a second-order differential equation."""
         return 1e5 * ((1.0 - u**2) * du - u)
 
-    @probdiffeq.residual_state_velocity_acceleration
+    @probdiffeq.residual_position_velocity_acceleration
     def residual(u, du, ddu, /, *, t):
         """Evaluate a residual to solve the 2nd-order problem directly."""
         return ddu - vf_probdiffeq(u, du, t=t)

@@ -124,7 +124,7 @@ def hamiltonian_2nd(u, du):
     return kinetic + potential
 
 
-@probdiffeq.residual_state_velocity_acceleration
+@probdiffeq.residual_position_velocity_acceleration
 def residual(u, du, ddu, /, *, t):
     """Evaluate a custom residual for the harmonic oscillator."""
     deriv = ddu - vf_2nd(u, du, t=t)

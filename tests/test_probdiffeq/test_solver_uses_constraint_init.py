@@ -30,7 +30,7 @@ def test_output_matches_reference(
     vf, (u0,), (t0, t1) = ivp
 
     @func.partial(probdiffeq.jet_lift, lift_by=derivatives - 1)
-    @probdiffeq.residual_state_velocity
+    @probdiffeq.residual_position_velocity
     def residual(u, du, /, *, t):
         return tree.tree_map(
             lambda a, b: a + b,

@@ -36,7 +36,7 @@ General constraints:
 
 >>> import jax.numpy as jnp
 >>>
->>> @residual_state
+>>> @residual_position
 ... def g(y, /, *, t):
 ...     return jnp.abs2(y)
 >>>
@@ -45,7 +45,7 @@ Residual(num_derivatives_in_args=1, jacobian=jacobian_hutchinson_fwd(seed=1, num
 
 Higher-order constraints:
 
->>> @residual_state_velocity
+>>> @residual_position_velocity
 ... def g(y, /, dy, *, t):
 ...     return jnp.abs2(dy)
 >>>
@@ -61,14 +61,14 @@ from probdiffeq.backend import func, linalg, random, tree
 from probdiffeq.backend.typing import Any, Array, Generic, Protocol, Sequence, TypeVar
 
 __all__ = [
-    "AutonomousODEFunction",
     "JacobianHandler",
     "ODEFunction",
+    "ODEFunctionAutonomous",
     "ProtocolODEAutonomous",
     "ProtocolODEAutonomousSecondOrder",
     "ProtocolODEFirstOrder",
     "ProtocolODESecondOrder",
-    "ProtocolResidualState",
+    "ProtocolResidualPosition",
     "ProtocolResidualVelocity",
     "Residual",
     "jacobian_hutchinson_fwd",
@@ -82,9 +82,9 @@ __all__ = [
     "ode_autonomous_second_order",
     "ode_second_order",
     "residual_from_stack",
-    "residual_state",
-    "residual_state_velocity",
-    "residual_state_velocity_acceleration",
+    "residual_position",
+    "residual_position_velocity",
+    "residual_position_velocity_acceleration",
 ]
 
 
@@ -313,7 +313,7 @@ class ODEFunction(_AbstractJetFunction, Generic[T]):
         return self.vector_field(jet_coords=jet_coords, t=t)
 
 
-class AutonomousODEFunction(ODEFunction[T]):
+class ODEFunctionAutonomous(ODEFunction[T]):
     """An autonomous ODE y^(k) = f(y, y', ...) where f does not depend on t."""
 
     def __init__(
@@ -394,7 +394,7 @@ def ode_autonomous(
     if jacobian is None:
         jacobian = jacobian_hutchinson_fwd()
 
-    return AutonomousODEFunction(
+    return ODEFunctionAutonomous(
         autonomous_func, jacobian=jacobian, num_derivatives_in_args=1
     )
 
@@ -418,14 +418,14 @@ def ode_autonomous_second_order(
     if jacobian is None:
         jacobian = jacobian_hutchinson_fwd()
 
-    return AutonomousODEFunction(
+    return ODEFunctionAutonomous(
         autonomous_func, jacobian=jacobian, num_derivatives_in_args=2
     )
 
 
 def ode_autonomous_arbitrary_order(
     func, /, *, num_derivatives_in_args: int, jacobian: JacobianHandler | None = None
-) -> "AutonomousODEFunction":
+) -> "ODEFunctionAutonomous":
     """Construct an autonomous ODE of arbitrary order.
 
     Prefer ode_autonomous or ode_autonomous_second_order when possible.
@@ -437,7 +437,7 @@ def ode_autonomous_arbitrary_order(
     if jacobian is None:
         jacobian = jacobian_hutchinson_fwd()
 
-    return AutonomousODEFunction(
+    return ODEFunctionAutonomous(
         autonomous_func,
         jacobian=jacobian,
         num_derivatives_in_args=num_derivatives_in_args,
@@ -461,15 +461,12 @@ class Residual(_AbstractJetFunction):
         return self.residual_function(jet_coords=jet_coords, t=t)
 
 
-class ProtocolResidualState(Protocol[T_contra]):
+class ProtocolResidualPosition(Protocol[T_contra]):
     def __call__(self, u: T_contra, /, *, t: float) -> Any: ...
 
 
-# TODO: rename _state to _position (as in position, velocity, acceleration)
-
-
-def residual_state(
-    func: ProtocolResidualState, /, *, jacobian: JacobianHandler | None = None
+def residual_position(
+    func: ProtocolResidualPosition, /, *, jacobian: JacobianHandler | None = None
 ) -> Residual:
     """Construct a description of a residual f(u, t) = 0."""
 
@@ -505,7 +502,7 @@ class ProtocolResidualVelocity(Protocol[T_contra]):
     def __call__(self, u: T_contra, du: T_contra, /, *, t: float) -> Any: ...
 
 
-def residual_state_velocity(
+def residual_position_velocity(
     func: ProtocolResidualVelocity, /, *, jacobian: JacobianHandler | None = None
 ) -> Residual:
     """Construct a description of a residual f(u, du, t) = 0."""
@@ -529,7 +526,7 @@ class ProtocolResidualAcceleration(Protocol[T_contra]):
     ) -> Any: ...
 
 
-def residual_state_velocity_acceleration(
+def residual_position_velocity_acceleration(
     func: ProtocolResidualAcceleration, /, *, jacobian: JacobianHandler | None = None
 ) -> Residual:
     """Construct a description of a residual f(u, du, t) = 0."""
