@@ -28,7 +28,7 @@ class Factory:
     )
     strategy: Callable = probdiffeq.strategy_filter
     solver: Callable = probdiffeq.solver
-    jacobian: probdiffeq.JacobianHandler = probdiffeq.jacobian_materialize()
+    jacobian: probdiffeq.Jacobian = probdiffeq.jacobian_materialize()
 
     # ts1 default because it uses more backend functions (eg Jacobians)
     # so the tests gain relevance
@@ -113,13 +113,13 @@ def case_factory_jacobian_materialize(jacfun):
 
 
 @testing.case
-def case_factory_jacobian_hutchinson_fwd():
-    return Factory(jacobian=probdiffeq.jacobian_hutchinson_fwd())
+def case_factory_jacobian_monte_carlo_fwd():
+    return Factory(jacobian=probdiffeq.jacobian_monte_carlo_fwd())
 
 
 @testing.case
-def case_factory_jacobian_hutchinson_rev():
-    return Factory(jacobian=probdiffeq.jacobian_hutchinson_rev())
+def case_factory_jacobian_monte_carlo_rev():
+    return Factory(jacobian=probdiffeq.jacobian_monte_carlo_rev())
 
 
 @testing.case
@@ -130,7 +130,7 @@ def case_factory_constraint_residual_ts1(ivp):
     # Always materialize to stabilise blockdiagonal/isotropic TS1
     jacobian = probdiffeq.jacobian_materialize()
 
-    @func.partial(probdiffeq.residual_position_velocity, jacobian=jacobian)
+    @func.partial(probdiffeq.residual_velocity, jacobian=jacobian)
     def residual(u, du, /, *, t):
         return tree.tree_map(lambda a, b: a - b, du, vf(u, t=t))
 

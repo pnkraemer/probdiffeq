@@ -14,7 +14,7 @@ from probdiffeq.backend import func, np, testing
 )
 def test_solution_is_accurate(ssm_factory):
 
-    @probdiffeq.ode_second_order
+    @probdiffeq.ode_order_second
     def vf(u, du, /, *, t):
         del t
         del du

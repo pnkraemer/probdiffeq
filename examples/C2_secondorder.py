@@ -47,7 +47,7 @@ def main():
 
     f, (u0, du0), (t0, t1), f_args = ivps.three_body_restricted()
 
-    @probdiffeq.ode_second_order
+    @probdiffeq.ode_order_second
     def vf_2(y, dy, /, *, t):
         """Evaluate the three-body problem as a second-order IVP."""
         del t

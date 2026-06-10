@@ -18,20 +18,20 @@ def main():
     """Sample from various prior distributions."""
     ts = jnp.linspace(0.0, 5.0, num=100, endpoint=True)
 
-    @func.partial(probdiffeq.ode_autonomous_arbitrary_order, num_derivatives_in_args=3)
+    @func.partial(probdiffeq.ode_autonomous_order_arbitrary, num_derivatives_in_args=3)
     def vf_matern(u, du, ddu, /):
         ell = 0.5
         return -(ell**3) * u - 3 * ell**2 * du - 3 * ell * ddu
 
-    @func.partial(probdiffeq.ode_autonomous_arbitrary_order, num_derivatives_in_args=3)
+    @func.partial(probdiffeq.ode_autonomous_order_arbitrary, num_derivatives_in_args=3)
     def vf_oscillator(_u, du, _ddu, /):
         return -5 * du  # always the second highest coefficient
 
-    @func.partial(probdiffeq.ode_autonomous_arbitrary_order, num_derivatives_in_args=3)
+    @func.partial(probdiffeq.ode_autonomous_order_arbitrary, num_derivatives_in_args=3)
     def vf_ioup(_u, _du, ddu, /):
         return -5 * ddu  # always the highest coefficient
 
-    @func.partial(probdiffeq.ode_autonomous_arbitrary_order, num_derivatives_in_args=3)
+    @func.partial(probdiffeq.ode_autonomous_order_arbitrary, num_derivatives_in_args=3)
     def vf_iwp(u, _du, _ddu, /):
         return 0.0 * u  # always zeros
 

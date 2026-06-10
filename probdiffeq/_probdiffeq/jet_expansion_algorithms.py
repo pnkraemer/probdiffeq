@@ -1,7 +1,7 @@
 r"""Evaluate jet-recursions in differential equations."""
 
 from probdiffeq._probdiffeq import linearization_points, problem_types, utilities
-from probdiffeq._probdiffeq.problem_types import ode, ode_second_order
+from probdiffeq._probdiffeq.problem_types import ode, ode_order_second
 from probdiffeq._probdiffeq.ssm_via_dense import state_space_model_dense
 from probdiffeq.backend import flow, func, np, tree
 from probdiffeq.backend.typing import Array, Protocol, Sequence, TypeVar
@@ -352,7 +352,7 @@ def _allow_pytree_inits(expand):
                     return tree.ravel_pytree(fy)[0]
             elif vf.num_derivatives_in_args == 2:
 
-                @ode_second_order
+                @ode_order_second
                 def vf_wrapped(y: T, dy: T, /, *, t: float) -> T:
                     y = tree.tree_map(unravel, y)
                     dy = tree.tree_map(unravel, dy)

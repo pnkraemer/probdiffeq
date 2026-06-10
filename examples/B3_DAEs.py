@@ -28,7 +28,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
 
-    @probdiffeq.residual_position_velocity
+    @probdiffeq.residual_velocity
     def differential(u, du, /, *, t):
         del t
         return du[:2] - dynamics(u)
