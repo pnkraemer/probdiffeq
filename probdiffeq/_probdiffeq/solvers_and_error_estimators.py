@@ -5,7 +5,7 @@ from probdiffeq._probdiffeq import (
     linearization,
     utilities,
 )
-from probdiffeq._probdiffeq import ssm_interfaces as ssm_impl
+from probdiffeq._probdiffeq import ssm_via_interfaces as ssm_impl
 from probdiffeq.backend import func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, TypeVar
 

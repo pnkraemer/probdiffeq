@@ -7,7 +7,7 @@ def main(
     src="probdiffeq",
     target="docs/API_documentation/",
     path_skip=("backend/*", "util/*"),
-    nested_modules=("probdiffeq", "ssm_impl", "ivpsolve"),
+    nested_modules=("probdiffeq", "ivpsolve"),
 ):
     """Create an automatic API documentation.
 
@@ -56,9 +56,11 @@ def main(
                 header = header.replace("_and_", " & ")
                 header = header.replace("_via_", ": ")
                 header = header.replace("_", " ")
+                header = header.capitalize()
+                header = header.replace("Ssm", "SSM")
                 p_as_module = path_as_module(path)
                 content = f"""
-# {header.capitalize()}
+# {header}
 
 :::{p_as_module}
 """

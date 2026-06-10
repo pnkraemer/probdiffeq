@@ -1,8 +1,8 @@
 r"""Evaluate jet-recursions in differential equations."""
 
 from probdiffeq._probdiffeq import linearization, problem_types, utilities
-from probdiffeq._probdiffeq.factorisation_via_dense import state_space_model_dense
 from probdiffeq._probdiffeq.problem_types import ode, ode_second_order
+from probdiffeq._probdiffeq.ssm_via_dense import state_space_model_dense
 from probdiffeq.backend import flow, func, np, tree
 from probdiffeq.backend.typing import Array, Protocol, Sequence, TypeVar
 

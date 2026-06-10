@@ -19,7 +19,7 @@ taylor_point_maximum_a_posteriori
 
 """
 
-from probdiffeq._probdiffeq import ssm_interfaces as ssm_impl
+from probdiffeq._probdiffeq import ssm_via_interfaces as ssm_impl
 from probdiffeq.backend import flow, func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Array, Callable, Protocol, Sequence, TypeVar
 
