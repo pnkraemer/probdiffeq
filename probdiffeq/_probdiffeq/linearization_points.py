@@ -1,67 +1,33 @@
-"""Linearization strategies for probabilistic solvers.
+"""Linearization-point strategies for probabilistic solvers.
 
 Examples
 --------
 >>> from probdiffeq import probdiffeq
->>> ssm = probdiffeq.state_space_model_dense()
 
 Use the prior mean as the linearization point (default):
 
->>> tp = probdiffeq.TaylorPoint()
->>> print(type(tp).__name__)
-TaylorPoint
+>>> lp = probdiffeq.linearization_point_prior()
+>>> print(lp)
+linearization_point_prior()
 
 Use the MAP estimate as the linearization point for iterated filtering:
 
->>> tp = probdiffeq.taylor_point_maximum_a_posteriori()
->>> print(type(tp).__name__)
-taylor_point_maximum_a_posteriori
+>>> lp = probdiffeq.linearization_point_maximum_a_posteriori()
+>>> print(lp)
+linearization_point_maximum_a_posteriori(nlstsq=lstsq_constrained_gauss_newton())
 
 """
 
-from probdiffeq._probdiffeq import ssm_via_api
+from probdiffeq._probdiffeq.ssm_via_api import LinearizationPoint
 from probdiffeq.backend import flow, func, linalg, np, structs, tree
-from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
+from probdiffeq.backend.typing import Array, Callable
 
 __all__ = [
     "LstSqConstrained",
-    "TaylorPoint",
+    "linearization_point_maximum_a_posteriori",
+    "linearization_point_prior",
     "lstsq_constrained_gauss_newton",
-    "taylor_point_maximum_a_posteriori",
-    "taylor_point_prior",
 ]
-
-N = TypeVar("N", bound=ssm_via_api.AbstractTreeNormal)
-"""A type-variable to describe normal distributions.
-
-Used to type marginals, for example.
-"""
-
-
-class TaylorPoint:
-    """Find a linearization point for the Taylor expansion.
-
-    Use this API to distinguish iterated filtering from extended filtering.
-    """
-
-    def __call__(self, constraint_flat: Callable, rv: N, **constraint_kwargs) -> Array:
-        """Find a linearization point for the Taylor expansion.
-
-        Parameters
-        ----------
-        constraint_flat
-            The constraint to linearize, flattened to work with the raveled mean.
-        rv
-            The distribution to linearize around. The mean of this distribution is typically used as the linearization point.
-        **constraint_kwargs
-            Additional keyword-arguments to pass to the constraint function.
-
-        Returns
-        -------
-        Array
-            The point at which to linearize the constraint.
-        """
-        raise NotImplementedError
 
 
 class LstSqConstrained:
@@ -95,6 +61,9 @@ class lstsq_constrained_gauss_newton(LstSqConstrained):
         self.tol = tol
         self.lstsq = lstsq
         self.while_loop = while_loop
+
+    def __repr__(self) -> str:
+        return "lstsq_constrained_gauss_newton()"
 
     def __call__(self, constraint, x0, mean, cholesky, **constraint_kwargs):
 
@@ -142,8 +111,8 @@ class lstsq_constrained_gauss_newton(LstSqConstrained):
         return final.x, stats
 
 
-class taylor_point_prior(TaylorPoint):
-    """TaylorPoint point is the prior mean."""
+class linearization_point_prior(LinearizationPoint):
+    """Linearization point is the prior mean."""
 
     def __call__(self, constraint_flat: Callable, rv, **constraint_kwargs) -> Array:
         del constraint_flat
@@ -151,13 +120,16 @@ class taylor_point_prior(TaylorPoint):
         return rv.mean_flat
 
 
-class taylor_point_maximum_a_posteriori(TaylorPoint):
-    """TaylorPoint point is the maximum-a-posteriori estimate."""
+class linearization_point_maximum_a_posteriori(LinearizationPoint):
+    """Linearization point is the maximum-a-posteriori estimate."""
 
     def __init__(self, nlstsq: LstSqConstrained | None = None) -> None:
         if nlstsq is None:
             nlstsq = lstsq_constrained_gauss_newton()
         self.nlstsq = nlstsq
+
+    def __repr__(self) -> str:
+        return f"linearization_point_maximum_a_posteriori(nlstsq={self.nlstsq!r})"
 
     def __call__(self, constraint_flat: Callable, rv, **constraint_kwargs) -> Array:
         mean = rv.mean_flat
@@ -165,10 +137,3 @@ class taylor_point_maximum_a_posteriori(TaylorPoint):
             constraint_flat, mean, rv.mean_flat, rv.cholesky_flat, **constraint_kwargs
         )
         return mean
-
-
-C = TypeVar("C", bound=Sequence)
-"""A type-variable to describe sequences.
-
-Used to type Taylor coefficients, for example.
-"""

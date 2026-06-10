@@ -277,7 +277,7 @@ class state_space_model_blockdiag(interfaces.StateSpaceModel):
             raise ValueError(msg)
         return BlockDiagOdeTs1(ode=ode)
 
-    def constraint_residual(self, residual, *, taylor_point=None):
+    def constraint_residual(self, residual, *, linearization_point=None):
         raise NotImplementedError
 
     def _tcoeffs_standard_deviation(self, tcoeffs_mean, /, *, is_exact, inexact_eps):

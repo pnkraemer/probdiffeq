@@ -482,7 +482,7 @@ class state_space_model_isotropic(interfaces.StateSpaceModel):
             raise ValueError(msg)
         return IsotropicOdeTs1(ode=ode)
 
-    def constraint_residual(self, residual, *, taylor_point=None):
+    def constraint_residual(self, residual, *, linearization_point=None):
         raise NotImplementedError
 
 

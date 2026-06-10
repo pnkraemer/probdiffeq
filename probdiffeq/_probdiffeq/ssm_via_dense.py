@@ -1,7 +1,7 @@
 from probdiffeq._probdiffeq import ssm_via_api as interfaces
 from probdiffeq._probdiffeq import utilities
+from probdiffeq._probdiffeq.linearization_points import linearization_point_prior
 from probdiffeq._probdiffeq.problem_types import ODEFunction, Residual
-from probdiffeq._probdiffeq.taylor_point import taylor_point_prior
 from probdiffeq.backend import func, linalg, np, random, structs, tree, warnings
 from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
@@ -376,12 +376,14 @@ class state_space_model_dense(interfaces.StateSpaceModel):
             raise ValueError(msg)
         return DenseOdeTs1(ode=ode)
 
-    def constraint_residual(self, residual, *, taylor_point=None) -> "DenseResidual":
+    def constraint_residual(
+        self, residual, *, linearization_point=None
+    ) -> "DenseResidual":
         if not isinstance(residual, Residual):
             raise TypeError(residual)
-        if taylor_point is None:
-            taylor_point = taylor_point_prior()
-        return DenseResidual(residual, taylor_point=taylor_point)
+        if linearization_point is None:
+            linearization_point = linearization_point_prior()
+        return DenseResidual(residual, linearization_point=linearization_point)
 
 
 @structs.dataclass
@@ -594,9 +596,9 @@ class DenseOdeTs1(interfaces.AbstractOde):
 class DenseResidual(interfaces.AbstractResidual):
     """Construct a dense implementation of residual-TS1 linearization."""
 
-    def __init__(self, residual, *, taylor_point) -> None:
+    def __init__(self, residual, *, linearization_point) -> None:
         super().__init__(residual)
-        self.taylor_point = taylor_point
+        self.linearization_point = linearization_point
 
     def init_linearization(self):
         return self.residual.jacobian.init_jacobian_handler()
@@ -625,7 +627,7 @@ class DenseResidual(interfaces.AbstractResidual):
         constraint_flat = self.constraint_flat(tree_flatten=rv.tree_flatten)
 
         # Get the linearization point (i.e., prior or posterior linearisation)
-        xi = self.taylor_point(constraint_flat, rv, t=t)
+        xi = self.linearization_point(constraint_flat, rv, t=t)
 
         # Evaluate the linearization
         jacobian = self.residual.jacobian.materialize_dense

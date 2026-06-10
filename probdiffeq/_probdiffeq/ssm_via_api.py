@@ -1,7 +1,8 @@
+from probdiffeq._probdiffeq import problem_types
 from probdiffeq.backend import abc, func, inspect, np, tree
 from probdiffeq.backend.typing import Array, Callable, Generic, Sequence, TypeVar
 
-__all__ = ["StateSpaceModel"]
+__all__ = ["LinearizationPoint", "StateSpaceModel"]
 
 
 T = TypeVar("T", bound=Array)
@@ -323,6 +324,42 @@ def _verify_ioup_signature_and_parse_order(vf) -> int:
     return len(state_args)
 
 
+N = TypeVar("N", bound=AbstractTreeNormal)
+"""A type-variable to describe normal distributions.
+
+Used to type the 'rv' argument of LinearizationPoint, for example.
+"""
+
+
+class LinearizationPoint:
+    """Choose the point at which to linearize a constraint.
+
+    Use this API to distinguish iterated filtering from extended Kalman filtering.
+    """
+
+    def __call__(self, constraint_flat: Callable, rv: N, **constraint_kwargs) -> Array:
+        """Find a linearization point.
+
+        Parameters
+        ----------
+        constraint_flat
+            The constraint to linearize, flattened to work with the raveled mean.
+        rv
+            The distribution to linearize around.
+        **constraint_kwargs
+            Additional keyword-arguments to pass to the constraint function.
+
+        Returns
+        -------
+        Array
+            The point at which to linearize the constraint.
+        """
+        raise NotImplementedError
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}()"
+
+
 class StateSpaceModel(abc.ABC):
     """Abstract base for factorised Markovian state-space model implementations.
 
@@ -516,7 +553,7 @@ class StateSpaceModel(abc.ABC):
     # --- Linearization constructors ---
 
     @abc.abstractmethod
-    def constraint_ode_ts0(self, ode, /) -> AbstractOde:
+    def constraint_ode_ts0(self, ode: problem_types.ODEFunction, /) -> AbstractOde:
         r"""Create an ODE constraint with zeroth-order Taylor linearisation.
 
         This constraint handles ODEs of the form
@@ -532,7 +569,7 @@ class StateSpaceModel(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def constraint_ode_ts1(self, ode, /) -> AbstractOde:
+    def constraint_ode_ts1(self, ode: problem_types.ODEFunction, /) -> AbstractOde:
         r"""Create an ODE constraint and linearise with a first-order Taylor approximation.
 
         This constraint handles ODEs of the form
@@ -548,7 +585,12 @@ class StateSpaceModel(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def constraint_residual(self, residual, *, taylor_point=None) -> AbstractResidual:
+    def constraint_residual(
+        self,
+        residual: problem_types.Residual,
+        *,
+        linearization_point: LinearizationPoint | None = None,
+    ) -> AbstractResidual:
         r"""Construct a general constraint.
 
         This constraint handles problems of the form
@@ -564,9 +606,9 @@ class StateSpaceModel(abc.ABC):
         ----------
         residual
             The residual to apply linearization to.
-        taylor_point
-            The strategy to use for finding the linearization point for the Taylor
-            expansion. If None, the prior mean is used as the linearization point.
+        linearization_point
+            The strategy to use for finding the linearization point. If None,
+            the prior mean is used as the linearization point.
 
         """
         raise NotImplementedError
