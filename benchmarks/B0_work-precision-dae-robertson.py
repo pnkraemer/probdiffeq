@@ -152,10 +152,8 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
         ssm = probdiffeq.state_space_model()
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
-        init, iwp = probdiffeq.prior_wiener_integrated(
-            tcoeffs, output_scale=base_scale, ssm=ssm
-        )
-        ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
+        init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=base_scale)
+        ts = ssm.constraint_ode_ts1(vf)
         strategy = probdiffeq.strategy_filter()
 
         solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts)
@@ -205,15 +203,11 @@ def solver_residual(*, num_derivatives: int, time_span) -> Callable:
         ssm = probdiffeq.state_space_model()
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
-        init, iwp = probdiffeq.prior_wiener_integrated(
-            tcoeffs, output_scale=base_scale, ssm=ssm
-        )
+        init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=base_scale)
 
         # We build a Jet constraint
         taylor_point = probdiffeq.taylor_point_maximum_a_posteriori(nlstsq)
-        jet = probdiffeq.constraint_residual(
-            residual, taylor_point=taylor_point, ssm=ssm
-        )
+        jet = ssm.constraint_residual(residual, taylor_point=taylor_point)
         strategy = probdiffeq.strategy_filter()
 
         # For proper DAEs, non-iterated solver's simply don't cut it

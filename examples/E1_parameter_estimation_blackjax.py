@@ -40,8 +40,8 @@ def main():
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     tcoeffs, _ = jetexpand(vf, (theta_guess,), t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
-    _init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=10.0)
-    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
+    _init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=10.0)
+    ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_filter()
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
     error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
@@ -162,7 +162,7 @@ def solve_adaptive(vf, *, solver, error, save_at):
         tcoeffs, _ = jetexpand(vf, (theta,), t=save_at[0])
 
         ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
-        init, _iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
+        init, _iwp = ssm.prior_wiener_integrated(tcoeffs)
         solve_fn = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
         return solve_fn(init, save_at=save_at, dt0=0.1, atol=1e-4, rtol=1e-2)
 
@@ -184,7 +184,7 @@ def log_posterior(vf, theta_true, *, solver, ts, mean, cov, obs_std=0.1):
     tcoeffs, _ = jetexpand(vf, (theta_true,), t=ts[0])
 
     ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
-    init, _iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
+    init, _iwp = ssm.prior_wiener_integrated(tcoeffs)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
     sol = solve(init, grid=ts)
     data = sol.u.mean[0][-1]
@@ -195,7 +195,7 @@ def log_posterior(vf, theta_true, *, solver, ts, mean, cov, obs_std=0.1):
         jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
         tcoeffs, _ = jetexpand(vf, (theta,), t=ts[0])
 
-        init, _iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
+        init, _iwp = ssm.prior_wiener_integrated(tcoeffs)
         solve = ivpsolve.solve_fixed_grid(solver=solver)
         solution = solve(init, grid=ts)
         y_T = jax.tree.map(lambda s: s[-1], solution.u)

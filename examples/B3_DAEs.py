@@ -54,13 +54,11 @@ def main(t0=1e-6, t1=1e5) -> None:
     # the solutions live on vastly different scales
     # (but don't vary much within these scales).
     base_scale = jnp.asarray([0.8, 2e-05, 0.2])
-    init, ioup = probdiffeq.prior_wiener_integrated(
-        tcoeffs, ssm=ssm, output_scale=base_scale
-    )
+    init, ioup = ssm.prior_wiener_integrated(tcoeffs, output_scale=base_scale)
 
     # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
     taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
-    jet = probdiffeq.constraint_residual(residual, ssm=ssm, taylor_point=taylor_point)
+    jet = ssm.constraint_residual(residual, taylor_point=taylor_point)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
     solver = probdiffeq.solver_dynamic(strategy=strategy, prior=ioup, constraint=jet)
 

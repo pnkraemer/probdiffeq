@@ -160,15 +160,11 @@ def solver(residual, tol, while_loop, trafo):
         tcoeffs, _ = jetexpand(residual, [y0], t=t0)
         ssm = probdiffeq.state_space_model()
 
-        init, prior = probdiffeq.prior_wiener_integrated(
-            tcoeffs, ssm=ssm, output_scale=output_scale
-        )
+        init, prior = ssm.prior_wiener_integrated(tcoeffs, output_scale=output_scale)
 
         # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
         taylor_point = probdiffeq.taylor_point_maximum_a_posteriori(nlstsq)
-        jet = probdiffeq.constraint_residual(
-            residual, ssm=ssm, taylor_point=taylor_point
-        )
+        jet = ssm.constraint_residual(residual, taylor_point=taylor_point)
         strategy = probdiffeq.strategy_smoother_fixedpoint()
         solver_obj = probdiffeq.solver_dynamic(
             strategy=strategy, prior=prior, constraint=jet

@@ -43,12 +43,8 @@ def main(start=3.0, stop=11.0, step=0.5, repeats=2) -> None:
 
     # Assemble algorithms
     algorithms = {
-        r"ProbDiffEq: TS0($5$)": solver_probdiffeq(
-            num_derivatives=5, constraint_ode_fun=probdiffeq.constraint_ode_ts0
-        ),
-        r"ProbDiffEq: TS0($8$)": solver_probdiffeq(
-            num_derivatives=8, constraint_ode_fun=probdiffeq.constraint_ode_ts0
-        ),
+        r"ProbDiffEq: TS0($5$)": solver_probdiffeq(num_derivatives=5),
+        r"ProbDiffEq: TS0($8$)": solver_probdiffeq(num_derivatives=8),
         "SciPy: 'RK45'": solver_scipy(method="RK45", use_numba=False),
         "SciPy: 'DOP853'": solver_scipy(method="DOP853", use_numba=False),
         "SciPy: 'RK45' (+numba)": solver_scipy(method="RK45", use_numba=True),
@@ -123,7 +119,7 @@ def solve_ivp_once():
     return solution.t, solution.y.T
 
 
-def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
+def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
     # fmt: off
     u0 = jnp.asarray(
@@ -162,8 +158,8 @@ def solver_probdiffeq(*, num_derivatives: int, constraint_ode_fun) -> Callable:
         tcoeffs, _ = jetexpand(vf_probdiffeq, (u0, du0), t=t0)
 
         ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
-        init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-        ts = constraint_ode_fun(vf_probdiffeq, ssm=ssm)
+        init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+        ts = ssm.constraint_ode_ts0(vf_probdiffeq)
         strategy = probdiffeq.strategy_filter()
         solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts)
         error = probdiffeq.error_residual_std(constraint=ts, prior=iwp)

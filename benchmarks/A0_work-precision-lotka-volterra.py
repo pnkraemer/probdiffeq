@@ -38,10 +38,9 @@ def main(start=3.0, stop=12.0, step=1.0, repeats=2) -> None:
     timeit_fun = benchmark_util.setup_timeit(repeats=repeats)
 
     # Assemble algorithms
-    ts0, ts1 = probdiffeq.constraint_ode_ts0, probdiffeq.constraint_ode_ts1
-    ts0_iso = solver_probdiffeq(5, constraint=ts0, implementation="isotropic")
-    ts0_bd = solver_probdiffeq(5, constraint=ts0, implementation="blockdiag")
-    ts1_dense = solver_probdiffeq(8, constraint=ts1, implementation="dense")
+    ts0_iso = solver_probdiffeq(5, constraint_order=0, implementation="isotropic")
+    ts0_bd = solver_probdiffeq(5, constraint_order=0, implementation="blockdiag")
+    ts1_dense = solver_probdiffeq(8, constraint_order=1, implementation="dense")
     algorithms = {
         r"ProbDiffEq: TS0($5$, isotropic)": ts0_iso,
         r"ProbDiffEq: TS0($5$, blockdiag)": ts0_bd,
@@ -96,7 +95,9 @@ def solve_ivp_once():
     return solution.t, solution.y.T
 
 
-def solver_probdiffeq(num_derivatives: int, implementation, constraint) -> Callable:
+def solver_probdiffeq(
+    num_derivatives: int, implementation, constraint_order: int
+) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @probdiffeq.ode
@@ -115,9 +116,12 @@ def solver_probdiffeq(num_derivatives: int, implementation, constraint) -> Calla
         tcoeffs, _ = jetexpand(vf_probdiffeq, (u0,), t=t0)
 
         ssm = probdiffeq.state_space_model(ssm_fact=implementation)
-        init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
+        init, iwp = ssm.prior_wiener_integrated(tcoeffs)
         strategy = probdiffeq.strategy_filter()
-        ts = constraint(vf_probdiffeq, ssm=ssm)
+        if constraint_order == 0:
+            ts = ssm.constraint_ode_ts0(vf_probdiffeq)
+        else:
+            ts = ssm.constraint_ode_ts1(vf_probdiffeq)
         solver = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts)
         error = probdiffeq.error_residual_std(constraint=ts, prior=iwp)
 

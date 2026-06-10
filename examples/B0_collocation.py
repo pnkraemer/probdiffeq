@@ -29,8 +29,8 @@ def main():
 
     # "Bad" prior (no Taylor coefficients)
     ssm = probdiffeq.state_space_model()
-    init_diffuse, iwp_diffuse = probdiffeq.prior_wiener_integrated(
-        [u0], diffuse_derivatives=2, ssm=ssm, output_scale=10.0
+    init_diffuse, iwp_diffuse = ssm.prior_wiener_integrated(
+        [u0], diffuse_derivatives=2, output_scale=10.0
     )
     mseq_prior = probdiffeq.MarkovSequence.from_grid(
         init_diffuse, iwp_diffuse, grid=ts, reverse=False
@@ -40,13 +40,13 @@ def main():
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     tcoeffs, _ = jetexpand(vector_field, (u0,), t=t0)
 
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=10.0)
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=10.0)
     mseq_tcoeffs = probdiffeq.MarkovSequence.from_grid(
         init, iwp, grid=ts, reverse=False
     )
 
     # Posterior
-    ts1 = probdiffeq.constraint_ode_ts1(vector_field, ssm=ssm)
+    ts1 = ssm.constraint_ode_ts1(vector_field)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts1)
     error = probdiffeq.error_residual_std(constraint=ts1, prior=iwp)

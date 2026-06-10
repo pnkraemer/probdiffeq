@@ -31,8 +31,8 @@ def main():
 
     # Construct a state-space model factorisation
     ssm = probdiffeq.state_space_model()
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ode_ts1 = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ode_ts1 = ssm.constraint_ode_ts1(vf)
 
     # Build the rest of the solver
     strategy = probdiffeq.strategy_filter()

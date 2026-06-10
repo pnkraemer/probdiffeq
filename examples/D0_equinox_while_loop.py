@@ -53,8 +53,8 @@ def solution_routine(while_loop):
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=1)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     ssm = probdiffeq.state_space_model(ssm_fact="isotropic")
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_ode_ts0(vf)
 
     strategy = probdiffeq.strategy_smoother_fixedpoint()
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)

@@ -128,8 +128,8 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         tcoeffs, _ = jetexpand(vf_probdiffeq, (u0,), t=t0)
         ssm = probdiffeq.state_space_model(ssm_fact="dense")
 
-        init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-        ts1 = probdiffeq.constraint_ode_ts1(vf_probdiffeq, ssm=ssm)
+        init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+        ts1 = ssm.constraint_ode_ts1(vf_probdiffeq)
 
         strategy = probdiffeq.strategy_filter()
         solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts1)
