@@ -23,7 +23,7 @@ ODEFunction(num_tcoeffs_in_args=1, jacobian=jacobian_monte_carlo_fwd(seed=1, num
 
 Higher-order problems:
 
->>> @ode_order_second
+>>> @ode_order_two
 ... def f(y, dy, /, *, t):
 ...     return y + dy
 >>>
@@ -44,7 +44,7 @@ Residual(num_tcoeffs_in_args=1, jacobian=jacobian_monte_carlo_fwd(seed=1, num_pr
 Higher-order constraints:
 
 >>> @residual_velocity
-... def g(y, /, dy, *, t):
+... def g(y, dy, /, *, t):
 ...     return jnp.abs2(dy)
 >>>
 >>> print(g)
@@ -63,9 +63,9 @@ __all__ = [
     "ODEFunction",
     "ODEFunctionAutonomous",
     "ProtocolODEAutonomous",
-    "ProtocolODEAutonomousSecondOrder",
+    "ProtocolODEAutonomousOrderTwo",
     "ProtocolODEFirstOrder",
-    "ProtocolODESecondOrder",
+    "ProtocolODEOrderTwo",
     "ProtocolResidualAcceleration",
     "ProtocolResidualPosition",
     "ProtocolResidualVelocity",
@@ -76,9 +76,9 @@ __all__ = [
     "ode",
     "ode_autonomous",
     "ode_autonomous_order_arbitrary",
-    "ode_autonomous_order_second",
+    "ode_autonomous_order_two",
     "ode_order_arbitrary",
-    "ode_order_second",
+    "ode_order_two",
     "residual_acceleration",
     "residual_from_stack",
     "residual_jet_lift",
@@ -294,7 +294,7 @@ class ProtocolODEFirstOrder(Protocol[T]):
     def __call__(self, u: T, /, *, t: float) -> T: ...
 
 
-class ProtocolODESecondOrder(Protocol[T]):
+class ProtocolODEOrderTwo(Protocol[T]):
     def __call__(self, u: T, du: T, /, *, t: float) -> T: ...
 
 
@@ -335,9 +335,7 @@ def ode(func: ProtocolODEFirstOrder, /, *, jacobian: Jacobian | None = None):
     return ODEFunction(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=1)
 
 
-def ode_order_second(
-    func: ProtocolODESecondOrder, /, *, jacobian: Jacobian | None = None
-):
+def ode_order_two(func: ProtocolODEOrderTwo, /, *, jacobian: Jacobian | None = None):
     """Construct a description of an  ODE y'' = f(y, y', t)."""
 
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
@@ -350,13 +348,13 @@ def ode_order_second(
     return ODEFunction(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=2)
 
 
+# No typing because arbitrary order is difficult to type (unlike ode and ode_order_two)
+
+
 def ode_order_arbitrary(
     func, /, *, num_tcoeffs_in_args: int, jacobian: Jacobian | None = None
 ):
-    """Construct a description of an ODE of arbitrary order.
-
-    Prefer ode or ode_order_second when possible.
-    """
+    """Construct a description of an ODE of arbitrary order."""
 
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
         return func(*jet_coords[:num_tcoeffs_in_args], t=t)
@@ -386,12 +384,12 @@ def ode_autonomous(func: ProtocolODEAutonomous, /, *, jacobian: Jacobian | None 
     return ODEFunctionAutonomous(autonomous, jacobian=jacobian, num_tcoeffs_in_args=1)
 
 
-class ProtocolODEAutonomousSecondOrder(Protocol[T]):
+class ProtocolODEAutonomousOrderTwo(Protocol[T]):
     def __call__(self, u: T, du: T, /) -> T: ...
 
 
-def ode_autonomous_order_second(
-    func: ProtocolODEAutonomousSecondOrder, /, *, jacobian: Jacobian | None = None
+def ode_autonomous_order_two(
+    func: ProtocolODEAutonomousOrderTwo, /, *, jacobian: Jacobian | None = None
 ):
     """Construct a description of an autonomous ODE y'' = f(y, y')."""
 
@@ -405,13 +403,13 @@ def ode_autonomous_order_second(
     return ODEFunctionAutonomous(autonomous, jacobian=jacobian, num_tcoeffs_in_args=2)
 
 
+# No typing because arbitrary order is difficult to type (unlike ode and ode_order_two)
+
+
 def ode_autonomous_order_arbitrary(
     func, /, *, num_tcoeffs_in_args: int, jacobian: Jacobian | None = None
 ) -> "ODEFunctionAutonomous":
-    """Construct an autonomous ODE of arbitrary order.
-
-    Prefer ode_autonomous or ode_autonomous_order_second when possible.
-    """
+    """Construct an autonomous ODE of arbitrary order."""
 
     def autonomous(*, jet_coords: Sequence[T]) -> T:
         return func(*jet_coords[:num_tcoeffs_in_args])

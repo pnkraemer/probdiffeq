@@ -99,7 +99,7 @@ def solve_ivp_once():
 def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
-    @probdiffeq.ode_order_second
+    @probdiffeq.ode_order_two
     def vf_probdiffeq(u, du, *, t):  # noqa: ARG001
         """Van-der-Pol dynamics as a second-order differential equation."""
         return 1e5 * ((1.0 - u**2) * du - u)
