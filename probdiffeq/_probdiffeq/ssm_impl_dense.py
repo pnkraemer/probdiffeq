@@ -614,7 +614,7 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         b = np.eye(num_derivatives + 1)[-1][:, None]
         B = np.kron(b, Lambda)
 
-        q0 = np.zeros(single_flat.shape)
+        q0 = np.zeros((num_derivatives + 1) * d)
         tf = DenseTreeFlatten.from_example(tcoeffs_mean)
         precon_fun = utilities.preconditioner_taylor(num_derivatives)
         dtype_str = str(B.dtype)
