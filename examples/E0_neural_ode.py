@@ -1,5 +1,6 @@
 """Learn neural ODEs with diffusion tempering."""
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -136,12 +137,20 @@ def loss_log_marginal_likelihood(vf, *, t0):
             return vf(y, t=t, p=p)
 
         ts0 = ssm.constraint_ode_ts0(vf_p)
-        strategy = probdiffeq.strategy_smoother_fixedinterval()
+        strategy = probdiffeq.strategy_smoother_fixedpoint()
         solver_ts0 = probdiffeq.solver(strategy=strategy, constraint=ts0)
+        error = probdiffeq.error_state_std(constraint=ts0)
+
+        def while_loop(cond, body, init):
+            return eqx.internal.while_loop(
+                cond, body, init, kind="bounded", max_steps=8
+            )
 
         # Solve
-        solve = ivpsolve.solve_fixed_grid(solver=solver_ts0)
-        sol = solve(iwp, grid=grid)
+        solve = ivpsolve.solve_adaptive_save_at(
+            solver=solver_ts0, error=error, while_loop=while_loop
+        )
+        sol = solve(iwp, save_at=grid, atol=1e-4, rtol=1e-2)
 
         # Evaluate loss
         loss_lml = probdiffeq.loss_lml_timeseries()

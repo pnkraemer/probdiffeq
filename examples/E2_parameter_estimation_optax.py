@@ -6,6 +6,7 @@ compute the marginal likelihood of this data _under the ODE posterior_
 and optimize the parameters with `optax`.
 """
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -100,10 +101,19 @@ def solver(vf, u0, *, grid):
             return vf(y, t=t, p=p)
 
         ts0 = ssm.constraint_ode_ts0(vf_p)
-        strategy = probdiffeq.strategy_smoother_fixedinterval()
+        strategy = probdiffeq.strategy_smoother_fixedpoint()
         solver_obj = probdiffeq.solver(strategy=strategy, constraint=ts0)
-        solve_fn = ivpsolve.solve_fixed_grid(solver=solver_obj)
-        return solve_fn(iwp, grid=grid)
+        error = probdiffeq.error_state_std(constraint=ts0)
+
+        def while_loop(cond, body, init):
+            return eqx.internal.while_loop(
+                cond, body, init, kind="bounded", max_steps=8
+            )
+
+        solve_fn = ivpsolve.solve_adaptive_save_at(
+            solver=solver_obj, error=error, while_loop=while_loop
+        )
+        return solve_fn(iwp, save_at=grid, atol=1e-4, rtol=1e-2)
 
     return solve
 
