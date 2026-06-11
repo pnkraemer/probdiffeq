@@ -285,9 +285,6 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
 
 class AbstractPrior(abc.ABC):
     def __init__(self, init, output_scale, /):
-        if not isinstance(output_scale, Array):
-            raise TypeError
-
         self.init = init
         self.output_scale = output_scale
 

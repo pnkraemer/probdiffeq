@@ -133,7 +133,13 @@ class MarkovSequence(Generic[N]):
     @classmethod
     def from_grid(cls, prior, *, grid, reverse: bool):
         marginal = prior.init
-        conditional = func.vmap(prior.discretize)(np.diff(grid))
+
+        @func.partial(func.vmap, in_axes=(0, None))
+        def transition_vmap(a, b):
+            return prior.transition(dt=a, output_scale=b)
+
+        output_scale = marginal.prototype_output_scale_calibrated()
+        conditional = transition_vmap(np.diff(grid), output_scale)
         return cls(marginal, conditional, reverse=reverse)
 
     def rescale_cholesky(self, factor, /):

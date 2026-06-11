@@ -199,6 +199,7 @@ class DenseNormal(ssm_impl_api.AbstractTreeNormal[DenseTreeFlatten]):
         noise = DenseNormal(np.zeros((n,)), np.zeros((n, n)), self.tree_flatten)
         return DenseLatentCond.from_linop_and_noise(A, noise)
 
+    # TODO: move prototype_output_scale_calibrated to the prior?
     def prototype_output_scale_calibrated(self):
         return np.ones(())
 
@@ -349,6 +350,7 @@ class DenseResidual(ssm_impl_api.AbstractResidual):
 class DenseWienerIntegrated(ssm_impl_api.AbstractPrior):
     def __init__(self, init, output_scale, /):
         super().__init__(init, output_scale)
+
         num_derivatives = len(init.mean) - 1
         a, q_sqrtm = utilities.system_matrices_1d_iwp(num_derivatives)
 

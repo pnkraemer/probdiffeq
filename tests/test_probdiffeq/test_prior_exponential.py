@@ -26,8 +26,8 @@ def test_exponential_prior_matches_ioup(ssm_factory):
 
     scale = 12.3456
     dt = 0.123456
-    cond1 = func.jit(exponential.discretize)(dt, scale)
-    cond2 = func.jit(ioup.discretize)(dt, scale)
+    cond1 = func.jit(exponential.transition)(dt, scale)
+    cond2 = func.jit(ioup.transition)(dt, scale)
     assert testing.allclose(cond1, cond2)
 
 
@@ -50,8 +50,8 @@ def test_exponential_prior_matches_iwp(ssm_factory):
     scale = 12.3456
     dt = 0.123456
 
-    cond1 = func.jit(exponential.discretize)(dt, scale)
-    cond2 = func.jit(iwp.discretize)(dt, scale)
+    cond1 = func.jit(exponential.transition)(dt, scale)
+    cond2 = func.jit(iwp.transition)(dt, scale)
     assert testing.allclose(cond1, cond2)
 
 
@@ -95,7 +95,7 @@ def test_exponential_transition_as_expected(ode_shape, ssm_factory):
     exponential = ssm.prior_exponential(vf_linear, tcoeffs)
 
     dt = 0.123456
-    cond = func.jit(exponential.discretize)(dt)
+    cond = func.jit(exponential.transition)(dt)
     cond = cond.preconditioner_apply()
     A_received = cond.A
 
@@ -104,7 +104,7 @@ def test_exponential_transition_as_expected(ode_shape, ssm_factory):
 
     ssm = probdiffeq.state_space_model_dense()
     iwp = ssm.prior_wiener_integrated(tcoeffs[:-1])
-    cond = func.jit(iwp.discretize)(dt)
+    cond = func.jit(iwp.transition)(dt)
     cond = cond.preconditioner_apply()
     phi_iwp_smaller = cond.A
     assert testing.allclose(A_received[:-d, :-d], phi_iwp_smaller)
