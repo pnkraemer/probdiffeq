@@ -54,6 +54,7 @@ def main(
                 header = path.name.lower()
                 header = header.replace(".py", "")
                 header = header.replace("_and_", " & ")
+                header = header.replace("_via_", ": ")
                 header = header.replace("ssm_impl_", "ssms: ")
                 header = header.replace("_", " ")
                 header = header.capitalize()
