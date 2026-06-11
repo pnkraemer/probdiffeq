@@ -38,9 +38,7 @@ class IsotropicTreeFlatten(ssm_impl_api.AbstractTreeFlatten):
             return tree.tree_structure(s) == tree.tree_structure(x[0])
 
         leaves = tree.tree_leaves_depth_one(x)
-
         leaves_flat = [tree.ravel_pytree(s)[0] for s in leaves]
-
         return np.stack(leaves_flat)
 
     def flatten_tree_scalar(self, x):
@@ -384,24 +382,13 @@ class IsotropicWienerIntegrated(ssm_impl_api.AbstractPrior):
     @staticmethod
     def register_pytree():
         def flatten(iwp):
-            children = (iwp.init, iwp.output_scale, iwp.A, iwp.q_sqrtm, iwp.q0)
-            aux = (iwp.num_derivatives, iwp.d, iwp.tree_flatten)
-            return children, aux
+            children = (iwp.init, iwp.output_scale)
+            return children, ()
 
         def unflatten(aux, children):
-            num_derivatives, d, tf = aux
-            init, output_scale, A, q_sqrtm, q0 = children
-            obj = object.__new__(IsotropicWienerIntegrated)
-            obj.init = init
-            obj.output_scale = output_scale
-            obj.num_derivatives = num_derivatives
-            obj.d = d
-            obj.A = A
-            obj.q_sqrtm = q_sqrtm
-            obj.q0 = q0
-            obj.tree_flatten = tf
-            obj.precon_fun = utilities.preconditioner_taylor(num_derivatives)
-            return obj
+            del aux
+            init, output_scale = children
+            return IsotropicWienerIntegrated(init, output_scale)
 
         tree.register_pytree_node(IsotropicWienerIntegrated, flatten, unflatten)
 

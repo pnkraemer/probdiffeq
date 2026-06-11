@@ -175,8 +175,8 @@ class ProbabilisticSolver:
             raise NotImplementedError
 
         prior_at_t0 = _extract_previous(solution.prior)
-        transition_t0_t = prior_at_t0.discretize(t - t0, output_scale)
-        transition_t_t1 = prior_at_t0.discretize(t1 - t, output_scale)
+        transition_t0_t = prior_at_t0.discretize(dt=t - t0, output_scale=output_scale)
+        transition_t_t1 = prior_at_t0.discretize(dt=t1 - t, output_scale=output_scale)
         (estimate, _posterior), _interp_res = self.strategy.interpolate(
             posterior_t0=posterior_t0,
             posterior_t1=posterior_t1,
@@ -191,8 +191,12 @@ class ProbabilisticSolver:
         """Interpolate between two solution objects."""
         # Domain is (t0, t1]; thus, take the output scale from interp_to
         output_scale = interp_to.output_scale
-        transition_t0_t = interp_from.prior.discretize(t - interp_from.t, output_scale)
-        transition_t_t1 = interp_from.prior.discretize(interp_to.t - t, output_scale)
+        transition_t0_t = interp_from.prior.discretize(
+            dt=t - interp_from.t, output_scale=output_scale
+        )
+        transition_t_t1 = interp_from.prior.discretize(
+            dt=interp_to.t - t, output_scale=output_scale
+        )
 
         # Interpolate
         tmp = self.strategy.interpolate(
@@ -366,7 +370,7 @@ class solver_mle(ProbabilisticSolver):
         # Discretize
         prototype = state.u.prototype_output_scale_calibrated()
         output_scale = np.ones_like(prototype)
-        transition = state.prior.discretize(dt, output_scale)
+        transition = state.prior.discretize(dt=dt, output_scale=output_scale)
 
         # Predict
         u, prediction = self.strategy.predict(
@@ -507,7 +511,7 @@ class solver_dynamic(ProbabilisticSolver):
         # Calibrate the output scale
         prototype = state.u.prototype_output_scale_calibrated()
         ones = np.ones_like(prototype)
-        transition = state.prior.discretize(dt, ones)
+        transition = state.prior.discretize(dt=dt, output_scale=ones)
         mean = state.u.mean_flat
         u = transition.apply_flat(mean)
 
@@ -525,7 +529,7 @@ class solver_dynamic(ProbabilisticSolver):
 
         # Do the full extrapolation with the calibrated output scale
         # (Includes re-discretisation)
-        transition = state.prior.discretize(dt, output_scale)
+        transition = state.prior.discretize(dt=dt, output_scale=output_scale)
         u, prediction = self.strategy.predict(
             state.solution_full, transition=transition
         )
@@ -651,7 +655,7 @@ class solver(ProbabilisticSolver):
     def step(self, state: ProbabilisticSolution, *, dt, damp):
         # Discretize
         output_scale = np.ones_like(state.output_scale)
-        transition = state.prior.discretize(dt, output_scale)
+        transition = state.prior.discretize(dt=dt, output_scale=output_scale)
 
         # Predict
         u_pred, prediction = self.strategy.predict(
@@ -881,7 +885,7 @@ class error_residual_std(ErrorEstimator):
         # since the error is multiplied with a local scale estimate anyway
         prototype = proposed.u.prototype_output_scale_calibrated()
         output_scale = np.ones_like(prototype)
-        transition = previous.prior.discretize(dt, output_scale)
+        transition = previous.prior.discretize(dt=dt, output_scale=output_scale)
 
         # Extrapolate from the zero-error state
         mean = previous.u.mean_flat
@@ -978,7 +982,7 @@ class error_state_std(ErrorEstimator):
         # since the error is multiplied with a local scale estimate anyway
         prototype = proposed.u.prototype_output_scale_calibrated()
         output_scale = np.ones_like(prototype)
-        transition = previous.prior.discretize(dt, output_scale)
+        transition = previous.prior.discretize(dt=dt, output_scale=output_scale)
 
         # Extrapolate from the zero-error state
         mean = previous.u.mean_flat

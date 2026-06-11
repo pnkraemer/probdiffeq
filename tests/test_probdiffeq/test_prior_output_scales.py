@@ -89,8 +89,9 @@ def test_output_scales_covariances_scaled_correctly_default(rules: ScaleShapeRul
     # 1d problem, but "unusual" shapes. Values don't matter.
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
     iwp = rules.prior(ssm, tcoeffs)
-    cond = iwp.discretize(1.0)
+    cond = iwp.discretize(dt=1.0, output_scale=np.ones(rules.calibrated))
     Q_expected = 1.0 / np.asarray([[3.0, 2.0], [2.0, 1.0]])
+
     _, cov = cond.noise.to_multivariate_normal()
     assert testing.allclose(cov, Q_expected)
 
@@ -105,7 +106,7 @@ def test_output_scales_covariances_scaled_correctly_custom(rules: ScaleShapeRule
     scale = 123.45 * np.ones(rules.base)
     iwp = rules.prior(ssm, tcoeffs, output_scale=scale)
 
-    cond = iwp.discretize(1.0, 9.876 * np.ones(rules.calibrated))
+    cond = iwp.discretize(dt=1.0, output_scale=9.876 * np.ones(rules.calibrated))
     Q_expected = (9.876 * 123.45) ** 2.0 * 1.0 / np.asarray([[3.0, 2.0], [2.0, 1.0]])
     _, cov = cond.noise.to_multivariate_normal()
     assert testing.allclose(cov, Q_expected)
@@ -134,11 +135,11 @@ def test_output_scales_wrong_shape_raises_error_at_calling(rules: ScaleShapeRule
     iwp = rules.prior(ssm, tcoeffs)
 
     # Sanity check: assert that the same error does not happen with the correct shape
-    _ = iwp.discretize(1.0, np.ones(rules.calibrated))
+    _ = iwp.discretize(dt=1.0, output_scale=np.ones(rules.calibrated))
 
     for shapes in rules.calibrated_baddies:
         with testing.raises(ValueError, match="wrong shape"):
-            _ = iwp.discretize(1.0, np.ones(shapes))
+            _ = iwp.discretize(dt=1.0, output_scale=np.ones(shapes))
 
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")

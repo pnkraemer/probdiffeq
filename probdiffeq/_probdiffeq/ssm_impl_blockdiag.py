@@ -390,19 +390,15 @@ class BlockDiagWienerIntegrated(ssm_impl_api.AbstractPrior):
         self.precon_fun = utilities.preconditioner_taylor(num_derivatives)
         self.tree_flatten = BlockDiagTreeFlatten.from_example(init.mean)
 
-    def discretize(self, dt, output_scale: Array | None = None):
+    def discretize(self, *, dt: float, output_scale: Array) -> BlockDiagLatentCond:
         p, p_inv = self.precon_fun(dt)
-        if output_scale is None:
-            output_scale = np.ones_like(self.output_scale)
-        else:
-            output_scale = np.asarray(output_scale)
 
-            if output_scale.shape != self.output_scale.shape:
-                msg = "The output-scale has the wrong shape."
-                msg += f" Expected: {output_scale.shape}."
-                msg += f" Received: {self.output_scale.shape}."
-                raise ValueError(msg)
-            output_scale, _ = tree.ravel_pytree(output_scale)
+        output_scale = np.asarray(output_scale)
+        if output_scale.shape != self.output_scale.shape:
+            msg = "The output-scale has the wrong shape."
+            msg += f" Expected: {output_scale.shape}."
+            msg += f" Received: {self.output_scale.shape}."
+            raise ValueError(msg)
 
         output_scale = self.output_scale * output_scale
 
@@ -421,23 +417,13 @@ class BlockDiagWienerIntegrated(ssm_impl_api.AbstractPrior):
     @staticmethod
     def register_pytree():
         def flatten(iwp):
-            children = (iwp.init, iwp.output_scale, iwp.a, iwp.q_sqrtm, iwp.q0)
-            aux = (iwp.num_derivatives, iwp.tree_flatten)
-            return children, aux
+            children = (iwp.init, iwp.output_scale)
+            return children, ()
 
         def unflatten(aux, children):
-            num_derivatives, tf = aux
-            init, output_scale, a, q_sqrtm, q0 = children
-            obj = object.__new__(BlockDiagWienerIntegrated)
-            obj.init = init
-            obj.output_scale = output_scale
-            obj.num_derivatives = num_derivatives
-            obj.a = a
-            obj.q_sqrtm = q_sqrtm
-            obj.q0 = q0
-            obj.tree_flatten = tf
-            obj.precon_fun = utilities.preconditioner_taylor(num_derivatives)
-            return obj
+            del aux
+            init, output_scale = children
+            return BlockDiagWienerIntegrated(init, output_scale)
 
         tree.register_pytree_node(BlockDiagWienerIntegrated, flatten, unflatten)
 
@@ -458,7 +444,7 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
         diffuse_derivatives: int = 0,
         diffuse_eps: float = 1.0,
         output_scale: Array | None = None,
-    ):
+    ) -> BlockDiagWienerIntegrated:
         tcoeffs_std = self._tcoeffs_standard_deviation(
             tcoeffs_mean, is_exact=is_exact, inexact_eps=inexact_eps
         )
@@ -479,7 +465,7 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
         diffuse_derivatives: int = 0,
         diffuse_eps: float = 1.0,
         output_scale: Array | None = None,
-    ):
+    ) -> BlockDiagWienerIntegrated:
         if diffuse_derivatives > 0:
             tcoeffs_mean, tcoeffs_std = self._add_diffuse_derivatives(
                 tcoeffs_mean,

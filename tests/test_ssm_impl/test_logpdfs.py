@@ -56,7 +56,7 @@ def create_random_variable(ssm_factory):
         output_scale = np.ones((3,))
     else:
         output_scale = np.ones(())
-    rv = iwp.discretize(0.1, output_scale)
+    rv = iwp.discretize(dt=0.1, output_scale=output_scale)
     key = random.prng_key(seed=1)
     noise_flat, unravel = tree.ravel_pytree(rv.noise)
     noise_flat = random.normal(key, shape=noise_flat.shape)

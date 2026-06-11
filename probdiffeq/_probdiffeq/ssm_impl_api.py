@@ -278,18 +278,21 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def to_derivative(self, i, std) -> "AbstractLatentCond":
+    def to_derivative(self, i, std) -> AbstractLatentCond:
         """Construct an observation model that extracts the i-th Taylor coefficient."""
         raise NotImplementedError
 
 
 class AbstractPrior(abc.ABC):
     def __init__(self, init, output_scale, /):
+        if not isinstance(output_scale, Array):
+            raise TypeError
+
         self.init = init
         self.output_scale = output_scale
 
     @abc.abstractmethod
-    def discretize(self, *, dt, output_scale):
+    def discretize(self, *, dt: float, output_scale: Array) -> AbstractLatentCond:
         """Discretize the prior at a time step."""
         raise NotImplementedError
 
@@ -317,7 +320,7 @@ class StateSpaceModel(abc.ABC):
         diffuse_derivatives: int = 0,
         diffuse_eps: float = 1.0,
         output_scale: Array | None = None,
-    ):
+    ) -> AbstractPrior:
         """Construct an integrated Wiener process prior."""
         raise NotImplementedError
 
@@ -331,7 +334,7 @@ class StateSpaceModel(abc.ABC):
         diffuse_derivatives: int = 0,
         diffuse_eps: float = 1.0,
         output_scale: Array | None = None,
-    ):
+    ) -> AbstractPrior:
         """Construct a diffuse integrated Wiener process prior."""
         raise NotImplementedError
 
@@ -347,7 +350,7 @@ class StateSpaceModel(abc.ABC):
         diffuse_derivatives: int = 0,
         diffuse_eps: float = 1.0,
         output_scale: Array | None = None,
-    ):
+    ) -> AbstractPrior:
         """Construct an exponential integrator prior.
 
         According to https://arxiv.org/abs/2305.14978, but following the numerical
@@ -366,7 +369,7 @@ class StateSpaceModel(abc.ABC):
         diffuse_derivatives: int = 0,
         diffuse_eps: float = 1.0,
         output_scale: Array | None = None,
-    ):
+    ) -> AbstractPrior:
         """Construct a diffuse exponential integrator prior.
 
         According to https://arxiv.org/abs/2305.14978, but following the numerical
@@ -385,7 +388,7 @@ class StateSpaceModel(abc.ABC):
         diffuse_derivatives: int = 0,
         diffuse_eps: float = 1.0,
         output_scale: Array | None = None,
-    ):
+    ) -> AbstractPrior:
         """Construct an integrated Ornstein-Uhlenbeck prior."""
 
         def autonomous(*, jet_coords):
@@ -416,7 +419,7 @@ class StateSpaceModel(abc.ABC):
         diffuse_derivatives: int = 0,
         diffuse_eps: float = 1.0,
         output_scale: Array | None = None,
-    ):
+    ) -> AbstractPrior:
         """Construct a diffuse integrated Ornstein-Uhlenbeck prior."""
 
         def autonomous(*, jet_coords):
