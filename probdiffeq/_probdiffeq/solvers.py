@@ -1,6 +1,6 @@
 """Solvers."""
 
-from probdiffeq._probdiffeq import estimators_and_loss_functions, ssm_via_api, utilities
+from probdiffeq._probdiffeq import estimators_and_losses, ssm_via_api, utilities
 from probdiffeq.backend import func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, TypeVar
 
@@ -25,8 +25,7 @@ Used to type marginals, for example.
 """
 
 T = TypeVar(
-    "T",
-    bound=estimators_and_loss_functions.MarkovSequence | ssm_via_api.AbstractTreeNormal,
+    "T", bound=estimators_and_losses.MarkovSequence | ssm_via_api.AbstractTreeNormal
 )
 """A type-variable to describe posterior distributions."""
 
@@ -81,7 +80,7 @@ class ProbabilisticSolver:
     def __init__(
         self,
         *,
-        strategy: estimators_and_loss_functions.MarkovStrategy,
+        strategy: estimators_and_losses.MarkovStrategy,
         prior: Callable,
         constraint: ssm_via_api.AbstractLinearization,
         constraint_init: ssm_via_api.AbstractLinearization | None,
@@ -301,7 +300,7 @@ class solver_mle(ProbabilisticSolver):
         *,
         constraint: ssm_via_api.AbstractLinearization,
         prior: Callable,
-        strategy: estimators_and_loss_functions.MarkovStrategy,
+        strategy: estimators_and_losses.MarkovStrategy,
         constraint_init: ssm_via_api.AbstractLinearization | None = None,
         correct_asymptotic_underconfidence: bool = True,
     ) -> None:
@@ -449,7 +448,7 @@ class solver_dynamic(ProbabilisticSolver):
     def __init__(
         self,
         *,
-        strategy: estimators_and_loss_functions.MarkovStrategy,
+        strategy: estimators_and_losses.MarkovStrategy,
         prior: Callable,
         constraint: ssm_via_api.AbstractLinearization,
         constraint_init: ssm_via_api.AbstractLinearization | None = None,
@@ -598,7 +597,7 @@ class solver(ProbabilisticSolver):
         *,
         constraint: ssm_via_api.AbstractLinearization,
         prior: Callable,
-        strategy: estimators_and_loss_functions.MarkovStrategy,
+        strategy: estimators_and_losses.MarkovStrategy,
         constraint_init: ssm_via_api.AbstractLinearization | None = None,
     ) -> None:
         super().__init__(

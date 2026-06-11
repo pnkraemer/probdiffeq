@@ -1,6 +1,6 @@
 from probdiffeq._probdiffeq import (
     linearization_points,
-    problem_types,
+    problems,
     ssm_via_api,
     utilities,
 )
@@ -428,7 +428,7 @@ class state_space_model_dense(ssm_via_api.StateSpaceModel):
 
     def prior_exponential(
         self,
-        ode: problem_types.ODEFunctionAutonomous,
+        ode: problems.ODEFunctionAutonomous,
         tcoeffs_mean: C,
         /,
         *,
@@ -467,7 +467,7 @@ class state_space_model_dense(ssm_via_api.StateSpaceModel):
 
     def prior_exponential_diffuse(
         self,
-        ode: problem_types.ODEFunctionAutonomous,
+        ode: problems.ODEFunctionAutonomous,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
@@ -638,13 +638,13 @@ class state_space_model_dense(ssm_via_api.StateSpaceModel):
             raise ValueError(msg)
         return output_scale
 
-    def constraint_ode_ts0(self, ode: problem_types.ODEFunction, /) -> DenseOdeTs0:
-        if not isinstance(ode, problem_types.ODEFunction):
+    def constraint_ode_ts0(self, ode: problems.ODEFunction, /) -> DenseOdeTs0:
+        if not isinstance(ode, problems.ODEFunction):
             raise TypeError(ode)
         return DenseOdeTs0(ode=ode)
 
-    def constraint_ode_ts1(self, ode: problem_types.ODEFunction, /) -> DenseOdeTs1:
-        if not isinstance(ode, problem_types.ODEFunction):
+    def constraint_ode_ts1(self, ode: problems.ODEFunction, /) -> DenseOdeTs1:
+        if not isinstance(ode, problems.ODEFunction):
             raise TypeError(ode)
         if ode.num_tcoeffs_in_args > 1:
             msg = "Not implemented."
@@ -654,11 +654,11 @@ class state_space_model_dense(ssm_via_api.StateSpaceModel):
 
     def constraint_residual(
         self,
-        residual: problem_types.Residual,
+        residual: problems.Residual,
         *,
         linearization_point: linearization_points.LinearizationPoint | None = None,
     ) -> DenseResidual:
-        if not isinstance(residual, problem_types.Residual):
+        if not isinstance(residual, problems.Residual):
             raise TypeError(residual)
         if linearization_point is None:
             linearization_point = linearization_points.linearization_point_prior()

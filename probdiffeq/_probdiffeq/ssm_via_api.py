@@ -1,4 +1,4 @@
-from probdiffeq._probdiffeq import problem_types
+from probdiffeq._probdiffeq import problems
 from probdiffeq.backend import abc, func, np, tree
 from probdiffeq.backend.typing import (
     TYPE_CHECKING,
@@ -327,7 +327,7 @@ class StateSpaceModel(abc.ABC):
     @abc.abstractmethod
     def prior_exponential(
         self,
-        ode: problem_types.ODEFunctionAutonomous,
+        ode: problems.ODEFunctionAutonomous,
         tcoeffs: C,
         /,
         *,
@@ -347,7 +347,7 @@ class StateSpaceModel(abc.ABC):
     @abc.abstractmethod
     def prior_exponential_diffuse(
         self,
-        ode: problem_types.ODEFunctionAutonomous,
+        ode: problems.ODEFunctionAutonomous,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
@@ -380,9 +380,9 @@ class StateSpaceModel(abc.ABC):
         def autonomous(*, jet_coords):
             return linop(jet_coords[-1])
 
-        ode: problem_types.ODEFunctionAutonomous = problem_types.ODEFunctionAutonomous(
+        ode: problems.ODEFunctionAutonomous = problems.ODEFunctionAutonomous(
             autonomous,
-            jacobian=problem_types.jacobian_materialize(),
+            jacobian=problems.jacobian_materialize(),
             num_tcoeffs_in_args=len(tcoeffs),
         )
         return self.prior_exponential(
@@ -411,9 +411,9 @@ class StateSpaceModel(abc.ABC):
         def autonomous(*, jet_coords):
             return linop(jet_coords[-1])
 
-        ode: problem_types.ODEFunctionAutonomous = problem_types.ODEFunctionAutonomous(
+        ode: problems.ODEFunctionAutonomous = problems.ODEFunctionAutonomous(
             autonomous,
-            jacobian=problem_types.jacobian_materialize(),
+            jacobian=problems.jacobian_materialize(),
             num_tcoeffs_in_args=len(tcoeffs_mean),
         )
         return self.prior_exponential_diffuse(
@@ -428,7 +428,7 @@ class StateSpaceModel(abc.ABC):
     # --- Linearization constructors ---
 
     @abc.abstractmethod
-    def constraint_ode_ts0(self, ode: problem_types.ODEFunction, /) -> AbstractOde:
+    def constraint_ode_ts0(self, ode: problems.ODEFunction, /) -> AbstractOde:
         r"""Create an ODE constraint with zeroth-order Taylor linearisation.
 
         This constraint handles ODEs of the form
@@ -444,7 +444,7 @@ class StateSpaceModel(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def constraint_ode_ts1(self, ode: problem_types.ODEFunction, /) -> AbstractOde:
+    def constraint_ode_ts1(self, ode: problems.ODEFunction, /) -> AbstractOde:
         r"""Create an ODE constraint and linearise with a first-order Taylor approximation.
 
         This constraint handles ODEs of the form
@@ -462,7 +462,7 @@ class StateSpaceModel(abc.ABC):
     @abc.abstractmethod
     def constraint_residual(
         self,
-        residual: problem_types.Residual,
+        residual: problems.Residual,
         *,
         linearization_point: "linearization_points.LinearizationPoint | None" = None,
     ) -> AbstractResidual:

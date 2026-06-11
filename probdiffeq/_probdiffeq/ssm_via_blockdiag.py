@@ -1,6 +1,6 @@
 from probdiffeq._probdiffeq import (
     linearization_points,
-    problem_types,
+    problems,
     ssm_via_api,
     utilities,
 )
@@ -528,13 +528,13 @@ class state_space_model_blockdiag(ssm_via_api.StateSpaceModel):
         msg += " If you need them, reach out."
         raise NotImplementedError(msg)
 
-    def constraint_ode_ts0(self, ode: problem_types.ODEFunction, /) -> BlockDiagOdeTs0:
-        if not isinstance(ode, problem_types.ODEFunction):
+    def constraint_ode_ts0(self, ode: problems.ODEFunction, /) -> BlockDiagOdeTs0:
+        if not isinstance(ode, problems.ODEFunction):
             raise TypeError(ode)
         return BlockDiagOdeTs0(ode=ode)
 
-    def constraint_ode_ts1(self, ode: problem_types.ODEFunction, /) -> BlockDiagOdeTs1:
-        if not isinstance(ode, problem_types.ODEFunction):
+    def constraint_ode_ts1(self, ode: problems.ODEFunction, /) -> BlockDiagOdeTs1:
+        if not isinstance(ode, problems.ODEFunction):
             raise TypeError(ode)
         if ode.num_tcoeffs_in_args > 2:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
@@ -543,7 +543,7 @@ class state_space_model_blockdiag(ssm_via_api.StateSpaceModel):
 
     def constraint_residual(
         self,
-        residual: problem_types.Residual,
+        residual: problems.Residual,
         *,
         linearization_point: linearization_points.LinearizationPoint | None = None,
     ):

@@ -1,4 +1,4 @@
-from probdiffeq._probdiffeq import problem_types, ssm_via_api, utilities
+from probdiffeq._probdiffeq import problems, ssm_via_api, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
@@ -528,13 +528,13 @@ class state_space_model_isotropic(ssm_via_api.StateSpaceModel):
         tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
         return tcoeffs_mean, tcoeffs_std
 
-    def constraint_ode_ts0(self, ode: problem_types.ODEFunction, /) -> IsotropicOdeTs0:
-        if not isinstance(ode, problem_types.ODEFunction):
+    def constraint_ode_ts0(self, ode: problems.ODEFunction, /) -> IsotropicOdeTs0:
+        if not isinstance(ode, problems.ODEFunction):
             raise TypeError(ode)
         return IsotropicOdeTs0(ode=ode)
 
-    def constraint_ode_ts1(self, ode: problem_types.ODEFunction, /) -> IsotropicOdeTs1:
-        if not isinstance(ode, problem_types.ODEFunction):
+    def constraint_ode_ts1(self, ode: problems.ODEFunction, /) -> IsotropicOdeTs1:
+        if not isinstance(ode, problems.ODEFunction):
             raise TypeError(ode)
         if ode.num_tcoeffs_in_args > 1:
             msg = "This linearization is not compatible with high-order ODEs as of yet."
@@ -542,6 +542,6 @@ class state_space_model_isotropic(ssm_via_api.StateSpaceModel):
         return IsotropicOdeTs1(ode=ode)
 
     def constraint_residual(
-        self, residual: problem_types.Residual, *, linearization_point=None
+        self, residual: problems.Residual, *, linearization_point=None
     ):
         raise NotImplementedError
