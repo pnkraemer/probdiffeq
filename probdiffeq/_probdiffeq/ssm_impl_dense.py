@@ -346,6 +346,42 @@ class DenseResidual(ssm_impl_api.AbstractResidual):
         return cond, state
 
 
+class DenseWienerIntegrated(ssm_impl_api.AbstractPrior):
+    def __init__(self, init, Lambda, /):
+        super().__init__(init, Lambda)
+        num_derivatives = len(init.mean) - 1
+        a, q_sqrtm = utilities.system_matrices_1d_iwp(num_derivatives)
+
+        single_flat, _single_unravel = tree.ravel_pytree(init.mean[0])
+        (self.d,) = single_flat.shape
+        eye_d = np.eye(self.d)
+        self.A = np.kron(a, eye_d)
+        self.Q = np.kron(q_sqrtm, Lambda)
+
+        self.q0 = np.zeros(((num_derivatives + 1) * self.d,))
+        self.precon_fun = utilities.preconditioner_taylor(num_derivatives)
+        self.tree_flatten = DenseTreeFlatten.from_example(init.mean)
+
+    def discretize(self, dt, output_scale=1.0):
+        output_scale = self._process_calibrated_scale(output_scale, self.output_scale)
+
+        p, p_inv = self.precon_fun(dt)
+        p = np.repeat(p, self.d)
+        p_inv = np.repeat(p_inv, self.d)
+
+        noise = DenseNormal(self.q0, output_scale * self.Q, self.tree_flatten)
+        return DenseLatentCond(self.A, noise, to_latent=p_inv, to_observed=p)
+
+    def _process_calibrated_scale(self, output_scale, Lambda):
+        output_scale = np.asarray(output_scale)
+        if output_scale.shape != ():
+            msg = "The output-scale has the wrong shape."
+            msg += f" Expected: {()}."
+            msg += f" Received: {output_scale.shape}."
+            raise ValueError(msg)
+        return output_scale * Lambda
+
+
 class state_space_model_dense(ssm_impl_api.StateSpaceModel):
     """Dense (full-covariance) state-space model implementation."""
 
@@ -391,35 +427,9 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
 
         # Construct the initial variable from the mean and std
         init = DenseNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
-
-        # Process the base-scale
         single_flat, single_unravel = tree.ravel_pytree(tcoeffs_mean[0])
         Lambda = self._process_base_scale(output_scale, single_flat, single_unravel)
-
-        # Construct the transitions
-        num_derivatives = len(tcoeffs_mean) - 1
-        a, q_sqrtm = utilities.system_matrices_1d_iwp(num_derivatives)
-        (d,) = single_flat.shape
-        eye_d = np.eye(d)
-        A = np.kron(a, eye_d)
-        Q = np.kron(q_sqrtm, Lambda)
-
-        q0 = np.zeros(((num_derivatives + 1) * d,))
-        precon_fun = utilities.preconditioner_taylor(num_derivatives=num_derivatives)
-
-        def discretise(dt, output_scale=1.0):
-            output_scale = self._process_calibrated_scale(output_scale)
-
-            p, p_inv = precon_fun(dt)
-            p = np.repeat(p, d)
-            p_inv = np.repeat(p_inv, d)
-
-            tree_flatten = DenseTreeFlatten.from_example(tcoeffs_mean)
-            noise = DenseNormal(q0, output_scale * Q, tree_flatten)
-            return DenseLatentCond(A, noise, to_latent=p_inv, to_observed=p)
-
-        # Return the initial variable and the discretisation
-        return init, discretise
+        return DenseWienerIntegrated(init, Lambda)
 
     def prior_exponential(
         self,
@@ -527,7 +537,7 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         q0 = np.zeros(leaves_flat.shape)
 
         # TODO: why is there a default argument for output_scale?
-        def discretise(dt, output_scale=1.0):
+        def discretize(dt, output_scale=1.0):
             output_scale = self._process_calibrated_scale(output_scale)
 
             p, p_inv = precon_fun(dt)
@@ -543,7 +553,7 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
             noise = DenseNormal(q0, output_scale * L, tree_flatten)
             return DenseLatentCond(eA, noise, to_latent=p_inv, to_observed=p)
 
-        return init, discretise
+        return init, discretize
 
     def _tcoeffs_standard_deviation(self, tcoeffs_mean, /, *, is_exact, inexact_eps):
 
@@ -623,15 +633,6 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         # Flatten the scale into something compatible with the flattened SSM
         base_scale, _ = tree.ravel_pytree(base_scale)
         return linalg.diagonal_matrix(base_scale)
-
-    def _process_calibrated_scale(self, output_scale):
-        output_scale = np.asarray(output_scale)
-        if output_scale.shape != ():
-            msg = "The output-scale has the wrong shape."
-            msg += f" Expected: {()}."
-            msg += f" Received: {output_scale.shape}."
-            raise ValueError(msg)
-        return output_scale
 
     def constraint_ode_ts0(self, ode: problems.ODEFunction, /) -> DenseOdeTs0:
         if not isinstance(ode, problems.ODEFunction):

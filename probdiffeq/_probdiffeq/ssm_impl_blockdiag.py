@@ -458,7 +458,7 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
         q0 = np.zeros((num_derivatives + 1,))
         precon_fun = utilities.preconditioner_taylor(num_derivatives=num_derivatives)
 
-        def discretise(dt, scale: Array | None = None):
+        def discretize(dt, scale: Array | None = None):
             p, p_inv = precon_fun(dt)
             if scale is None:
                 scale = np.ones_like(output_scale)
@@ -486,7 +486,7 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
             p_inv = np.ones((d, 1)) * p_inv[None, :]
             return BlockDiagLatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
 
-        return init, discretise
+        return init, discretize
 
     def prior_exponential(
         self,

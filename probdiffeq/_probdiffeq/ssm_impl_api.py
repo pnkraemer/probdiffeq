@@ -284,7 +284,7 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
 
 
 class AbstractPrior(abc.ABC):
-    def __init__(self, init, output_scale):
+    def __init__(self, init, output_scale, /):
         self.init = init
         self.output_scale = output_scale
 

@@ -356,7 +356,7 @@ class IsotropicOdeTs1(ssm_impl_api.AbstractOde):
 
 
 class IsotropicWienerIntegrated(ssm_impl_api.AbstractPrior):
-    def __init__(self, init, output_scale):
+    def __init__(self, init, output_scale, /):
         super().__init__(init, output_scale)
 
         num_derivatives = len(init.mean) - 1
@@ -376,7 +376,6 @@ class IsotropicWienerIntegrated(ssm_impl_api.AbstractPrior):
 
         scale = self.output_scale * output_scale
         noise = IsotropicNormal(self.q0, scale * self.q_sqrtm, self.tree_flatten)
-
         p, p_inv = self.precon_fun(dt)
         return IsotropicLatentCond(self.A, noise, to_latent=p_inv, to_observed=p)
 

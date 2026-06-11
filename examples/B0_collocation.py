@@ -23,7 +23,7 @@ def main():
     t0, t1 = 0.0, 2.5
     u0 = jnp.asarray(0.1)
 
-    # Assemble the discretised prior (with and without the correct Taylor coefficients).
+    # Assemble the discretized prior (with and without the correct Taylor coefficients).
 
     ts = jnp.linspace(t0, t1, num=500, endpoint=True)
 
