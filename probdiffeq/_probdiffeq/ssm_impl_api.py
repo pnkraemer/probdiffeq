@@ -283,6 +283,12 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
         raise NotImplementedError
 
 
+class AbstractPrior(abc.ABC):
+    def __init__(self, init, output_scale):
+        self.init = init
+        self.output_scale = output_scale
+
+
 class StateSpaceModel(abc.ABC):
     """Abstract base for factorised Markovian state-space model implementations.
 
