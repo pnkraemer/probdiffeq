@@ -390,7 +390,7 @@ class BlockDiagWienerIntegrated(ssm_impl_api.AbstractPrior):
         self.precon_fun = utilities.preconditioner_taylor(num_derivatives)
         self.tree_flatten = BlockDiagTreeFlatten.from_example(init.mean)
 
-    def discretize(self, *, dt: float, output_scale: Array) -> BlockDiagLatentCond:
+    def transition(self, *, dt: float, output_scale: Array) -> BlockDiagLatentCond:
         p, p_inv = self.precon_fun(dt)
 
         output_scale = np.asarray(output_scale)

@@ -13,7 +13,7 @@ def test_transitions_are_correct_in_1d(ssm_factory) -> None:
     ssm = ssm_factory()
     iwp = ssm.prior_wiener_integrated(tcoeffs)
 
-    cond = iwp.discretize(dt=1.0, output_scale=1.0)
+    cond = iwp.transition(dt=1.0, output_scale=1.0)
     A_expected = np.asarray(
         [
             [1.0, 3.0, 3.0, 1.0],
@@ -42,7 +42,7 @@ def test_transitions_are_correct_in_1d_blockdiag() -> None:
     ssm = probdiffeq.state_space_model_blockdiag()
     iwp = ssm.prior_wiener_integrated(tcoeffs)
 
-    cond = iwp.discretize(dt=1.0, output_scale=np.ones((1,)))
+    cond = iwp.transition(dt=1.0, output_scale=np.ones((1,)))
     A_expected = np.asarray(
         [
             [1.0, 3.0, 3.0, 1.0],

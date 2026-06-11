@@ -366,7 +366,7 @@ class IsotropicWienerIntegrated(ssm_impl_api.AbstractPrior):
         self.tree_flatten = IsotropicTreeFlatten.from_example(init.mean)
         self.precon_fun = utilities.preconditioner_taylor(num_derivatives)
 
-    def discretize(self, dt, output_scale: Array = 1.0):
+    def transition(self, dt, output_scale: Array = 1.0):
         output_scale = np.asarray(output_scale)
         if output_scale.shape != ():
             msg = "The base-scale has the wrong shape."

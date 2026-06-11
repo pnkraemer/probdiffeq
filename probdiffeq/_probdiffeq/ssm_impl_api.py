@@ -292,7 +292,7 @@ class AbstractPrior(abc.ABC):
         self.output_scale = output_scale
 
     @abc.abstractmethod
-    def discretize(self, *, dt: float, output_scale: Array) -> AbstractLatentCond:
+    def transition(self, *, dt: float, output_scale: Array) -> AbstractLatentCond:
         """Discretize the prior at a time step."""
         raise NotImplementedError
 

@@ -363,7 +363,7 @@ class DenseWienerIntegrated(ssm_impl_api.AbstractPrior):
         self.precon_fun = utilities.preconditioner_taylor(num_derivatives)
         self.tree_flatten = DenseTreeFlatten.from_example(init.mean)
 
-    def discretize(self, *, dt, output_scale):
+    def transition(self, *, dt, output_scale):
         output_scale = np.asarray(output_scale)
         if output_scale.shape != ():
             msg = "The output-scale has the wrong shape."
@@ -425,7 +425,7 @@ class DenseExponential(ssm_impl_api.AbstractPrior):
             pade_legendre=pade_legendre, solve=linalg.solve_lu
         )
 
-    def discretize(self, *, dt: float, output_scale: Array):
+    def transition(self, *, dt: float, output_scale: Array):
         output_scale = np.asarray(output_scale)
         if output_scale.shape != ():
             msg = "The output-scale has the wrong shape."
