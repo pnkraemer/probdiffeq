@@ -1,6 +1,6 @@
 r"""Evaluate jet-recursions in differential equations."""
 
-from probdiffeq._probdiffeq import problems, ssm_via_dense, taylor_points, utilities
+from probdiffeq._probdiffeq import problems, ssm_impl_dense, taylor_points, utilities
 from probdiffeq.backend import flow, func, np, tree
 from probdiffeq.backend.typing import Array, Protocol, Sequence, TypeVar
 
@@ -394,7 +394,7 @@ def jetexpand_residual(
 
         # Determine degrees of freedom ("dof") and initialse all others diffusely
         # Concretely: The provided 'inits' are not DOFs, all added ones are.
-        ssm = ssm_via_dense.state_space_model_dense()
+        ssm = ssm_impl_dense.state_space_model_dense()
         rv, _ = ssm.prior_wiener_integrated(inits, diffuse_derivatives=num)
 
         x0, unravel = tree.ravel_pytree(rv.mean)

@@ -1,6 +1,6 @@
 """Solvers."""
 
-from probdiffeq._probdiffeq import estimators_and_losses, ssm_via_api, utilities
+from probdiffeq._probdiffeq import estimators_and_losses, ssm_impl_api, utilities
 from probdiffeq.backend import func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, TypeVar
 
@@ -18,14 +18,14 @@ __all__ = [
 ]
 
 
-N = TypeVar("N", bound=ssm_via_api.AbstractTreeNormal)
+N = TypeVar("N", bound=ssm_impl_api.AbstractTreeNormal)
 """A type-variable to describe normal distributions.
 
 Used to type marginals, for example.
 """
 
 T = TypeVar(
-    "T", bound=estimators_and_losses.MarkovSequence | ssm_via_api.AbstractTreeNormal
+    "T", bound=estimators_and_losses.MarkovSequence | ssm_impl_api.AbstractTreeNormal
 )
 """A type-variable to describe posterior distributions."""
 
@@ -82,8 +82,8 @@ class ProbabilisticSolver:
         *,
         strategy: estimators_and_losses.MarkovStrategy,
         prior: Callable,
-        constraint: ssm_via_api.AbstractLinearization,
-        constraint_init: ssm_via_api.AbstractLinearization | None,
+        constraint: ssm_impl_api.AbstractLinearization,
+        constraint_init: ssm_impl_api.AbstractLinearization | None,
     ) -> None:
         self.strategy = strategy
         self.prior = prior
@@ -298,10 +298,10 @@ class solver_mle(ProbabilisticSolver):
     def __init__(
         self,
         *,
-        constraint: ssm_via_api.AbstractLinearization,
+        constraint: ssm_impl_api.AbstractLinearization,
         prior: Callable,
         strategy: estimators_and_losses.MarkovStrategy,
-        constraint_init: ssm_via_api.AbstractLinearization | None = None,
+        constraint_init: ssm_impl_api.AbstractLinearization | None = None,
         correct_asymptotic_underconfidence: bool = True,
     ) -> None:
         super().__init__(
@@ -450,8 +450,8 @@ class solver_dynamic(ProbabilisticSolver):
         *,
         strategy: estimators_and_losses.MarkovStrategy,
         prior: Callable,
-        constraint: ssm_via_api.AbstractLinearization,
-        constraint_init: ssm_via_api.AbstractLinearization | None = None,
+        constraint: ssm_impl_api.AbstractLinearization,
+        constraint_init: ssm_impl_api.AbstractLinearization | None = None,
         re_linearize_after_calibration=False,
         stop_gradient_through_calibration=True,
     ) -> None:
@@ -595,10 +595,10 @@ class solver(ProbabilisticSolver):
     def __init__(
         self,
         *,
-        constraint: ssm_via_api.AbstractLinearization,
+        constraint: ssm_impl_api.AbstractLinearization,
         prior: Callable,
         strategy: estimators_and_losses.MarkovStrategy,
-        constraint_init: ssm_via_api.AbstractLinearization | None = None,
+        constraint_init: ssm_impl_api.AbstractLinearization | None = None,
     ) -> None:
         super().__init__(
             strategy=strategy,
@@ -841,7 +841,7 @@ class error_residual_std(ErrorEstimator):
     def __init__(
         self,
         *,
-        constraint: ssm_via_api.AbstractLinearization,
+        constraint: ssm_impl_api.AbstractLinearization,
         prior: Any,
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default
@@ -938,7 +938,7 @@ class error_state_std(ErrorEstimator):
     def __init__(
         self,
         *,
-        constraint: ssm_via_api.AbstractLinearization,
+        constraint: ssm_impl_api.AbstractLinearization,
         prior: Any,
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default

@@ -1,4 +1,4 @@
-from probdiffeq._probdiffeq import problems, ssm_via_api, taylor_points, utilities
+from probdiffeq._probdiffeq import problems, ssm_impl_api, taylor_points, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
@@ -13,7 +13,7 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class BlockDiagLatentCond(ssm_via_api.AbstractLatentCond):
+class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
     """Block-diagonal implementation of LatentCond operations."""
 
     def apply_flat(self, x, /):
@@ -117,7 +117,7 @@ def _transpose(matrix):
     return np.transpose(matrix, axes=(0, 2, 1))
 
 
-class BlockDiagOdeTs0(ssm_via_api.AbstractOde):
+class BlockDiagOdeTs0(ssm_impl_api.AbstractOde):
     """Construct a block-diagonal implementation of ODE-TS0 linearization."""
 
     def init_linearization(self) -> None:
@@ -140,7 +140,7 @@ class BlockDiagOdeTs0(ssm_via_api.AbstractOde):
         return cond, None
 
 
-class BlockDiagOdeTs1(ssm_via_api.AbstractOde):
+class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
     """Construct a block-diagonal implementation of ODE-TS1 linearization."""
 
     def init_linearization(self):
@@ -179,7 +179,7 @@ class BlockDiagOdeTs1(ssm_via_api.AbstractOde):
 
 
 @structs.dataclass
-class BlockDiagTreeFlatten(ssm_via_api.AbstractTreeFlatten):
+class BlockDiagTreeFlatten(ssm_impl_api.AbstractTreeFlatten):
     """Flattening information for block-diagonal random variables."""
 
     # The treedef of the target
@@ -207,7 +207,7 @@ class BlockDiagTreeFlatten(ssm_via_api.AbstractTreeFlatten):
         return cls(treedef, unravel_leaf)
 
 
-class BlockDiagNormal(ssm_via_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
+class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
     """Construct a block-diagonal normal distribution.
 
     This assumes that the pytree is of the form [M_1, ..., M_{num_coeffs}],
@@ -379,7 +379,7 @@ class BlockDiagNormal(ssm_via_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
 BlockDiagNormal.register_pytree_node()
 
 
-class state_space_model_blockdiag(ssm_via_api.StateSpaceModel):
+class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
     """Implementation of block-diagonal SSM constructors."""
 
     def prior_wiener_integrated(

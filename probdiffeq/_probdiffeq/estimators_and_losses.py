@@ -1,6 +1,6 @@
 """Estimation strategies and loss functions."""
 
-from probdiffeq._probdiffeq import ssm_via_api, utilities
+from probdiffeq._probdiffeq import ssm_impl_api, utilities
 from probdiffeq.backend import flow, func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Callable, Generic, Sequence, TypeVar
 
@@ -105,7 +105,7 @@ C = TypeVar("C", bound=Sequence)
 Used to type Taylor coefficients, for example.
 """
 
-N = TypeVar("N", bound=ssm_via_api.AbstractTreeNormal)
+N = TypeVar("N", bound=ssm_impl_api.AbstractTreeNormal)
 """A type-variable to describe normal distributions.
 
 Used to type marginals, for example.
@@ -261,7 +261,7 @@ class MarkovSequence(Generic[N]):
         return tree.tree_array_prepend(sample0_tree, samples)
 
 
-T = TypeVar("T", bound=MarkovSequence | ssm_via_api.AbstractTreeNormal)
+T = TypeVar("T", bound=MarkovSequence | ssm_impl_api.AbstractTreeNormal)
 """A type-variable to describe posterior distributions."""
 
 

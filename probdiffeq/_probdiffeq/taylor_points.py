@@ -18,7 +18,7 @@ taylor_point_maximum_a_posteriori(nlstsq=lstsq_constrained_gauss_newton())
 
 """
 
-from probdiffeq._probdiffeq import ssm_via_api
+from probdiffeq._probdiffeq import ssm_impl_api
 from probdiffeq.backend import flow, func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Array, Callable, TypeVar
 
@@ -30,7 +30,7 @@ __all__ = [
     "taylor_point_prior",
 ]
 
-N = TypeVar("N", bound=ssm_via_api.AbstractTreeNormal)
+N = TypeVar("N", bound=ssm_impl_api.AbstractTreeNormal)
 """A type-variable to describe normal distributions.
 
 Used to type the 'rv' argument of TaylorPoint.

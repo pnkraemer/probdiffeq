@@ -439,7 +439,7 @@ class StateSpaceModel(abc.ABC):
 
         where $k$ is the order of the ODE.
 
-        Related: :class:`probdiffeq._probdiffeq.ssm_via_api.AbstractLinearization`.
+        Related: :class:`probdiffeq._probdiffeq.ssm_impl_api.AbstractLinearization`.
         """
         raise NotImplementedError
 
@@ -455,7 +455,7 @@ class StateSpaceModel(abc.ABC):
 
         where $k$ is the order of the ODE.
 
-        Related: :class:`probdiffeq._probdiffeq.ssm_via_api.AbstractLinearization`.
+        Related: :class:`probdiffeq._probdiffeq.ssm_impl_api.AbstractLinearization`.
         """
         raise NotImplementedError
 

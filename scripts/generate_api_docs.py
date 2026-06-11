@@ -54,11 +54,11 @@ def main(
                 header = path.name.lower()
                 header = header.replace(".py", "")
                 header = header.replace("_and_", " & ")
-                header = header.replace("_via_", ": ")
+                header = header.replace("ssm_impl_", "ssms: ")
                 header = header.replace("_", " ")
                 header = header.capitalize()
-                header = header.replace("Ssm", "SSM")
                 header = header.replace("api", "API")
+                header = header.replace("Ssm", "SSM")
                 p_as_module = path_as_module(path)
                 content = f"""
 # {header}

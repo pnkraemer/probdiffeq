@@ -1,4 +1,4 @@
-from probdiffeq._probdiffeq import problems, ssm_via_api, utilities
+from probdiffeq._probdiffeq import problems, ssm_impl_api, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
@@ -20,7 +20,7 @@ __all__ = ["state_space_model_isotropic"]
 
 
 @structs.dataclass
-class IsotropicTreeFlatten(ssm_via_api.AbstractTreeFlatten):
+class IsotropicTreeFlatten(ssm_impl_api.AbstractTreeFlatten):
     """Flattening information for isotropic random variables."""
 
     # The treedef of the target
@@ -68,7 +68,7 @@ class IsotropicTreeFlatten(ssm_via_api.AbstractTreeFlatten):
         return cls(treedef, unravel_leaf)
 
 
-class IsotropicLatentCond(ssm_via_api.AbstractLatentCond):
+class IsotropicLatentCond(ssm_impl_api.AbstractLatentCond):
     """Isotropic (scalar-variance) implementation of LatentCond operations."""
 
     def apply_flat(self, x, /):
@@ -142,7 +142,7 @@ class IsotropicLatentCond(ssm_via_api.AbstractLatentCond):
 IsotropicLatentCond._register_as_pytree()
 
 
-class IsotropicNormal(ssm_via_api.AbstractTreeNormal[IsotropicTreeFlatten]):
+class IsotropicNormal(ssm_impl_api.AbstractTreeNormal[IsotropicTreeFlatten]):
     """Construct an isotropic normal distribution."""
 
     @classmethod
@@ -294,7 +294,7 @@ class IsotropicNormal(ssm_via_api.AbstractTreeNormal[IsotropicTreeFlatten]):
 IsotropicNormal.register_pytree_node()
 
 
-class IsotropicOdeTs0(ssm_via_api.AbstractOde):
+class IsotropicOdeTs0(ssm_impl_api.AbstractOde):
     """Construct an isotropic implementation of ODE-TS0 linearization."""
 
     def init_linearization(self) -> None:
@@ -316,7 +316,7 @@ class IsotropicOdeTs0(ssm_via_api.AbstractOde):
         return cond, None
 
 
-class IsotropicOdeTs1(ssm_via_api.AbstractOde):
+class IsotropicOdeTs1(ssm_impl_api.AbstractOde):
     """Construct an isotropic implementation of ODE-TS1 linearization."""
 
     def init_linearization(self):
@@ -355,7 +355,7 @@ class IsotropicOdeTs1(ssm_via_api.AbstractOde):
         return cond, state
 
 
-class state_space_model_isotropic(ssm_via_api.StateSpaceModel):
+class state_space_model_isotropic(ssm_impl_api.StateSpaceModel):
     """Isotropic (scalar-variance) state-space model implementation."""
 
     def prior_wiener_integrated(

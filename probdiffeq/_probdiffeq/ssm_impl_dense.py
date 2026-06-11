@@ -1,4 +1,4 @@
-from probdiffeq._probdiffeq import problems, ssm_via_api, taylor_points, utilities
+from probdiffeq._probdiffeq import problems, ssm_impl_api, taylor_points, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree, warnings
 from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
@@ -12,7 +12,7 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class DenseLatentCond(ssm_via_api.AbstractLatentCond):
+class DenseLatentCond(ssm_impl_api.AbstractLatentCond):
     """Dense (full-covariance) implementation of LatentCond operations."""
 
     def apply_flat(self, x, /):
@@ -88,7 +88,7 @@ DenseLatentCond._register_as_pytree()
 
 
 @structs.dataclass
-class DenseTreeFlatten(ssm_via_api.AbstractTreeFlatten):
+class DenseTreeFlatten(ssm_impl_api.AbstractTreeFlatten):
     """Implementation of flattening information for dense models."""
 
     unravel: Callable
@@ -105,7 +105,7 @@ class DenseTreeFlatten(ssm_via_api.AbstractTreeFlatten):
         return cls(unravel)
 
 
-class DenseNormal(ssm_via_api.AbstractTreeNormal[DenseTreeFlatten]):
+class DenseNormal(ssm_impl_api.AbstractTreeNormal[DenseTreeFlatten]):
     """Construct a dense implementation of a normal distribution."""
 
     @classmethod
@@ -233,7 +233,7 @@ class DenseNormal(ssm_via_api.AbstractTreeNormal[DenseTreeFlatten]):
 DenseNormal.register_pytree_node()
 
 
-class DenseOdeTs0(ssm_via_api.AbstractOde):
+class DenseOdeTs0(ssm_impl_api.AbstractOde):
     """Construct a dense implementation of ODE-TS0 linearization."""
 
     def init_linearization(self) -> None:
@@ -257,7 +257,7 @@ class DenseOdeTs0(ssm_via_api.AbstractOde):
         return cond, None
 
 
-class DenseOdeTs1(ssm_via_api.AbstractOde):
+class DenseOdeTs1(ssm_impl_api.AbstractOde):
     """Construct a dense implementation of ODE-TS1 linearization."""
 
     def init_linearization(self):
@@ -293,7 +293,7 @@ class DenseOdeTs1(ssm_via_api.AbstractOde):
         return cond, state
 
 
-class DenseResidual(ssm_via_api.AbstractResidual):
+class DenseResidual(ssm_impl_api.AbstractResidual):
     """Construct a dense implementation of residual-TS1 linearization."""
 
     def __init__(self, residual, *, taylor_point) -> None:
@@ -346,7 +346,7 @@ class DenseResidual(ssm_via_api.AbstractResidual):
         return cond, state
 
 
-class state_space_model_dense(ssm_via_api.StateSpaceModel):
+class state_space_model_dense(ssm_impl_api.StateSpaceModel):
     """Dense (full-covariance) state-space model implementation."""
 
     def prior_wiener_integrated(
