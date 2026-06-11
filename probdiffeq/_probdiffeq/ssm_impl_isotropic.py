@@ -354,17 +354,13 @@ class IsotropicOdeTs1(ssm_impl_api.AbstractOde):
 
 
 class IsotropicWienerIntegrated(ssm_impl_api.AbstractPrior):
-    def __init__(self, init, output_scale, /):
+    def __init__(self, init, output_scale, *, A, q_sqrtm, q0, tree_flatten, precon_fun):
         super().__init__(init, output_scale)
-
-        num_derivatives = len(init.mean) - 1
-        (d,) = tree.ravel_pytree(init.mean[0])[0].shape
-        self.num_derivatives = num_derivatives
-        self.d = d
-        self.A, self.q_sqrtm = utilities.system_matrices_1d_iwp(num_derivatives)
-        self.q0 = np.zeros((num_derivatives + 1, d))
-        self.tree_flatten = IsotropicTreeFlatten.from_example(init.mean)
-        self.precon_fun = utilities.preconditioner_taylor(num_derivatives)
+        self.A = A
+        self.q_sqrtm = q_sqrtm
+        self.q0 = q0
+        self.tree_flatten = tree_flatten
+        self.precon_fun = precon_fun
 
     def transition(self, dt, output_scale: Array = 1.0):
         output_scale = np.asarray(output_scale)
@@ -382,13 +378,22 @@ class IsotropicWienerIntegrated(ssm_impl_api.AbstractPrior):
     @staticmethod
     def register_pytree():
         def flatten(iwp):
-            children = (iwp.init, iwp.output_scale)
-            return children, ()
+            children = (iwp.init, iwp.output_scale, iwp.A, iwp.q_sqrtm, iwp.q0)
+            aux = (iwp.tree_flatten, iwp.precon_fun)
+            return children, aux
 
         def unflatten(aux, children):
-            del aux
-            init, output_scale = children
-            return IsotropicWienerIntegrated(init, output_scale)
+            tf, precon_fun = aux
+            init, output_scale, A, q_sqrtm, q0 = children
+            return IsotropicWienerIntegrated(
+                init,
+                output_scale,
+                A=A,
+                q_sqrtm=q_sqrtm,
+                q0=q0,
+                tree_flatten=tf,
+                precon_fun=precon_fun,
+            )
 
         tree.register_pytree_node(IsotropicWienerIntegrated, flatten, unflatten)
 
@@ -458,7 +463,21 @@ class state_space_model_isotropic(ssm_impl_api.StateSpaceModel):
                 msg += f" Received: {output_scale.shape}."
                 raise ValueError(msg)
 
-        return IsotropicWienerIntegrated(init, output_scale)
+        num_derivatives = len(tcoeffs_mean) - 1
+        (d,) = tree.ravel_pytree(tcoeffs_mean[0])[0].shape
+        A, q_sqrtm = utilities.system_matrices_1d_iwp(num_derivatives)
+        q0 = np.zeros((num_derivatives + 1, d))
+        tf = IsotropicTreeFlatten.from_example(tcoeffs_mean)
+        precon_fun = utilities.preconditioner_taylor(num_derivatives)
+        return IsotropicWienerIntegrated(
+            init,
+            output_scale,
+            A=A,
+            q_sqrtm=q_sqrtm,
+            q0=q0,
+            tree_flatten=tf,
+            precon_fun=precon_fun,
+        )
 
     def prior_exponential(
         self,

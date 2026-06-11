@@ -380,15 +380,13 @@ BlockDiagNormal.register_pytree_node()
 
 
 class BlockDiagWienerIntegrated(ssm_impl_api.AbstractPrior):
-    def __init__(self, init, output_scale, /):
+    def __init__(self, init, output_scale, *, a, q_sqrtm, q0, tree_flatten, precon_fun):
         super().__init__(init, output_scale)
-
-        num_derivatives = len(init.mean) - 1
-        self.num_derivatives = num_derivatives
-        self.a, self.q_sqrtm = utilities.system_matrices_1d_iwp(num_derivatives)
-        self.q0 = np.zeros((num_derivatives + 1,))
-        self.precon_fun = utilities.preconditioner_taylor(num_derivatives)
-        self.tree_flatten = BlockDiagTreeFlatten.from_example(init.mean)
+        self.a = a
+        self.q_sqrtm = q_sqrtm
+        self.q0 = q0
+        self.tree_flatten = tree_flatten
+        self.precon_fun = precon_fun
 
     def transition(self, *, dt: float, output_scale: Array) -> BlockDiagLatentCond:
         p, p_inv = self.precon_fun(dt)
@@ -417,13 +415,22 @@ class BlockDiagWienerIntegrated(ssm_impl_api.AbstractPrior):
     @staticmethod
     def register_pytree():
         def flatten(iwp):
-            children = (iwp.init, iwp.output_scale)
-            return children, ()
+            children = (iwp.init, iwp.output_scale, iwp.a, iwp.q_sqrtm, iwp.q0)
+            aux = (iwp.tree_flatten, iwp.precon_fun)
+            return children, aux
 
         def unflatten(aux, children):
-            del aux
-            init, output_scale = children
-            return BlockDiagWienerIntegrated(init, output_scale)
+            tf, precon_fun = aux
+            init, output_scale, a, q_sqrtm, q0 = children
+            return BlockDiagWienerIntegrated(
+                init,
+                output_scale,
+                a=a,
+                q_sqrtm=q_sqrtm,
+                q0=q0,
+                tree_flatten=tf,
+                precon_fun=precon_fun,
+            )
 
         tree.register_pytree_node(BlockDiagWienerIntegrated, flatten, unflatten)
 
@@ -505,7 +512,20 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
 
         output_scale, _ = tree.ravel_pytree(output_scale)
 
-        return BlockDiagWienerIntegrated(init, output_scale)
+        num_derivatives = len(tcoeffs_mean) - 1
+        a, q_sqrtm = utilities.system_matrices_1d_iwp(num_derivatives)
+        q0 = np.zeros((num_derivatives + 1,))
+        tf = BlockDiagTreeFlatten.from_example(tcoeffs_mean)
+        precon_fun = utilities.preconditioner_taylor(num_derivatives)
+        return BlockDiagWienerIntegrated(
+            init,
+            output_scale,
+            a=a,
+            q_sqrtm=q_sqrtm,
+            q0=q0,
+            tree_flatten=tf,
+            precon_fun=precon_fun,
+        )
 
     def prior_exponential(
         self,

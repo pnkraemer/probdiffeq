@@ -348,22 +348,14 @@ class DenseResidual(ssm_impl_api.AbstractResidual):
 
 
 class DenseWienerIntegrated(ssm_impl_api.AbstractPrior):
-    def __init__(self, init, output_scale, /):
+    def __init__(self, init, output_scale, *, d, A, Q, q0, tree_flatten, precon_fun):
         super().__init__(init, output_scale)
-
-        num_derivatives = len(init.mean) - 1
-        a, q_sqrtm = utilities.system_matrices_1d_iwp(num_derivatives)
-
-        single_flat, _single_unravel = tree.ravel_pytree(init.mean[0])
-        (self.d,) = single_flat.shape
-        self.num_derivatives = num_derivatives
-        eye_d = np.eye(self.d)
-        self.A = np.kron(a, eye_d)
-        self.Q = np.kron(q_sqrtm, output_scale)
-
-        self.q0 = np.zeros(((num_derivatives + 1) * self.d,))
-        self.precon_fun = utilities.preconditioner_taylor(num_derivatives)
-        self.tree_flatten = DenseTreeFlatten.from_example(init.mean)
+        self.d = d
+        self.A = A
+        self.Q = Q
+        self.q0 = q0
+        self.tree_flatten = tree_flatten
+        self.precon_fun = precon_fun
 
     def transition(self, *, dt, output_scale):
         output_scale = np.asarray(output_scale)
@@ -384,13 +376,23 @@ class DenseWienerIntegrated(ssm_impl_api.AbstractPrior):
     @staticmethod
     def register_pytree():
         def flatten(iwp):
-            children = (iwp.init, iwp.output_scale)
-            return children, ()
+            children = (iwp.init, iwp.output_scale, iwp.A, iwp.Q, iwp.q0)
+            aux = (iwp.d, iwp.tree_flatten, iwp.precon_fun)
+            return children, aux
 
         def unflatten(aux, children):
-            del aux
-            init, output_scale = children
-            return DenseWienerIntegrated(init, output_scale)
+            d, tf, precon_fun = aux
+            init, output_scale, A, Q, q0 = children
+            return DenseWienerIntegrated(
+                init,
+                output_scale,
+                d=d,
+                A=A,
+                Q=Q,
+                q0=q0,
+                tree_flatten=tf,
+                precon_fun=precon_fun,
+            )
 
         tree.register_pytree_node(DenseWienerIntegrated, flatten, unflatten)
 
@@ -399,33 +401,17 @@ DenseWienerIntegrated.register_pytree()
 
 
 class DenseExponential(ssm_impl_api.AbstractPrior):
-    def __init__(self, init, output_scale, A, B, /):
+    def __init__(
+        self, init, output_scale, A, B, *, d, q0, tree_flatten, precon_fun, exp_gram
+    ):
         super().__init__(init, output_scale)
-
-        # SDE system matrices
         self.A = A
         self.B = B
-
-        # Discretisation parameters (at least those we can already compute)
-        single_flat, _ = tree.ravel_pytree(init.mean[0])
-        (self.d,) = single_flat.shape
-        self.q0 = np.zeros(single_flat.shape)
-
-        # Preconditioner
-        num_derivatives = len(init.mean) - 1
-        self.num_derivatives = num_derivatives
-        self.precon_fun = utilities.preconditioner_taylor(num_derivatives)
-        self.tree_flatten = DenseTreeFlatten.from_example(init.mean)
-
-        # Compute Cholesky of Gram matrix
-        pade_legendre = (
-            gram_util.pade_and_legendre_9()
-            if B.dtype == "float64"
-            else gram_util.pade_and_legendre_5()
-        )
-        self.exp_gram = gram_util.exp_gram_cholesky(
-            pade_legendre=pade_legendre, solve=linalg.solve_lu
-        )
+        self.d = d
+        self.q0 = q0
+        self.tree_flatten = tree_flatten
+        self.precon_fun = precon_fun
+        self.exp_gram = exp_gram
 
     def transition(self, *, dt: float, output_scale: Array):
         output_scale = np.asarray(output_scale)
@@ -452,13 +438,24 @@ class DenseExponential(ssm_impl_api.AbstractPrior):
     @staticmethod
     def register_pytree():
         def flatten(expo):
-            children = (expo.init, expo.output_scale, expo.A, expo.B)
-            return children, ()
+            children = (expo.init, expo.output_scale, expo.A, expo.B, expo.q0)
+            aux = (expo.d, expo.tree_flatten, expo.precon_fun, expo.exp_gram)
+            return children, aux
 
         def unflatten(aux, children):
-            del aux
-            init, output_scale, A, B = children
-            return DenseExponential(init, output_scale, A, B)
+            d, tf, precon_fun, exp_gram = aux
+            init, output_scale, A, B, q0 = children
+            return DenseExponential(
+                init,
+                output_scale,
+                A,
+                B,
+                d=d,
+                q0=q0,
+                tree_flatten=tf,
+                precon_fun=precon_fun,
+                exp_gram=exp_gram,
+            )
 
         tree.register_pytree_node(DenseExponential, flatten, unflatten)
 
@@ -513,7 +510,19 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         init = DenseNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
         single_flat, single_unravel = tree.ravel_pytree(tcoeffs_mean[0])
         Lambda = self._process_base_scale(output_scale, single_flat, single_unravel)
-        return DenseWienerIntegrated(init, Lambda)
+
+        num_derivatives = len(tcoeffs_mean) - 1
+        (d,) = single_flat.shape
+        a, q_sqrtm_1d = utilities.system_matrices_1d_iwp(num_derivatives)
+        eye_d = np.eye(d)
+        A = np.kron(a, eye_d)
+        Q = np.kron(q_sqrtm_1d, Lambda)
+        q0 = np.zeros(((num_derivatives + 1) * d,))
+        tf = DenseTreeFlatten.from_example(tcoeffs_mean)
+        precon_fun = utilities.preconditioner_taylor(num_derivatives)
+        return DenseWienerIntegrated(
+            init, Lambda, d=d, A=A, Q=Q, q0=q0, tree_flatten=tf, precon_fun=precon_fun
+        )
 
     def prior_exponential(
         self,
@@ -605,7 +614,29 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         b = np.eye(num_derivatives + 1)[-1][:, None]
         B = np.kron(b, Lambda)
 
-        return DenseExponential(init, Lambda, A, B)
+        q0 = np.zeros(single_flat.shape)
+        tf = DenseTreeFlatten.from_example(tcoeffs_mean)
+        precon_fun = utilities.preconditioner_taylor(num_derivatives)
+        dtype_str = str(B.dtype)
+        pade_legendre = (
+            gram_util.pade_and_legendre_9()
+            if dtype_str == "float64"
+            else gram_util.pade_and_legendre_5()
+        )
+        exp_gram = gram_util.exp_gram_cholesky(
+            pade_legendre=pade_legendre, solve=linalg.solve_lu
+        )
+        return DenseExponential(
+            init,
+            Lambda,
+            A,
+            B,
+            d=d,
+            q0=q0,
+            tree_flatten=tf,
+            precon_fun=precon_fun,
+            exp_gram=exp_gram,
+        )
 
     def _tcoeffs_standard_deviation(self, tcoeffs_mean, /, *, is_exact, inexact_eps):
 
