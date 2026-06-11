@@ -9,21 +9,34 @@ from probdiffeq.util import test_util
 
 
 @testing.fixture(name="solver_setup")
-@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def fixture_solver_setup(fact):
+@testing.parametrize(
+    "ssm_factory",
+    [
+        probdiffeq.state_space_model_dense,
+        probdiffeq.state_space_model_isotropic,
+        probdiffeq.state_space_model_blockdiag,
+    ],
+)
+def fixture_solver_setup(ssm_factory):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
     vf = probdiffeq.ode(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     tcoeffs, _ = jetexpand(vf, [u0], t=t0)
-    return {"vf": vf, "tcoeffs": tcoeffs, "t0": t0, "t1": t1, "fact": fact}
+    return {
+        "vf": vf,
+        "tcoeffs": tcoeffs,
+        "t0": t0,
+        "t1": t1,
+        "ssm_factory": ssm_factory,
+    }
 
 
 @testing.fixture(name="solution_smoother")
 def fixture_solution_smoother(solver_setup):
-    tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    ssm = probdiffeq.state_space_model(ssm_fact=fact)
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
+    tcoeffs = solver_setup["tcoeffs"]
+    ssm = solver_setup["ssm_factory"]()
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_ode_ts0(solver_setup["vf"])
     strategy = probdiffeq.strategy_smoother_fixedinterval()
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
     error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
@@ -36,10 +49,10 @@ def test_fixedpoint_smoother_equivalent_same_grid(
     solver_setup, solution_smoother
 ) -> None:
     """Test that with save_at=smoother_solution.t, the results should be identical."""
-    tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    ssm = probdiffeq.state_space_model(ssm_fact=fact)
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
+    tcoeffs = solver_setup["tcoeffs"]
+    ssm = solver_setup["ssm_factory"]()
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_ode_ts0(solver_setup["vf"])
     strategy = probdiffeq.strategy_smoother_fixedpoint()
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
     error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
@@ -78,10 +91,10 @@ def test_fixedpoint_smoother_equivalent_different_grid(
     save_at = solution_smoother.t
 
     # Re-generate the smoothing solver
-    tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    ssm = probdiffeq.state_space_model(ssm_fact=fact)
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
+    tcoeffs = solver_setup["tcoeffs"]
+    ssm = solver_setup["ssm_factory"]()
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_ode_ts0(solver_setup["vf"])
     strategy_sm = probdiffeq.strategy_smoother_fixedinterval()
     solver_smoother = probdiffeq.solver(strategy=strategy_sm, prior=iwp, constraint=ts0)
 
@@ -93,10 +106,10 @@ def test_fixedpoint_smoother_equivalent_different_grid(
     interpolated = func.jit(func.vmap(offgrid))(ts[1:-1])
 
     # Generate a fixedpoint solver and solve (saving at the interpolation points)
-    tcoeffs, fact = solver_setup["tcoeffs"], solver_setup["fact"]
-    ssm = probdiffeq.state_space_model(ssm_fact=fact)
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
+    tcoeffs = solver_setup["tcoeffs"]
+    ssm = solver_setup["ssm_factory"]()
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_ode_ts0(solver_setup["vf"])
     strategy_fp = probdiffeq.strategy_smoother_fixedpoint()
     solver = probdiffeq.solver(strategy=strategy_fp, prior=iwp, constraint=ts0)
     error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)

@@ -43,8 +43,8 @@ def main(
 ) -> None:
     """Run the script."""
 
-    @functools.partial(probdiffeq.jet_lift, lift_by=2)
-    @probdiffeq.residual_state_velocity
+    @functools.partial(probdiffeq.residual_jet_lift, lift_by=2)
+    @probdiffeq.residual_velocity
     def differential(u, du, /, *, t):
         del t
         return du[:2] - dynamics(u)
@@ -55,8 +55,8 @@ def main(
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
         return jnp.stack([f0, f1])
 
-    @functools.partial(probdiffeq.jet_lift, lift_by=3)
-    @probdiffeq.residual_state
+    @functools.partial(probdiffeq.residual_jet_lift, lift_by=3)
+    @probdiffeq.residual_position
     def algebraic(u, *, t):
         del t
         return u[0] + u[1] + u[2] - 1
@@ -158,17 +158,13 @@ def solver(residual, tol, while_loop, trafo):
         )
         jetexpand = probdiffeq.jetexpand_residual(num=3, nlstsq=nlstsq)
         tcoeffs, _ = jetexpand(residual, [y0], t=t0)
-        ssm = probdiffeq.state_space_model()
+        ssm = probdiffeq.state_space_model_dense()
 
-        init, prior = probdiffeq.prior_wiener_integrated(
-            tcoeffs, ssm=ssm, output_scale=output_scale
-        )
+        init, prior = ssm.prior_wiener_integrated(tcoeffs, output_scale=output_scale)
 
         # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
         taylor_point = probdiffeq.taylor_point_maximum_a_posteriori(nlstsq)
-        jet = probdiffeq.constraint_residual(
-            residual, ssm=ssm, taylor_point=taylor_point
-        )
+        jet = ssm.constraint_residual(residual, taylor_point=taylor_point)
         strategy = probdiffeq.strategy_smoother_fixedpoint()
         solver_obj = probdiffeq.solver_dynamic(
             strategy=strategy, prior=prior, constraint=jet

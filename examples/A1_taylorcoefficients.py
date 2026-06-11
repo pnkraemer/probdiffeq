@@ -80,9 +80,9 @@ def main():
 
 def solve(vf, tc, *, t0, t1):
     """Solve the ODE."""
-    ssm = probdiffeq.state_space_model(ssm_fact="dense")
-    init, prior = probdiffeq.prior_wiener_integrated(tc, ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
+    ssm = probdiffeq.state_space_model_dense()
+    init, prior = ssm.prior_wiener_integrated(tc)
+    ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
     solver = probdiffeq.solver_mle(strategy=strategy, prior=prior, constraint=ts0)
     ts = jnp.linspace(t0, t1, endpoint=True, num=10)

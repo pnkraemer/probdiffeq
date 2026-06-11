@@ -5,22 +5,29 @@ from probdiffeq.backend import func, linalg, np, ode, testing, tree
 
 
 @testing.fixture(name="solver_setup")
-@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def fixture_solver_setup(fact):
+@testing.parametrize(
+    "ssm_factory",
+    [
+        probdiffeq.state_space_model_dense,
+        probdiffeq.state_space_model_isotropic,
+        probdiffeq.state_space_model_blockdiag,
+    ],
+)
+def fixture_solver_setup(ssm_factory):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
     vf = probdiffeq.ode(vf)
     grid = np.linspace(t0, t1, endpoint=True, num=12)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     tcoeffs, _ = jetexpand(vf, [u0], t=t0)
-    return {"vf": vf, "tcoeffs": tcoeffs, "grid": grid, "fact": fact}
+    return {"vf": vf, "tcoeffs": tcoeffs, "grid": grid, "ssm_factory": ssm_factory}
 
 
 @testing.fixture(name="filter_solution")
 def fixture_filter_solution(solver_setup):
     tcoeffs = solver_setup["tcoeffs"]
-    ssm = probdiffeq.state_space_model(ssm_fact=solver_setup["fact"])
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
+    ssm = solver_setup["ssm_factory"]()
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_ode_ts0(solver_setup["vf"])
     strategy = probdiffeq.strategy_filter()
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
@@ -30,9 +37,9 @@ def fixture_filter_solution(solver_setup):
 @testing.fixture(name="smoother_solution")
 def fixture_smoother_solution(solver_setup):
     tcoeffs = solver_setup["tcoeffs"]
-    ssm = probdiffeq.state_space_model(ssm_fact=solver_setup["fact"])
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(solver_setup["vf"], ssm=ssm)
+    ssm = solver_setup["ssm_factory"]()
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_ode_ts0(solver_setup["vf"])
     strategy = probdiffeq.strategy_smoother_fixedinterval()
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
     solve = ivpsolve.solve_fixed_grid(solver=solver)

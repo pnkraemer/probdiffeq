@@ -128,16 +128,14 @@ def loss_log_marginal_likelihood(vf, *, t0):
         """Loss function: log-marginal likelihood of the data."""
         # Build a solver
         tcoeffs = (*u0, vf(*u0, t=t0, p=p))
-        ssm = probdiffeq.state_space_model(ssm_fact="dense")
-        init, iwp = probdiffeq.prior_wiener_integrated(
-            tcoeffs, ssm=ssm, output_scale=output_scale
-        )
+        ssm = probdiffeq.state_space_model_dense()
+        init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=output_scale)
 
         @probdiffeq.ode
         def vf_p(y, /, *, t):
             return vf(y, t=t, p=p)
 
-        ts0 = probdiffeq.constraint_ode_ts0(vf_p, ssm=ssm)
+        ts0 = ssm.constraint_ode_ts0(vf_p)
         strategy = probdiffeq.strategy_smoother_fixedinterval()
         solver_ts0 = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
 

@@ -4,8 +4,15 @@ from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, testing, tree
 
 
-@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def test_output_matches_reference(fact) -> None:
+@testing.parametrize(
+    "ssm_factory",
+    [
+        probdiffeq.state_space_model_dense,
+        probdiffeq.state_space_model_isotropic,
+        probdiffeq.state_space_model_blockdiag,
+    ],
+)
+def test_output_matches_reference(ssm_factory) -> None:
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     # Don't try all solvers because they're tested in a different file.
@@ -13,11 +20,11 @@ def test_output_matches_reference(fact) -> None:
     vf = probdiffeq.ode(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
     tcoeffs, _ = jetexpand(vf, u0, t=t0)
-    ssm = probdiffeq.state_space_model(ssm_fact=fact)
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
+    ssm = ssm_factory()
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
 
     strategy = probdiffeq.strategy_smoother_fixedpoint()
-    constraint = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
+    constraint = ssm.constraint_ode_ts0(vf)
     solver = probdiffeq.solver_dynamic(
         strategy=strategy, prior=iwp, constraint=constraint
     )

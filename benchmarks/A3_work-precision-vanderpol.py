@@ -99,12 +99,12 @@ def solve_ivp_once():
 def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
-    @probdiffeq.ode_second_order
+    @probdiffeq.ode_order_two
     def vf_probdiffeq(u, du, *, t):  # noqa: ARG001
         """Van-der-Pol dynamics as a second-order differential equation."""
         return 1e5 * ((1.0 - u**2) * du - u)
 
-    @probdiffeq.residual_state_velocity_acceleration
+    @probdiffeq.residual_acceleration
     def residual(u, du, ddu, /, *, t):
         """Evaluate a residual to solve the 2nd-order problem directly."""
         return ddu - vf_probdiffeq(u, du, t=t)
@@ -119,9 +119,9 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives - 1)
         tcoeffs, _ = jetexpand(vf_probdiffeq, (u0, du0), t=t0)
 
-        ssm = probdiffeq.state_space_model(ssm_fact="dense")
-        init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-        ts = probdiffeq.constraint_residual(residual, ssm=ssm)
+        ssm = probdiffeq.state_space_model_dense()
+        init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+        ts = ssm.constraint_residual(residual)
         strategy = probdiffeq.strategy_filter()
 
         solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts)

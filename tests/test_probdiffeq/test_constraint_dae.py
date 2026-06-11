@@ -30,9 +30,9 @@ def solve_ode(inits, num):
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num)
     tcoeffs, _ = jetexpand(vf_ode, inits, t=0.0)
 
-    ssm = probdiffeq.state_space_model(ssm_fact="dense")
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(vf_ode, ssm=ssm)
+    ssm = probdiffeq.state_space_model_dense()
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_ode_ts0(vf_ode)
     strategy = probdiffeq.strategy_filter()
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
     error = probdiffeq.error_state_std(constraint=ts0, prior=iwp)
@@ -46,15 +46,15 @@ def solve_ode(inits, num):
 def solve_dae(inits, num):
     """Solve the SIR model as a DAE."""
 
-    @func.partial(probdiffeq.jet_lift, lift_by=num)
-    @probdiffeq.residual_state
+    @func.partial(probdiffeq.residual_jet_lift, lift_by=num)
+    @probdiffeq.residual_position
     def algebraic(u, /, *, t):
         del t
         N = 1.0  # total population
         return u[0] + u[1] + u[2] - N
 
-    @func.partial(probdiffeq.jet_lift, lift_by=num - 1)
-    @probdiffeq.residual_state_velocity
+    @func.partial(probdiffeq.residual_jet_lift, lift_by=num - 1)
+    @probdiffeq.residual_velocity
     def differential(u, du, /, *, t):
         del t
         beta, gamma = 2.0, 0.5
@@ -73,9 +73,9 @@ def solve_dae(inits, num):
     jetexpand = probdiffeq.jetexpand_residual(num=num)
     tcoeffs, _ = jetexpand(residual, inits, t=0.0)
 
-    ssm = probdiffeq.state_space_model(ssm_fact="dense")
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_residual(residual, ssm=ssm)
+    ssm = probdiffeq.state_space_model_dense()
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_residual(residual)
     strategy = probdiffeq.strategy_filter()
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
     error = probdiffeq.error_state_std(constraint=ts0, prior=iwp)

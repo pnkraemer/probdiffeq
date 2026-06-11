@@ -127,7 +127,7 @@ def solve_ivp_once(*, save_at, method, tol):
 def solver_ode(*, num_derivatives: int, time_span) -> Callable:
     """Construct a method that solves Robertson as an ODE."""
 
-    @probdiffeq.residual_state_velocity
+    @probdiffeq.residual_velocity
     def residual(u, du, /, *, t):
         return du - vf(u, t=t)
 
@@ -149,13 +149,11 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
         jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives - 1)
         tcoeffs, _ = jetexpand(vf, (y0,), t=t0)
 
-        ssm = probdiffeq.state_space_model()
+        ssm = probdiffeq.state_space_model_dense()
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
-        init, iwp = probdiffeq.prior_wiener_integrated(
-            tcoeffs, output_scale=base_scale, ssm=ssm
-        )
-        ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
+        init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=base_scale)
+        ts = ssm.constraint_ode_ts1(vf)
         strategy = probdiffeq.strategy_filter()
 
         solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts)
@@ -172,8 +170,8 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
 def solver_residual(*, num_derivatives: int, time_span) -> Callable:
     """Construct a method that solves Robertson as a DAE."""
 
-    @functools.partial(probdiffeq.jet_lift, lift_by=num_derivatives - 1)
-    @probdiffeq.residual_state_velocity
+    @functools.partial(probdiffeq.residual_jet_lift, lift_by=num_derivatives - 1)
+    @probdiffeq.residual_velocity
     def differential(u, du, /, *, t):
         del t
         return du[:2] - dynamics(u)
@@ -184,8 +182,8 @@ def solver_residual(*, num_derivatives: int, time_span) -> Callable:
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
         return jnp.stack([f0, f1])
 
-    @functools.partial(probdiffeq.jet_lift, lift_by=num_derivatives)
-    @probdiffeq.residual_state
+    @functools.partial(probdiffeq.residual_jet_lift, lift_by=num_derivatives)
+    @probdiffeq.residual_position
     def algebraic(u, *, t):
         del t
         return u[0] + u[1] + u[2] - 1
@@ -202,18 +200,14 @@ def solver_residual(*, num_derivatives: int, time_span) -> Callable:
         jetexpand = probdiffeq.jetexpand_residual(nlstsq=nlstsq, num=num_derivatives)
         tcoeffs, _ = jetexpand(residual, y0, t=t0)
 
-        ssm = probdiffeq.state_space_model()
+        ssm = probdiffeq.state_space_model_dense()
 
         base_scale = jnp.asarray([1e0, 1e-5, 1e-1])
-        init, iwp = probdiffeq.prior_wiener_integrated(
-            tcoeffs, output_scale=base_scale, ssm=ssm
-        )
+        init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=base_scale)
 
         # We build a Jet constraint
         taylor_point = probdiffeq.taylor_point_maximum_a_posteriori(nlstsq)
-        jet = probdiffeq.constraint_residual(
-            residual, taylor_point=taylor_point, ssm=ssm
-        )
+        jet = ssm.constraint_residual(residual, taylor_point=taylor_point)
         strategy = probdiffeq.strategy_filter()
 
         # For proper DAEs, non-iterated solver's simply don't cut it

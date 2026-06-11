@@ -4,11 +4,14 @@ from probdiffeq import probdiffeq
 from probdiffeq.backend import np, testing
 
 
-@testing.parametrize("ssm_fact", ["isotropic", "dense"])
-def test_transitions_are_correct_in_1d(ssm_fact) -> None:
+@testing.parametrize(
+    "ssm_factory",
+    [probdiffeq.state_space_model_isotropic, probdiffeq.state_space_model_dense],
+)
+def test_transitions_are_correct_in_1d(ssm_factory) -> None:
     tcoeffs = [2.0, 3.0, 4.0, 5.0]
-    ssm = probdiffeq.state_space_model(ssm_fact=ssm_fact)
-    _init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
+    ssm = ssm_factory()
+    _init, iwp = ssm.prior_wiener_integrated(tcoeffs)
 
     cond = iwp(1.0, 1.0)
     A_expected = np.asarray(
@@ -36,8 +39,8 @@ def test_transitions_are_correct_in_1d(ssm_fact) -> None:
 # Separate test because conditional shapes differ
 def test_transitions_are_correct_in_1d_blockdiag() -> None:
     tcoeffs = [2.0, 3.0, 4.0, 5.0]
-    ssm = probdiffeq.state_space_model(ssm_fact="blockdiag")
-    _init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
+    ssm = probdiffeq.state_space_model_blockdiag()
+    _init, iwp = ssm.prior_wiener_integrated(tcoeffs)
 
     cond = iwp(1.0, np.ones((1,)))
     A_expected = np.asarray(

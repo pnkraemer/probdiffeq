@@ -1,4 +1,4 @@
-from probdiffeq._ssm_impl import interfaces, utilities
+from probdiffeq._probdiffeq import problems, ssm_impl_api, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
@@ -16,19 +16,11 @@ C = TypeVar("C", bound=Sequence)
 For example, this variable is used to type Taylor coefficients.
 """
 
-__all__ = [
-    "IsotropicLatentCond",
-    "IsotropicLinearizationFactory",
-    "IsotropicNormal",
-    "IsotropicOdeTs0",
-    "IsotropicOdeTs1",
-    "IsotropicPriorFactory",
-    "IsotropicTreeFlatten",
-]
+__all__ = ["state_space_model_isotropic"]
 
 
 @structs.dataclass
-class IsotropicTreeFlatten(interfaces.AbstractTreeFlatten):
+class IsotropicTreeFlatten(ssm_impl_api.AbstractTreeFlatten):
     """Flattening information for isotropic random variables."""
 
     # The treedef of the target
@@ -76,7 +68,7 @@ class IsotropicTreeFlatten(interfaces.AbstractTreeFlatten):
         return cls(treedef, unravel_leaf)
 
 
-class IsotropicLatentCond(interfaces.AbstractLatentCond):
+class IsotropicLatentCond(ssm_impl_api.AbstractLatentCond):
     """Isotropic (scalar-variance) implementation of LatentCond operations."""
 
     def apply_flat(self, x, /):
@@ -150,7 +142,7 @@ class IsotropicLatentCond(interfaces.AbstractLatentCond):
 IsotropicLatentCond._register_as_pytree()
 
 
-class IsotropicNormal(interfaces.AbstractTreeNormal[IsotropicTreeFlatten]):
+class IsotropicNormal(ssm_impl_api.AbstractTreeNormal[IsotropicTreeFlatten]):
     """Construct an isotropic normal distribution."""
 
     @classmethod
@@ -302,40 +294,101 @@ class IsotropicNormal(interfaces.AbstractTreeNormal[IsotropicTreeFlatten]):
 IsotropicNormal.register_pytree_node()
 
 
-class IsotropicPriorFactory(interfaces.AbstractPriorFactory):
-    """Implementation of isotropic prior constructors."""
+class IsotropicOdeTs0(ssm_impl_api.AbstractOde):
+    """Construct an isotropic implementation of ODE-TS0 linearization."""
 
-    def wiener_integrated(
+    def init_linearization(self) -> None:
+        return None
+
+    def linearize(self, rv, state: None, *, damp: float, t):
+        del state
+        Ms = rv.mean
+        jet_coords = Ms[: self.ode.num_tcoeffs_in_args]
+        fx_tree = self.ode.vector_field(jet_coords=jet_coords, t=t)
+        fx = tree.tree_map(lambda s: -s, fx_tree)
+
+        bias = IsotropicNormal.from_dirac([fx], damp=damp)
+
+        linop = func.jacrev(lambda s: s[[self.ode.num_tcoeffs_in_args], ...])(
+            rv.mean_flat[..., 0]
+        )
+        cond = IsotropicLatentCond.from_linop_and_noise(linop, bias)
+        return cond, None
+
+
+class IsotropicOdeTs1(ssm_impl_api.AbstractOde):
+    """Construct an isotropic implementation of ODE-TS1 linearization."""
+
+    def init_linearization(self):
+        return self.ode.jacobian.init_jacobian_handler()
+
+    def linearize(self, rv, state, *, damp: float, t):
+
+        # Evaluate the linearisation
+        m0 = rv.mean_flat[0]
+
+        m0_tree = rv.mean[0]
+        rv0 = IsotropicNormal.from_dirac([m0_tree], damp=0.0)
+
+        def vf_ravel(s):
+            s_tree = rv0.tree_flatten.unflatten_array(s[None])
+            fs = self.ode.vector_field(jet_coords=s_tree, t=t)
+            return tree.ravel_pytree(fs)[0]
+
+        # Estimate the trace using Hutchinson's estimator
+        fx, J_trace, state = self.ode.jacobian.calculate_trace(vf_ravel, m0, state)
+
+        # Best Jacobian approximation: mean of diagonal = trace / len(diagonal)
+        J_trace /= len(fx)
+
+        n, _d = rv.mean_flat.shape
+        eye = np.eye(n)
+        E0, E1 = eye[np.asarray([0])], eye[np.asarray([1])]
+        linop = E1 - J_trace * E0
+        fx = rv.mean_flat[1, ...] - fx
+        fx = fx - linop @ rv.mean_flat
+        fx = rv0.tree_flatten.unflatten_array(fx)
+
+        # Turn fx and J_trace into an observation model
+        noise = IsotropicNormal.from_dirac(fx, damp=damp)
+        cond = IsotropicLatentCond.from_linop_and_noise(linop, noise)
+        return cond, state
+
+
+class state_space_model_isotropic(ssm_impl_api.StateSpaceModel):
+    """Isotropic (scalar-variance) state-space model implementation."""
+
+    def prior_wiener_integrated(
         self,
         tcoeffs_mean: C,
         /,
         *,
-        is_exact: C | bool,
-        inexact_eps: float,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        is_exact: C | bool = True,
+        inexact_eps: float = 1e-6,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
         tcoeffs_std = self._tcoeffs_standard_deviation(
             tcoeffs_mean, is_exact=is_exact, inexact_eps=inexact_eps
         )
-        return self.wiener_integrated_diffuse(
+        return self.prior_wiener_integrated_diffuse(
             tcoeffs_mean,
             tcoeffs_std,
             diffuse_derivatives=diffuse_derivatives,
             diffuse_eps=diffuse_eps,
-            base_scale=base_scale,
+            output_scale=output_scale,
         )
 
-    def wiener_integrated_diffuse(
+    def prior_wiener_integrated_diffuse(
         self,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
         *,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
         if diffuse_derivatives > 0:
             tcoeffs_mean, tcoeffs_std = self._add_diffuse_derivatives(
@@ -348,21 +401,23 @@ class IsotropicPriorFactory(interfaces.AbstractPriorFactory):
         # Construct the initial variable from the mean and std
         init = IsotropicNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)
 
-        if base_scale is None:
-            base_scale = np.ones(())
+        if output_scale is None:
+            output_scale = np.ones(())
         else:
-            if tree.tree_structure(base_scale) != tree.tree_structure(1.0):
+            if tree.tree_structure(output_scale) != tree.tree_structure(1.0):
                 msg = "The 'base_scale' argument has an unexpected PyTree structure."
                 msg += f" Expected: {tree.tree_structure(1.0)}."
-                msg += f" Received: {tree.tree_structure(base_scale)}."
+                msg += f" Received: {tree.tree_structure(output_scale)}."
                 raise TypeError(msg)
 
-            base_scale = np.asarray(base_scale)
-            if base_scale.shape != ():
+            output_scale = np.asarray(output_scale)
+            if output_scale.shape != ():
                 msg = "The base-scale has the wrong shape."
                 msg += f" Expected: {()}."
-                msg += f" Received: {base_scale.shape}."
+                msg += f" Received: {output_scale.shape}."
                 raise ValueError(msg)
+
+        base_scale = output_scale
 
         num_derivatives = len(tcoeffs_mean) - 1
         (d,) = tree.ravel_pytree(tcoeffs_mean[0])[0].shape
@@ -388,46 +443,37 @@ class IsotropicPriorFactory(interfaces.AbstractPriorFactory):
 
         return init, discretise
 
-    def exponential(
+    def prior_exponential(
         self,
+        ode,
         tcoeffs_mean: C,
         /,
         *,
-        vf_linear,
-        is_exact: C | bool,
-        inexact_eps: float,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        is_exact: C | bool = True,
+        inexact_eps: float = 1e-6,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
-        del tcoeffs_mean
-        del vf_linear
-        del is_exact
-        del inexact_eps
-        del diffuse_derivatives
-        del diffuse_eps
-        del base_scale
+        del ode, tcoeffs_mean, is_exact, inexact_eps, diffuse_derivatives
+        del diffuse_eps, output_scale
         msg = "Isotropic exponential priors have not been implemented (yet.)."
         msg += " If you need them, reach out."
         raise NotImplementedError(msg)
 
-    def exponential_diffuse(
+    def prior_exponential_diffuse(
         self,
+        ode,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
         *,
-        vf_linear,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
-        del tcoeffs_mean
-        del tcoeffs_std
-        del vf_linear
-        del diffuse_derivatives
-        del diffuse_eps
-        del base_scale
+        del ode, tcoeffs_mean, tcoeffs_std, diffuse_derivatives
+        del diffuse_eps, output_scale
         msg = "Isotropic exponential priors have not been implemented (yet.)."
         msg += " If you need them, reach out."
         raise NotImplementedError(msg)
@@ -482,80 +528,18 @@ class IsotropicPriorFactory(interfaces.AbstractPriorFactory):
         tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
         return tcoeffs_mean, tcoeffs_std
 
-
-class IsotropicLinearizationFactory(interfaces.AbstractLinearizationFactory):
-    """Construct an isotropic linearization-factory."""
-
-    def residual(self, *, residual, taylor_point):
-        raise NotImplementedError
-
-    def ode_taylor_1st(self, *, ode):
-        if ode.num_derivatives_in_args > 1:
-            msg = "This linearization is not compatible with high-order ODEs as of yet."
-            raise ValueError(msg)
-
-        return IsotropicOdeTs1(ode=ode)
-
-    def ode_taylor_0th(self, *, ode):
+    def constraint_ode_ts0(self, ode: problems.ODEFunction, /) -> IsotropicOdeTs0:
+        if not isinstance(ode, problems.ODEFunction):
+            raise TypeError(ode)
         return IsotropicOdeTs0(ode=ode)
 
+    def constraint_ode_ts1(self, ode: problems.ODEFunction, /) -> IsotropicOdeTs1:
+        if not isinstance(ode, problems.ODEFunction):
+            raise TypeError(ode)
+        if ode.num_tcoeffs_in_args > 1:
+            msg = "This linearization is not compatible with high-order ODEs as of yet."
+            raise ValueError(msg)
+        return IsotropicOdeTs1(ode=ode)
 
-class IsotropicOdeTs0(interfaces.AbstractOde):
-    """Construct an isotropic implementation of ODE-TS0 linearization."""
-
-    def init_linearization(self) -> None:
-        return None
-
-    def linearize(self, rv, state: None, *, damp: float, t):
-        del state
-        Ms = rv.mean
-        jet_coords = Ms[: self.ode.num_derivatives_in_args]
-        fx_tree = self.ode.vector_field(jet_coords=jet_coords, t=t)
-        fx = tree.tree_map(lambda s: -s, fx_tree)
-
-        bias = IsotropicNormal.from_dirac([fx], damp=damp)
-
-        linop = func.jacrev(lambda s: s[[self.ode.num_derivatives_in_args], ...])(
-            rv.mean_flat[..., 0]
-        )
-        cond = IsotropicLatentCond.from_linop_and_noise(linop, bias)
-        return cond, None
-
-
-class IsotropicOdeTs1(interfaces.AbstractOde):
-    """Construct an isotropic implementation of ODE-TS1 linearization."""
-
-    def init_linearization(self):
-        return self.ode.jacobian.init_jacobian_handler()
-
-    def linearize(self, rv, state, *, damp: float, t):
-
-        # Evaluate the linearisation
-        m0 = rv.mean_flat[0]
-
-        m0_tree = rv.mean[0]
-        rv0 = IsotropicNormal.from_dirac([m0_tree], damp=0.0)
-
-        def vf_ravel(s):
-            s_tree = rv0.tree_flatten.unflatten_array(s[None])
-            fs = self.ode.vector_field(jet_coords=s_tree, t=t)
-            return tree.ravel_pytree(fs)[0]
-
-        # Estimate the trace using Hutchinson's estimator
-        fx, J_trace, state = self.ode.jacobian.calculate_trace(vf_ravel, m0, state)
-
-        # Best Jacobian approximation: mean of diagonal = trace / len(diagonal)
-        J_trace /= len(fx)
-
-        n, _d = rv.mean_flat.shape
-        eye = np.eye(n)
-        E0, E1 = eye[np.asarray([0])], eye[np.asarray([1])]
-        linop = E1 - J_trace * E0
-        fx = rv.mean_flat[1, ...] - fx
-        fx = fx - linop @ rv.mean_flat
-        fx = rv0.tree_flatten.unflatten_array(fx)
-
-        # Turn fx and J_trace into an observation model
-        noise = IsotropicNormal.from_dirac(fx, damp=damp)
-        cond = IsotropicLatentCond.from_linop_and_noise(linop, noise)
-        return cond, state
+    def constraint_residual(self, residual: problems.Residual, *, taylor_point=None):
+        raise NotImplementedError

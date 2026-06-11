@@ -1,17 +1,22 @@
+from probdiffeq._probdiffeq import problems
 from probdiffeq.backend import abc, func, np, tree
-from probdiffeq.backend.typing import Array, Generic, Sequence, TypeVar
+from probdiffeq.backend.typing import (
+    TYPE_CHECKING,
+    Array,
+    Callable,
+    Generic,
+    Sequence,
+    TypeVar,
+)
 
-__all__ = [
-    "AbstractLatentCond",
-    "AbstractLinearization",
-    "AbstractLinearizationFactory",
-    "AbstractOde",
-    "AbstractPriorFactory",
-    "AbstractResidual",
-    "AbstractTreeFlatten",
-    "AbstractTreeNormal",
-]
+if TYPE_CHECKING:
+    from probdiffeq._probdiffeq import taylor_points
 
+__all__ = ["StateSpaceModel"]
+
+
+R = TypeVar("R", bound=Array)
+"""A fallback type-variable to cover what isn't covered by the others."""
 
 T = TypeVar("T", bound=Array)
 """A type-variable for Array types.
@@ -133,6 +138,14 @@ AbstractLatentCond._register_as_pytree()
 class AbstractLinearization(abc.ABC):
     """Interface for linearizations."""
 
+    residual_order: int
+    """The order of the root-constraint.
+
+    Here, 'order' relates to the highest derivative that the constraint depends on;
+    for instance, in first-order ODEs, the residual_order would be two; and in
+    second-order ODEs, the residual_order would be three.
+    """
+
     @abc.abstractmethod
     def init_linearization(self):
         """Initialize a linearization."""
@@ -149,11 +162,7 @@ class AbstractResidual(AbstractLinearization):
 
     def __init__(self, residual, /) -> None:
         self.residual = residual
-
-    @property
-    def residual_order(self):
-        """The order of the residual constraint."""
-        return self.residual.num_derivatives_in_args
+        self.residual_order = self.residual.num_tcoeffs_in_args
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(residual={self.residual})"
@@ -164,36 +173,10 @@ class AbstractOde(AbstractLinearization):
 
     def __init__(self, *, ode) -> None:
         self.ode = ode
+        self.residual_order = self.ode.num_tcoeffs_in_args + 1
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(ode={self.ode})"
-
-    @property
-    def residual_order(self):
-        """The order of the residual constraint."""
-        return self.ode.num_derivatives_in_args + 1
-
-
-class AbstractLinearizationFactory(abc.ABC):
-    """Interface for linearization factories."""
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}()"
-
-    @abc.abstractmethod
-    def residual(self, residual, *, taylor_point) -> AbstractResidual:
-        """Construct an implementation of 1st-order Taylor-linearization for residuals."""
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def ode_taylor_0th(self, *, ode) -> AbstractOde:
-        """Construct an implementation of 0th-order Taylor-linearization for ODEs."""
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def ode_taylor_1st(self, *, ode) -> AbstractOde:
-        """Construct an implementation of 1st-order Taylor-linearization for ODEs."""
-        raise NotImplementedError
 
 
 class AbstractTreeFlatten(abc.ABC):
@@ -300,66 +283,207 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
         raise NotImplementedError
 
 
-class AbstractPriorFactory(abc.ABC):
-    """Interface for prior constructions."""
+class StateSpaceModel(abc.ABC):
+    """Abstract base for factorised Markovian state-space model implementations.
+
+    Construct via `state_space_model_dense`, `state_space_model_blockdiag`,
+    or `state_space_model_isotropic`.
+    """
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
 
+    # --- Prior constructors ---
+
     @abc.abstractmethod
-    def wiener_integrated(
+    def prior_wiener_integrated(
         self,
-        tcoeffs_mean: C,
+        tcoeffs: C,
         /,
         *,
-        is_exact: C | bool,
-        inexact_eps: float,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        is_exact: C | bool = True,
+        inexact_eps: float = 1e-6,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
-        """Construct the transitions for an integrated Wiener process."""
+        """Construct an integrated Wiener process prior."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def wiener_integrated_diffuse(
+    def prior_wiener_integrated_diffuse(
         self,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
         *,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
-        """Construct the transitions for an integrated Wiener process."""
+        """Construct a diffuse integrated Wiener process prior."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def exponential(
+    def prior_exponential(
         self,
-        tcoeffs_mean: C,
+        ode: problems.ODEFunctionAutonomous,
+        tcoeffs: C,
         /,
         *,
-        vf_linear: Array,
-        is_exact: C | bool,
-        inexact_eps: float,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        is_exact: C | bool = True,
+        inexact_eps: float = 1e-6,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
+        """Construct an exponential integrator prior.
+
+        According to https://arxiv.org/abs/2305.14978, but following the numerical
+        methods from https://arxiv.org/abs/2310.13462.
+        """
         raise NotImplementedError
 
     @abc.abstractmethod
-    def exponential_diffuse(
+    def prior_exponential_diffuse(
         self,
+        ode: problems.ODEFunctionAutonomous,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
         *,
-        vf_linear: Array,
-        diffuse_derivatives: int,
-        diffuse_eps: float,
-        base_scale: Array | None,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
     ):
+        """Construct a diffuse exponential integrator prior.
+
+        According to https://arxiv.org/abs/2305.14978, but following the numerical
+        methods from https://arxiv.org/abs/2310.13462.
+        """
+        raise NotImplementedError
+
+    def prior_ornstein_uhlenbeck_integrated(
+        self,
+        linop: Callable[[R], R],
+        tcoeffs: C,
+        /,
+        *,
+        is_exact: C | bool = True,
+        inexact_eps: float = 1e-6,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
+    ):
+        """Construct an integrated Ornstein-Uhlenbeck prior."""
+
+        def autonomous(*, jet_coords):
+            return linop(jet_coords[-1])
+
+        ode: problems.ODEFunctionAutonomous = problems.ODEFunctionAutonomous(
+            autonomous,
+            jacobian=problems.jacobian_materialize(),
+            num_tcoeffs_in_args=len(tcoeffs),
+        )
+        return self.prior_exponential(
+            ode,
+            tcoeffs,
+            is_exact=is_exact,
+            inexact_eps=inexact_eps,
+            diffuse_derivatives=diffuse_derivatives,
+            diffuse_eps=diffuse_eps,
+            output_scale=output_scale,
+        )
+
+    def prior_ornstein_uhlenbeck_integrated_diffuse(
+        self,
+        linop: Callable[[R], R],
+        tcoeffs_mean: C,
+        tcoeffs_std: C,
+        /,
+        *,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
+    ):
+        """Construct a diffuse integrated Ornstein-Uhlenbeck prior."""
+
+        def autonomous(*, jet_coords):
+            return linop(jet_coords[-1])
+
+        ode: problems.ODEFunctionAutonomous = problems.ODEFunctionAutonomous(
+            autonomous,
+            jacobian=problems.jacobian_materialize(),
+            num_tcoeffs_in_args=len(tcoeffs_mean),
+        )
+        return self.prior_exponential_diffuse(
+            ode,
+            tcoeffs_mean,
+            tcoeffs_std,
+            diffuse_derivatives=diffuse_derivatives,
+            diffuse_eps=diffuse_eps,
+            output_scale=output_scale,
+        )
+
+    # --- Linearization constructors ---
+
+    @abc.abstractmethod
+    def constraint_ode_ts0(self, ode: problems.ODEFunction, /) -> AbstractOde:
+        r"""Create an ODE constraint with zeroth-order Taylor linearisation.
+
+        This constraint handles ODEs of the form
+
+        $$
+        \frac{d^k}{dt^k} u(t) = f\left(u(t), \frac{du}{dt}(t), ..., t\right)
+        $$
+
+        where $k$ is the order of the ODE.
+
+        Related: :class:`probdiffeq._probdiffeq.ssm_impl_api.AbstractLinearization`.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def constraint_ode_ts1(self, ode: problems.ODEFunction, /) -> AbstractOde:
+        r"""Create an ODE constraint and linearise with a first-order Taylor approximation.
+
+        This constraint handles ODEs of the form
+
+        $$
+        \frac{d^k}{dt^k} u(t) = f\left(u(t), \frac{du}{dt}(t), ..., t\right)
+        $$
+
+        where $k$ is the order of the ODE.
+
+        Related: :class:`probdiffeq._probdiffeq.ssm_impl_api.AbstractLinearization`.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def constraint_residual(
+        self,
+        residual: problems.Residual,
+        *,
+        taylor_point: "taylor_points.TaylorPoint | None" = None,
+    ) -> AbstractResidual:
+        r"""Construct a general constraint.
+
+        This constraint handles problems of the form
+
+        $$
+        f\left(u(t), \frac{du}{dt}(t), ..., t\right) = 0
+        $$
+
+        !!! warning "Warning: highly EXPERIMENTAL feature!"
+            This function is highly experimental and not safe to use.
+
+        Parameters
+        ----------
+        residual
+            The residual to apply linearization to.
+        taylor_point
+            The strategy to use for finding the linearization point. If None,
+            the prior mean is used as the linearization point.
+
+        """
         raise NotImplementedError

@@ -26,7 +26,7 @@ def fixture_problem_with_solution():
 
     path = "./tests/test_probdiffeq/test_jetexpand/data/van_der_pol_second_solution.npy"
     solution = np.load(path)
-    return (probdiffeq.ode_second_order(vf), (u0, du0), t0), solution
+    return (probdiffeq.ode_order_two(vf), (u0, du0), t0), solution
 
 
 @testing.parametrize_with_cases("taylor_fun", cases=".", prefix="case_")

@@ -4,10 +4,17 @@ from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, testing
 
 
-@testing.parametrize("fact", ["dense", "isotropic", "blockdiag"])
-def test_solution_is_accurate(fact):
+@testing.parametrize(
+    "ssm_factory",
+    [
+        probdiffeq.state_space_model_dense,
+        probdiffeq.state_space_model_isotropic,
+        probdiffeq.state_space_model_blockdiag,
+    ],
+)
+def test_solution_is_accurate(ssm_factory):
 
-    @probdiffeq.ode_second_order
+    @probdiffeq.ode_order_two
     def vf(u, du, /, *, t):
         del t
         del du
@@ -16,9 +23,9 @@ def test_solution_is_accurate(fact):
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     tcoeffs, _ = jetexpand(vf, (1.0, 0.0), t=0.0)
 
-    ssm = probdiffeq.state_space_model(ssm_fact=fact)
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
+    ssm = ssm_factory()
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_filter()
     solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
     error = probdiffeq.error_state_std(constraint=ts0, prior=iwp)

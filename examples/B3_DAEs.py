@@ -28,7 +28,7 @@ def main(t0=1e-6, t1=1e5) -> None:
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
 
-    @probdiffeq.residual_state_velocity
+    @probdiffeq.residual_velocity
     def differential(u, du, /, *, t):
         del t
         return du[:2] - dynamics(u)
@@ -39,12 +39,12 @@ def main(t0=1e-6, t1=1e5) -> None:
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
         return jnp.stack([f0, f1])
 
-    @probdiffeq.residual_state
+    @probdiffeq.residual_position
     def algebraic(u, *, t):
         del t
         return u[0] + u[1] + u[2] - 1
 
-    ssm = probdiffeq.state_space_model()
+    ssm = probdiffeq.state_space_model_dense()
 
     jetexpand = probdiffeq.jetexpand_residual(num=4)
     residual = probdiffeq.residual_from_stack(differential, algebraic)
@@ -54,13 +54,11 @@ def main(t0=1e-6, t1=1e5) -> None:
     # the solutions live on vastly different scales
     # (but don't vary much within these scales).
     base_scale = jnp.asarray([0.8, 2e-05, 0.2])
-    init, ioup = probdiffeq.prior_wiener_integrated(
-        tcoeffs, ssm=ssm, output_scale=base_scale
-    )
+    init, ioup = ssm.prior_wiener_integrated(tcoeffs, output_scale=base_scale)
 
     # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
     taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
-    jet = probdiffeq.constraint_residual(residual, ssm=ssm, taylor_point=taylor_point)
+    jet = ssm.constraint_residual(residual, taylor_point=taylor_point)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
     solver = probdiffeq.solver_dynamic(strategy=strategy, prior=ioup, constraint=jet)
 

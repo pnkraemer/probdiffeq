@@ -13,8 +13,12 @@ def test_residual_init_matches_expectation_on_sir_model(num):
     expected, _ = jetexpand_ode(vf_ode, y0, t=0.0)
 
     # Residual via DAE
-    differential_lifted = probdiffeq.jet_lift(differential, lift_by=len(expected) - 2)
-    algebraic_lifted = probdiffeq.jet_lift(algebraic, lift_by=len(expected) - 1)
+    differential_lifted = probdiffeq.residual_jet_lift(
+        differential, lift_by=len(expected) - 2
+    )
+    algebraic_lifted = probdiffeq.residual_jet_lift(
+        algebraic, lift_by=len(expected) - 1
+    )
     residual = probdiffeq.residual_from_stack(differential_lifted, algebraic_lifted)
 
     # Jet expansion
@@ -37,14 +41,14 @@ def vf_ode(y, /, *, t):
     return np.stack([f0, f1, f2])
 
 
-@probdiffeq.residual_state
+@probdiffeq.residual_position
 def algebraic(u, /, *, t):
     del t
     N = 1.0  # total population
     return u[0] + u[1] + u[2] - N
 
 
-@probdiffeq.residual_state_velocity
+@probdiffeq.residual_velocity
 def differential(u, du, /, *, t):
     del t
     beta, gamma = 2.0, 0.5

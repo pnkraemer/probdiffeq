@@ -23,9 +23,9 @@ def main():
     u0 = jnp.asarray(1.0)
 
     tcoeffs = (u0, vf(u0, t=t0))
-    ssm = probdiffeq.state_space_model(ssm_fact="dense")
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm, output_scale=1.0)
-    ts1 = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
+    ssm = probdiffeq.state_space_model_dense()
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=1.0)
+    ts1 = ssm.constraint_ode_ts1(vf)
     strategy = probdiffeq.strategy_filter()
     dynamic = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts1)
     mle = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts1)

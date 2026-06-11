@@ -125,7 +125,7 @@ def _pleiades():
     )
     # fmt: on
 
-    @probdiffeq.ode_second_order
+    @probdiffeq.ode_order_two
     def vf_probdiffeq(u, du, *, t):
         """Pleiades problem."""
         del du

@@ -30,9 +30,9 @@ def main():
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
 
     # Construct a state-space model factorisation
-    ssm = probdiffeq.state_space_model()
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
-    ode_ts1 = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
+    ssm = probdiffeq.state_space_model_dense()
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    ode_ts1 = ssm.constraint_ode_ts1(vf)
 
     # Build the rest of the solver
     strategy = probdiffeq.strategy_filter()

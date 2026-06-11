@@ -37,11 +37,9 @@ def main():
 
     # Set up the first-order solver (for illustration).
     tcoeffs = [u0_1st]
-    ssm = probdiffeq.state_space_model()
-    init, iwp = probdiffeq.prior_wiener_integrated(
-        tcoeffs, diffuse_derivatives=2, ssm=ssm
-    )
-    ts1 = probdiffeq.constraint_ode_ts1(vf_1st, ssm=ssm)
+    ssm = probdiffeq.state_space_model_dense()
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs, diffuse_derivatives=2)
+    ts1 = ssm.constraint_ode_ts1(vf_1st)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
     solver_1st = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts1)
     error = probdiffeq.error_state_std(constraint=ts1, prior=iwp)
@@ -59,13 +57,11 @@ def main():
     # But for low-order solvers, custom residuals work well.
     u0, du0 = jnp.split(u0_1st, 2)
     tcoeffs = [u0, du0]
-    ssm = probdiffeq.state_space_model()
-    init, iwp = probdiffeq.prior_wiener_integrated(
-        tcoeffs, diffuse_derivatives=1, ssm=ssm
-    )
+    ssm = probdiffeq.state_space_model_dense()
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs, diffuse_derivatives=1)
 
     # Use this constraint function for custom residuals:
-    residual_constraint = probdiffeq.constraint_residual(residual, ssm=ssm)
+    residual_constraint = ssm.constraint_residual(residual)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
     solver_2nd = probdiffeq.solver_mle(
         strategy=strategy, prior=iwp, constraint=residual_constraint
@@ -128,7 +124,7 @@ def hamiltonian_2nd(u, du):
     return kinetic + potential
 
 
-@probdiffeq.residual_state_velocity_acceleration
+@probdiffeq.residual_acceleration
 def residual(u, du, ddu, /, *, t):
     """Evaluate a custom residual for the harmonic oscillator."""
     deriv = ddu - vf_2nd(u, du, t=t)

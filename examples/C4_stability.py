@@ -39,18 +39,16 @@ def main():
     A = jnp.asarray([[-0.5, 20], [0, -20]])
 
     # Set up a state-space model over Taylor coefficients
-    ssm = probdiffeq.state_space_model()
+    ssm = probdiffeq.state_space_model_dense()
 
     # Build a solver
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=3)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
     strategy = probdiffeq.strategy_smoother_fixedinterval()
-    _init, ioup = probdiffeq.prior_ornstein_uhlenbeck_integrated(
-        lambda s: A @ s, tcoeffs, ssm=ssm
-    )
-    ts0 = probdiffeq.constraint_ode_ts0(vf, ssm=ssm)
-    ts1 = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
+    _init, ioup = ssm.prior_ornstein_uhlenbeck_integrated(lambda s: A @ s, tcoeffs)
+    ts0 = ssm.constraint_ode_ts0(vf)
+    ts1 = ssm.constraint_ode_ts1(vf)
 
     # Prepare the plot
     _fig, axes = plt.subplots(ncols=4, figsize=(13, 3), constrained_layout=True)

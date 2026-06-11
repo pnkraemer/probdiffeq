@@ -29,11 +29,11 @@ def main() -> None:
 
     # Set up a state-space model
     tcoeffs = [u0, vf(u0, t=t0)]
-    ssm = probdiffeq.state_space_model(ssm_fact="blockdiag")
-    init, iwp = probdiffeq.prior_wiener_integrated(tcoeffs, ssm=ssm)
+    ssm = probdiffeq.state_space_model_blockdiag()
+    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
 
     # Build a solver
-    ts = probdiffeq.constraint_ode_ts1(vf, ssm=ssm)
+    ts = ssm.constraint_ode_ts1(vf)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
     solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts)
     error = probdiffeq.error_residual_std(constraint=ts, prior=iwp)
