@@ -160,24 +160,22 @@ def solver(residual, tol, while_loop, trafo):
         tcoeffs, _ = jetexpand(residual, [y0], t=t0)
         ssm = probdiffeq.state_space_model_dense()
 
-        init, prior = ssm.prior_wiener_integrated(tcoeffs, output_scale=output_scale)
+        prior = ssm.prior_wiener_integrated(tcoeffs, output_scale=output_scale)
 
         # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
         taylor_point = probdiffeq.taylor_point_maximum_a_posteriori(nlstsq)
         jet = ssm.constraint_residual(residual, taylor_point=taylor_point)
         strategy = probdiffeq.strategy_smoother_fixedpoint()
-        solver_obj = probdiffeq.solver_dynamic(
-            strategy=strategy, prior=prior, constraint=jet
-        )
+        solver_obj = probdiffeq.solver_dynamic(strategy=strategy, constraint=jet)
 
         # The state-error-estimate doesn't care about the dimension
         # of the DAE, which is exactly what we need here
-        error = probdiffeq.error_state_std(constraint=jet, prior=prior)
+        error = probdiffeq.error_state_std(constraint=jet)
 
         solve_fn = ivpsolve.solve_adaptive_save_at(
             solver=solver_obj, error=error, while_loop=while_loop
         )
-        return solve_fn(init, save_at=save_at, atol=tol, rtol=tol)
+        return solve_fn(prior, save_at=save_at, atol=tol, rtol=tol)
 
     return solve
 

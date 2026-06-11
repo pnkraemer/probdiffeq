@@ -66,6 +66,8 @@ class ProbabilisticSolution(Generic[N, T]):
     and error estimates.
     """
 
+    prior: ssm_impl_api.AbstractPrior
+
 
 class ProbabilisticSolver:
     """An interface for probabilistic differential equation solvers.
@@ -81,12 +83,10 @@ class ProbabilisticSolver:
         self,
         *,
         strategy: estimators_and_losses.MarkovStrategy,
-        prior: Callable,
         constraint: ssm_impl_api.AbstractLinearization,
         constraint_init: ssm_impl_api.AbstractLinearization | None,
     ) -> None:
         self.strategy = strategy
-        self.prior = prior
         self.constraint = constraint
         self.constraint_init = constraint_init
 
@@ -174,8 +174,9 @@ class ProbabilisticSolver:
         if not self.is_suitable_for_offgrid_marginals:
             raise NotImplementedError
 
-        transition_t0_t = self.prior(t - t0, output_scale)
-        transition_t_t1 = self.prior(t1 - t, output_scale)
+        prior_at_t0 = _extract_previous(solution.prior)
+        transition_t0_t = prior_at_t0.discretize(t - t0, output_scale)
+        transition_t_t1 = prior_at_t0.discretize(t1 - t, output_scale)
         (estimate, _posterior), _interp_res = self.strategy.interpolate(
             posterior_t0=posterior_t0,
             posterior_t1=posterior_t1,
@@ -190,8 +191,8 @@ class ProbabilisticSolver:
         """Interpolate between two solution objects."""
         # Domain is (t0, t1]; thus, take the output scale from interp_to
         output_scale = interp_to.output_scale
-        transition_t0_t = self.prior(t - interp_from.t, output_scale)
-        transition_t_t1 = self.prior(interp_to.t - t, output_scale)
+        transition_t0_t = interp_from.prior.discretize(t - interp_from.t, output_scale)
+        transition_t_t1 = interp_from.prior.discretize(interp_to.t - t, output_scale)
 
         # Interpolate
         tmp = self.strategy.interpolate(
@@ -212,6 +213,7 @@ class ProbabilisticSolver:
             auxiliary=interp_to.auxiliary,
             num_steps=interp_to.num_steps,
             fun_evals=interp_to.fun_evals,
+            prior=interp_to.prior,
         )
 
         interpolated = ProbabilisticSolution(
@@ -224,6 +226,7 @@ class ProbabilisticSolver:
             auxiliary=interp_to.auxiliary,
             num_steps=interp_to.num_steps,
             fun_evals=interp_to.fun_evals,
+            prior=interp_to.prior,
         )
 
         interp_from = ProbabilisticSolution(
@@ -236,6 +239,7 @@ class ProbabilisticSolver:
             auxiliary=interp_from.auxiliary,
             num_steps=interp_from.num_steps,
             fun_evals=interp_from.fun_evals,
+            prior=interp_from.prior,
         )
 
         interp_res = utilities.InterpResult(
@@ -261,6 +265,7 @@ class ProbabilisticSolver:
             auxiliary=interp_from.auxiliary,
             num_steps=interp_from.num_steps,
             fun_evals=interp_from.fun_evals,
+            prior=interp_from.prior,
         )
         sol = ProbabilisticSolution(
             t=interp_to.t,
@@ -272,6 +277,7 @@ class ProbabilisticSolver:
             auxiliary=interp_to.auxiliary,
             num_steps=interp_to.num_steps,
             fun_evals=interp_to.fun_evals,
+            prior=interp_to.prior,
         )
         acc = ProbabilisticSolution(
             t=interp_to.t,
@@ -283,6 +289,7 @@ class ProbabilisticSolver:
             auxiliary=interp_to.auxiliary,
             num_steps=interp_to.num_steps,
             fun_evals=interp_to.fun_evals,
+            prior=interp_to.prior,
         )
         return sol, utilities.InterpResult(step_from=acc, interp_from=prev)
 
@@ -299,24 +306,21 @@ class solver_mle(ProbabilisticSolver):
         self,
         *,
         constraint: ssm_impl_api.AbstractLinearization,
-        prior: Callable,
         strategy: estimators_and_losses.MarkovStrategy,
         constraint_init: ssm_impl_api.AbstractLinearization | None = None,
         correct_asymptotic_underconfidence: bool = True,
     ) -> None:
         super().__init__(
-            strategy=strategy,
-            prior=prior,
-            constraint=constraint,
-            constraint_init=constraint_init,
+            strategy=strategy, constraint=constraint, constraint_init=constraint_init
         )
         self.correct_asymptotic_underconfidence = correct_asymptotic_underconfidence
 
-    def init(self, t, u, *, damp) -> ProbabilisticSolution:
-        u_pred, prediction = self.strategy.init_posterior(u=u)
+    def init(self, t, u: ssm_impl_api.AbstractPrior, *, damp) -> ProbabilisticSolution:
+        prior = u
+        u_pred, prediction = self.strategy.init_posterior(u=u.init)
         cstate = self.constraint.init_linearization()
 
-        prototype = u.prototype_output_scale_calibrated()
+        prototype = u_pred.prototype_output_scale_calibrated()
         output_scale_prior = np.ones_like(prototype)
 
         # Update
@@ -355,13 +359,14 @@ class solver_mle(ProbabilisticSolver):
             output_scale=output_scale_prior,
             num_steps=0,
             fun_evals=fx,
+            prior=prior,
         )
 
     def step(self, state, *, dt: float, damp: float):
         # Discretize
         prototype = state.u.prototype_output_scale_calibrated()
         output_scale = np.ones_like(prototype)
-        transition = self.prior(dt, output_scale)
+        transition = state.prior.discretize(dt, output_scale)
 
         # Predict
         u, prediction = self.strategy.predict(
@@ -398,6 +403,7 @@ class solver_mle(ProbabilisticSolver):
             auxiliary=auxiliary,
             num_steps=state.num_steps + 1,
             fun_evals=fx,
+            prior=state.prior,
         )
 
     def userfriendly_output(
@@ -435,6 +441,7 @@ class solver_mle(ProbabilisticSolver):
             num_steps=solution.num_steps,
             auxiliary=solution.auxiliary,
             fun_evals=solution.fun_evals,
+            prior=solution.prior,
         )
 
 
@@ -449,23 +456,20 @@ class solver_dynamic(ProbabilisticSolver):
         self,
         *,
         strategy: estimators_and_losses.MarkovStrategy,
-        prior: Callable,
         constraint: ssm_impl_api.AbstractLinearization,
         constraint_init: ssm_impl_api.AbstractLinearization | None = None,
         re_linearize_after_calibration=False,
         stop_gradient_through_calibration=True,
     ) -> None:
         super().__init__(
-            strategy=strategy,
-            prior=prior,
-            constraint=constraint,
-            constraint_init=constraint_init,
+            strategy=strategy, constraint=constraint, constraint_init=constraint_init
         )
         self.re_linearize_after_calibration = re_linearize_after_calibration
         self.stop_gradient_through_calibration = stop_gradient_through_calibration
 
-    def init(self, t, u, *, damp) -> ProbabilisticSolution:
-        u_pred, prediction = self.strategy.init_posterior(u=u)
+    def init(self, t, u: ssm_impl_api.AbstractPrior, *, damp) -> ProbabilisticSolution:
+        prior = u
+        u_pred, prediction = self.strategy.init_posterior(u=u.init)
         lin_state = self.constraint.init_linearization()
 
         prototype = u_pred.prototype_output_scale_calibrated()
@@ -494,6 +498,7 @@ class solver_dynamic(ProbabilisticSolver):
             output_scale=output_scale,
             num_steps=0,
             fun_evals=fx,
+            prior=prior,
         )
 
     def step(self, state: ProbabilisticSolution, *, dt: float, damp: float):
@@ -502,7 +507,7 @@ class solver_dynamic(ProbabilisticSolver):
         # Calibrate the output scale
         prototype = state.u.prototype_output_scale_calibrated()
         ones = np.ones_like(prototype)
-        transition = self.prior(dt, ones)
+        transition = state.prior.discretize(dt, ones)
         mean = state.u.mean_flat
         u = transition.apply_flat(mean)
 
@@ -520,7 +525,7 @@ class solver_dynamic(ProbabilisticSolver):
 
         # Do the full extrapolation with the calibrated output scale
         # (Includes re-discretisation)
-        transition = self.prior(dt, output_scale)
+        transition = state.prior.discretize(dt, output_scale)
         u, prediction = self.strategy.predict(
             state.solution_full, transition=transition
         )
@@ -545,6 +550,7 @@ class solver_dynamic(ProbabilisticSolver):
             auxiliary=lin_state,
             output_scale=output_scale,
             fun_evals=fx,  # return the initial linearization
+            prior=state.prior,
         )
 
     def userfriendly_output(
@@ -561,7 +567,7 @@ class solver_dynamic(ProbabilisticSolver):
             posterior0=init, posterior=posterior, output_scale=output_scale
         )
 
-        # TODO: stack the calibrated output scales?
+        # TODO: stack the calibrated output scales instead of ones?
         output_scale = ones
         ts = np.concatenate([solution0.t[None], solution.t])
         return ProbabilisticSolution(
@@ -572,6 +578,7 @@ class solver_dynamic(ProbabilisticSolver):
             num_steps=solution.num_steps,
             auxiliary=solution.auxiliary,
             fun_evals=solution.fun_evals,
+            prior=solution.prior,
         )
 
 
@@ -596,19 +603,18 @@ class solver(ProbabilisticSolver):
         self,
         *,
         constraint: ssm_impl_api.AbstractLinearization,
-        prior: Callable,
         strategy: estimators_and_losses.MarkovStrategy,
         constraint_init: ssm_impl_api.AbstractLinearization | None = None,
     ) -> None:
         super().__init__(
-            strategy=strategy,
-            prior=prior,
-            constraint=constraint,
-            constraint_init=constraint_init,
+            strategy=strategy, constraint=constraint, constraint_init=constraint_init
         )
 
-    def init(self, t: Array, u, *, damp) -> ProbabilisticSolution:
-        u_pred, prediction = self.strategy.init_posterior(u=u)
+    def init(
+        self, t: Array, u: ssm_impl_api.AbstractPrior, *, damp
+    ) -> ProbabilisticSolution:
+        prior = u
+        u_pred, prediction = self.strategy.init_posterior(u=u.init)
 
         if self.constraint_init is not None:
             cstate_init = self.constraint_init.init_linearization()
@@ -629,7 +635,7 @@ class solver(ProbabilisticSolver):
         fx, _cstate = func.eval_shape(lin_fun, u_pred, cstate)
         fx = tree.tree_map(np.zeros_like, fx)
 
-        prototype = u.prototype_output_scale_calibrated()
+        prototype = u_pred.prototype_output_scale_calibrated()
         output_scale = np.ones_like(prototype)
         return ProbabilisticSolution(
             t=t,
@@ -639,12 +645,13 @@ class solver(ProbabilisticSolver):
             auxiliary=cstate,
             output_scale=output_scale,
             fun_evals=fx,
+            prior=prior,
         )
 
     def step(self, state: ProbabilisticSolution, *, dt, damp):
         # Discretize
         output_scale = np.ones_like(state.output_scale)
-        transition = self.prior(dt, output_scale)
+        transition = state.prior.discretize(dt, output_scale)
 
         # Predict
         u_pred, prediction = self.strategy.predict(
@@ -671,6 +678,7 @@ class solver(ProbabilisticSolver):
             auxiliary=auxiliary,
             num_steps=state.num_steps + 1,
             fun_evals=fx,
+            prior=state.prior,
         )
 
     def userfriendly_output(
@@ -699,6 +707,7 @@ class solver(ProbabilisticSolver):
             num_steps=solution.num_steps,
             auxiliary=solution.auxiliary,
             fun_evals=solution.fun_evals,
+            prior=solution.prior,
         )
 
 
@@ -842,7 +851,6 @@ class error_residual_std(ErrorEstimator):
         self,
         *,
         constraint: ssm_impl_api.AbstractLinearization,
-        prior: Any,
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default
         error_per_unit_step: bool = False,
@@ -852,7 +860,6 @@ class error_residual_std(ErrorEstimator):
 
         self.error_norm = error_norm
         self.constraint = constraint
-        self.prior = prior
         self.re_linearize_before_error = re_linearize_before_error
         self.error_per_unit_step = error_per_unit_step
 
@@ -874,7 +881,7 @@ class error_residual_std(ErrorEstimator):
         # since the error is multiplied with a local scale estimate anyway
         prototype = proposed.u.prototype_output_scale_calibrated()
         output_scale = np.ones_like(prototype)
-        transition = self.prior(dt, output_scale)
+        transition = previous.prior.discretize(dt, output_scale)
 
         # Extrapolate from the zero-error state
         mean = previous.u.mean_flat
@@ -939,7 +946,6 @@ class error_state_std(ErrorEstimator):
         self,
         *,
         constraint: ssm_impl_api.AbstractLinearization,
-        prior: Any,
         error_norm: Callable | None = None,
         re_linearize_before_error: bool = False,  # cache by default
         derivative_idx: int = 0,
@@ -950,7 +956,6 @@ class error_state_std(ErrorEstimator):
 
         self.error_norm = error_norm
         self.constraint = constraint
-        self.prior = prior
         self.re_linearize_before_error = re_linearize_before_error
         self.derivative_idx = derivative_idx
         self.error_per_unit_step = error_per_unit_step
@@ -973,7 +978,7 @@ class error_state_std(ErrorEstimator):
         # since the error is multiplied with a local scale estimate anyway
         prototype = proposed.u.prototype_output_scale_calibrated()
         output_scale = np.ones_like(prototype)
-        transition = self.prior(dt, output_scale)
+        transition = previous.prior.discretize(dt, output_scale)
 
         # Extrapolate from the zero-error state
         mean = previous.u.mean_flat

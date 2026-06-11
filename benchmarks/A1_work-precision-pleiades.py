@@ -158,11 +158,11 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         tcoeffs, _ = jetexpand(vf_probdiffeq, (u0, du0), t=t0)
 
         ssm = probdiffeq.state_space_model_isotropic()
-        init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+        iwp = ssm.prior_wiener_integrated(tcoeffs)
         ts = ssm.constraint_ode_ts0(vf_probdiffeq)
         strategy = probdiffeq.strategy_filter()
-        solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts)
-        error = probdiffeq.error_residual_std(constraint=ts, prior=iwp)
+        solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=ts)
+        error = probdiffeq.error_residual_std(constraint=ts)
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
@@ -171,7 +171,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
 
         # Solve
         dt0 = ivpsolve.dt0(vf_probdiffeq, (u0, du0), t=t0)
-        solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-3 * tol, rtol=tol)
+        solution = solve(iwp, t0=t0, t1=t1, dt0=dt0, atol=1e-3 * tol, rtol=tol)
 
         # Return the terminal value
         return jax.block_until_ready(solution.u.mean[0])

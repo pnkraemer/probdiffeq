@@ -31,15 +31,15 @@ def fixture_pn_solution(ssm_factory):
     coeffs, _ = jetexpand(vf, u0, t=t0)
     tcoeffs = Taylor(*coeffs)
     ssm = ssm_factory()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
 
     ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_filter()
-    solver = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts0)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
+    solver = probdiffeq.solver_mle(strategy=strategy, constraint=ts0)
+    error = probdiffeq.error_residual_std(constraint=ts0)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
     save_at = np.linspace(t0, t1, endpoint=True, num=5)
-    return func.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
+    return func.jit(solve)(iwp, save_at=save_at, atol=1e-2, rtol=1e-2)
 
 
 def test_u_inherits_data_structure(pn_solution) -> None:

@@ -361,6 +361,8 @@ class IsotropicWienerIntegrated(ssm_impl_api.AbstractPrior):
 
         num_derivatives = len(init.mean) - 1
         (d,) = tree.ravel_pytree(init.mean[0])[0].shape
+        self.num_derivatives = num_derivatives
+        self.d = d
         self.A, self.q_sqrtm = utilities.system_matrices_1d_iwp(num_derivatives)
         self.q0 = np.zeros((num_derivatives + 1, d))
         self.tree_flatten = IsotropicTreeFlatten.from_example(init.mean)
@@ -378,6 +380,33 @@ class IsotropicWienerIntegrated(ssm_impl_api.AbstractPrior):
         noise = IsotropicNormal(self.q0, scale * self.q_sqrtm, self.tree_flatten)
         p, p_inv = self.precon_fun(dt)
         return IsotropicLatentCond(self.A, noise, to_latent=p_inv, to_observed=p)
+
+    @staticmethod
+    def register_pytree():
+        def flatten(iwp):
+            children = (iwp.init, iwp.output_scale, iwp.A, iwp.q_sqrtm, iwp.q0)
+            aux = (iwp.num_derivatives, iwp.d, iwp.tree_flatten)
+            return children, aux
+
+        def unflatten(aux, children):
+            num_derivatives, d, tf = aux
+            init, output_scale, A, q_sqrtm, q0 = children
+            obj = object.__new__(IsotropicWienerIntegrated)
+            obj.init = init
+            obj.output_scale = output_scale
+            obj.num_derivatives = num_derivatives
+            obj.d = d
+            obj.A = A
+            obj.q_sqrtm = q_sqrtm
+            obj.q0 = q0
+            obj.tree_flatten = tf
+            obj.precon_fun = utilities.preconditioner_taylor(num_derivatives)
+            return obj
+
+        tree.register_pytree_node(IsotropicWienerIntegrated, flatten, unflatten)
+
+
+IsotropicWienerIntegrated.register_pytree()
 
 
 class state_space_model_isotropic(ssm_impl_api.StateSpaceModel):

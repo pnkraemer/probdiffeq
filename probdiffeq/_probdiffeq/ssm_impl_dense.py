@@ -354,6 +354,7 @@ class DenseWienerIntegrated(ssm_impl_api.AbstractPrior):
 
         single_flat, _single_unravel = tree.ravel_pytree(init.mean[0])
         (self.d,) = single_flat.shape
+        self.num_derivatives = num_derivatives
         eye_d = np.eye(self.d)
         self.A = np.kron(a, eye_d)
         self.Q = np.kron(q_sqrtm, Lambda)
@@ -363,23 +364,119 @@ class DenseWienerIntegrated(ssm_impl_api.AbstractPrior):
         self.tree_flatten = DenseTreeFlatten.from_example(init.mean)
 
     def discretize(self, dt, output_scale=1.0):
-        output_scale = self._process_calibrated_scale(output_scale, self.output_scale)
-
-        p, p_inv = self.precon_fun(dt)
-        p = np.repeat(p, self.d)
-        p_inv = np.repeat(p_inv, self.d)
-
-        noise = DenseNormal(self.q0, output_scale * self.Q, self.tree_flatten)
-        return DenseLatentCond(self.A, noise, to_latent=p_inv, to_observed=p)
-
-    def _process_calibrated_scale(self, output_scale, Lambda):
         output_scale = np.asarray(output_scale)
         if output_scale.shape != ():
             msg = "The output-scale has the wrong shape."
             msg += f" Expected: {()}."
             msg += f" Received: {output_scale.shape}."
             raise ValueError(msg)
-        return output_scale * Lambda
+        p, p_inv = self.precon_fun(dt)
+        p = np.repeat(p, self.d)
+        p_inv = np.repeat(p_inv, self.d)
+        noise = DenseNormal(self.q0, output_scale * self.Q, self.tree_flatten)
+        return DenseLatentCond(self.A, noise, to_latent=p_inv, to_observed=p)
+
+    @staticmethod
+    def register_pytree():
+        def flatten(iwp):
+            children = (iwp.init, iwp.output_scale, iwp.A, iwp.Q, iwp.q0)
+            aux = (iwp.num_derivatives, iwp.d, iwp.tree_flatten)
+            return children, aux
+
+        def unflatten(aux, children):
+            num_derivatives, d, tf = aux
+            init, output_scale, A, Q, q0 = children
+            obj = object.__new__(DenseWienerIntegrated)
+            obj.init = init
+            obj.output_scale = output_scale
+            obj.num_derivatives = num_derivatives
+            obj.d = d
+            obj.A = A
+            obj.Q = Q
+            obj.q0 = q0
+            obj.tree_flatten = tf
+            obj.precon_fun = utilities.preconditioner_taylor(num_derivatives)
+            return obj
+
+        tree.register_pytree_node(DenseWienerIntegrated, flatten, unflatten)
+
+
+DenseWienerIntegrated.register_pytree()
+
+
+class DenseExponential(ssm_impl_api.AbstractPrior):
+    def __init__(self, init, Lambda, A, B, /):
+        super().__init__(init, Lambda)
+        self.A = A
+        self.B = B
+        single_flat, _ = tree.ravel_pytree(init.mean[0])
+        (self.d,) = single_flat.shape
+        num_derivatives = len(init.mean) - 1
+        self.num_derivatives = num_derivatives
+        self.precon_fun = utilities.preconditioner_taylor(num_derivatives)
+        self.tree_flatten = DenseTreeFlatten.from_example(init.mean)
+        leaves_flat, _ = tree.ravel_pytree(init.mean)
+        self.q0 = np.zeros(leaves_flat.shape)
+        dtype_str = str(B.dtype)
+        pade_legendre = (
+            gram_util.pade_and_legendre_9()
+            if dtype_str == "float64"
+            else gram_util.pade_and_legendre_5()
+        )
+        self.exp_gram = gram_util.exp_gram_cholesky(
+            pade_legendre=pade_legendre, solve=linalg.solve_lu
+        )
+
+    def discretize(self, dt, output_scale=1.0):
+        output_scale = np.asarray(output_scale)
+        if output_scale.shape != ():
+            msg = "The output-scale has the wrong shape."
+            msg += f" Expected: {()}."
+            msg += f" Received: {output_scale.shape}."
+            raise ValueError(msg)
+        p, p_inv = self.precon_fun(dt)
+        p = np.repeat(p, self.d)
+        p_inv = np.repeat(p_inv, self.d)
+        A_p = dt * p_inv[:, None] * self.A * p[None, :]
+        B_p = np.sqrt(dt) * p_inv[:, None] * self.B
+        eA, L = self.exp_gram(A_p, B_p)
+        noise = DenseNormal(self.q0, output_scale * L, self.tree_flatten)
+        return DenseLatentCond(eA, noise, to_latent=p_inv, to_observed=p)
+
+    @staticmethod
+    def register_pytree():
+        def flatten(exp):
+            children = (exp.init, exp.output_scale, exp.A, exp.B, exp.q0)
+            aux = (exp.num_derivatives, exp.d, exp.tree_flatten, str(exp.B.dtype))
+            return children, aux
+
+        def unflatten(aux, children):
+            num_derivatives, d, tf, dtype_str = aux
+            init, output_scale, A, B, q0 = children
+            obj = object.__new__(DenseExponential)
+            obj.init = init
+            obj.output_scale = output_scale
+            obj.A = A
+            obj.B = B
+            obj.d = d
+            obj.num_derivatives = num_derivatives
+            obj.tree_flatten = tf
+            obj.q0 = q0
+            obj.precon_fun = utilities.preconditioner_taylor(num_derivatives)
+            pade_legendre = (
+                gram_util.pade_and_legendre_9()
+                if dtype_str == "float64"
+                else gram_util.pade_and_legendre_5()
+            )
+            obj.exp_gram = gram_util.exp_gram_cholesky(
+                pade_legendre=pade_legendre, solve=linalg.solve_lu
+            )
+            return obj
+
+        tree.register_pytree_node(DenseExponential, flatten, unflatten)
+
+
+DenseExponential.register_pytree()
 
 
 class state_space_model_dense(ssm_impl_api.StateSpaceModel):
@@ -521,39 +618,7 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         b = np.eye(num_derivatives + 1)[-1][:, None]
         B = np.kron(b, Lambda)
 
-        precon_fun = utilities.preconditioner_taylor(num_derivatives=num_derivatives)
-
-        # TODO: find a good default. Always using high orders seems wasteful.
-        pade_legendre = (
-            gram_util.pade_and_legendre_9()
-            if B.dtype == "float64"
-            else gram_util.pade_and_legendre_5()
-        )
-
-        # Pascal matrices are upper triangular so we use a dedicated solver
-        exp_gram = gram_util.exp_gram_cholesky(
-            pade_legendre=pade_legendre, solve=linalg.solve_lu
-        )
-        q0 = np.zeros(leaves_flat.shape)
-
-        # TODO: why is there a default argument for output_scale?
-        def discretize(dt, output_scale=1.0):
-            output_scale = self._process_calibrated_scale(output_scale)
-
-            p, p_inv = precon_fun(dt)
-            p = np.repeat(p, d)
-            p_inv = np.repeat(p_inv, d)
-
-            # Precondition. (I've not seen a big impact, but we do it anyway)
-            A_p = dt * p_inv[:, None] * A * p[None, :]
-            B_p = np.sqrt(dt) * p_inv[:, None] * B
-
-            eA, L = exp_gram(A_p, B_p)
-            tree_flatten = DenseTreeFlatten.from_example(tcoeffs_mean)
-            noise = DenseNormal(q0, output_scale * L, tree_flatten)
-            return DenseLatentCond(eA, noise, to_latent=p_inv, to_observed=p)
-
-        return init, discretize
+        return DenseExponential(init, Lambda, A, B)
 
     def _tcoeffs_standard_deviation(self, tcoeffs_mean, /, *, is_exact, inexact_eps):
 

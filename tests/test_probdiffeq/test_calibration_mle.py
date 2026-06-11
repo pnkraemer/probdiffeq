@@ -25,15 +25,15 @@ def case_solve_fixed_grid(ssm_factory):
     tcoeffs, _ = jetexpand(vf, u0, t=t0)
 
     ssm = ssm_factory()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf)
     grid = np.linspace(t0, t1, endpoint=True, num=5)
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun()
-        solver = solver_fun(strategy=strategy, prior=iwp, constraint=ts0)
+        solver = solver_fun(strategy=strategy, constraint=ts0)
         solve = ivpsolve.solve_fixed_grid(solver=solver)
-        return func.jit(solve)(init, grid=grid)
+        return func.jit(solve)(iwp, grid=grid)
 
     return solver_to_solution
 
@@ -57,15 +57,15 @@ def case_simulate_terminal_values(ssm_factory):
     dt0 = ivpsolve.dt0(vf, u0, t=t0)
 
     ssm = ssm_factory()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf)
 
     def solver_to_solution(solver_fun, strategy_fun):
         strategy = strategy_fun()
-        solver = solver_fun(strategy=strategy, prior=iwp, constraint=ts0)
-        error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
+        solver = solver_fun(strategy=strategy, constraint=ts0)
+        error = probdiffeq.error_residual_std(constraint=ts0)
         solve = ivpsolve.solve_adaptive_terminal_values(error=error, solver=solver)
-        return func.jit(solve)(init, t0=t0, t1=t1, dt0=dt0, atol=1e-2, rtol=1e-2)
+        return func.jit(solve)(iwp, t0=t0, t1=t1, dt0=dt0, atol=1e-2, rtol=1e-2)
 
     return solver_to_solution
 

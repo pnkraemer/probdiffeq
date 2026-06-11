@@ -144,11 +144,11 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
 
         # Build a solver
         ssm = probdiffeq.state_space_model_dense()
-        init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+        iwp = ssm.prior_wiener_integrated(tcoeffs)
         strategy = probdiffeq.strategy_filter()
         ts = ssm.constraint_ode_ts1(vf_probdiffeq)
-        solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts)
-        error = probdiffeq.error_residual_std(constraint=ts, prior=iwp)
+        solver = probdiffeq.solver(strategy=strategy, constraint=ts)
+        error = probdiffeq.error_residual_std(constraint=ts)
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
@@ -157,7 +157,7 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
 
         # Solve
         dt0 = ivpsolve.dt0(vf_probdiffeq, (u0,), t=t0)
-        solution = solve(init, t0=t0, t1=t1, dt0=dt0, atol=1e-2 * tol, rtol=tol)
+        solution = solve(iwp, t0=t0, t1=t1, dt0=dt0, atol=1e-2 * tol, rtol=tol)
 
         # Return the terminal value
         return solution.u.mean[0], solution.num_steps

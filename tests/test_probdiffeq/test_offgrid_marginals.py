@@ -22,22 +22,22 @@ def test_save_at_result_matches_interpolated_adaptive_result(ssm_factory) -> Non
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     tcoeffs, _ = jetexpand(vf, u0, t=t0)
     ssm = ssm_factory()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_filter()
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
+    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
+    error = probdiffeq.error_residual_std(constraint=ts0)
 
     # Compute an adaptive solution and interpolate
     ts = np.linspace(t0, t1, num=15, endpoint=True)
     solve = test_util.solve_adaptive_save_every_step(error=error, solver=solver)
-    save_every = solve(init, t0=t0, t1=t1, dt0=0.1, atol=1e-2, rtol=1e-2)
+    save_every = solve(iwp, t0=t0, t1=t1, dt0=0.1, atol=1e-2, rtol=1e-2)
     offgrid = func.vmap(lambda s: solver.offgrid_marginals(s, solution=save_every))
     u_interpolated = func.jit(offgrid)(ts[1:-1])
 
     # Compute a save-at solution and remove the edge-points
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
-    save_at = func.jit(solve)(init, atol=1e-2, rtol=1e-2, save_at=ts, dt0=0.1)
+    save_at = func.jit(solve)(iwp, atol=1e-2, rtol=1e-2, save_at=ts, dt0=0.1)
     u_save_at = tree.tree_map(lambda s: s[1:-1], save_at.u)
 
     # Assert similarity
@@ -75,13 +75,13 @@ def test_filter_marginals_close_only_to_left_boundary(ssm_factory) -> None:
     tcoeffs = (u0, vf(u0, t=t0))
     vf = probdiffeq.ode(vf)
     ssm = ssm_factory()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_filter()
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
+    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
     grid = np.linspace(t0, t1, endpoint=True, num=5)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
-    sol = solve(init, grid=grid)
+    sol = solve(iwp, grid=grid)
 
     # Extrapolate from the left: close-to-left boundary must be similar,
     # but close-to-right boundary needs not be similar
@@ -114,14 +114,14 @@ def test_smoother_marginals_close_to_both_boundaries(ssm_factory) -> None:
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     ssm = ssm_factory()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_smoother_fixedinterval()
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
+    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
 
     grid = np.linspace(t0, t1, endpoint=True, num=5)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
-    sol = solve(init, grid=grid)
+    sol = solve(iwp, grid=grid)
 
     # Extrapolate from the left: close-to-left boundary must be similar,
     # and close-to-right boundary must be similar

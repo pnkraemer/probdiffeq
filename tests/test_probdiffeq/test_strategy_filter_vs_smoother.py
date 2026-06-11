@@ -26,24 +26,24 @@ def fixture_solver_setup(ssm_factory):
 def fixture_filter_solution(solver_setup):
     tcoeffs = solver_setup["tcoeffs"]
     ssm = solver_setup["ssm_factory"]()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(solver_setup["vf"])
     strategy = probdiffeq.strategy_filter()
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
+    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
-    return func.jit(solve)(init, grid=solver_setup["grid"])
+    return func.jit(solve)(iwp, grid=solver_setup["grid"])
 
 
 @testing.fixture(name="smoother_solution")
 def fixture_smoother_solution(solver_setup):
     tcoeffs = solver_setup["tcoeffs"]
     ssm = solver_setup["ssm_factory"]()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(solver_setup["vf"])
     strategy = probdiffeq.strategy_smoother_fixedinterval()
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
+    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
-    return func.jit(solve)(init, grid=solver_setup["grid"])
+    return func.jit(solve)(iwp, grid=solver_setup["grid"])
 
 
 def test_compare_filter_smoother_rmse(filter_solution, smoother_solution) -> None:

@@ -53,25 +53,25 @@ def solution_routine(while_loop):
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=1)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     ssm = probdiffeq.state_space_model_isotropic()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf)
 
     strategy = probdiffeq.strategy_smoother_fixedpoint()
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
+    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
+    error = probdiffeq.error_residual_std(constraint=ts0)
     solve_adaptive = ivpsolve.solve_adaptive_terminal_values(
         solver=solver, error=error, while_loop=while_loop
     )
 
-    def simulate(init_val):
+    def simulate(prior):
         """Evaluate the parameter-to-solution function."""
-        sol = solve_adaptive(init_val, t0=t0, t1=t1, atol=1e-3, rtol=1e-3)
+        sol = solve_adaptive(prior, t0=t0, t1=t1, atol=1e-3, rtol=1e-3)
 
         # Any scalar function of the IVP solution would do
         # Try the log-marginal-likelihood losses (see the other tutorials).
         return jnp.dot(sol.u.mean[0], sol.u.mean[0])
 
-    return simulate, init
+    return simulate, iwp
 
 
 if __name__ == "__main__":

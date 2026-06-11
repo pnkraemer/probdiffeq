@@ -24,14 +24,14 @@ def test_solution_is_accurate(ssm_factory):
     tcoeffs, _ = jetexpand(vf, (1.0, 0.0), t=0.0)
 
     ssm = ssm_factory()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_filter()
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
-    error = probdiffeq.error_state_std(constraint=ts0, prior=iwp)
+    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
+    error = probdiffeq.error_state_std(constraint=ts0)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
 
     save_at = np.linspace(0.0, 5.0, endpoint=True, num=10)
-    solution_2nd = func.jit(solve)(init, save_at=save_at, atol=1e-6, rtol=1e-6)
+    solution_2nd = func.jit(solve)(iwp, save_at=save_at, atol=1e-6, rtol=1e-6)
 
     assert testing.allclose(solution_2nd.u.mean[0], np.cos(solution_2nd.t))

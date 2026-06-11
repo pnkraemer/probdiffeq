@@ -44,9 +44,9 @@ def main():
     # Build a solver
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=3)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     strategy = probdiffeq.strategy_smoother_fixedinterval()
-    _init, ioup = ssm.prior_ornstein_uhlenbeck_integrated(lambda s: A @ s, tcoeffs)
+    ioup = ssm.prior_ornstein_uhlenbeck_integrated(lambda s: A @ s, tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf)
     ts1 = ssm.constraint_ode_ts1(vf)
 
@@ -62,12 +62,10 @@ def main():
         zip(solvers, axes.flatten())
     ):
         # Set up the solver and solve the ODE
-        solver = probdiffeq.solver_mle(
-            strategy=strategy, prior=prior, constraint=constraint
-        )
+        solver = probdiffeq.solver_mle(strategy=strategy, constraint=constraint)
         solve = ivpsolve.solve_fixed_grid(solver=solver)
         grid = jnp.linspace(t0, t1, num=num, endpoint=True)
-        solution = jax.jit(solve)(init, grid=grid)
+        solution = jax.jit(solve)(prior, grid=grid)
 
         # Calculate the solution at a finer grid for plotting
         ts = jnp.linspace(t0 + 1e-4, t1 - 1e-4, num=200, endpoint=True)

@@ -35,18 +35,18 @@ def main():
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=3)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     ssm = probdiffeq.state_space_model_blockdiag()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts1 = ssm.constraint_ode_ts1(vf)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
 
-    solver = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts1)
-    error = probdiffeq.error_residual_std(constraint=ts1, prior=iwp)
+    solver = probdiffeq.solver_mle(strategy=strategy, constraint=ts1)
+    error = probdiffeq.error_residual_std(constraint=ts1)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
 
     # Solve the ODE.
 
     ts = jnp.linspace(t0, t1, endpoint=True, num=50)
-    sol = jax.jit(solve)(init, save_at=ts, dt0=0.1, atol=1e-1, rtol=1e-1)
+    sol = jax.jit(solve)(iwp, save_at=ts, dt0=0.1, atol=1e-1, rtol=1e-1)
 
     # Plot the solution.
 

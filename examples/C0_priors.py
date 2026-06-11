@@ -49,8 +49,8 @@ def main():
         # Match initial distribution to stationary distribution of Matern
         mean, loc = [0.0, 0.0, 0.0], [2.5, 0.7, 0.6]
         ssm = probdiffeq.state_space_model_dense()
-        init, prior = ssm.prior_exponential_diffuse(vf_prior, mean, loc)
-        mseq = probdiffeq.MarkovSequence.from_grid(init, prior, grid=ts, reverse=False)
+        prior = ssm.prior_exponential_diffuse(vf_prior, mean, loc)
+        mseq = probdiffeq.MarkovSequence.from_grid(prior, grid=ts, reverse=False)
 
         # Evaluate samples
         key = jax.random.PRNGKey(i)

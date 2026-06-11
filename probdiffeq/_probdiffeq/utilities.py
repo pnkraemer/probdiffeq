@@ -108,9 +108,12 @@ def system_matrices_1d_iwp(num_derivatives):
 
 def preconditioner_taylor(num_derivatives):
     """Construct the diagonal preconditioner for Taylor-coefficient state-spaces."""
-    powers = np.arange(num_derivatives, -1.0, step=-1.0)
-    scales = np.factorial(powers)
-    powers = powers + 0.5
+    import jax
+
+    with jax.ensure_compile_time_eval():
+        powers = np.arange(num_derivatives, -1.0, step=-1.0)
+        scales = np.factorial(powers)
+        powers = powers + 0.5
 
     def precon(dt):
         dt_abs = np.abs(dt)

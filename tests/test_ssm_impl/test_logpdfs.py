@@ -50,15 +50,13 @@ def test_grad_not_none(ssm_factory) -> None:
 def create_random_variable(ssm_factory):
     tcoeffs = [np.ones((3,))] * 5  # values irrelevant
     ssm = ssm_factory()
-    _, discretize = ssm.prior_wiener_integrated(
-        tcoeffs, is_exact=False, inexact_eps=1.0
-    )
+    iwp = ssm.prior_wiener_integrated(tcoeffs, is_exact=False, inexact_eps=1.0)
 
     if isinstance(ssm, probdiffeq.state_space_model_blockdiag):
         output_scale = np.ones((3,))
     else:
         output_scale = np.ones(())
-    rv = discretize(0.1, output_scale)
+    rv = iwp.discretize(0.1, output_scale)
     key = random.prng_key(seed=1)
     noise_flat, unravel = tree.ravel_pytree(rv.noise)
     noise_flat = random.normal(key, shape=noise_flat.shape)

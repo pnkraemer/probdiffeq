@@ -31,21 +31,21 @@ def main():
 
     # Construct a state-space model factorisation
     ssm = probdiffeq.state_space_model_dense()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     ode_ts1 = ssm.constraint_ode_ts1(vf)
 
     # Build the rest of the solver
     strategy = probdiffeq.strategy_filter()
-    solver = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ode_ts1)
-    error = probdiffeq.error_residual_std(constraint=ode_ts1, prior=iwp)
+    solver = probdiffeq.solver_mle(strategy=strategy, constraint=ode_ts1)
+    error = probdiffeq.error_residual_std(constraint=ode_ts1)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
 
     # Solve the ODE. Try different solution routines.
 
     save_at = jnp.linspace(t0, t1, num=100, endpoint=True)
-    solution = jax.jit(solve)(init, save_at, atol=1e-3, rtol=1e-3)
+    solution = jax.jit(solve)(iwp, save_at, atol=1e-3, rtol=1e-3)
 
-    print(f"\ninitial = {jax.tree.map(jnp.shape, init)}")
+    print(f"\ninitial = {jax.tree.map(jnp.shape, iwp.init)}")
     print(f"\nsolution = {jax.tree.map(jnp.shape, solution)}")
 
 

@@ -38,14 +38,14 @@ def main():
     # Set up the first-order solver (for illustration).
     tcoeffs = [u0_1st]
     ssm = probdiffeq.state_space_model_dense()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs, diffuse_derivatives=2)
+    iwp = ssm.prior_wiener_integrated(tcoeffs, diffuse_derivatives=2)
     ts1 = ssm.constraint_ode_ts1(vf_1st)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
-    solver_1st = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts1)
-    error = probdiffeq.error_state_std(constraint=ts1, prior=iwp)
+    solver_1st = probdiffeq.solver_mle(strategy=strategy, constraint=ts1)
+    error = probdiffeq.error_state_std(constraint=ts1)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, error=error)
 
-    sol_1 = jax.jit(solve)(init, save_at=save_at, atol=atol, rtol=rtol)
+    sol_1 = jax.jit(solve)(iwp, save_at=save_at, atol=atol, rtol=rtol)
     ham_1 = jax.vmap(hamiltonian_1st)(sol_1.u.mean[0])
 
     # The harmonic oscillator calls for a custom information operator because
@@ -58,13 +58,13 @@ def main():
     u0, du0 = jnp.split(u0_1st, 2)
     tcoeffs = [u0, du0]
     ssm = probdiffeq.state_space_model_dense()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs, diffuse_derivatives=1)
+    iwp = ssm.prior_wiener_integrated(tcoeffs, diffuse_derivatives=1)
 
     # Use this constraint function for custom residuals:
     residual_constraint = ssm.constraint_residual(residual)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
     solver_2nd = probdiffeq.solver_mle(
-        strategy=strategy, prior=iwp, constraint=residual_constraint
+        strategy=strategy, constraint=residual_constraint
     )
 
     # Custom residuals with residual-based error estimates
@@ -73,9 +73,9 @@ def main():
     # because scaling-then-norming assumes that the residual pytree
     # has the same structure as the target pytree.
 
-    error = probdiffeq.error_state_std(constraint=residual_constraint, prior=iwp)
+    error = probdiffeq.error_state_std(constraint=residual_constraint)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, error=error)
-    sol_2 = jax.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
+    sol_2 = jax.jit(solve)(iwp, save_at=save_at, atol=1e-2, rtol=1e-2)
     ham_2 = jax.vmap(hamiltonian_2nd)(sol_2.u.mean[0], sol_2.u.mean[1])
 
     # Plot both solutions.

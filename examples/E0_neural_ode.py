@@ -129,7 +129,7 @@ def loss_log_marginal_likelihood(vf, *, t0):
         # Build a solver
         tcoeffs = (*u0, vf(*u0, t=t0, p=p))
         ssm = probdiffeq.state_space_model_dense()
-        init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=output_scale)
+        iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=output_scale)
 
         @probdiffeq.ode
         def vf_p(y, /, *, t):
@@ -137,11 +137,11 @@ def loss_log_marginal_likelihood(vf, *, t0):
 
         ts0 = ssm.constraint_ode_ts0(vf_p)
         strategy = probdiffeq.strategy_smoother_fixedinterval()
-        solver_ts0 = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
+        solver_ts0 = probdiffeq.solver(strategy=strategy, constraint=ts0)
 
         # Solve
         solve = ivpsolve.solve_fixed_grid(solver=solver_ts0)
-        sol = solve(init, grid=grid)
+        sol = solve(iwp, grid=grid)
 
         # Evaluate loss
         loss_lml = probdiffeq.loss_lml_timeseries()

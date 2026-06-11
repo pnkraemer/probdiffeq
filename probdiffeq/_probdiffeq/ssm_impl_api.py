@@ -288,6 +288,11 @@ class AbstractPrior(abc.ABC):
         self.init = init
         self.output_scale = output_scale
 
+    @abc.abstractmethod
+    def discretize(self, dt, output_scale=1.0):
+        """Discretize the prior at a time step."""
+        raise NotImplementedError
+
 
 class StateSpaceModel(abc.ABC):
     """Abstract base for factorised Markovian state-space model implementations.

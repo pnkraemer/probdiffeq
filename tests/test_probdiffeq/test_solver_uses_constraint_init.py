@@ -53,7 +53,7 @@ def test_output_matches_reference(
     # Only use the dense factorisation because this test uses JET constraints
     # and they have not been implemented for isotropic or blockdiagonal models
     ssm = ssm_factory()
-    init, prior = ssm.prior_wiener_integrated([u0], diffuse_derivatives=derivatives)
+    prior = ssm.prior_wiener_integrated([u0], diffuse_derivatives=derivatives)
 
     # Build a solver
     nlstsq = probdiffeq.lstsq_constrained_gauss_newton(maxiter=50, tol=1e-10)
@@ -61,15 +61,12 @@ def test_output_matches_reference(
     taylor_point = probdiffeq.taylor_point_maximum_a_posteriori(nlstsq)
     constraint = ssm.constraint_residual(residual, taylor_point=taylor_point)
     solver = solver_factory(
-        strategy=strategy,
-        prior=prior,
-        constraint=constraint,
-        constraint_init=constraint,
+        strategy=strategy, constraint=constraint, constraint_init=constraint
     )
     solve = ivpsolve.solve_fixed_grid(solver=solver)
 
     # Compute the PN solution
     grid = np.linspace(t0, t1, endpoint=True, num=10)
-    solution = func.jit(solve)(init, grid=grid)
+    solution = func.jit(solve)(prior, grid=grid)
     received = tree.tree_map(lambda s: s[0], solution.u.mean)
     assert testing.allclose(received, expected)
