@@ -1,4 +1,4 @@
-"""Linearization-point strategies for probabilistic solvers.
+"""Taylor-expansion-point finding strategies for probabilistic solvers.
 
 Examples
 --------
@@ -6,15 +6,15 @@ Examples
 
 Use the prior mean as the linearization point (default):
 
->>> lp = probdiffeq.linearization_point_prior()
+>>> lp = probdiffeq.taylor_point_prior()
 >>> print(lp)
-linearization_point_prior()
+taylor_point_prior()
 
-Use the MAP estimate as the linearization point for iterated filtering:
+Use the MAP estimate as the expansion point for iterated filtering:
 
->>> lp = probdiffeq.linearization_point_maximum_a_posteriori()
+>>> lp = probdiffeq.taylor_point_maximum_a_posteriori()
 >>> print(lp)
-linearization_point_maximum_a_posteriori(nlstsq=lstsq_constrained_gauss_newton())
+taylor_point_maximum_a_posteriori(nlstsq=lstsq_constrained_gauss_newton())
 
 """
 
@@ -23,21 +23,21 @@ from probdiffeq.backend import flow, func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Array, Callable, TypeVar
 
 __all__ = [
-    "LinearizationPoint",
     "LstSqConstrained",
-    "linearization_point_maximum_a_posteriori",
-    "linearization_point_prior",
+    "TaylorPoint",
     "lstsq_constrained_gauss_newton",
+    "taylor_point_maximum_a_posteriori",
+    "taylor_point_prior",
 ]
 
 N = TypeVar("N", bound=ssm_via_api.AbstractTreeNormal)
 """A type-variable to describe normal distributions.
 
-Used to type the 'rv' argument of LinearizationPoint.
+Used to type the 'rv' argument of TaylorPoint.
 """
 
 
-class LinearizationPoint:
+class TaylorPoint:
     """Choose the point at which to linearize a constraint.
 
     Use this API to distinguish iterated filtering from extended Kalman filtering.
@@ -147,7 +147,7 @@ class lstsq_constrained_gauss_newton(LstSqConstrained):
         return final.x, stats
 
 
-class linearization_point_prior(LinearizationPoint):
+class taylor_point_prior(TaylorPoint):
     """Linearization point is the prior mean."""
 
     def __call__(self, constraint_flat: Callable, rv, **constraint_kwargs) -> Array:
@@ -156,7 +156,7 @@ class linearization_point_prior(LinearizationPoint):
         return rv.mean_flat
 
 
-class linearization_point_maximum_a_posteriori(LinearizationPoint):
+class taylor_point_maximum_a_posteriori(TaylorPoint):
     """Linearization point is the maximum-a-posteriori estimate."""
 
     def __init__(self, nlstsq: LstSqConstrained | None = None) -> None:
@@ -165,7 +165,7 @@ class linearization_point_maximum_a_posteriori(LinearizationPoint):
         self.nlstsq = nlstsq
 
     def __repr__(self) -> str:
-        return f"linearization_point_maximum_a_posteriori(nlstsq={self.nlstsq!r})"
+        return f"taylor_point_maximum_a_posteriori(nlstsq={self.nlstsq!r})"
 
     def __call__(self, constraint_flat: Callable, rv, **constraint_kwargs) -> Array:
         mean = rv.mean_flat

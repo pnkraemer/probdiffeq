@@ -10,7 +10,7 @@ from probdiffeq.backend.typing import (
 )
 
 if TYPE_CHECKING:
-    from probdiffeq._probdiffeq import linearization_points
+    from probdiffeq._probdiffeq import taylor_points
 
 __all__ = ["StateSpaceModel"]
 
@@ -464,7 +464,7 @@ class StateSpaceModel(abc.ABC):
         self,
         residual: problems.Residual,
         *,
-        linearization_point: "linearization_points.LinearizationPoint | None" = None,
+        taylor_point: "taylor_points.TaylorPoint | None" = None,
     ) -> AbstractResidual:
         r"""Construct a general constraint.
 
@@ -481,7 +481,7 @@ class StateSpaceModel(abc.ABC):
         ----------
         residual
             The residual to apply linearization to.
-        linearization_point
+        taylor_point
             The strategy to use for finding the linearization point. If None,
             the prior mean is used as the linearization point.
 

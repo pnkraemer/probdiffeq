@@ -1,11 +1,6 @@
 r"""Evaluate jet-recursions in differential equations."""
 
-from probdiffeq._probdiffeq import (
-    linearization_points,
-    problems,
-    ssm_via_dense,
-    utilities,
-)
+from probdiffeq._probdiffeq import problems, ssm_via_dense, taylor_points, utilities
 from probdiffeq.backend import flow, func, np, tree
 from probdiffeq.backend.typing import Array, Protocol, Sequence, TypeVar
 
@@ -368,11 +363,11 @@ def _allow_pytree_inits(expand):
 
 
 def jetexpand_residual(
-    num: int, nlstsq: linearization_points.LstSqConstrained | None = None
+    num: int, nlstsq: taylor_points.LstSqConstrained | None = None
 ) -> JetExpansionAlg[problems.Residual]:
     """Evaluate the Taylor series of a differential-algebraic equation system."""
     if nlstsq is None:
-        nlstsq = linearization_points.lstsq_constrained_gauss_newton()
+        nlstsq = taylor_points.lstsq_constrained_gauss_newton()
 
     # TODO: enable pytree inputs/outputs
     def expand(

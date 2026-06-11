@@ -541,7 +541,5 @@ class state_space_model_isotropic(ssm_via_api.StateSpaceModel):
             raise ValueError(msg)
         return IsotropicOdeTs1(ode=ode)
 
-    def constraint_residual(
-        self, residual: problems.Residual, *, linearization_point=None
-    ):
+    def constraint_residual(self, residual: problems.Residual, *, taylor_point=None):
         raise NotImplementedError

@@ -206,10 +206,8 @@ def solver_residual(*, num_derivatives: int, time_span) -> Callable:
         init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=base_scale)
 
         # We build a Jet constraint
-        linearization_point = probdiffeq.linearization_point_maximum_a_posteriori(
-            nlstsq
-        )
-        jet = ssm.constraint_residual(residual, linearization_point=linearization_point)
+        taylor_point = probdiffeq.taylor_point_maximum_a_posteriori(nlstsq)
+        jet = ssm.constraint_residual(residual, taylor_point=taylor_point)
         strategy = probdiffeq.strategy_filter()
 
         # For proper DAEs, non-iterated solver's simply don't cut it

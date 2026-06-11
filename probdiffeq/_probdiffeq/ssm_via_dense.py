@@ -1,9 +1,4 @@
-from probdiffeq._probdiffeq import (
-    linearization_points,
-    problems,
-    ssm_via_api,
-    utilities,
-)
+from probdiffeq._probdiffeq import problems, ssm_via_api, taylor_points, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree, warnings
 from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
@@ -301,9 +296,9 @@ class DenseOdeTs1(ssm_via_api.AbstractOde):
 class DenseResidual(ssm_via_api.AbstractResidual):
     """Construct a dense implementation of residual-TS1 linearization."""
 
-    def __init__(self, residual, *, linearization_point) -> None:
+    def __init__(self, residual, *, taylor_point) -> None:
         super().__init__(residual)
-        self.linearization_point = linearization_point
+        self.taylor_point = taylor_point
 
     def init_linearization(self):
         return self.residual.jacobian.init_jacobian_handler()
@@ -332,7 +327,7 @@ class DenseResidual(ssm_via_api.AbstractResidual):
         constraint_flat = self.constraint_flat(tree_flatten=rv.tree_flatten)
 
         # Get the linearization point (i.e., prior or posterior linearisation)
-        xi = self.linearization_point(constraint_flat, rv, t=t)
+        xi = self.taylor_point(constraint_flat, rv, t=t)
 
         # Evaluate the linearization
         jacobian = self.residual.jacobian.materialize_dense
@@ -656,10 +651,10 @@ class state_space_model_dense(ssm_via_api.StateSpaceModel):
         self,
         residual: problems.Residual,
         *,
-        linearization_point: linearization_points.LinearizationPoint | None = None,
+        taylor_point: taylor_points.TaylorPoint | None = None,
     ) -> DenseResidual:
         if not isinstance(residual, problems.Residual):
             raise TypeError(residual)
-        if linearization_point is None:
-            linearization_point = linearization_points.linearization_point_prior()
-        return DenseResidual(residual, linearization_point=linearization_point)
+        if taylor_point is None:
+            taylor_point = taylor_points.taylor_point_prior()
+        return DenseResidual(residual, taylor_point=taylor_point)

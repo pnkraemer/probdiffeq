@@ -1,9 +1,4 @@
-from probdiffeq._probdiffeq import (
-    linearization_points,
-    problems,
-    ssm_via_api,
-    utilities,
-)
+from probdiffeq._probdiffeq import problems, ssm_via_api, taylor_points, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
@@ -545,7 +540,7 @@ class state_space_model_blockdiag(ssm_via_api.StateSpaceModel):
         self,
         residual: problems.Residual,
         *,
-        linearization_point: linearization_points.LinearizationPoint | None = None,
+        taylor_point: taylor_points.TaylorPoint | None = None,
     ):
         raise NotImplementedError
 
