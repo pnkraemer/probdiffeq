@@ -12,7 +12,7 @@ from probdiffeq import ivpsolve, probdiffeq
 jax.config.update("jax_debug_nans", True)
 
 
-def main(num_data=100, epochs=1000, print_every=100, hidden=(20,), lr=0.2) -> None:
+def main(num_data=20, epochs=1000, print_every=100, hidden=(20,), lr=0.2) -> None:
     """Train a neural ODE using diffusion tempering."""
     # Create some data and construct a neural ODE
     grid = jnp.linspace(0, 1, num=num_data)
@@ -23,7 +23,9 @@ def main(num_data=100, epochs=1000, print_every=100, hidden=(20,), lr=0.2) -> No
 
     # Create a loss (this is where probabilistic numerics enters!)
     loss = loss_log_marginal_likelihood(vf=vf, t0=t0)
-    _loss0, info0 = loss(
+
+    # Evaluate once to get the mean before optimisation
+    _, info0 = loss(
         f_args, u0=u0, grid=grid, data=data, std=std, output_scale=output_scale
     )
 
@@ -115,6 +117,11 @@ def model_mlp(
 
 def loss_log_marginal_likelihood(vf, *, t0):
     """Build a loss function from an ODE problem."""
+    ssm = probdiffeq.state_space_model_dense()
+    strategy = probdiffeq.strategy_smoother_fixedpoint()
+
+    def while_loop(cond, body, init):
+        return eqx.internal.while_loop(cond, body, init, kind="bounded", max_steps=8)
 
     @jax.jit
     def loss(
@@ -127,9 +134,7 @@ def loss_log_marginal_likelihood(vf, *, t0):
         output_scale: jax.Array,
     ):
         """Loss function: log-marginal likelihood of the data."""
-        # Build a solver
         tcoeffs = (*u0, vf(*u0, t=t0, p=p))
-        ssm = probdiffeq.state_space_model_dense()
         iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=output_scale)
 
         @probdiffeq.ode
@@ -137,16 +142,8 @@ def loss_log_marginal_likelihood(vf, *, t0):
             return vf(y, t=t, p=p)
 
         ts0 = ssm.constraint_ode_ts0(vf_p)
-        strategy = probdiffeq.strategy_smoother_fixedpoint()
         solver_ts0 = probdiffeq.solver(strategy=strategy, constraint=ts0)
         error = probdiffeq.error_state_std(constraint=ts0)
-
-        def while_loop(cond, body, init):
-            return eqx.internal.while_loop(
-                cond, body, init, kind="bounded", max_steps=8
-            )
-
-        # Solve
         solve = ivpsolve.solve_adaptive_save_at(
             solver=solver_ts0, error=error, while_loop=while_loop
         )
