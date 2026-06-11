@@ -11,9 +11,9 @@ from probdiffeq.backend import np, testing
 def test_transitions_are_correct_in_1d(ssm_factory) -> None:
     tcoeffs = [2.0, 3.0, 4.0, 5.0]
     ssm = ssm_factory()
-    _init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
 
-    cond = iwp(1.0, 1.0)
+    cond = iwp.transition(dt=1.0, output_scale=1.0)
     A_expected = np.asarray(
         [
             [1.0, 3.0, 3.0, 1.0],
@@ -40,9 +40,9 @@ def test_transitions_are_correct_in_1d(ssm_factory) -> None:
 def test_transitions_are_correct_in_1d_blockdiag() -> None:
     tcoeffs = [2.0, 3.0, 4.0, 5.0]
     ssm = probdiffeq.state_space_model_blockdiag()
-    _init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
 
-    cond = iwp(1.0, np.ones((1,)))
+    cond = iwp.transition(dt=1.0, output_scale=np.ones((1,)))
     A_expected = np.asarray(
         [
             [1.0, 3.0, 3.0, 1.0],

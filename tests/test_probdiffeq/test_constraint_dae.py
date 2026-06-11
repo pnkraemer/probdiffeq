@@ -31,15 +31,15 @@ def solve_ode(inits, num):
     tcoeffs, _ = jetexpand(vf_ode, inits, t=0.0)
 
     ssm = probdiffeq.state_space_model_dense()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf_ode)
     strategy = probdiffeq.strategy_filter()
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
-    error = probdiffeq.error_state_std(constraint=ts0, prior=iwp)
+    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
+    error = probdiffeq.error_state_std(constraint=ts0)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
 
     save_at = np.linspace(0.0, 5.0, endpoint=True, num=10)
-    return func.jit(solve)(init, save_at=save_at, atol=1e-6, rtol=1e-6)
+    return func.jit(solve)(iwp, save_at=save_at, atol=1e-6, rtol=1e-6)
 
 
 @func.partial(func.jit, static_argnames=("num",))
@@ -74,12 +74,12 @@ def solve_dae(inits, num):
     tcoeffs, _ = jetexpand(residual, inits, t=0.0)
 
     ssm = probdiffeq.state_space_model_dense()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_residual(residual)
     strategy = probdiffeq.strategy_filter()
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
-    error = probdiffeq.error_state_std(constraint=ts0, prior=iwp)
+    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
+    error = probdiffeq.error_state_std(constraint=ts0)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
 
     save_at = np.linspace(0.0, 5.0, endpoint=True, num=10)
-    return func.jit(solve)(init, save_at=save_at, atol=1e-6, rtol=1e-6)
+    return func.jit(solve)(iwp, save_at=save_at, atol=1e-6, rtol=1e-6)

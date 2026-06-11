@@ -20,17 +20,17 @@ def fixture_solution(ssm_factory):
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     ssm = ssm_factory()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
 
     ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
 
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
+    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
+    error = probdiffeq.error_residual_std(constraint=ts0)
 
     save_at = np.linspace(t0, t1, endpoint=True, num=13)
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
-    sol = func.jit(solve)(init, save_at=save_at, atol=1e-2, rtol=1e-2)
+    sol = func.jit(solve)(iwp, save_at=save_at, atol=1e-2, rtol=1e-2)
 
     loss = probdiffeq.loss_lml_timeseries()
     data = sol.u.mean[0]

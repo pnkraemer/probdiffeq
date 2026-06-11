@@ -81,14 +81,14 @@ def main():
 def solve(vf, tc, *, t0, t1):
     """Solve the ODE."""
     ssm = probdiffeq.state_space_model_dense()
-    init, prior = ssm.prior_wiener_integrated(tc)
+    prior = ssm.prior_wiener_integrated(tc)
     ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
-    solver = probdiffeq.solver_mle(strategy=strategy, prior=prior, constraint=ts0)
+    solver = probdiffeq.solver_mle(strategy=strategy, constraint=ts0)
     ts = jnp.linspace(t0, t1, endpoint=True, num=10)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=prior)
+    error = probdiffeq.error_residual_std(constraint=ts0)
     solve_fn = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    return solve_fn(init, save_at=ts, atol=1e-2, rtol=1e-2)
+    return solve_fn(prior, save_at=ts, atol=1e-2, rtol=1e-2)
 
 
 if __name__ == "__main__":

@@ -21,13 +21,13 @@ def test_exponential_prior_matches_ioup(ssm_factory):
         return M @ x
 
     ssm = ssm_factory()
-    _init, exponential = ssm.prior_exponential(vf_exponential, tcoeffs)
-    _init, ioup = ssm.prior_ornstein_uhlenbeck_integrated(linop_ioup, tcoeffs)
+    exponential = ssm.prior_exponential(vf_exponential, tcoeffs)
+    ioup = ssm.prior_ornstein_uhlenbeck_integrated(linop_ioup, tcoeffs)
 
     scale = 12.3456
     dt = 0.123456
-    cond1 = func.jit(exponential)(dt, scale)
-    cond2 = func.jit(ioup)(dt, scale)
+    cond1 = func.jit(exponential.transition)(dt=dt, output_scale=scale)
+    cond2 = func.jit(ioup.transition)(dt=dt, output_scale=scale)
     assert testing.allclose(cond1, cond2)
 
 
@@ -44,14 +44,14 @@ def test_exponential_prior_matches_iwp(ssm_factory):
         return np.zeros_like(u)
 
     ssm = ssm_factory()
-    _init, exponential = ssm.prior_exponential(vf_linear, tcoeffs)
-    _init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    exponential = ssm.prior_exponential(vf_linear, tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
 
     scale = 12.3456
     dt = 0.123456
 
-    cond1 = func.jit(exponential)(dt, scale)
-    cond2 = func.jit(iwp)(dt, scale)
+    cond1 = func.jit(exponential.transition)(dt=dt, output_scale=scale)
+    cond2 = func.jit(iwp.transition)(dt=dt, output_scale=scale)
     assert testing.allclose(cond1, cond2)
 
 
@@ -92,10 +92,11 @@ def test_exponential_transition_as_expected(ode_shape, ssm_factory):
         del du
         return M @ ddu.ravel()
 
-    _init, exponential = ssm.prior_exponential(vf_linear, tcoeffs)
+    exponential = ssm.prior_exponential(vf_linear, tcoeffs)
 
     dt = 0.123456
-    cond = func.jit(exponential)(dt)
+    output_scale = 1.0
+    cond = func.jit(exponential.transition)(dt=dt, output_scale=output_scale)
     cond = cond.preconditioner_apply()
     A_received = cond.A
 
@@ -103,8 +104,8 @@ def test_exponential_transition_as_expected(ode_shape, ssm_factory):
     assert testing.allclose(A_received[-d:, -d:], linalg.expm(M * np.eye(1) * dt))
 
     ssm = probdiffeq.state_space_model_dense()
-    _init, iwp = ssm.prior_wiener_integrated(tcoeffs[:-1])
-    cond = func.jit(iwp)(dt)
+    iwp = ssm.prior_wiener_integrated(tcoeffs[:-1])
+    cond = func.jit(iwp.transition)(dt=dt, output_scale=1.0)
     cond = cond.preconditioner_apply()
     phi_iwp_smaller = cond.A
     assert testing.allclose(A_received[:-d, :-d], phi_iwp_smaller)

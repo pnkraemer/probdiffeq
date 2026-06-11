@@ -22,15 +22,15 @@ def test_exponential_approximated_well(ssm_factory) -> None:
 
     tcoeffs = (*u0, vf(*u0, t=t0))
     ssm = ssm_factory()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     vf = probdiffeq.ode(vf)
     ts0 = ssm.constraint_ode_ts0(vf)
     strategy = probdiffeq.strategy_filter()
-    solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts0)
+    solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=ts0)
 
     grid = np.linspace(t0, t1, num=20)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
-    approximation = func.jit(solve)(init, grid=grid)
+    approximation = func.jit(solve)(iwp, grid=grid)
 
     solution = ode.odeint_and_save_at(
         vf, u0, save_at=np.asarray([t0, t1]), atol=1e-5, rtol=1e-5

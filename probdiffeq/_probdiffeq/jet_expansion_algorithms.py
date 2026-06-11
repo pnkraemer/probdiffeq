@@ -395,9 +395,9 @@ def jetexpand_residual(
         # Determine degrees of freedom ("dof") and initialse all others diffusely
         # Concretely: The provided 'inits' are not DOFs, all added ones are.
         ssm = ssm_impl_dense.state_space_model_dense()
-        rv, _ = ssm.prior_wiener_integrated(inits, diffuse_derivatives=num)
+        prior = ssm.prior_wiener_integrated(inits, diffuse_derivatives=num)
 
-        x0, unravel = tree.ravel_pytree(rv.mean)
+        x0, unravel = tree.ravel_pytree(prior.init.mean)
 
         def residual_jet(tcoeffs_flat):
             tcoeffs_all = unravel(tcoeffs_flat)
@@ -407,6 +407,7 @@ def jetexpand_residual(
             # Flatten the output so that the Jacobians are matrices, not Pytrees.
             return tree.ravel_pytree(output)[0]
 
+        rv = prior.init
         x1, info = nlstsq(residual_jet, x0, rv.mean_flat, rv.cholesky_flat)
         return list(unravel(x1)), info
 

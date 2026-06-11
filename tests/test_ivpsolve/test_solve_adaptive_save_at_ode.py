@@ -11,6 +11,14 @@ def ivp_lotka_volterra():
     return vf, (u0,), (t0, t1)
 
 
+def _prior_wiener_integrated(ssm, tcoeffs, **kw):
+    return ssm.prior_wiener_integrated(tcoeffs, **kw)
+
+
+def _constraint_ts0(ssm, ode):
+    return ssm.constraint_ode_ts0(ode)
+
+
 @structs.dataclass
 class Factory:
     """A solver factory.
@@ -23,24 +31,23 @@ class Factory:
     and make each case only vary one of the parameters.
     """
 
-    prior: Callable = lambda ssm, tcoeffs, **kw: ssm.prior_wiener_integrated(
-        tcoeffs, **kw
-    )
+    prior: Callable = _prior_wiener_integrated
     strategy: Callable = probdiffeq.strategy_filter
     solver: Callable = probdiffeq.solver
     jacobian: probdiffeq.Jacobian = probdiffeq.jacobian_materialize()
 
     # ts1 default because it uses more backend functions (eg Jacobians)
     # so the tests gain relevance
-    constraint: Callable = lambda ssm, ode: ssm.constraint_ode_ts0(ode)
+    constraint: Callable = _constraint_ts0
     error: Callable = probdiffeq.error_residual_std
 
 
 @testing.case
 def case_factory_prior_wiener_integrated():
-    return Factory(
-        prior=lambda ssm, tcoeffs, **kw: ssm.prior_wiener_integrated(tcoeffs, **kw)
-    )
+    def prior(ssm, tcoeffs, **kw):
+        return ssm.prior_wiener_integrated(tcoeffs, **kw)
+
+    return Factory(prior=prior)
 
 
 @testing.case
@@ -189,18 +196,18 @@ def test_output_matches_reference(ivp, ssm_factory, factory: Factory) -> None:
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
 
     tcoeffs, _ = jetexpand(vf, u0, t=t0)
-    init, prior = factory.prior(ssm, tcoeffs)
+    prior = factory.prior(ssm, tcoeffs)
     strategy = factory.strategy()
     constraint = factory.constraint(ssm, vf)
-    solver = factory.solver(strategy=strategy, prior=prior, constraint=constraint)
+    solver = factory.solver(strategy=strategy, constraint=constraint)
     # not all constraints have shape (d,):
     error_norm = probdiffeq.error_norm_rms_then_scale()
-    error = factory.error(prior=prior, constraint=constraint, error_norm=error_norm)
+    error = factory.error(constraint=constraint, error_norm=error_norm)
 
     # Compute the PN solution
     save_at = np.linspace(t0, t1, endpoint=True, num=7)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    received = func.jit(solve)(init, save_at=save_at, atol=1e-4, rtol=1e-4)
+    received = func.jit(solve)(prior, save_at=save_at, atol=1e-4, rtol=1e-4)
 
     # Compute a reference solution
     expected = ode.odeint_and_save_at(vf, u0, save_at=save_at, atol=1e-7, rtol=1e-7)

@@ -1,4 +1,4 @@
-from probdiffeq._ivpsolve import controllers, solver_interfaces
+from probdiffeq._ivpsolve import controllers, solver_protocols
 from probdiffeq.backend import flow, func, np, structs, tree, warnings
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, TypeVar
 
@@ -14,12 +14,12 @@ __all__ = [
 
 
 def solve_adaptive_terminal_values(
-    solver: solver_interfaces.Solver,
+    solver: solver_protocols.Solver,
     error,
     control: controllers.Control | None = None,
     clip_dt: bool = True,
     while_loop: Callable = flow.while_loop,
-) -> Callable[..., solver_interfaces.Solution]:
+) -> Callable[..., solver_protocols.Solution]:
     """Simulate the terminal values of an initial value problem."""
     # Turn off warnings because any solver goes for terminal values
     solve_save_at = solve_adaptive_save_at(
@@ -33,7 +33,7 @@ def solve_adaptive_terminal_values(
 
     def solve(
         u: T, /, *, t0, t1, atol, rtol, dt0=0.1, eps=1e-8, damp=0.0
-    ) -> solver_interfaces.Solution[T]:
+    ) -> solver_protocols.Solution[T]:
         save_at = np.asarray([t0, t1])
         solution = solve_save_at(
             u, save_at=save_at, atol=atol, rtol=rtol, dt0=dt0, eps=eps, damp=damp
@@ -45,13 +45,13 @@ def solve_adaptive_terminal_values(
 
 def solve_adaptive_save_at(
     *,
-    solver: solver_interfaces.Solver,
+    solver: solver_protocols.Solver,
     error,
     control: controllers.Control | None = None,
     clip_dt: bool = False,
     while_loop: Callable = flow.while_loop,
     warn=True,
-) -> Callable[..., solver_interfaces.Solution]:
+) -> Callable[..., solver_protocols.Solution]:
     r"""Solve an initial value problem and return the solution at a pre-determined grid.
 
     This algorithm implements the method by Krämer (2025). Please consider citing it
@@ -194,7 +194,7 @@ class RejectionLoop:
 
     def __init__(
         self,
-        solver: solver_interfaces.Solver,
+        solver: solver_protocols.Solver,
         clip_dt: bool,
         error: Any,
         control: controllers.Control,

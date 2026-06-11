@@ -21,14 +21,12 @@ def test_output_matches_reference(ssm_factory) -> None:
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
     tcoeffs, _ = jetexpand(vf, u0, t=t0)
     ssm = ssm_factory()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
 
     strategy = probdiffeq.strategy_smoother_fixedpoint()
     constraint = ssm.constraint_ode_ts0(vf)
-    solver = probdiffeq.solver_dynamic(
-        strategy=strategy, prior=iwp, constraint=constraint
-    )
-    error = probdiffeq.error_residual_std(constraint=constraint, prior=iwp)
+    solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=constraint)
+    error = probdiffeq.error_residual_std(constraint=constraint)
 
     # Compute the PN solution
     dt0 = ivpsolve.dt0_adaptive(
@@ -36,7 +34,7 @@ def test_output_matches_reference(ssm_factory) -> None:
     )
 
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
-    received = func.jit(solve)(init, t0=t0, t1=t1, dt0=dt0, atol=1e-3, rtol=1e-3)
+    received = func.jit(solve)(iwp, t0=t0, t1=t1, dt0=dt0, atol=1e-3, rtol=1e-3)
 
     # Compute a reference solution
     save_at = np.asarray([t0, t1])

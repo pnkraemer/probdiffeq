@@ -131,9 +131,15 @@ class MarkovSequence(Generic[N]):
     """The direction of factorisations."""
 
     @classmethod
-    def from_grid(cls, init, discretize, *, grid, reverse: bool):
-        marginal = init
-        conditional = func.vmap(discretize)(np.diff(grid))
+    def from_grid(cls, prior, *, grid, reverse: bool):
+        marginal = prior.init
+
+        @func.partial(func.vmap, in_axes=(0, None))
+        def transition_vmap(a, b):
+            return prior.transition(dt=a, output_scale=b)
+
+        output_scale = marginal.prototype_output_scale_calibrated()
+        conditional = transition_vmap(np.diff(grid), output_scale)
         return cls(marginal, conditional, reverse=reverse)
 
     def rescale_cholesky(self, factor, /):

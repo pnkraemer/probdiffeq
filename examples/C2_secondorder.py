@@ -31,15 +31,15 @@ def main():
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
     tcoeffs, _ = jetexpand(vf_1, (u0,), t=t0)
     ssm = probdiffeq.state_space_model_isotropic()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=1.0)
+    iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=1.0)
     strategy = probdiffeq.strategy_filter()
     ts0 = ssm.constraint_ode_ts0(vf_1)
-    solver_1st = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts0)
-    error_1st = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
+    solver_1st = probdiffeq.solver_mle(strategy=strategy, constraint=ts0)
+    error_1st = probdiffeq.error_residual_std(constraint=ts0)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver_1st, error=error_1st)
 
     # Plot the result
-    solution = jax.jit(solve)(init, save_at=save_at, atol=atol, rtol=rtol)
+    solution = jax.jit(solve)(iwp, save_at=save_at, atol=atol, rtol=rtol)
     plt.plot(solution.u.mean[0][:, 0], solution.u.mean[0][:, 1], marker=".")
     plt.show()
 
@@ -58,15 +58,15 @@ def main():
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=3)
     tcoeffs, _ = jetexpand(vf_2, (u0, du0), t=t0)
     ssm = probdiffeq.state_space_model_isotropic()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=1.0)
+    iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=1.0)
     ts0 = ssm.constraint_ode_ts0(vf_2)
     strategy = probdiffeq.strategy_filter()
-    solver_2nd = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts0)
-    error_2nd = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
+    solver_2nd = probdiffeq.solver_mle(strategy=strategy, constraint=ts0)
+    error_2nd = probdiffeq.error_residual_std(constraint=ts0)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver_2nd, error=error_2nd)
 
     # Plot the result
-    solution = jax.jit(solve)(init, save_at=save_at, atol=atol, rtol=rtol)
+    solution = jax.jit(solve)(iwp, save_at=save_at, atol=atol, rtol=rtol)
     plt.plot(solution.u.mean[0][:, 0], solution.u.mean[0][:, 1], marker=".")
     plt.show()
 

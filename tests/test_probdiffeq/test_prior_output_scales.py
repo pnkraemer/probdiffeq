@@ -19,9 +19,12 @@ class ScaleShapeRules:
 
 
 def case_scale_rules_iwp_dense() -> ScaleShapeRules:
+    def prior(ssm, tcoeffs, **kw):
+        return ssm.prior_wiener_integrated(tcoeffs, **kw)
+
     return ScaleShapeRules(
         ssm_factory=probdiffeq.state_space_model_dense,
-        prior=lambda ssm, tcoeffs, **kw: ssm.prior_wiener_integrated(tcoeffs, **kw),
+        prior=prior,
         ode=(1, 1),
         base=(1, 1),
         calibrated=(),
@@ -49,9 +52,12 @@ def case_scale_rules_ioup_dense() -> ScaleShapeRules:
 
 
 def case_scale_rules_iwp_blockdiag() -> ScaleShapeRules:
+    def prior(ssm, tcoeffs, **kw):
+        return ssm.prior_wiener_integrated(tcoeffs, **kw)
+
     return ScaleShapeRules(
         ssm_factory=probdiffeq.state_space_model_blockdiag,
-        prior=lambda ssm, tcoeffs, **kw: ssm.prior_wiener_integrated(tcoeffs, **kw),
+        prior=prior,
         ode=(1, 1),
         base=(1, 1),
         calibrated=(1,),
@@ -61,9 +67,12 @@ def case_scale_rules_iwp_blockdiag() -> ScaleShapeRules:
 
 
 def case_scale_rules_iwp_isotropic() -> ScaleShapeRules:
+    def prior(ssm, tcoeffs, **kw):
+        return ssm.prior_wiener_integrated(tcoeffs, **kw)
+
     return ScaleShapeRules(
         ssm_factory=probdiffeq.state_space_model_isotropic,
-        prior=lambda ssm, tcoeffs, **kw: ssm.prior_wiener_integrated(tcoeffs, **kw),
+        prior=prior,
         ode=(1, 1),
         base=(),
         calibrated=(),
@@ -79,9 +88,10 @@ def test_output_scales_covariances_scaled_correctly_default(rules: ScaleShapeRul
 
     # 1d problem, but "unusual" shapes. Values don't matter.
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
-    _init, iwp = rules.prior(ssm, tcoeffs)
-    cond = iwp(1.0)
+    iwp = rules.prior(ssm, tcoeffs)
+    cond = iwp.transition(dt=1.0, output_scale=np.ones(rules.calibrated))
     Q_expected = 1.0 / np.asarray([[3.0, 2.0], [2.0, 1.0]])
+
     _, cov = cond.noise.to_multivariate_normal()
     assert testing.allclose(cov, Q_expected)
 
@@ -94,9 +104,9 @@ def test_output_scales_covariances_scaled_correctly_custom(rules: ScaleShapeRule
     # 1d problem, but "unusual" shapes. Values don't matter.
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
     scale = 123.45 * np.ones(rules.base)
-    _init, iwp = rules.prior(ssm, tcoeffs, output_scale=scale)
+    iwp = rules.prior(ssm, tcoeffs, output_scale=scale)
 
-    cond = iwp(1.0, 9.876 * np.ones(rules.calibrated))
+    cond = iwp.transition(dt=1.0, output_scale=9.876 * np.ones(rules.calibrated))
     Q_expected = (9.876 * 123.45) ** 2.0 * 1.0 / np.asarray([[3.0, 2.0], [2.0, 1.0]])
     _, cov = cond.noise.to_multivariate_normal()
     assert testing.allclose(cov, Q_expected)
@@ -122,14 +132,14 @@ def test_output_scales_wrong_shape_raises_error_at_calling(rules: ScaleShapeRule
     ssm = rules.ssm_factory()
 
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
-    _init, iwp = rules.prior(ssm, tcoeffs)
+    iwp = rules.prior(ssm, tcoeffs)
 
     # Sanity check: assert that the same error does not happen with the correct shape
-    _ = iwp(1.0, np.ones(rules.calibrated))
+    _ = iwp.transition(dt=1.0, output_scale=np.ones(rules.calibrated))
 
     for shapes in rules.calibrated_baddies:
         with testing.raises(ValueError, match="wrong shape"):
-            _ = iwp(1.0, np.ones(shapes))
+            _ = iwp.transition(dt=1.0, output_scale=np.ones(shapes))
 
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")

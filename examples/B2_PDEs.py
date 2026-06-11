@@ -30,18 +30,18 @@ def main() -> None:
     # Set up a state-space model
     tcoeffs = [u0, vf(u0, t=t0)]
     ssm = probdiffeq.state_space_model_blockdiag()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
 
     # Build a solver
     ts = ssm.constraint_ode_ts1(vf)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
-    solver = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts)
-    error = probdiffeq.error_residual_std(constraint=ts, prior=iwp)
+    solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=ts)
+    error = probdiffeq.error_residual_std(constraint=ts)
 
     # Solve the ODE
     save_at = jnp.linspace(t0, t1, num=5, endpoint=True)
     simulate = simulator(save_at=save_at, error=error, solver=solver)
-    (u, u_std) = simulate(init)
+    (u, u_std) = simulate(iwp)
 
     _fig, axes = plt.subplots(
         nrows=2, ncols=len(u), figsize=(2 * len(u), 3), tight_layout=True
@@ -69,9 +69,9 @@ def simulator(save_at, error, solver):
     """Simulate a PDE."""
 
     @jax.jit
-    def solve(init):
+    def solve(prior):
         solve_fn = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
-        solution = solve_fn(init, save_at=save_at, atol=1e-4, rtol=1e-2)
+        solution = solve_fn(prior, save_at=save_at, atol=1e-4, rtol=1e-2)
         return (solution.u.mean[0], solution.u.std[0])
 
     return solve

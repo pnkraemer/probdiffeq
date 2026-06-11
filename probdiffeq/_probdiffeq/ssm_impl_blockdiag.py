@@ -379,6 +379,65 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
 BlockDiagNormal.register_pytree_node()
 
 
+class BlockDiagWienerIntegrated(ssm_impl_api.AbstractPrior):
+    def __init__(self, init, output_scale, *, a, q_sqrtm, q0, tree_flatten, precon_fun):
+        super().__init__(init, output_scale)
+        self.a = a
+        self.q_sqrtm = q_sqrtm
+        self.q0 = q0
+        self.tree_flatten = tree_flatten
+        self.precon_fun = precon_fun
+
+    def transition(self, *, dt: float, output_scale: Array) -> BlockDiagLatentCond:
+        p, p_inv = self.precon_fun(dt)
+
+        output_scale = np.asarray(output_scale)
+        if output_scale.shape != self.output_scale.shape:
+            msg = "The output-scale has the wrong shape."
+            msg += f" Expected: {output_scale.shape}."
+            msg += f" Received: {self.output_scale.shape}."
+            raise ValueError(msg)
+
+        output_scale = self.output_scale * output_scale
+
+        # Flatten the scale into something compatible with the flattened SSM
+        (d,) = output_scale.shape
+
+        mean = np.ones((d, 1)) * self.q0[None, :]
+        cholesky = output_scale[:, None, None] * self.q_sqrtm[None, :, :]
+        noise = BlockDiagNormal(mean, cholesky, self.tree_flatten)
+
+        A_batch = np.ones((d, 1, 1)) * self.a[None, :, :]
+        p = np.ones((d, 1)) * p[None, :]
+        p_inv = np.ones((d, 1)) * p_inv[None, :]
+        return BlockDiagLatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
+
+    @staticmethod
+    def register_pytree():
+        def flatten(iwp):
+            children = (iwp.init, iwp.output_scale, iwp.a, iwp.q_sqrtm, iwp.q0)
+            aux = (iwp.tree_flatten, iwp.precon_fun)
+            return children, aux
+
+        def unflatten(aux, children):
+            tf, precon_fun = aux
+            init, output_scale, a, q_sqrtm, q0 = children
+            return BlockDiagWienerIntegrated(
+                init,
+                output_scale,
+                a=a,
+                q_sqrtm=q_sqrtm,
+                q0=q0,
+                tree_flatten=tf,
+                precon_fun=precon_fun,
+            )
+
+        tree.register_pytree_node(BlockDiagWienerIntegrated, flatten, unflatten)
+
+
+BlockDiagWienerIntegrated.register_pytree()
+
+
 class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
     """Implementation of block-diagonal SSM constructors."""
 
@@ -392,7 +451,7 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
         diffuse_derivatives: int = 0,
         diffuse_eps: float = 1.0,
         output_scale: Array | None = None,
-    ):
+    ) -> BlockDiagWienerIntegrated:
         tcoeffs_std = self._tcoeffs_standard_deviation(
             tcoeffs_mean, is_exact=is_exact, inexact_eps=inexact_eps
         )
@@ -413,7 +472,7 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
         diffuse_derivatives: int = 0,
         diffuse_eps: float = 1.0,
         output_scale: Array | None = None,
-    ):
+    ) -> BlockDiagWienerIntegrated:
         if diffuse_derivatives > 0:
             tcoeffs_mean, tcoeffs_std = self._add_diffuse_derivatives(
                 tcoeffs_mean,
@@ -456,37 +515,17 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
         num_derivatives = len(tcoeffs_mean) - 1
         a, q_sqrtm = utilities.system_matrices_1d_iwp(num_derivatives)
         q0 = np.zeros((num_derivatives + 1,))
-        precon_fun = utilities.preconditioner_taylor(num_derivatives=num_derivatives)
-
-        def discretise(dt, scale: Array | None = None):
-            p, p_inv = precon_fun(dt)
-            if scale is None:
-                scale = np.ones_like(output_scale)
-            else:
-                scale = np.asarray(scale)
-
-                if scale.shape != output_scale.shape:
-                    msg = "The output-scale has the wrong shape."
-                    msg += f" Expected: {scale.shape}."
-                    msg += f" Received: {output_scale.shape}."
-                    raise ValueError(msg)
-                scale, _ = tree.ravel_pytree(scale)
-
-            scale = output_scale * scale
-
-            # Flatten the scale into something compatible with the flattened SSM
-            (d,) = scale.shape
-
-            A_batch = np.ones((d, 1, 1)) * a[None, :, :]
-            mean = np.ones((d, 1)) * q0[None, :]
-            cholesky = scale[:, None, None] * q_sqrtm[None, :, :]
-            tree_flatten = BlockDiagTreeFlatten.from_example(tcoeffs_mean)
-            noise = BlockDiagNormal(mean, cholesky, tree_flatten)
-            p = np.ones((d, 1)) * p[None, :]
-            p_inv = np.ones((d, 1)) * p_inv[None, :]
-            return BlockDiagLatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
-
-        return init, discretise
+        tf = BlockDiagTreeFlatten.from_example(tcoeffs_mean)
+        precon_fun = utilities.preconditioner_taylor(num_derivatives)
+        return BlockDiagWienerIntegrated(
+            init,
+            output_scale,
+            a=a,
+            q_sqrtm=q_sqrtm,
+            q0=q0,
+            tree_flatten=tf,
+            precon_fun=precon_fun,
+        )
 
     def prior_exponential(
         self,

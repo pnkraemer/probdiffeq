@@ -24,20 +24,20 @@ def main():
 
     tcoeffs = (u0, vf(u0, t=t0))
     ssm = probdiffeq.state_space_model_dense()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=1.0)
+    iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=1.0)
     ts1 = ssm.constraint_ode_ts1(vf)
     strategy = probdiffeq.strategy_filter()
-    dynamic = probdiffeq.solver_dynamic(strategy=strategy, prior=iwp, constraint=ts1)
-    mle = probdiffeq.solver_mle(strategy=strategy, prior=iwp, constraint=ts1)
+    dynamic = probdiffeq.solver_dynamic(strategy=strategy, constraint=ts1)
+    mle = probdiffeq.solver_mle(strategy=strategy, constraint=ts1)
     num_pts = 200
 
     ts = jnp.linspace(t0, t1, num=num_pts, endpoint=True)
 
     solve_dynamic = ivpsolve.solve_fixed_grid(solver=dynamic)
-    solution_dynamic = jax.jit(solve_dynamic)(init, grid=ts)
+    solution_dynamic = jax.jit(solve_dynamic)(iwp, grid=ts)
 
     solve_mle = ivpsolve.solve_fixed_grid(solver=mle)
-    solution_mle = jax.jit(solve_mle)(init, grid=ts)
+    solution_mle = jax.jit(solve_mle)(iwp, grid=ts)
 
     # Plot the solution.
 

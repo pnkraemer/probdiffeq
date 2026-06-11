@@ -38,9 +38,7 @@ class IsotropicTreeFlatten(ssm_impl_api.AbstractTreeFlatten):
             return tree.tree_structure(s) == tree.tree_structure(x[0])
 
         leaves = tree.tree_leaves_depth_one(x)
-
         leaves_flat = [tree.ravel_pytree(s)[0] for s in leaves]
-
         return np.stack(leaves_flat)
 
     def flatten_tree_scalar(self, x):
@@ -355,6 +353,54 @@ class IsotropicOdeTs1(ssm_impl_api.AbstractOde):
         return cond, state
 
 
+class IsotropicWienerIntegrated(ssm_impl_api.AbstractPrior):
+    def __init__(self, init, output_scale, *, A, q_sqrtm, q0, tree_flatten, precon_fun):
+        super().__init__(init, output_scale)
+        self.A = A
+        self.q_sqrtm = q_sqrtm
+        self.q0 = q0
+        self.tree_flatten = tree_flatten
+        self.precon_fun = precon_fun
+
+    def transition(self, dt, output_scale: Array = 1.0):
+        output_scale = np.asarray(output_scale)
+        if output_scale.shape != ():
+            msg = "The base-scale has the wrong shape."
+            msg += f" Expected: {()}."
+            msg += f" Received: {output_scale.shape}."
+            raise ValueError(msg)
+
+        scale = self.output_scale * output_scale
+        noise = IsotropicNormal(self.q0, scale * self.q_sqrtm, self.tree_flatten)
+        p, p_inv = self.precon_fun(dt)
+        return IsotropicLatentCond(self.A, noise, to_latent=p_inv, to_observed=p)
+
+    @staticmethod
+    def register_pytree():
+        def flatten(iwp):
+            children = (iwp.init, iwp.output_scale, iwp.A, iwp.q_sqrtm, iwp.q0)
+            aux = (iwp.tree_flatten, iwp.precon_fun)
+            return children, aux
+
+        def unflatten(aux, children):
+            tf, precon_fun = aux
+            init, output_scale, A, q_sqrtm, q0 = children
+            return IsotropicWienerIntegrated(
+                init,
+                output_scale,
+                A=A,
+                q_sqrtm=q_sqrtm,
+                q0=q0,
+                tree_flatten=tf,
+                precon_fun=precon_fun,
+            )
+
+        tree.register_pytree_node(IsotropicWienerIntegrated, flatten, unflatten)
+
+
+IsotropicWienerIntegrated.register_pytree()
+
+
 class state_space_model_isotropic(ssm_impl_api.StateSpaceModel):
     """Isotropic (scalar-variance) state-space model implementation."""
 
@@ -417,31 +463,21 @@ class state_space_model_isotropic(ssm_impl_api.StateSpaceModel):
                 msg += f" Received: {output_scale.shape}."
                 raise ValueError(msg)
 
-        base_scale = output_scale
-
         num_derivatives = len(tcoeffs_mean) - 1
         (d,) = tree.ravel_pytree(tcoeffs_mean[0])[0].shape
         A, q_sqrtm = utilities.system_matrices_1d_iwp(num_derivatives)
         q0 = np.zeros((num_derivatives + 1, d))
-        precon_fun = utilities.preconditioner_taylor(num_derivatives=num_derivatives)
-
-        def discretise(dt, output_scale: Array = 1.0):
-            output_scale = np.asarray(output_scale)
-            if output_scale.shape != ():
-                msg = "The base-scale has the wrong shape."
-                msg += f" Expected: {()}."
-                msg += f" Received: {output_scale.shape}."
-                raise ValueError(msg)
-
-            scale = base_scale * output_scale
-
-            p, p_inv = precon_fun(dt)
-            tree_flatten = IsotropicTreeFlatten.from_example(tcoeffs_mean)
-            noise = IsotropicNormal(q0, scale * q_sqrtm, tree_flatten)
-
-            return IsotropicLatentCond(A, noise, to_latent=p_inv, to_observed=p)
-
-        return init, discretise
+        tf = IsotropicTreeFlatten.from_example(tcoeffs_mean)
+        precon_fun = utilities.preconditioner_taylor(num_derivatives)
+        return IsotropicWienerIntegrated(
+            init,
+            output_scale,
+            A=A,
+            q_sqrtm=q_sqrtm,
+            q0=q0,
+            tree_flatten=tf,
+            precon_fun=precon_fun,
+        )
 
     def prior_exponential(
         self,

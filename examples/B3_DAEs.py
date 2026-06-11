@@ -54,22 +54,22 @@ def main(t0=1e-6, t1=1e5) -> None:
     # the solutions live on vastly different scales
     # (but don't vary much within these scales).
     base_scale = jnp.asarray([0.8, 2e-05, 0.2])
-    init, ioup = ssm.prior_wiener_integrated(tcoeffs, output_scale=base_scale)
+    ioup = ssm.prior_wiener_integrated(tcoeffs, output_scale=base_scale)
 
     # We build a Jet constraint. Iteration is key, because DAEs are proper stiff.
     taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
     jet = ssm.constraint_residual(residual, taylor_point=taylor_point)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
-    solver = probdiffeq.solver_dynamic(strategy=strategy, prior=ioup, constraint=jet)
+    solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=jet)
 
     # The state-error-estimate doesn't care about the dimension
     # of the DAE, which is exactly what we need here
-    error = probdiffeq.error_state_std(constraint=jet, prior=ioup)
+    error = probdiffeq.error_state_std(constraint=jet)
 
     # Linear spacing on a log-scale
     save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=200)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    solution = jax.jit(solve)(init, save_at=save_at, atol=1e-9, rtol=1e-7)
+    solution = jax.jit(solve)(ioup, save_at=save_at, atol=1e-9, rtol=1e-7)
 
     fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(5, 5), sharex=True)
     ax[0][0].set_title("Robertson solution", fontsize="medium")

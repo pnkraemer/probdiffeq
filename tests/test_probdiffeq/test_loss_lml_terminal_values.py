@@ -36,13 +36,13 @@ def fixture_solution_and_loss_and_data(strategy_func, ssm_factory):
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
     ssm = ssm_factory()
-    init, iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs)
     ts0 = ssm.constraint_ode_ts0(vf)
     strategy = strategy_func()
-    solver = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
-    error = probdiffeq.error_residual_std(constraint=ts0, prior=iwp)
+    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
+    error = probdiffeq.error_residual_std(constraint=ts0)
     solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
-    sol = func.jit(solve)(init, t0=t0, t1=t1, atol=1e-2, rtol=1e-2)
+    sol = func.jit(solve)(iwp, t0=t0, t1=t1, atol=1e-2, rtol=1e-2)
 
     loss = probdiffeq.loss_lml_terminal_values()
     data = sol.u.mean[0]

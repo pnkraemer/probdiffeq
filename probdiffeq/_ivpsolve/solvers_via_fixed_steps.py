@@ -1,4 +1,4 @@
-from probdiffeq._ivpsolve import solver_interfaces
+from probdiffeq._ivpsolve import solver_protocols
 from probdiffeq.backend import flow, np
 from probdiffeq.backend.typing import Callable, TypeVar
 
@@ -9,11 +9,11 @@ __all__ = ["solve_fixed_grid"]
 
 
 def solve_fixed_grid(
-    *, solver: solver_interfaces.Solver
-) -> Callable[..., solver_interfaces.Solution]:
+    *, solver: solver_protocols.Solver
+) -> Callable[..., solver_protocols.Solution]:
     """Solve an initial value problem on a fixed, pre-determined grid."""
 
-    def solve(u: T, /, *, grid, damp: float = 0.0) -> solver_interfaces.Solution[T]:
+    def solve(u: T, /, *, grid, damp: float = 0.0) -> solver_protocols.Solution[T]:
         def body_fn(s, dt):
             s_new = solver.step(state=s, dt=dt, damp=damp)
             return s_new, s_new

@@ -133,17 +133,15 @@ def test_posterior_linearisation_matches_closed_form_recursion(
 ):
     derivatives = len(expected) - 1
     ssm = ssm_factory()
-    init, _iwp = ssm.prior_wiener_integrated(
-        [residual.u0], diffuse_derivatives=derivatives
-    )
+    iwp = ssm.prior_wiener_integrated([residual.u0], diffuse_derivatives=derivatives)
 
     lift_by = len(expected) - 2 if lift_by == "max" else lift_by
     constraint = jet_factory(ssm=ssm, lift_by=lift_by)
 
     cstate = constraint.init_linearization()
-    fx, cstate = constraint.linearize(init, cstate, damp=0.0, t=residual.t0)
+    fx, cstate = constraint.linearize(iwp.init, cstate, damp=0.0, t=residual.t0)
 
-    _observed, reverted = fx.revert(init, solve_triu=linalg.lstsq_svd)
+    _observed, reverted = fx.revert(iwp.init, solve_triu=linalg.lstsq_svd)
 
     updated = reverted.apply_flat(0.0)
     received = updated.mean
@@ -161,9 +159,9 @@ def test_wrong_lift_by_raises_error(
 ):
     # 5 Taylor coefficients + residual-orders of 2 (constraints depend on u and du).
     ssm = ssm_factory()
-    init, _ = ssm.prior_wiener_integrated([residual.u0], diffuse_derivatives=4)
+    iwp = ssm.prior_wiener_integrated([residual.u0], diffuse_derivatives=4)
     constraint = jet_factory(ssm=ssm, lift_by=wrong_lift_by)
 
     cstate = constraint.init_linearization()
     with testing.raises(ValueError, match="Received"):
-        _ = constraint.linearize(init, cstate, damp=0.0, t=residual.t0)
+        _ = constraint.linearize(iwp.init, cstate, damp=0.0, t=residual.t0)

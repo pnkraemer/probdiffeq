@@ -93,7 +93,7 @@ def solver(vf, u0, *, grid):
     def solve(p):
         """Evaluate the parameter-to-solution map."""
         tcoeffs = (u0, vf(u0, grid[0], p=p))
-        init, iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=10.0)
+        iwp = ssm.prior_wiener_integrated(tcoeffs, output_scale=10.0)
 
         @probdiffeq.ode
         def vf_p(y, /, *, t):
@@ -101,9 +101,9 @@ def solver(vf, u0, *, grid):
 
         ts0 = ssm.constraint_ode_ts0(vf_p)
         strategy = probdiffeq.strategy_smoother_fixedinterval()
-        solver_obj = probdiffeq.solver(strategy=strategy, prior=iwp, constraint=ts0)
+        solver_obj = probdiffeq.solver(strategy=strategy, constraint=ts0)
         solve_fn = ivpsolve.solve_fixed_grid(solver=solver_obj)
-        return solve_fn(init, grid=grid)
+        return solve_fn(iwp, grid=grid)
 
     return solve
 
