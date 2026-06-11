@@ -289,7 +289,7 @@ class AbstractPrior(abc.ABC):
         self.output_scale = output_scale
 
     @abc.abstractmethod
-    def discretize(self, dt, output_scale=1.0):
+    def discretize(self, *, dt, output_scale):
         """Discretize the prior at a time step."""
         raise NotImplementedError
 
