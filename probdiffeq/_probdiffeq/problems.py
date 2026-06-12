@@ -189,10 +189,17 @@ class jacobian_monte_carlo_fwd(Jacobian):
             f"{self.__class__.__name__}(seed={self.seed}, num_probes={self.num_probes})"
         )
 
-    def init_jacobian_handler(self):
-        return random.prng_key(seed=self.seed)
+    def init_jacobian_handler(self, *, num_tcoeffs: int, d: int):
+        return (random.prng_key(seed=self.seed), num_tcoeffs, d)
 
     def materialize_dense(self, fun, x, state, /, **fun_kwargs):
+        _key, num_tcoeffs, d = state
+        if x.shape != (num_tcoeffs * d,):
+            msg = "This function expects a flat array for 'x'. "
+            msg += f"Expected: x.shape = {(num_tcoeffs * d,)}. "
+            msg += f"Received: x.shape = {x.shape}. "
+            raise ValueError(msg)
+
         # TODO: approximate Jacobian with outer products instead of forming?
         # What is the "correct" thing to do?
         fx = fun(x, **fun_kwargs)
@@ -243,10 +250,17 @@ class jacobian_monte_carlo_rev(Jacobian):
             f"{self.__class__.__name__}(seed={self.seed}, num_probes={self.num_probes})"
         )
 
-    def init_jacobian_handler(self):
-        return random.prng_key(seed=self.seed)
+    def init_jacobian_handler(self, *, num_tcoeffs: int, d: int):
+        return (random.prng_key(seed=self.seed), num_tcoeffs, d)
 
     def materialize_dense(self, fun, x, state, /, **fun_kwargs):
+        _key, num_tcoeffs, d = state
+        if x.shape != (num_tcoeffs * d,):
+            msg = "This function expects a flat array for 'x'. "
+            msg += f"Expected: x.shape = {(num_tcoeffs * d,)}. "
+            msg += f"Received: x.shape = {x.shape}. "
+            raise ValueError(msg)
+
         # TODO: approximate Jacobian with outer products instead of forming?
         # What is the "correct" thing to do?
         fx = fun(x, **fun_kwargs)
