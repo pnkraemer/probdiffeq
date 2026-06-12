@@ -1,6 +1,7 @@
 """Jacobian matrix handling."""
 
-from probdiffeq.backend import func, linalg, random
+from probdiffeq.backend import func, linalg, np, random, structs, tree
+from probdiffeq.backend.typing import Array
 
 __all__ = [
     "Jacobian",
@@ -21,9 +22,7 @@ class Jacobian:
         """
         raise NotImplementedError
 
-    def materialize_dense(
-        self, fun, x, state, /, *, num_tcoeffs: int, d: int, **fun_kwargs
-    ):
+    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
         """Materialize a dense Jacobian.
 
         This is typically used for first-order linearization in dense
@@ -31,9 +30,7 @@ class Jacobian:
         """
         raise NotImplementedError
 
-    def calculate_trace_along_d(
-        self, fun, x, state, /, *, num_tcoeffs: int, d: int, **fun_kwargs
-    ):
+    def calculate_trace_along_d(self, fun, x, state, /, **fun_kwargs):
         """Calculate the trace of a Jacobian.
 
         This is typically used for first-order linearization in isotropic
@@ -41,15 +38,36 @@ class Jacobian:
         """
         raise NotImplementedError
 
-    def calculate_diagonal_along_d(
-        self, fun, x, state, /, *, num_tcoeffs: int, d: int, **fun_kwargs
-    ):
+    def calculate_diagonal_along_d(self, fun, x, state, /, **fun_kwargs):
         """Calculate the diagonal of a Jacobian.
 
         This is typically used for first-order linearization in block-diagonal
         state-space models.
         """
         raise NotImplementedError
+
+    def _verify_fun_and_x(self, fun, x):
+        fx_like = func.eval_shape(fun, x)
+
+        # Be strict with the input types and shapes (because previous versions
+        # of this code were lose *and different*.
+        msg = "'fun' must map an (n, d) array to an (m, d) array."
+        msg += f" Received: f(x).shape = {tree.tree_map(np.shape, fx_like)}"
+        msg += " for x.shape == {tree.tree_map(np.shape, x)}. "
+        if not isinstance(x, Array) or not isinstance(
+            fx_like, structs.ShapeDtypeStruct
+        ):
+            raise ValueError(msg)
+
+        if x.ndim != 2 or fx_like.ndim != 2:
+            raise ValueError(msg)
+
+        n_in, d = x.shape
+        n_out, d2 = fx_like.shape
+        if d != d2:
+            raise ValueError(msg)
+
+        return n_in, n_out, d
 
 
 class jacobian_materialize(Jacobian):
@@ -67,46 +85,27 @@ class jacobian_materialize(Jacobian):
     def init_jacobian_handler(self):
         return ()
 
-    def materialize_dense(
-        self, fun, x, state, /, num_tcoeffs: int, d: int, **fun_kwargs
-    ):
-        if x.shape != (num_tcoeffs * d,):
-            msg = "This function expects a flat array for 'x'. "
-            msg += f"Expected: x.shape = {(num_tcoeffs * d,)}. "
-            msg += f"Received: x.shape = {x.shape}. "
-            raise ValueError(msg)
+    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
+        n_in, n_out, d = self._verify_fun_and_x(fun, x)
 
         fx = fun(x, **fun_kwargs)
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, state
 
-    def calculate_trace_along_d(
-        self, fun, x, state, /, num_tcoeffs: int, d: int, **fun_kwargs
-    ):
-        if x.shape != (num_tcoeffs, d):
-            msg = "This function expects an nxd array for 'x'. "
-            msg += f"Expected: x.shape = {(num_tcoeffs, d)}. "
-            msg += f"Received: x.shape = {x.shape}. "
-            raise ValueError(msg)
+    def calculate_trace_along_d(self, fun, x, state, /, **fun_kwargs):
+        n_in, n_out, d = self._verify_fun_and_x(fun, x)
 
         fx = fun(x, **fun_kwargs)
-
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
-        dfx_trace = linalg.trace(dfx, axis1=0, axis2=-1)
+        dfx_trace = linalg.trace(dfx, axis1=1, axis2=3)
         return fx, dfx_trace, state
 
-    def calculate_diagonal_along_d(
-        self, fun, x, state, /, num_tcoeffs: int, d: int, **fun_kwargs
-    ):
-        if x.shape != (d, num_tcoeffs):
-            msg = "This function expects a dxn array for 'x'. "
-            msg += f"Expected: x.shape = {(d, num_tcoeffs)}. "
-            msg += f"Received: x.shape = {x.shape}. "
-            raise ValueError(msg)
+    def calculate_diagonal_along_d(self, fun, x, state, /, **fun_kwargs):
+        n_in, n_out, d = self._verify_fun_and_x(fun, x)
         fx = fun(x)
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
-        dfx_diagonal = linalg.diagonal(dfx, axis1=0, axis2=1)
-        return fx, dfx_diagonal.T, state
+        dfx_diagonal = linalg.einsum("mdnd->dmn", dfx)
+        return fx, dfx_diagonal, state
 
 
 class jacobian_monte_carlo_fwd(Jacobian):
@@ -135,14 +134,8 @@ class jacobian_monte_carlo_fwd(Jacobian):
     def init_jacobian_handler(self):
         return random.prng_key(seed=self.seed)
 
-    def materialize_dense(
-        self, fun, x, state, /, num_tcoeffs: int, d: int, **fun_kwargs
-    ):
-        if x.shape != (num_tcoeffs * d,):
-            msg = "This function expects a flat array for 'x'. "
-            msg += f"Expected: x.shape = {(num_tcoeffs * d,)}. "
-            msg += f"Received: x.shape = {x.shape}. "
-            raise ValueError(msg)
+    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
+        n_in, n_out, d = self._verify_fun_and_x(fun, x)
 
         # TODO: approximate Jacobian with outer products instead of forming?
         # What is the "correct" thing to do?
@@ -150,47 +143,47 @@ class jacobian_monte_carlo_fwd(Jacobian):
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, state
 
-    def calculate_trace_along_d(
-        self, fun, x, key, /, num_tcoeffs: int, d: int, **fun_kwargs
-    ):
-        if x.shape != (num_tcoeffs, d):
-            msg = "This function expects an nxd array for 'x'. "
-            msg += f"Expected: x.shape = {(num_tcoeffs, d)}. "
-            msg += f"Received: x.shape = {x.shape}. "
-            raise ValueError(msg)
+    def calculate_trace_along_d(self, fun, x, key, /, **fun_kwargs):
+        n_in, n_out, d = self._verify_fun_and_x(fun, x)
 
         fx, Jvp = func.linearize(lambda s: fun(s, **fun_kwargs), x)
 
         key, subkey = random.split(key, num=2)
-        sample_shape = (self.num_probes, *x.shape)
-        v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
-        J_trace = func.vmap(lambda s: linalg.vector_dot(s, Jvp(s)))(v)
-        J_trace = J_trace.mean(axis=0)
-        return fx, J_trace, key
 
-    def calculate_diagonal_along_d(self, fun, x, key, /, num_tcoeffs, d, **fun_kwargs):
-        if x.shape != (d, num_tcoeffs):
-            msg = "This function expects a dxn array for 'x'. "
-            msg += f"Expected: x.shape = {(d, num_tcoeffs)}. "
-            msg += f"Received: x.shape = {x.shape}. "
-            raise ValueError(msg)
+        # (s, n_in, d)
+        v = random.rademacher(subkey, shape=(self.num_probes, n_in, d), dtype=x.dtype)
 
-        fx, Jvp = func.linearize(lambda s: fun(s, **fun_kwargs), x)
-
-        key, subkey = random.split(key, num=2)
-        sample_shape = (self.num_probes, *x.shape)
-
-        # shape: (s, d, n)
-        v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
-
-        # shape: (s, d)
+        # (s, n_out, d)
         Jv = func.vmap(Jvp)(v)
 
-        # shape: (s, d, n)
-        vJv = v * Jv[..., None]
+        # (s, n_out, n_in)
+        vJv = linalg.einsum("smd,snd->snm", v, Jv)
 
-        # shape: (d, n)
-        J_diagonal = vJv.mean(axis=0)
+        # (n_out, n_in)
+        J_trace = np.mean(vJv, axis=0)
+        return fx, J_trace, key
+
+    def calculate_diagonal_along_d(self, fun, x, key, /, **fun_kwargs):
+        n_in, n_out, d = self._verify_fun_and_x(fun, x)
+
+        fx, Jvp = func.linearize(lambda s: fun(s, **fun_kwargs), x)
+
+        key, subkey = random.split(key, num=2)
+
+        # (s, n_in, d)
+        v = random.rademacher(subkey, shape=(self.num_probes, n_in, d), dtype=x.dtype)
+
+        # (s, n_out, d)
+        Jv = func.vmap(Jvp)(v)
+
+        # (s, n_out, n_in, d)
+        vJv = v[:, None, :, :] * Jv[:, :, None, :]
+
+        # (n_in, n_out, d)
+        J_diagonal = np.mean(vJv, axis=0)
+
+        # (d, n_in, n_out)
+        J_diagonal = np.transpose(J_diagonal, axes=(2, 0, 1))
         return fx, J_diagonal, key
 
 
@@ -220,14 +213,8 @@ class jacobian_monte_carlo_rev(Jacobian):
     def init_jacobian_handler(self):
         return random.prng_key(seed=self.seed)
 
-    def materialize_dense(
-        self, fun, x, state, /, num_tcoeffs: int, d: int, **fun_kwargs
-    ):
-        if x.shape != (num_tcoeffs * d,):
-            msg = "This function expects a flat array for 'x'. "
-            msg += f"Expected: x.shape = {(num_tcoeffs * d,)}. "
-            msg += f"Received: x.shape = {x.shape}. "
-            raise ValueError(msg)
+    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
+        n_in, n_out, d = self._verify_fun_and_x(fun, x)
 
         # TODO: approximate Jacobian with outer products instead of forming?
         # What is the "correct" thing to do?
@@ -235,55 +222,45 @@ class jacobian_monte_carlo_rev(Jacobian):
         dfx = func.jacrev(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, state
 
-    def calculate_trace_along_d(
-        self, fun, x, key, /, num_tcoeffs: int, d: int, **fun_kwargs
-    ):
-        if x.shape != (num_tcoeffs, d):
-            msg = "This function expects an nxd array for 'x'. "
-            msg += f"Expected: x.shape = {(num_tcoeffs, d)}. "
-            msg += f"Received: x.shape = {x.shape}. "
-            raise ValueError(msg)
+    def calculate_trace_along_d(self, fun, x, key, /, **fun_kwargs):
+        n_in, n_out, d = self._verify_fun_and_x(fun, x)
 
         fx, vjp = func.vjp(lambda s: fun(s, **fun_kwargs), x)
 
         key, subkey = random.split(key, num=2)
-        sample_shape = (self.num_probes, *(x[0].shape))
 
-        # v.shape: (s, d)
-        v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
+        # (s, n_out, d)
+        v = random.rademacher(subkey, shape=(self.num_probes, n_out, d), dtype=x.dtype)
 
-        # vjpx.shape: (s, n, d)
+        # (s, n_in, d)
         (vjpx,) = func.vmap(vjp)(v)
 
-        # Einsum along the "d" axis (trace = sum of diagonals)
-        J_trace = linalg.einsum("snd,sd->sn", vjpx, v)
+        # (s, n_in, n_out)
+        J_trace = linalg.einsum("snd,smd->smn", vjpx, v)
+
+        # (n_in, n_out)
         J_trace = J_trace.mean(axis=0)
         return fx, J_trace, key
 
-    def calculate_diagonal_along_d(
-        self, fun, x, key, /, num_tcoeffs: int, d: int, **fun_kwargs
-    ):
+    def calculate_diagonal_along_d(self, fun, x, key, /, **fun_kwargs):
 
-        if x.shape != (d, num_tcoeffs):
-            msg = "This function expects a dxn array for 'x'. "
-            msg += f"Expected: x.shape = {(d, num_tcoeffs)}. "
-            msg += f"Received: x.shape = {x.shape}. "
-            raise ValueError(msg)
-
+        n_in, n_out, d = self._verify_fun_and_x(fun, x)
         fx, vjp = func.vjp(lambda s: fun(s, **fun_kwargs), x)
 
         key, subkey = random.split(key, num=2)
-        sample_shape = (self.num_probes, *(x[:, 0].shape))
 
-        # shape: (s, d)
-        v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
+        # (s, n_out, d)
+        v = random.rademacher(subkey, shape=(self.num_probes, n_out, d), dtype=x.dtype)
 
-        # shape: (s, d, n)
+        # (s, n_in, d)
         (vjpx,) = func.vmap(vjp)(v)
 
-        # shape: (s, d, n)
-        vJv = vjpx * v[..., None]
+        # (s, n_out, n_in, d)
+        vJv = vjpx[:, None, :, :] * v[:, :, None, :]
 
-        # shape: (d, n)
-        J_diagonal = vJv.mean(axis=0)
+        # (n_out, n_in, d)
+        J_diagonal = np.mean(vJv, axis=0)
+
+        # (d, n_out, n_in)
+        J_diagonal = np.transpose(J_diagonal, axes=(2, 0, 1))
         return fx, J_diagonal, key
