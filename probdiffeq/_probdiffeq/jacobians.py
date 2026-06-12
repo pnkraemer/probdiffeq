@@ -57,7 +57,7 @@ class Jacobian:
         if not isinstance(x, Array) or not isinstance(
             fx_like, structs.ShapeDtypeStruct
         ):
-            raise ValueError(msg)
+            raise TypeError(msg)
 
         if x.ndim != 2 or fx_like.ndim != 2:
             raise ValueError(msg)
@@ -86,14 +86,14 @@ class jacobian_materialize(Jacobian):
         return ()
 
     def materialize_dense(self, fun, x, state, /, **fun_kwargs):
-        n_in, n_out, d = self._verify_fun_and_x(fun, x)
+        _ = self._verify_fun_and_x(fun, x)
 
         fx = fun(x, **fun_kwargs)
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, state
 
     def calculate_trace_along_d(self, fun, x, state, /, **fun_kwargs):
-        n_in, n_out, d = self._verify_fun_and_x(fun, x)
+        _ = self._verify_fun_and_x(fun, x)
 
         fx = fun(x, **fun_kwargs)
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
@@ -101,7 +101,7 @@ class jacobian_materialize(Jacobian):
         return fx, dfx_trace, state
 
     def calculate_diagonal_along_d(self, fun, x, state, /, **fun_kwargs):
-        n_in, n_out, d = self._verify_fun_and_x(fun, x)
+        _ = self._verify_fun_and_x(fun, x)
         fx = fun(x)
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         dfx_diagonal = linalg.einsum("mdnd->dmn", dfx)
@@ -135,7 +135,7 @@ class jacobian_monte_carlo_fwd(Jacobian):
         return random.prng_key(seed=self.seed)
 
     def materialize_dense(self, fun, x, state, /, **fun_kwargs):
-        n_in, n_out, d = self._verify_fun_and_x(fun, x)
+        _ = self._verify_fun_and_x(fun, x)
 
         # TODO: approximate Jacobian with outer products instead of forming?
         # What is the "correct" thing to do?
@@ -144,7 +144,7 @@ class jacobian_monte_carlo_fwd(Jacobian):
         return fx, dfx, state
 
     def calculate_trace_along_d(self, fun, x, key, /, **fun_kwargs):
-        n_in, n_out, d = self._verify_fun_and_x(fun, x)
+        n_in, _n_out, d = self._verify_fun_and_x(fun, x)
 
         fx, Jvp = func.linearize(lambda s: fun(s, **fun_kwargs), x)
 
@@ -164,7 +164,7 @@ class jacobian_monte_carlo_fwd(Jacobian):
         return fx, J_trace, key
 
     def calculate_diagonal_along_d(self, fun, x, key, /, **fun_kwargs):
-        n_in, n_out, d = self._verify_fun_and_x(fun, x)
+        n_in, _n_out, d = self._verify_fun_and_x(fun, x)
 
         fx, Jvp = func.linearize(lambda s: fun(s, **fun_kwargs), x)
 
@@ -214,7 +214,7 @@ class jacobian_monte_carlo_rev(Jacobian):
         return random.prng_key(seed=self.seed)
 
     def materialize_dense(self, fun, x, state, /, **fun_kwargs):
-        n_in, n_out, d = self._verify_fun_and_x(fun, x)
+        _ = self._verify_fun_and_x(fun, x)
 
         # TODO: approximate Jacobian with outer products instead of forming?
         # What is the "correct" thing to do?
@@ -223,7 +223,7 @@ class jacobian_monte_carlo_rev(Jacobian):
         return fx, dfx, state
 
     def calculate_trace_along_d(self, fun, x, key, /, **fun_kwargs):
-        n_in, n_out, d = self._verify_fun_and_x(fun, x)
+        _n_in, n_out, d = self._verify_fun_and_x(fun, x)
 
         fx, vjp = func.vjp(lambda s: fun(s, **fun_kwargs), x)
 
@@ -244,7 +244,7 @@ class jacobian_monte_carlo_rev(Jacobian):
 
     def calculate_diagonal_along_d(self, fun, x, key, /, **fun_kwargs):
 
-        n_in, n_out, d = self._verify_fun_and_x(fun, x)
+        _n_in, n_out, d = self._verify_fun_and_x(fun, x)
         fx, vjp = func.vjp(lambda s: fun(s, **fun_kwargs), x)
 
         key, subkey = random.split(key, num=2)

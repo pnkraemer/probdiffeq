@@ -30,7 +30,7 @@ def test_materialize_dense(
 
     # Assert that if vecs of the wrong shape are passed, errors are raised.
     msg = "Received: "
-    with testing.raises(ValueError, match=msg):
+    with testing.raises(TypeError, match=msg):
         _ = jacobian.materialize_dense(fun, [*x], state)
 
     with testing.raises(ValueError, match=msg):
@@ -68,7 +68,7 @@ def test_calculate_trace_along_d(
 
     # Assert that if vecs of the wrong shape are passed, errors are raised.
     msg = "Received: "
-    with testing.raises(ValueError, match=msg):
+    with testing.raises(TypeError, match=msg):
         _ = jacobian.materialize_dense(fun, [*x], state)
 
     with testing.raises(ValueError, match=msg):
@@ -106,7 +106,7 @@ def test_jacobian_calculate_diagonal_along_d(
 
     # Assert that if vecs of the wrong shape are passed, errors are raised.
     msg = "Received: "
-    with testing.raises(ValueError, match=msg):
+    with testing.raises(TypeError, match=msg):
         _ = jacobian.materialize_dense(fun, [*x], state)
 
     with testing.raises(ValueError, match=msg):

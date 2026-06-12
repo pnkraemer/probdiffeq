@@ -148,8 +148,9 @@ class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
 
     def linearize(self, rv, state, *, damp: float, t):
 
-        m0_tree = rv.mean[0]
-        rv0 = BlockDiagNormal.from_dirac([m0_tree], damp=0.0)
+        # Understand flattening and unflattening for
+        # single Taylor coefficients
+        rv0 = BlockDiagNormal.from_dirac([rv.mean[0]], damp=0.0)
 
         def a1(s):
             return s[[self.ode.num_tcoeffs_in_args], ...]
@@ -165,11 +166,18 @@ class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
         # Evaluate the linearisation
         # Not 100% the most efficient because we compute the diagonal of
         # the function of all tcoeffs instead of just the relevant ones.
-        d, n = rv.mean_flat.shape
+        # But if we use reverse-Jacobians, things should be fine.
         fx, J_diag, state = self.ode.jacobian.calculate_diagonal_along_d(
             vf_flat, rv.mean_flat.T, state
         )
+
+        # Jacobian objects work with (n, d) arrays but block-diagonal models with (d, n) arrays
         fx = fx.T
+
+        msg = "TODO (next): make the outputs of ODEFunction.vector_field into tuples and fix all tests."
+        msg += "Then, we should have the software for jet linearisation in ODEs "
+        msg += "and long term we could remove jetexpand from the PEC solvers."
+        raise RuntimeError(msg)
 
         # J_diag.shape = (d, 1, n)
         # linop.shape: (d, 1, n)

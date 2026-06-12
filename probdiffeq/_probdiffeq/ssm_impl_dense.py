@@ -264,36 +264,57 @@ class DenseOdeTs1(ssm_impl_api.AbstractOde):
     def init_linearization(self):
         return self.ode.jacobian.init_jacobian_handler()
 
-    def linearize(self, rv, state: None, *, damp: float, t):
+    def linearize(self, rv, state, *, damp: float, t: float):
+        # Read n and d so that we can turn latent arrays into
+        # (n, d) arrays, which Jacobians require
         m_tree = rv.mean
         n = len(m_tree)
         d = rv.mean_flat.size // n
 
+        # Rewrite the vector field as one that maps
+        # Arrays to arrays.
+        # Maps (n, d) to (1, d) to conform the Jacobian API
         def vf(s: Array) -> Array:
-            # Maps (n, d) to (1, d) to conform the Jacobian API
+            # Move to latent space
             s = np.reshape(s, (-1,))
+
+            # Extract all tcoeffs
             jet_coords = rv.tree_flatten.unflatten_array(s)
+
+            # Extract relevant tcoeffs ("jet-coordinates")
             jet_coords = jet_coords[: self.ode.num_tcoeffs_in_args]
+
+            # Evaluate the actual vector field
             fs0 = self.ode.vector_field(jet_coords=jet_coords, t=t)
+
+            # Bring back into (m, d) form.
             return tree.ravel_pytree(fs0)[0][None, :]
 
+        # Materialize the Jacobian
+        m0 = rv.mean_flat.reshape((n, d))
+        fx, J, state = self.ode.jacobian.materialize_dense(vf, m0, state)
+
+        # Flatten fx and J correctly (from [m, d, n, d] to [md,nd])
+        m, d = fx.shape
+        fx = fx.reshape((m * d,))
+        J = J.reshape((m * d, -1))
+
+        # Bulletproof construction of selection operators via jacobian(slicing).
         @func.jacfwd
         def e1(s):
             s_tree = rv.tree_flatten.unflatten_array(s)
             return tree.ravel_pytree(s_tree[self.ode.num_tcoeffs_in_args])[0]
 
+        # Complete the expressions for bias and linop
+        fx = J @ m0 - fx
         E1 = e1(rv.mean_flat)
-
-        m0 = rv.mean_flat.reshape((n, d))
-        fx, J, state = self.ode.jacobian.materialize_dense(vf, m0, state)
-        m, d = fx.shape
-        fx = fx.reshape((m * d,))
-        J = J.reshape((m * d, -1))
         linop = E1 - J
-        fx = -(fx - J @ m0)
 
+        # Flatten fx into the correct pytree structure
         f0 = DenseNormal.from_dirac([m_tree[self.ode.num_tcoeffs_in_args]], damp=0.0)
         fx = f0.tree_flatten.unflatten_array(fx)
+
+        # Collect all quantities and return
         noise = DenseNormal.from_dirac(fx, damp=damp)
         cond = DenseLatentCond.from_linop_and_noise(linop, noise)
         return cond, state
