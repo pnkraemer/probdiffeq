@@ -322,32 +322,30 @@ class IsotropicOdeTs1(ssm_impl_api.AbstractOde):
 
     def linearize(self, rv, state, *, damp: float, t):
 
-        # Estimate the trace using Hutchinson's estimator
-        m0, m0_unravel = tree.ravel_pytree(rv.mean)
-
         # Evaluate the linearisation
         m0_tree = rv.mean[: self.ode.num_tcoeffs_in_args]
         rv0 = IsotropicNormal.from_dirac(m0_tree, damp=0.0)
 
-        def vf_ravel(s):
-            s_tree = m0_unravel(s)[: self.ode.num_tcoeffs_in_args]
+        def vf(s_stack):
+            s_tree = rv.tree_flatten.unflatten_array(s_stack)
+            s_tree = s_tree[: self.ode.num_tcoeffs_in_args]
             fs = self.ode.vector_field(jet_coords=s_tree, t=t)
             return tree.ravel_pytree(fs)[0]
 
-        print(m0)
-        print(vf_ravel(m0))
-        fx, J_trace, state = self.ode.jacobian.calculate_trace(vf_ravel, m0, state)
+        n, d = rv.mean_flat.shape
+        # This is not 100% the most efficent because we compute the trace
+        # of the function that depends on all tcoeffs instead of just the
+        # relevant ones.
+        fx, J_trace, state = self.ode.jacobian.calculate_trace_along_d(
+            vf, rv.mean_flat, state, num_tcoeffs=n, d=d
+        )
 
-        assert False
         # Best Jacobian approximation: mean of diagonal = trace / len(diagonal)
-        J_trace /= len(fx)
+        J_trace = J_trace[None, ...] / d
 
         n, _d = rv.mean_flat.shape
         eye = np.eye(n)
         E0, E1 = eye[np.asarray([0])], eye[np.asarray([1])]
-
-        print(E0.shape)
-        print(E1.shape)
 
         n, _d = rv.mean_flat.shape
         eye = np.eye(n)

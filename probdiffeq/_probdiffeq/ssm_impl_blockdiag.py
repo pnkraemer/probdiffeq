@@ -157,16 +157,25 @@ class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
         linop = func.vmap(func.jacrev(a1))(rv.mean_flat)
 
         def vf_flat(u):
-            u_tree = rv0.tree_flatten.unflatten_array(u[:, None])
+            u_tree = rv.tree_flatten.unflatten_array(u)
+            u_tree = u_tree[: self.ode.num_tcoeffs_in_args]
             fu_tree = self.ode.vector_field(jet_coords=u_tree, t=t)
             return rv0.tree_flatten.flatten_tree([fu_tree]).reshape((-1,))
 
         # Evaluate the linearisation
-        m0 = rv.mean_flat[:, 0]
-        fx, J_diag, state = self.ode.jacobian.calculate_diagonal(vf_flat, m0, state)
+        # Not 100% the most efficient because we compute the diagonal of
+        # the function of all tcoeffs instead of just the relevant ones.
+        d, n = rv.mean_flat.shape
+        fx, J_diag, state = self.ode.jacobian.calculate_diagonal_along_d(
+            vf_flat, rv.mean_flat, state, num_tcoeffs=n, d=d
+        )
 
         E1 = func.jacrev(lambda s: s[0])(rv.mean_flat[0])
-        linop = linop - J_diag[:, None, None] * E1[None, None, :]
+
+        # J_diag.shape = (d, n)
+        # E1.shape = (n,)
+        # linop.shape: (d, 1, n)
+        linop = linop - J_diag[:, None, :] * E1[None, None, :]
 
         fx = rv.mean_flat[:, 1] - fx
         fx = fx[..., None]

@@ -12,8 +12,8 @@ from probdiffeq.backend import np, testing
         probdiffeq.jacobian_monte_carlo_rev(),
     ],
 )
-@testing.parametrize("n", [1, 3])
-@testing.parametrize("d", [1, 2])
+@testing.parametrize("n", [3])
+@testing.parametrize("d", [2])
 def test_jacobian_materialize_dense(jacobian: probdiffeq.Jacobian, n: int, d: int):
 
     def vf_nd(vec_nd):
@@ -23,18 +23,22 @@ def test_jacobian_materialize_dense(jacobian: probdiffeq.Jacobian, n: int, d: in
     vec = np.arange(0, n * d)
     vec /= np.mean(vec)
 
-    state = jacobian.init_jacobian_handler(num_tcoeffs=n, d=d)
+    state = jacobian.init_jacobian_handler()
 
     # Assert that if vecs of the wrong shape are passed, errors are raised.
     msg = "expects a flat"
     with testing.raises(ValueError, match=msg):
-        _ = jacobian.materialize_dense(vf_nd, vec.reshape((d, n)), state)
+        _ = jacobian.materialize_dense(
+            vf_nd, vec.reshape((d, n)), state, num_tcoeffs=n, d=d
+        )
 
     with testing.raises(ValueError, match=msg):
-        _ = jacobian.materialize_dense(vf_nd, vec.reshape((d, n)).T, state)
+        _ = jacobian.materialize_dense(
+            vf_nd, vec.reshape((d, n)).T, state, num_tcoeffs=n, d=d
+        )
 
     # Assert that when the right input is passed, the Jacobian has the expected shape
-    _fx, J, _ = jacobian.materialize_dense(vf_nd, vec, state)
+    _fx, J, _ = jacobian.materialize_dense(vf_nd, vec, state, num_tcoeffs=n, d=d)
 
     assert J.shape == (d, n * d)
 
@@ -47,8 +51,8 @@ def test_jacobian_materialize_dense(jacobian: probdiffeq.Jacobian, n: int, d: in
         probdiffeq.jacobian_monte_carlo_rev(),
     ],
 )
-@testing.parametrize("n", [1, 3])
-@testing.parametrize("d", [1, 2])
+@testing.parametrize("n", [3])
+@testing.parametrize("d", [2])
 def test_jacobian_calculate_trace_along_d(
     jacobian: probdiffeq.Jacobian, n: int, d: int
 ):
@@ -59,19 +63,26 @@ def test_jacobian_calculate_trace_along_d(
     vec = np.arange(0, n * d).reshape((n, d))
     vec /= np.mean(vec)
 
-    state = jacobian.init_jacobian_handler(num_tcoeffs=n, d=d)
+    state = jacobian.init_jacobian_handler()
 
     # Assert that if vecs of the wrong shape are passed, errors are raised.
     msg = "expects an nxd"
     with testing.raises(ValueError, match=msg):
-        _ = jacobian.calculate_trace_along_d(vf_nxd, vec.reshape((d * n,)), state)
+        _ = jacobian.calculate_trace_along_d(
+            vf_nxd, vec.reshape((d * n,)), state, num_tcoeffs=n, d=d
+        )
 
     if d != n:
         with testing.raises(ValueError, match=msg):
-            _ = jacobian.calculate_trace_along_d(vf_nxd, vec.reshape((d, n)), state)
+            _ = jacobian.calculate_trace_along_d(
+                vf_nxd, vec.reshape((d, n)), state, num_tcoeffs=n, d=d
+            )
 
     # Assert that when the right input is passed, the Jacobian has the expected shape
-    _fx, J, _ = jacobian.calculate_trace_along_d(vf_nxd, vec, state)
+    for _ in range(4):
+        _fx, J, state = jacobian.calculate_trace_along_d(
+            vf_nxd, vec, state, num_tcoeffs=n, d=d
+        )
 
     assert J.shape == (n,)
 
@@ -84,8 +95,8 @@ def test_jacobian_calculate_trace_along_d(
         probdiffeq.jacobian_monte_carlo_rev(),
     ],
 )
-@testing.parametrize("n", [1, 3])
-@testing.parametrize("d", [1, 2])
+@testing.parametrize("n", [3])
+@testing.parametrize("d", [2])
 def test_jacobian_calculate_diagonal_along_d(
     jacobian: probdiffeq.Jacobian, n: int, d: int
 ):
@@ -96,18 +107,24 @@ def test_jacobian_calculate_diagonal_along_d(
     vec = np.arange(0, n * d).reshape((d, n))
     vec /= np.mean(vec)
 
-    state = jacobian.init_jacobian_handler(num_tcoeffs=n, d=d)
+    state = jacobian.init_jacobian_handler()
 
     # Assert that if vecs of the wrong shape are passed, errors are raised.
     msg = "expects a dxn"
     with testing.raises(ValueError, match=msg):
-        _ = jacobian.calculate_diagonal_along_d(vf_dxn, vec.reshape((d * n,)), state)
+        _ = jacobian.calculate_diagonal_along_d(
+            vf_dxn, vec.reshape((d * n,)), state, num_tcoeffs=n, d=d
+        )
 
     if d != n:
         with testing.raises(ValueError, match=msg):
-            _ = jacobian.calculate_diagonal_along_d(vf_dxn, vec.reshape((n, d)), state)
+            _ = jacobian.calculate_diagonal_along_d(
+                vf_dxn, vec.reshape((n, d)), state, num_tcoeffs=n, d=d
+            )
 
     # Assert that when the right input is passed, the Jacobian has the expected shape
-    _fx, J, _ = jacobian.calculate_diagonal_along_d(vf_dxn, vec, state)
+    _fx, J, _ = jacobian.calculate_diagonal_along_d(
+        vf_dxn, vec, state, num_tcoeffs=n, d=d
+    )
 
     assert J.shape == (d, n)

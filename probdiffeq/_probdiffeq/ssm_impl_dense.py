@@ -269,17 +269,10 @@ class DenseOdeTs1(ssm_impl_api.AbstractOde):
 
         rv0 = DenseNormal.from_dirac(m_tree[: self.ode.num_tcoeffs_in_args], damp=0.0)
 
-        def vf_flat(s: Array) -> Array:
+        def vf(s: Array) -> Array:
             jet_coords = rv0.tree_flatten.unflatten_array(s)
             fs0 = self.ode.vector_field(jet_coords=jet_coords, t=t)
             return rv0.tree_flatten.flatten_tree([fs0])
-
-        def select_i(i) -> Callable[[Array], Array]:
-            def select(s: Array) -> Array:
-                s_tree = rv.tree_flatten.unflatten_array(s)
-                return rv0.tree_flatten.flatten_tree(s_tree[i])
-
-            return select
 
         @func.jacfwd
         def e0(s):
@@ -295,7 +288,12 @@ class DenseOdeTs1(ssm_impl_api.AbstractOde):
         E1 = e1(rv.mean_flat)
 
         m0 = rv0.mean_flat
-        fx, J, state = self.ode.jacobian.materialize_dense(vf_flat, m0, state)
+
+        n = self.ode.num_tcoeffs_in_args
+        (d,) = tree.ravel_pytree(m_tree[0])[0].shape
+        fx, J, state = self.ode.jacobian.materialize_dense(
+            vf, m0, state, num_tcoeffs=n, d=d
+        )
         linop = E1 - J @ E0
         fx = -(fx - J @ m0)
 

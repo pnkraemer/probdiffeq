@@ -99,7 +99,9 @@ class Jacobian:
         """
         raise NotImplementedError
 
-    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
+    def materialize_dense(
+        self, fun, x, state, /, *, num_tcoeffs: int, d: int, **fun_kwargs
+    ):
         """Materialize a dense Jacobian.
 
         This is typically used for first-order linearization in dense
@@ -107,7 +109,9 @@ class Jacobian:
         """
         raise NotImplementedError
 
-    def calculate_trace_along_d(self, fun, x, state, /, **fun_kwargs):
+    def calculate_trace_along_d(
+        self, fun, x, state, /, *, num_tcoeffs: int, d: int, **fun_kwargs
+    ):
         """Calculate the trace of a Jacobian.
 
         This is typically used for first-order linearization in isotropic
@@ -115,7 +119,9 @@ class Jacobian:
         """
         raise NotImplementedError
 
-    def calculate_diagonal_along_d(self, fun, x, state, /, **fun_kwargs):
+    def calculate_diagonal_along_d(
+        self, fun, x, state, /, *, num_tcoeffs: int, d: int, **fun_kwargs
+    ):
         """Calculate the diagonal of a Jacobian.
 
         This is typically used for first-order linearization in block-diagonal
@@ -136,11 +142,12 @@ class jacobian_materialize(Jacobian):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(jacfun={self.jacfun})"
 
-    def init_jacobian_handler(self, *, num_tcoeffs: int, d: int):
-        return (num_tcoeffs, d)
+    def init_jacobian_handler(self):
+        return ()
 
-    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
-        num_tcoeffs, d = state
+    def materialize_dense(
+        self, fun, x, state, /, num_tcoeffs: int, d: int, **fun_kwargs
+    ):
         if x.shape != (num_tcoeffs * d,):
             msg = "This function expects a flat array for 'x'. "
             msg += f"Expected: x.shape = {(num_tcoeffs * d,)}. "
@@ -149,10 +156,11 @@ class jacobian_materialize(Jacobian):
 
         fx = fun(x, **fun_kwargs)
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
-        return fx, dfx, ()
+        return fx, dfx, state
 
-    def calculate_trace_along_d(self, fun, x, state, /, **fun_kwargs):
-        num_tcoeffs, d = state
+    def calculate_trace_along_d(
+        self, fun, x, state, /, num_tcoeffs: int, d: int, **fun_kwargs
+    ):
         if x.shape != (num_tcoeffs, d):
             msg = "This function expects an nxd array for 'x'. "
             msg += f"Expected: x.shape = {(num_tcoeffs, d)}. "
@@ -163,10 +171,11 @@ class jacobian_materialize(Jacobian):
 
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         dfx_trace = linalg.trace(dfx, axis1=0, axis2=-1)
-        return fx, dfx_trace, ()
+        return fx, dfx_trace, state
 
-    def calculate_diagonal_along_d(self, fun, x, state, /, **fun_kwargs):
-        num_tcoeffs, d = state
+    def calculate_diagonal_along_d(
+        self, fun, x, state, /, num_tcoeffs: int, d: int, **fun_kwargs
+    ):
         if x.shape != (d, num_tcoeffs):
             msg = "This function expects a dxn array for 'x'. "
             msg += f"Expected: x.shape = {(d, num_tcoeffs)}. "
@@ -175,7 +184,7 @@ class jacobian_materialize(Jacobian):
         fx = fun(x)
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         dfx_diagonal = linalg.diagonal(dfx, axis1=0, axis2=1)
-        return fx, dfx_diagonal.T, ()
+        return fx, dfx_diagonal.T, state
 
 
 class jacobian_monte_carlo_fwd(Jacobian):
@@ -201,11 +210,12 @@ class jacobian_monte_carlo_fwd(Jacobian):
             f"{self.__class__.__name__}(seed={self.seed}, num_probes={self.num_probes})"
         )
 
-    def init_jacobian_handler(self, *, num_tcoeffs: int, d: int):
-        return (random.prng_key(seed=self.seed), num_tcoeffs, d)
+    def init_jacobian_handler(self):
+        return random.prng_key(seed=self.seed)
 
-    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
-        _key, num_tcoeffs, d = state
+    def materialize_dense(
+        self, fun, x, state, /, num_tcoeffs: int, d: int, **fun_kwargs
+    ):
         if x.shape != (num_tcoeffs * d,):
             msg = "This function expects a flat array for 'x'. "
             msg += f"Expected: x.shape = {(num_tcoeffs * d,)}. "
@@ -218,8 +228,9 @@ class jacobian_monte_carlo_fwd(Jacobian):
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, state
 
-    def calculate_trace_along_d(self, fun, x, state, /, **fun_kwargs):
-        key, num_tcoeffs, d = state
+    def calculate_trace_along_d(
+        self, fun, x, key, /, num_tcoeffs: int, d: int, **fun_kwargs
+    ):
         if x.shape != (num_tcoeffs, d):
             msg = "This function expects an nxd array for 'x'. "
             msg += f"Expected: x.shape = {(num_tcoeffs, d)}. "
@@ -235,8 +246,7 @@ class jacobian_monte_carlo_fwd(Jacobian):
         J_trace = J_trace.mean(axis=0)
         return fx, J_trace, key
 
-    def calculate_diagonal_along_d(self, fun, x, state, /, **fun_kwargs):
-        key, num_tcoeffs, d = state
+    def calculate_diagonal_along_d(self, fun, x, key, /, num_tcoeffs, d, **fun_kwargs):
         if x.shape != (d, num_tcoeffs):
             msg = "This function expects a dxn array for 'x'. "
             msg += f"Expected: x.shape = {(d, num_tcoeffs)}. "
@@ -285,11 +295,12 @@ class jacobian_monte_carlo_rev(Jacobian):
             f"{self.__class__.__name__}(seed={self.seed}, num_probes={self.num_probes})"
         )
 
-    def init_jacobian_handler(self, *, num_tcoeffs: int, d: int):
-        return (random.prng_key(seed=self.seed), num_tcoeffs, d)
+    def init_jacobian_handler(self):
+        return random.prng_key(seed=self.seed)
 
-    def materialize_dense(self, fun, x, state, /, **fun_kwargs):
-        _key, num_tcoeffs, d = state
+    def materialize_dense(
+        self, fun, x, state, /, num_tcoeffs: int, d: int, **fun_kwargs
+    ):
         if x.shape != (num_tcoeffs * d,):
             msg = "This function expects a flat array for 'x'. "
             msg += f"Expected: x.shape = {(num_tcoeffs * d,)}. "
@@ -302,8 +313,9 @@ class jacobian_monte_carlo_rev(Jacobian):
         dfx = func.jacrev(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, state
 
-    def calculate_trace_along_d(self, fun, x, state, /, **fun_kwargs):
-        key, num_tcoeffs, d = state
+    def calculate_trace_along_d(
+        self, fun, x, key, /, num_tcoeffs: int, d: int, **fun_kwargs
+    ):
         if x.shape != (num_tcoeffs, d):
             msg = "This function expects an nxd array for 'x'. "
             msg += f"Expected: x.shape = {(num_tcoeffs, d)}. "
@@ -326,9 +338,10 @@ class jacobian_monte_carlo_rev(Jacobian):
         J_trace = J_trace.mean(axis=0)
         return fx, J_trace, key
 
-    def calculate_diagonal_along_d(self, fun, x, state, /, **fun_kwargs):
+    def calculate_diagonal_along_d(
+        self, fun, x, key, /, num_tcoeffs: int, d: int, **fun_kwargs
+    ):
 
-        key, num_tcoeffs, d = state
         if x.shape != (d, num_tcoeffs):
             msg = "This function expects a dxn array for 'x'. "
             msg += f"Expected: x.shape = {(d, num_tcoeffs)}. "
@@ -345,7 +358,6 @@ class jacobian_monte_carlo_rev(Jacobian):
 
         # shape: (s, d, n)
         (vjpx,) = func.vmap(vjp)(v)
-        print(vjpx.shape)
 
         # shape: (s, d, n)
         vJv = vjpx * v[..., None]
