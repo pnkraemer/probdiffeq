@@ -80,8 +80,8 @@ def diagonal(arr, /):
     return jnp.diagonal(arr)
 
 
-def trace(arr, /):
-    return jnp.trace(arr)
+def trace(arr, /, *, axis1=0, axis2=1):
+    return jnp.trace(arr, axis1=axis1, axis2=axis2)
 
 
 def diagonal_matrix(arr, /, k=0):
@@ -94,3 +94,7 @@ def triu(arr, /):
 
 def expm(arr, /):
     return jax.scipy.linalg.expm(arr)
+
+
+def einsum(expression, *args):
+    return jnp.einsum(expression, *args)

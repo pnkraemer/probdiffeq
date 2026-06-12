@@ -107,7 +107,7 @@ class Jacobian:
         """
         raise NotImplementedError
 
-    def calculate_trace(self, fun, x, state, /, **fun_kwargs):
+    def calculate_trace_along_d(self, fun, x, state, /, **fun_kwargs):
         """Calculate the trace of a Jacobian.
 
         This is typically used for first-order linearization in isotropic
@@ -115,7 +115,7 @@ class Jacobian:
         """
         raise NotImplementedError
 
-    def calculate_diagonal(self, fun, x, state, /, **fun_kwargs):
+    def calculate_diagonal_along_d(self, fun, x, state, /, **fun_kwargs):
         """Calculate the diagonal of a Jacobian.
 
         This is typically used for first-order linearization in block-diagonal
@@ -151,14 +151,21 @@ class jacobian_materialize(Jacobian):
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, ()
 
-    def calculate_trace(self, fun, x, state, /, **fun_kwargs):
-        del state
+    def calculate_trace_along_d(self, fun, x, state, /, **fun_kwargs):
+        num_tcoeffs, d = state
+        if x.shape != (num_tcoeffs, d):
+            msg = "This function expects an nxd array for 'x'. "
+            msg += f"Expected: x.shape = {(num_tcoeffs, d)}. "
+            msg += f"Received: x.shape = {x.shape}. "
+            raise ValueError(msg)
+
         fx = fun(x, **fun_kwargs)
+
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
-        dfx_trace = linalg.trace(dfx)
+        dfx_trace = linalg.trace(dfx, axis1=0, axis2=-1)
         return fx, dfx_trace, ()
 
-    def calculate_diagonal(self, fun, x, state, /, **fun_kwargs):
+    def calculate_diagonal_along_d(self, fun, x, state, /, **fun_kwargs):
         del state
         fx = fun(x)
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
@@ -206,7 +213,14 @@ class jacobian_monte_carlo_fwd(Jacobian):
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, state
 
-    def calculate_trace(self, fun, x, key, /, **fun_kwargs):
+    def calculate_trace_along_d(self, fun, x, state, /, **fun_kwargs):
+        key, num_tcoeffs, d = state
+        if x.shape != (num_tcoeffs, d):
+            msg = "This function expects an nxd array for 'x'. "
+            msg += f"Expected: x.shape = {(num_tcoeffs, d)}. "
+            msg += f"Received: x.shape = {x.shape}. "
+            raise ValueError(msg)
+
         key, subkey = random.split(key, num=2)
         sample_shape = (self.num_probes, *x.shape)
         v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
@@ -216,7 +230,7 @@ class jacobian_monte_carlo_fwd(Jacobian):
         J_trace = J_trace.mean(axis=0)
         return fx, J_trace, key
 
-    def calculate_diagonal(self, fun, x, key, /, **fun_kwargs):
+    def calculate_diagonal_along_d(self, fun, x, key, /, **fun_kwargs):
         key, subkey = random.split(key, num=2)
         sample_shape = (self.num_probes, *x.shape)
         v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
@@ -267,17 +281,32 @@ class jacobian_monte_carlo_rev(Jacobian):
         dfx = func.jacrev(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, state
 
-    def calculate_trace(self, fun, x, key, /, **fun_kwargs):
+    def calculate_trace_along_d(self, fun, x, state, /, **fun_kwargs):
+        key, num_tcoeffs, d = state
+        if x.shape != (num_tcoeffs, d):
+            msg = "This function expects an nxd array for 'x'. "
+            msg += f"Expected: x.shape = {(num_tcoeffs, d)}. "
+            msg += f"Received: x.shape = {x.shape}. "
+            raise ValueError(msg)
+
         key, subkey = random.split(key, num=2)
-        sample_shape = (self.num_probes, *x.shape)
+        sample_shape = (self.num_probes, *(x[0].shape))
+
+        # v.shape: (s, d)
         v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
 
+        # fx.shape: (d,)
         fx, vjp = func.vjp(lambda s: fun(s, **fun_kwargs), x)
-        J_trace = func.vmap(lambda s: linalg.vector_dot(s, vjp(s)[0]))(v)
+
+        # vjpx.shape: (s, n, d)
+        (vjpx,) = func.vmap(vjp)(v)
+
+        # Einsum along the "d" axis (trace = sum of diagonals)
+        J_trace = linalg.einsum("snd,sd->sn", vjpx, v)
         J_trace = J_trace.mean(axis=0)
         return fx, J_trace, key
 
-    def calculate_diagonal(self, fun, x, key, /, **fun_kwargs):
+    def calculate_diagonal_along_d(self, fun, x, key, /, **fun_kwargs):
         key, subkey = random.split(key, num=2)
         sample_shape = (self.num_probes, *x.shape)
         v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
