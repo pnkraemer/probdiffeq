@@ -323,8 +323,6 @@ class IsotropicOdeTs1(ssm_impl_api.AbstractOde):
     def linearize(self, rv, state, *, damp: float, t):
 
         # Evaluate the linearisation
-        m0_tree = rv.mean[: self.ode.num_tcoeffs_in_args]
-        rv0 = IsotropicNormal.from_dirac(m0_tree, damp=0.0)
 
         def vf(s_stack):
             s_tree = rv.tree_flatten.unflatten_array(s_stack)
@@ -342,18 +340,15 @@ class IsotropicOdeTs1(ssm_impl_api.AbstractOde):
 
         # Best Jacobian approximation: mean of diagonal = trace / len(diagonal)
         J_trace = J_trace[None, ...] / d
+        E1 = np.eye(n)[np.asarray([self.ode.num_tcoeffs_in_args])]
+        linop = E1 - J_trace
+        fx = rv.mean_flat[self.ode.num_tcoeffs_in_args, ...] - fx
+        fx = fx - (linop @ rv.mean_flat).reshape(fx.shape)
 
-        n, _d = rv.mean_flat.shape
-        eye = np.eye(n)
-        E0, E1 = eye[np.asarray([0])], eye[np.asarray([1])]
-
-        n, _d = rv.mean_flat.shape
-        eye = np.eye(n)
-        E0, E1 = eye[np.asarray([0])], eye[np.asarray([1])]
-        linop = E1 - J_trace * E0
-        fx = rv.mean_flat[1, ...] - fx
-        fx = fx - linop @ rv.mean_flat
-        fx = rv0.tree_flatten.unflatten_array(fx)
+        # Turn fx into the correct pytree
+        m0_tree = rv.mean[:1]
+        rv0 = IsotropicNormal.from_dirac(m0_tree, damp=0.0)
+        fx = rv0.tree_flatten.unflatten_array(fx[None, ...])
 
         # Turn fx and J_trace into an observation model
         noise = IsotropicNormal.from_dirac(fx, damp=damp)

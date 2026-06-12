@@ -15,7 +15,9 @@ from probdiffeq.backend import func, np, testing
 @testing.parametrize("constraint", ["ts0", "ts1"])
 def test_solution_is_accurate(ssm_factory, constraint):
 
-    @probdiffeq.ode_order_two
+    jacobian = probdiffeq.jacobian_materialize()
+
+    @func.partial(probdiffeq.ode_order_two, jacobian=jacobian)
     def vf(u, du, /, *, t):
         del t
         del du

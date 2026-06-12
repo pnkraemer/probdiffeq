@@ -152,7 +152,7 @@ class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
         rv0 = BlockDiagNormal.from_dirac([m0_tree], damp=0.0)
 
         def a1(s):
-            return s[[1], ...]
+            return s[[self.ode.num_tcoeffs_in_args], ...]
 
         linop = func.vmap(func.jacrev(a1))(rv.mean_flat)
 
@@ -170,14 +170,10 @@ class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
             vf_flat, rv.mean_flat, state, num_tcoeffs=n, d=d
         )
 
-        E1 = func.jacrev(lambda s: s[0])(rv.mean_flat[0])
-
         # J_diag.shape = (d, n)
-        # E1.shape = (n,)
         # linop.shape: (d, 1, n)
-        linop = linop - J_diag[:, None, :] * E1[None, None, :]
-
-        fx = rv.mean_flat[:, 1] - fx
+        linop = linop - J_diag[:, None, :]
+        fx = rv.mean_flat[:, self.ode.num_tcoeffs_in_args] - fx
         fx = fx[..., None]
         diff = func.vmap(lambda a, b: a @ b)(linop, rv.mean_flat)
         fx = fx - diff
