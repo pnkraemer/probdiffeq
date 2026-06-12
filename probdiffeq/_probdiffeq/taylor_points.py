@@ -165,7 +165,7 @@ class taylor_point_maximum_a_posteriori(TaylorPoint):
         self.nlstsq = nlstsq
 
     def __repr__(self) -> str:
-        return f"taylor_point_maximum_a_posteriori(nlstsq={self.nlstsq!r})"
+        return f"taylor_point_maximum_a_posteriori(nlstsq={self.nlstsq})"
 
     def __call__(self, constraint_flat: Callable, rv, **constraint_kwargs) -> Array:
         mean = rv.mean_flat

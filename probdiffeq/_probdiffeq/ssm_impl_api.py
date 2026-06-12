@@ -288,6 +288,9 @@ class AbstractPrior(abc.ABC):
         self.init = init
         self.output_scale = output_scale
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(init={self.init}, output_scale={self.output_scale})"
+
     @abc.abstractmethod
     def transition(self, *, dt: float, output_scale: Array) -> AbstractLatentCond:
         """Discretize the prior at a time step."""

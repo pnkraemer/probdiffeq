@@ -6,6 +6,7 @@ compute the marginal likelihood of this data _under the ODE posterior_
 and optimize the parameters with `optax`.
 """
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -23,9 +24,8 @@ jax.config.update("jax_debug_nans", True)
 
 def main():
     """Learn an ODE with Optax."""
-    # Create a problem and some fake-data:
+    # Define the problem
 
-    # +
     f, u0, (t0, t1), f_args = ivps.lotka_volterra()
     f_args = jnp.asarray(f_args)
 
@@ -33,9 +33,10 @@ def main():
         """Evaluate the Lotka-Volterra vector field."""
         return f(y, *p)
 
-    grid = jnp.linspace(t0, t1, endpoint=True, num=200)
+    grid = jnp.linspace(t0, t1, endpoint=True, num=50)
     solve = solver(vf, u0, grid=grid)
 
+    # Create a dataset
     parameter_true = f_args + 0.05
     parameter_guess = f_args
     solution_true = solve(parameter_true)
@@ -44,12 +45,11 @@ def main():
     # We make an initial guess, but it does not lead to a good data fit:
     initial = solve(parameter_guess)
 
-    # Use probdiffeq to compute a parameter-to-data fit function.
+    # Use probdiffeq to form the loss function:
     loss = loss_marginal_likelihood(solve=solve, data=data)
     value_and_grad = jax.jit(jax.value_and_grad(loss))
 
     # We can differentiate the function forward- and reverse-mode
-    # (the latter is possible because we use fixed steps)
     print("Value and gradient:")
     print(value_and_grad(parameter_guess))
 
@@ -60,26 +60,27 @@ def main():
     update = build_update(optimizer=optim, value_and_grad=value_and_grad)
     p = parameter_guess
     state = optim.init(p)
-    for i in range(10):
-        for _ in range(10):
+    for i in range(20):
+        for _ in range(20):
             p, state = update(p, state)
 
-        print(f"After {(i + 1) * 10} iterations:", p)
+        print(f"After {(i + 1) * 20} iterations:", p)
 
     # The solution looks much better:
     final = solve(p)
-    _fig, ax = plt.subplots(figsize=(5, 3), dpi=120, constrained_layout=True)
+    _fig, ax = plt.subplots(figsize=(5, 3), dpi=100, constrained_layout=True)
     ax.set_title("Learning a Predator-Prey model", fontsize="medium")
     ax.set_xlabel("Predators", fontsize="medium")
     ax.set_ylabel("Prey", fontsize="medium")
     ax.plot(
-        data[:, 0], data[:, 1], "o", markersize=8, label="Data", color="k", alpha=0.2
+        data[:, 0], data[:, 1], "X", markersize=8, label="Data", color="k", alpha=0.2
     )
     ax.plot(
         initial.u.mean[0][:, 0],
         initial.u.mean[0][:, 1],
         color="C0",
         label="Initial guess",
+        linestyle="dashed",
     )
     ax.plot(final.u.mean[0][:, 0], final.u.mean[0][:, 1], color="C1", label="Optimised")
     ax.legend(fontsize="small")
@@ -89,6 +90,10 @@ def main():
 def solver(vf, u0, *, grid):
     """Construct a solver."""
     ssm = probdiffeq.state_space_model_isotropic()
+    strategy = probdiffeq.strategy_smoother_fixedpoint()
+
+    def while_loop(cond, body, init):
+        return eqx.internal.while_loop(cond, body, init, kind="bounded", max_steps=8)
 
     def solve(p):
         """Evaluate the parameter-to-solution map."""
@@ -100,10 +105,12 @@ def solver(vf, u0, *, grid):
             return vf(y, t=t, p=p)
 
         ts0 = ssm.constraint_ode_ts0(vf_p)
-        strategy = probdiffeq.strategy_smoother_fixedinterval()
         solver_obj = probdiffeq.solver(strategy=strategy, constraint=ts0)
-        solve_fn = ivpsolve.solve_fixed_grid(solver=solver_obj)
-        return solve_fn(iwp, grid=grid)
+        error = probdiffeq.error_state_std(constraint=ts0)
+        solve_fn = ivpsolve.solve_adaptive_save_at(
+            solver=solver_obj, error=error, while_loop=while_loop
+        )
+        return solve_fn(iwp, save_at=grid, atol=1e-4, rtol=1e-2)
 
     return solve
 
@@ -123,7 +130,6 @@ def loss_marginal_likelihood(*, data, solve, std=1e-1):
     return loss
 
 
-# +
 def build_update(*, optimizer, value_and_grad):
     """Build a function for executing a single step in the optimization."""
 
