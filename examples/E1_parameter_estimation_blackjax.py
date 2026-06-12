@@ -23,184 +23,123 @@ if not backend.has_been_selected:
 
 def main():
     """Use BlackJAX's samplers to estimate ODE parameters."""
-    # First, set up an IVP and create some artificial data by
-    # simulating the system with "incorrect" initial conditions.
+    # Set up an initial value problem
 
     f, u0, (t0, t1), f_args = ivps.lotka_volterra()
 
     @probdiffeq.ode
-    def vf(y, /, *, t):  # noqa: ARG001
+    def vf(y, /, *, t):
         """Evaluate the Lotka-Volterra vector field."""
+        del t
         return f(y, *f_args)
 
-    theta_true = u0 + 0.5 * jnp.flip(u0)
-    theta_guess = u0  # initial guess
-
     # Construct solvers
-    ssm = probdiffeq.state_space_model_isotropic()
-    ts0 = ssm.constraint_ode_ts0(vf)
-    strategy = probdiffeq.strategy_filter()
-    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
-    error = probdiffeq.error_residual_std(constraint=ts0)
+    solve = solve_fixed(vf, t0=t0, t1=t1, num=200)
 
-    save_at = jnp.linspace(t0, t1, num=250, endpoint=True)
-    solve_save_at = solve_adaptive(vf, solver=solver, error=error, save_at=save_at)
+    # Determine true parameters and create data
+    theta_true = u0 + 0.5 * jnp.flip(u0)
+    solution_true = solve(theta_true)
+    data = solution_true.u.mean[0]
 
-    # Visualise the initial guess and the data
-
-    _fig, ax = plt.subplots(figsize=(5, 3))
-
-    data_kwargs = {"alpha": 0.5, "color": "gray"}
-    ax.annotate("Data", (13.0, 30.0), **data_kwargs)
-    sol = solve_save_at(theta_true)
-    ax = plot_solution(sol.t, sol.u.mean[0], ax=ax, **data_kwargs)
-
-    guess_kwargs = {"color": "C3"}
-    ax.annotate("Initial guess", (7.5, 20.0), **guess_kwargs)
-    sol = solve_save_at(theta_guess)
-    ax = plot_solution(sol.t, sol.u.mean[0], ax=ax, **guess_kwargs)
-    plt.show()
+    # Determine initial guesses
+    theta0 = u0
 
     # Set up a log-posterior density function that we can plug into BlackJAX.
     # Choose a Gaussian prior centered at the initial guess with a large variance.
-    mean = theta_guess
-    cov = jnp.eye(2) * 30  # fairly uninformed prior
-    ts = jnp.linspace(t0, t1, endpoint=True, num=100)
-    log_M = log_posterior(vf, theta_true, solver=solver, ts=ts, mean=mean, cov=cov)
-    print(jnp.exp(log_M(theta_true)), ">=", jnp.exp(log_M(theta_guess)), "?")
+    mean = theta0
+    cov = jnp.eye(2) * 30
+    log_M = log_posterior(solve=solve, data=data, mean=mean, cov=cov)
+    log_M(theta0)
 
     # From here on, BlackJAX takes over:
-    initial_position = theta_guess
-    rng_key = jax.random.PRNGKey(0)
-    warmup = blackjax.window_adaptation(blackjax.nuts, log_M, progress_bar=True)
-    warmup_results, _ = warmup.run(rng_key, initial_position, num_steps=200)
-    initial_state = warmup_results.state
-    step_size = warmup_results.parameters["step_size"]
-    inverse_mass_matrix = warmup_results.parameters["inverse_mass_matrix"]
-    nuts_kernel = blackjax.nuts(
-        logdensity_fn=log_M,
-        step_size=step_size,
-        inverse_mass_matrix=inverse_mass_matrix,
-    )
+
+    # Warmup
+    print("\nRunning window adaptation...", end="")
+    key = jax.random.PRNGKey(0)
+    key, subkey = jax.random.split(key, num=2)
+    warmup = blackjax.window_adaptation(blackjax.nuts, log_M, progress_bar=False)
+    warmup_results, _ = warmup.run(subkey, theta0, num_steps=200)
+    print("done.")
 
     # Inference loop
-    rng_key, _ = jax.random.split(rng_key, 2)
+    print("\nRunning inference loop...", end="")
+    nuts_kernel = blackjax.nuts(
+        logdensity_fn=log_M,
+        step_size=warmup_results.parameters["step_size"],
+        inverse_mass_matrix=warmup_results.parameters["inverse_mass_matrix"],
+    )
+    key, subkey = jax.random.split(key, num=2)
     states = inference_loop(
-        rng_key, kernel=nuts_kernel, initial_state=initial_state, num_samples=150
+        subkey, kernel=nuts_kernel, initial_state=warmup_results.state, num_samples=150
+    )
+    samples = states.position
+    print("done.")
+
+    # Create the plot
+    _fig, ax = plt.subplot_mosaic(
+        [["smp", "dens"]], sharex=True, sharey=True, figsize=(8, 3)
     )
 
-    # Now that we have samples of $\theta$, let's plot the corresponding solutions:
-    solution_samples = jax.vmap(solve_save_at)(states.position)
+    # Plot the samples
+    ax["smp"].set_title("Posterior samples (parameter space)", fontsize="medium")
+    ax["smp"].plot(samples[:, 0], samples[:, 1], ".", alpha=0.5, markersize=4)
+    ax["smp"].plot(theta_true[0], theta_true[1], "P", label="Truth", markersize=8)
+    ax["smp"].plot(theta0[0], theta0[1], "P", label="Initial guess", markersize=8)
+    ax["smp"].legend()
 
-    # Visualise the initial guess and the data
-
-    _fig, ax = plt.subplots()
-
-    sample_kwargs = {"color": "C0"}
-    ax.annotate("Samples", (2.75, 31.0), **sample_kwargs)
-    for ts, us in zip(solution_samples.t, solution_samples.u.mean[0]):
-        ax = plot_solution(ts, us, ax=ax, linewidth=0.1, alpha=0.75, **sample_kwargs)
-
-    data_kwargs = {"color": "gray"}
-    ax.annotate("Data", (18.25, 40.0), **data_kwargs)
-    sol = solve_save_at(theta_true)
-    ax = plot_solution(
-        sol.t, sol.u.mean[0], ax=ax, linewidth=4, alpha=0.5, **data_kwargs
-    )
-
-    guess_kwargs = {"color": "gray"}
-    ax.annotate("Initial guess", (6.0, 12.0), **guess_kwargs)
-    sol = solve_save_at(theta_guess)
-    ax = plot_solution(
-        sol.t, sol.u.mean[0], ax=ax, linestyle="dashed", alpha=0.75, **guess_kwargs
-    )
-    plt.show()
-
-    # In parameter space, this is what it looks like:
-    xlim = 14, jnp.amax(states.position[:, 0]) + 0.5
-    ylim = 14, jnp.amax(states.position[:, 1]) + 0.5
-
-    xs = jnp.linspace(*xlim, endpoint=True, num=300)
-    ys = jnp.linspace(*ylim, endpoint=True, num=300)
+    # Create a meshgrid for plotting the density
+    xlim = 17, jnp.amax(samples[:, 0]) + 0.5
+    ylim = 17, jnp.amax(samples[:, 1]) + 0.5
+    xs = jnp.linspace(*xlim, endpoint=True, num=200)
+    ys = jnp.linspace(*ylim, endpoint=True, num=200)
     Xs, Ys = jnp.meshgrid(xs, ys)
 
+    # Evaluate the density
     Thetas = jnp.stack((Xs, Ys))
     log_M_vmapped_x = jax.vmap(log_M, in_axes=-1, out_axes=-1)
     log_M_vmapped = jax.vmap(log_M_vmapped_x, in_axes=-1, out_axes=-1)
     Zs = log_M_vmapped(Thetas)
 
-    _fig, ax = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(8, 3))
-
-    ax_samples, ax_heatmap = ax
-
-    ax_samples.set_title("Posterior samples (parameter space)", fontsize="medium")
-    ax_samples.plot(
-        states.position[:, 0], states.position[:, 1], ".", alpha=0.5, markersize=4
-    )
-    ax_samples.plot(theta_true[0], theta_true[1], "P", label="Truth", markersize=8)
-    ax_samples.plot(
-        theta_guess[0], theta_guess[1], "P", label="Initial guess", markersize=8
-    )
-    ax_samples.legend()
-
-    ax_heatmap.set_title("Target density", fontsize="medium")
-    im = ax_heatmap.contourf(Xs, Ys, jnp.exp(Zs), cmap="cividis", alpha=0.8)
+    # Plot the density
+    ax["dens"].set_title("Target density", fontsize="medium")
+    im = ax["dens"].pcolormesh(Xs, Ys, jnp.exp(Zs), cmap="cividis", alpha=0.8)
     plt.colorbar(im)
     plt.show()
 
 
-def solve_adaptive(vf, *, solver, error, save_at):
+def solve_fixed(vf, *, t0, t1, num):
     """Create an adaptive solver (for visualisation)."""
+    ssm = probdiffeq.state_space_model_isotropic()
+    ts0 = ssm.constraint_ode_ts0(vf)
+    strategy = probdiffeq.strategy_filter()
+    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
+    solve_fn = ivpsolve.solve_fixed_grid(solver=solver)
+    grid = jnp.linspace(t0, t1, num=num, endpoint=True)
 
     @jax.jit
-    def solve(theta):
+    def solve(theta, /):
         """Evaluate the parameter-to-solution map, solving on an adaptive grid."""
-        jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
-        tcoeffs, _ = jetexpand(vf, (theta,), t=save_at[0])
+        jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=3)
+        tcoeffs, _ = jetexpand(vf, (theta,), t=t0)
 
-        ssm = probdiffeq.state_space_model_isotropic()
         iwp = ssm.prior_wiener_integrated(tcoeffs)
-        solve_fn = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-        return solve_fn(iwp, save_at=save_at, dt0=0.1, atol=1e-4, rtol=1e-2)
+        sol = solve_fn(iwp, grid=grid)
+        return jax.tree.map(lambda s: s[-1], sol)
 
     return solve
 
 
-def plot_solution(t, u, *, ax, marker=".", **plotting_kwargs):
-    """Plot the IVP solution."""
-    for d in [0, 1]:
-        ax.plot(t, u[:, d], marker="None", **plotting_kwargs)
-        ax.plot(t[0], u[0, d], marker=marker, **plotting_kwargs)
-        ax.plot(t[-1], u[-1, d], marker=marker, **plotting_kwargs)
-    return ax
-
-
-def log_posterior(vf, theta_true, *, solver, ts, mean, cov, obs_std=0.1):
+def log_posterior(*, solve, data, mean, cov, obs_std=0.1):
     """Create a log-posterior density function."""
-    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
-    tcoeffs, _ = jetexpand(vf, (theta_true,), t=ts[0])
-
-    ssm = probdiffeq.state_space_model_isotropic()
-    iwp = ssm.prior_wiener_integrated(tcoeffs)
-    solve = ivpsolve.solve_fixed_grid(solver=solver)
-    sol = solve(iwp, grid=ts)
-    data = sol.u.mean[0][-1]
+    loss = probdiffeq.loss_lml_terminal_values()
+    logpdf_normal = jax.scipy.stats.multivariate_normal.logpdf
 
     @jax.jit
-    def logposterior(theta):
+    def logposterior(theta, /):
         """Evaluate the logposterior-function of the data."""
-        jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
-        tcoeffs, _ = jetexpand(vf, (theta,), t=ts[0])
-
-        iwp = ssm.prior_wiener_integrated(tcoeffs)
-        solve = ivpsolve.solve_fixed_grid(solver=solver)
-        solution = solve(iwp, grid=ts)
-        y_T = jax.tree.map(lambda s: s[-1], solution.u)
-        loss = probdiffeq.loss_lml_terminal_values()
-        logpdf_data = loss(data, std=obs_std, marginals=y_T)
-        logpdf_prior = jax.scipy.stats.multivariate_normal.logpdf(
-            theta, mean=mean, cov=cov
-        )
+        solution = solve(theta)
+        logpdf_data = loss(data, std=obs_std, marginals=solution.u)
+        logpdf_prior = logpdf_normal(theta, mean=mean, cov=cov)
         return logpdf_data + logpdf_prior
 
     return logposterior
