@@ -266,35 +266,30 @@ class DenseOdeTs1(ssm_impl_api.AbstractOde):
 
     def linearize(self, rv, state: None, *, damp: float, t):
         m_tree = rv.mean
-
-        rv0 = DenseNormal.from_dirac(m_tree[: self.ode.num_tcoeffs_in_args], damp=0.0)
+        n = len(m_tree)
+        d = rv.mean_flat.size // n
 
         def vf(s: Array) -> Array:
-            jet_coords = rv0.tree_flatten.unflatten_array(s)
+            # Maps (n, d) to (1, d) to conform the Jacobian API
+            s = np.reshape(s, (-1,))
+            jet_coords = rv.tree_flatten.unflatten_array(s)
+            jet_coords = jet_coords[: self.ode.num_tcoeffs_in_args]
             fs0 = self.ode.vector_field(jet_coords=jet_coords, t=t)
-            return rv0.tree_flatten.flatten_tree([fs0])
-
-        @func.jacfwd
-        def e0(s):
-            s_tree = rv.tree_flatten.unflatten_array(s)
-            return rv0.tree_flatten.flatten_tree(s_tree[: self.ode.num_tcoeffs_in_args])
+            return tree.ravel_pytree(fs0)[0][None, :]
 
         @func.jacfwd
         def e1(s):
             s_tree = rv.tree_flatten.unflatten_array(s)
-            return rv0.tree_flatten.flatten_tree(s_tree[self.ode.num_tcoeffs_in_args])
+            return tree.ravel_pytree(s_tree[self.ode.num_tcoeffs_in_args])[0]
 
-        E0 = e0(rv.mean_flat)
         E1 = e1(rv.mean_flat)
 
-        m0 = rv0.mean_flat
-
-        n = self.ode.num_tcoeffs_in_args
-        (d,) = tree.ravel_pytree(m_tree[0])[0].shape
-        fx, J, state = self.ode.jacobian.materialize_dense(
-            vf, m0, state, num_tcoeffs=n, d=d
-        )
-        linop = E1 - J @ E0
+        m0 = rv.mean_flat.reshape((n, d))
+        fx, J, state = self.ode.jacobian.materialize_dense(vf, m0, state)
+        m, d = fx.shape
+        fx = fx.reshape((m * d,))
+        J = J.reshape((m * d, -1))
+        linop = E1 - J
         fx = -(fx - J @ m0)
 
         f0 = DenseNormal.from_dirac([m_tree[self.ode.num_tcoeffs_in_args]], damp=0.0)

@@ -328,18 +328,21 @@ class IsotropicOdeTs1(ssm_impl_api.AbstractOde):
             s_tree = rv.tree_flatten.unflatten_array(s_stack)
             s_tree = s_tree[: self.ode.num_tcoeffs_in_args]
             fs = self.ode.vector_field(jet_coords=s_tree, t=t)
-            return tree.ravel_pytree(fs)[0]
+            return tree.ravel_pytree(fs)[0][None, :]
 
         n, d = rv.mean_flat.shape
+
         # This is not 100% the most efficent because we compute the trace
         # of the function that depends on all tcoeffs instead of just the
         # relevant ones.
         fx, J_trace, state = self.ode.jacobian.calculate_trace_along_d(
-            vf, rv.mean_flat, state, num_tcoeffs=n, d=d
+            vf, rv.mean_flat, state
         )
 
         # Best Jacobian approximation: mean of diagonal = trace / len(diagonal)
-        J_trace = J_trace[None, ...] / d
+        J_trace /= d
+
+        # Complete the linearisation
         E1 = np.eye(n)[np.asarray([self.ode.num_tcoeffs_in_args])]
         linop = E1 - J_trace
         fx = rv.mean_flat[self.ode.num_tcoeffs_in_args, ...] - fx

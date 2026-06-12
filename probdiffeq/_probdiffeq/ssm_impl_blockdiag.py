@@ -157,24 +157,24 @@ class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
         linop = func.vmap(func.jacrev(a1))(rv.mean_flat)
 
         def vf_flat(u):
-            u_tree = rv.tree_flatten.unflatten_array(u)
+            u_tree = rv.tree_flatten.unflatten_array(u.T)
             u_tree = u_tree[: self.ode.num_tcoeffs_in_args]
             fu_tree = self.ode.vector_field(jet_coords=u_tree, t=t)
-            return rv0.tree_flatten.flatten_tree([fu_tree]).reshape((-1,))
+            return rv0.tree_flatten.flatten_tree([fu_tree])
 
         # Evaluate the linearisation
         # Not 100% the most efficient because we compute the diagonal of
         # the function of all tcoeffs instead of just the relevant ones.
         d, n = rv.mean_flat.shape
         fx, J_diag, state = self.ode.jacobian.calculate_diagonal_along_d(
-            vf_flat, rv.mean_flat, state, num_tcoeffs=n, d=d
+            vf_flat, rv.mean_flat.T, state
         )
+        fx = fx.T
 
-        # J_diag.shape = (d, n)
+        # J_diag.shape = (d, 1, n)
         # linop.shape: (d, 1, n)
-        linop = linop - J_diag[:, None, :]
-        fx = rv.mean_flat[:, self.ode.num_tcoeffs_in_args] - fx
-        fx = fx[..., None]
+        linop = linop - J_diag
+        fx = rv.mean_flat[:, self.ode.num_tcoeffs_in_args][:, None] - fx
         diff = func.vmap(lambda a, b: a @ b)(linop, rv.mean_flat)
         fx = fx - diff
         fx = rv0.tree_flatten.unflatten_array(fx)
