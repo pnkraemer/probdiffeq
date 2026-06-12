@@ -4,6 +4,7 @@ See the tutorials for example use cases.
 """
 
 from probdiffeq._probdiffeq.estimators_and_losses import *
+from probdiffeq._probdiffeq.jacobians import *
 from probdiffeq._probdiffeq.jet_expansion_algorithms import *
 from probdiffeq._probdiffeq.problems import *
 from probdiffeq._probdiffeq.solvers import *

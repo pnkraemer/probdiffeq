@@ -1,4 +1,4 @@
-from probdiffeq._probdiffeq import problems
+from probdiffeq._probdiffeq import jacobians, problems
 from probdiffeq.backend import abc, func, np, tree
 from probdiffeq.backend.typing import (
     TYPE_CHECKING,
@@ -396,7 +396,7 @@ class StateSpaceModel(abc.ABC):
 
         ode: problems.ODEFunctionAutonomous = problems.ODEFunctionAutonomous(
             autonomous,
-            jacobian=problems.jacobian_materialize(),
+            jacobian=jacobians.jacobian_monte_carlo_fwd(),
             num_tcoeffs_in_args=len(tcoeffs),
         )
         return self.prior_exponential(
@@ -427,7 +427,7 @@ class StateSpaceModel(abc.ABC):
 
         ode: problems.ODEFunctionAutonomous = problems.ODEFunctionAutonomous(
             autonomous,
-            jacobian=problems.jacobian_materialize(),
+            jacobian=jacobians.jacobian_monte_carlo_fwd(),
             num_tcoeffs_in_args=len(tcoeffs_mean),
         )
         return self.prior_exponential_diffuse(
