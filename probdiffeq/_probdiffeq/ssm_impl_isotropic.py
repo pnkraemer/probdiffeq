@@ -572,9 +572,6 @@ class state_space_model_isotropic(ssm_impl_api.StateSpaceModel):
     def constraint_ode_ts1(self, ode: problems.ODEFunction, /) -> IsotropicOdeTs1:
         if not isinstance(ode, problems.ODEFunction):
             raise TypeError(ode)
-        if ode.num_tcoeffs_in_args > 1:
-            msg = "This linearization is not compatible with high-order ODEs as of yet."
-            raise ValueError(msg)
         return IsotropicOdeTs1(ode=ode)
 
     def constraint_residual(self, residual: problems.Residual, *, taylor_point=None):

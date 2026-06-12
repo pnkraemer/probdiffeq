@@ -77,6 +77,7 @@ __all__ = [
     "ode_autonomous",
     "ode_autonomous_order_arbitrary",
     "ode_autonomous_order_two",
+    "ode_jet_lift",
     "ode_order_arbitrary",
     "ode_order_two",
     "residual_acceleration",
@@ -562,4 +563,51 @@ def residual_jet_lift(residual: Residual, lift_by: int) -> Residual:
     order = residual.num_tcoeffs_in_args + lift_by
     return Residual(
         residual_lifted, num_tcoeffs_in_args=order, jacobian=residual.jacobian
+    )
+
+
+def ode_jet_lift(ode_fun: ODEFunction, lift_by: int) -> ODEFunction:
+    """Lift a function on k-jet coordinates to one on (k+m)-jet coordinates."""
+    if not isinstance(lift_by, int):
+        raise TypeError
+
+    def residual_lifted(*, jet_coords: Sequence[T], t) -> Sequence[T]:
+        tcoeffs_all = jet_coords
+        _, unravel_one = tree.ravel_pytree(tcoeffs_all[0])
+
+        lift_by_upper = len(tcoeffs_all) - residual.num_tcoeffs_in_args
+        if lift_by < 0 or lift_by > lift_by_upper:
+            msg = "The provided jet-order is incompatible with the residual order."
+            msg += f" Expected: 0 <= lift_by <= {lift_by_upper}."
+            msg += f" Received: lift_by == {lift_by}."
+            raise ValueError(msg)
+        order = residual.num_tcoeffs_in_args + lift_by
+        tcoeffs = tcoeffs_all[:order]
+
+        # Flatten the residual because jax.jet is a bit high maintenance :)
+        def jet_call(*y):
+            y_tree = [unravel_one(s) for s in y]
+            fx = residual.residual_function(jet_coords=y_tree, t=t)
+            return tree.ravel_pytree(fx)[0]
+
+        flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
+
+        ps, ss = utilities.jet_coords_to_primals_and_series(
+            flat, residual.num_tcoeffs_in_args
+        )
+
+        if len(tree.tree_leaves(ss)) == 0:
+            fx = jet_call(*ps)
+
+            # Return a sequence to be compatible with Taylor-coeff logic,
+            # but don't bother unflattening the content
+            # because the result will be compared to zero anyway
+            return [fx]
+
+        primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
+        return [primals, *series]
+
+    order = ode_fun.num_tcoeffs_in_args + lift_by
+    return ODEFunction(
+        residual_lifted, num_tcoeffs_in_args=order, jacobian=ode_fun.jacobian
     )

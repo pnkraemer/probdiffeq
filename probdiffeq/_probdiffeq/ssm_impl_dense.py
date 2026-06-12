@@ -267,11 +267,11 @@ class DenseOdeTs1(ssm_impl_api.AbstractOde):
     def linearize(self, rv, state: None, *, damp: float, t):
         m_tree = rv.mean
 
-        rv0 = DenseNormal.from_dirac([m_tree[0]], damp=0.0)
+        rv0 = DenseNormal.from_dirac(m_tree[: self.ode.num_tcoeffs_in_args], damp=0.0)
 
         def vf_flat(s: Array) -> Array:
-            [s0] = rv0.tree_flatten.unflatten_array(s)
-            fs0 = self.ode.vector_field(jet_coords=[s0], t=t)
+            jet_coords = rv0.tree_flatten.unflatten_array(s)
+            fs0 = self.ode.vector_field(jet_coords=jet_coords, t=t)
             return rv0.tree_flatten.flatten_tree([fs0])
 
         def select_i(i) -> Callable[[Array], Array]:
@@ -281,14 +281,26 @@ class DenseOdeTs1(ssm_impl_api.AbstractOde):
 
             return select
 
-        E0 = func.jacfwd(select_i(i=0))(rv.mean_flat)
-        E1 = func.jacfwd(select_i(i=1))(rv.mean_flat)
+        @func.jacfwd
+        def e0(s):
+            s_tree = rv.tree_flatten.unflatten_array(s)
+            return rv0.tree_flatten.flatten_tree(s_tree[: self.ode.num_tcoeffs_in_args])
+
+        @func.jacfwd
+        def e1(s):
+            s_tree = rv.tree_flatten.unflatten_array(s)
+            return rv0.tree_flatten.flatten_tree(s_tree[self.ode.num_tcoeffs_in_args])
+
+        E0 = e0(rv.mean_flat)
+        E1 = e1(rv.mean_flat)
 
         m0 = rv0.mean_flat
         fx, J, state = self.ode.jacobian.materialize_dense(vf_flat, m0, state)
         linop = E1 - J @ E0
         fx = -(fx - J @ m0)
-        fx = rv0.tree_flatten.unflatten_array(fx)
+
+        f0 = DenseNormal.from_dirac([m_tree[self.ode.num_tcoeffs_in_args]], damp=0.0)
+        fx = f0.tree_flatten.unflatten_array(fx)
         noise = DenseNormal.from_dirac(fx, damp=damp)
         cond = DenseLatentCond.from_linop_and_noise(linop, noise)
         return cond, state
@@ -725,10 +737,6 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
     def constraint_ode_ts1(self, ode: problems.ODEFunction, /) -> DenseOdeTs1:
         if not isinstance(ode, problems.ODEFunction):
             raise TypeError(ode)
-        if ode.num_tcoeffs_in_args > 1:
-            msg = "Not implemented."
-            msg += " Try zeroth-order methods or residual-based constraints instead."
-            raise ValueError(msg)
         return DenseOdeTs1(ode=ode)
 
     def constraint_residual(
