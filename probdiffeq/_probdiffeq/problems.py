@@ -136,11 +136,17 @@ class jacobian_materialize(Jacobian):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(jacfun={self.jacfun})"
 
-    def init_jacobian_handler(self):
-        return ()
+    def init_jacobian_handler(self, *, num_tcoeffs: int, d: int):
+        return (num_tcoeffs, d)
 
     def materialize_dense(self, fun, x, state, /, **fun_kwargs):
-        del state
+        num_tcoeffs, d = state
+        if x.shape != (num_tcoeffs * d,):
+            msg = "This function expects a flat array for 'x'. "
+            msg += f"Expected: x.shape = {(num_tcoeffs * d,)}. "
+            msg += f"Received: x.shape = {x.shape}. "
+            raise ValueError(msg)
+
         fx = fun(x, **fun_kwargs)
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
         return fx, dfx, ()

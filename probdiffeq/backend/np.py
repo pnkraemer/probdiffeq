@@ -252,8 +252,8 @@ def cos(x, /):
     return jnp.cos(x)
 
 
-def mean(arr, /):
-    return jnp.mean(arr)
+def mean(arr, /, axis=None):
+    return jnp.mean(arr, axis=axis)
 
 
 def std(arr, /, *, ddof=0):
