@@ -166,11 +166,16 @@ class jacobian_materialize(Jacobian):
         return fx, dfx_trace, ()
 
     def calculate_diagonal_along_d(self, fun, x, state, /, **fun_kwargs):
-        del state
+        num_tcoeffs, d = state
+        if x.shape != (d, num_tcoeffs):
+            msg = "This function expects a dxn array for 'x'. "
+            msg += f"Expected: x.shape = {(d, num_tcoeffs)}. "
+            msg += f"Received: x.shape = {x.shape}. "
+            raise ValueError(msg)
         fx = fun(x)
         dfx = func.jacfwd(lambda s: fun(s, **fun_kwargs))(x)
-        dfx_diagonal = linalg.diagonal(dfx)
-        return fx, dfx_diagonal, ()
+        dfx_diagonal = linalg.diagonal(dfx, axis1=0, axis2=1)
+        return fx, dfx_diagonal.T, ()
 
 
 class jacobian_monte_carlo_fwd(Jacobian):
@@ -221,22 +226,38 @@ class jacobian_monte_carlo_fwd(Jacobian):
             msg += f"Received: x.shape = {x.shape}. "
             raise ValueError(msg)
 
+        fx, Jvp = func.linearize(lambda s: fun(s, **fun_kwargs), x)
+
         key, subkey = random.split(key, num=2)
         sample_shape = (self.num_probes, *x.shape)
         v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
-
-        fx, Jvp = func.linearize(lambda s: fun(s, **fun_kwargs), x)
         J_trace = func.vmap(lambda s: linalg.vector_dot(s, Jvp(s)))(v)
         J_trace = J_trace.mean(axis=0)
         return fx, J_trace, key
 
-    def calculate_diagonal_along_d(self, fun, x, key, /, **fun_kwargs):
-        key, subkey = random.split(key, num=2)
-        sample_shape = (self.num_probes, *x.shape)
-        v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
+    def calculate_diagonal_along_d(self, fun, x, state, /, **fun_kwargs):
+        key, num_tcoeffs, d = state
+        if x.shape != (d, num_tcoeffs):
+            msg = "This function expects a dxn array for 'x'. "
+            msg += f"Expected: x.shape = {(d, num_tcoeffs)}. "
+            msg += f"Received: x.shape = {x.shape}. "
+            raise ValueError(msg)
 
         fx, Jvp = func.linearize(lambda s: fun(s, **fun_kwargs), x)
-        vJv = func.vmap(lambda s: s * Jvp(s))(v)
+
+        key, subkey = random.split(key, num=2)
+        sample_shape = (self.num_probes, *x.shape)
+
+        # shape: (s, d, n)
+        v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
+
+        # shape: (s, d)
+        Jv = func.vmap(Jvp)(v)
+
+        # shape: (s, d, n)
+        vJv = v * Jv[..., None]
+
+        # shape: (d, n)
         J_diagonal = vJv.mean(axis=0)
         return fx, J_diagonal, key
 
@@ -289,14 +310,13 @@ class jacobian_monte_carlo_rev(Jacobian):
             msg += f"Received: x.shape = {x.shape}. "
             raise ValueError(msg)
 
+        fx, vjp = func.vjp(lambda s: fun(s, **fun_kwargs), x)
+
         key, subkey = random.split(key, num=2)
         sample_shape = (self.num_probes, *(x[0].shape))
 
         # v.shape: (s, d)
         v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
-
-        # fx.shape: (d,)
-        fx, vjp = func.vjp(lambda s: fun(s, **fun_kwargs), x)
 
         # vjpx.shape: (s, n, d)
         (vjpx,) = func.vmap(vjp)(v)
@@ -306,13 +326,31 @@ class jacobian_monte_carlo_rev(Jacobian):
         J_trace = J_trace.mean(axis=0)
         return fx, J_trace, key
 
-    def calculate_diagonal_along_d(self, fun, x, key, /, **fun_kwargs):
-        key, subkey = random.split(key, num=2)
-        sample_shape = (self.num_probes, *x.shape)
-        v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
+    def calculate_diagonal_along_d(self, fun, x, state, /, **fun_kwargs):
+
+        key, num_tcoeffs, d = state
+        if x.shape != (d, num_tcoeffs):
+            msg = "This function expects a dxn array for 'x'. "
+            msg += f"Expected: x.shape = {(d, num_tcoeffs)}. "
+            msg += f"Received: x.shape = {x.shape}. "
+            raise ValueError(msg)
 
         fx, vjp = func.vjp(lambda s: fun(s, **fun_kwargs), x)
-        vJv = func.vmap(lambda s: s * vjp(s)[0])(v)
+
+        key, subkey = random.split(key, num=2)
+        sample_shape = (self.num_probes, *(x[:, 0].shape))
+
+        # shape: (s, d)
+        v = random.rademacher(subkey, shape=sample_shape, dtype=x.dtype)
+
+        # shape: (s, d, n)
+        (vjpx,) = func.vmap(vjp)(v)
+        print(vjpx.shape)
+
+        # shape: (s, d, n)
+        vJv = vjpx * v[..., None]
+
+        # shape: (d, n)
         J_diagonal = vJv.mean(axis=0)
         return fx, J_diagonal, key
 

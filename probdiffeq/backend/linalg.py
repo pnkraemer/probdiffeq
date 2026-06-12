@@ -76,8 +76,8 @@ def diagonal_along_axis(arr, /, *, axis1, axis2):
     return jnp.diagonal(arr, axis1=axis1, axis2=axis2)
 
 
-def diagonal(arr, /):
-    return jnp.diagonal(arr)
+def diagonal(arr, /, *, axis1=0, axis2=1):
+    return jnp.diagonal(arr, axis1=axis1, axis2=axis2)
 
 
 def trace(arr, /, *, axis1=0, axis2=1):

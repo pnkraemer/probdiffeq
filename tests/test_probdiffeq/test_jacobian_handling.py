@@ -47,8 +47,8 @@ def test_jacobian_materialize_dense(jacobian: probdiffeq.Jacobian, n: int, d: in
         probdiffeq.jacobian_monte_carlo_rev(),
     ],
 )
-@testing.parametrize("n", [3])
-@testing.parametrize("d", [2])
+@testing.parametrize("n", [1, 3])
+@testing.parametrize("d", [1, 2])
 def test_jacobian_calculate_trace_along_d(
     jacobian: probdiffeq.Jacobian, n: int, d: int
 ):
@@ -66,10 +66,48 @@ def test_jacobian_calculate_trace_along_d(
     with testing.raises(ValueError, match=msg):
         _ = jacobian.calculate_trace_along_d(vf_nxd, vec.reshape((d * n,)), state)
 
-    with testing.raises(ValueError, match=msg):
-        _ = jacobian.calculate_trace_along_d(vf_nxd, vec.reshape((d, n)), state)
+    if d != n:
+        with testing.raises(ValueError, match=msg):
+            _ = jacobian.calculate_trace_along_d(vf_nxd, vec.reshape((d, n)), state)
 
     # Assert that when the right input is passed, the Jacobian has the expected shape
     _fx, J, _ = jacobian.calculate_trace_along_d(vf_nxd, vec, state)
 
     assert J.shape == (n,)
+
+
+@testing.parametrize(
+    "jacobian",
+    [
+        probdiffeq.jacobian_materialize(),
+        probdiffeq.jacobian_monte_carlo_fwd(),
+        probdiffeq.jacobian_monte_carlo_rev(),
+    ],
+)
+@testing.parametrize("n", [1, 3])
+@testing.parametrize("d", [1, 2])
+def test_jacobian_calculate_diagonal_along_d(
+    jacobian: probdiffeq.Jacobian, n: int, d: int
+):
+
+    def vf_dxn(vec_dxn):
+        return np.mean(vec_dxn, axis=-1)
+
+    vec = np.arange(0, n * d).reshape((d, n))
+    vec /= np.mean(vec)
+
+    state = jacobian.init_jacobian_handler(num_tcoeffs=n, d=d)
+
+    # Assert that if vecs of the wrong shape are passed, errors are raised.
+    msg = "expects a dxn"
+    with testing.raises(ValueError, match=msg):
+        _ = jacobian.calculate_diagonal_along_d(vf_dxn, vec.reshape((d * n,)), state)
+
+    if d != n:
+        with testing.raises(ValueError, match=msg):
+            _ = jacobian.calculate_diagonal_along_d(vf_dxn, vec.reshape((n, d)), state)
+
+    # Assert that when the right input is passed, the Jacobian has the expected shape
+    _fx, J, _ = jacobian.calculate_diagonal_along_d(vf_dxn, vec, state)
+
+    assert J.shape == (d, n)
