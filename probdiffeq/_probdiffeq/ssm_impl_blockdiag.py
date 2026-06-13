@@ -174,11 +174,6 @@ class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
         # Jacobian objects work with (n, d) arrays but block-diagonal models with (d, n) arrays
         fx = fx.T
 
-        msg = "TODO (next): make the outputs of ODEFunction.vector_field into tuples and fix all tests."
-        msg += "Then, we should have the software for jet linearisation in ODEs "
-        msg += "and long term we could remove jetexpand from the PEC solvers."
-        raise RuntimeError(msg)
-
         # J_diag.shape = (d, 1, n)
         # linop.shape: (d, 1, n)
         linop = linop - J_diag
@@ -575,19 +570,19 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
         msg += " If you need them, reach out."
         raise NotImplementedError(msg)
 
-    def constraint_ode_ts0(self, ode: problems.ODEFunction, /) -> BlockDiagOdeTs0:
-        if not isinstance(ode, problems.ODEFunction):
+    def constraint_ode_ts0(self, ode: problems.JetOde, /) -> BlockDiagOdeTs0:
+        if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
         return BlockDiagOdeTs0(ode=ode)
 
-    def constraint_ode_ts1(self, ode: problems.ODEFunction, /) -> BlockDiagOdeTs1:
-        if not isinstance(ode, problems.ODEFunction):
+    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> BlockDiagOdeTs1:
+        if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
         return BlockDiagOdeTs1(ode=ode)
 
     def constraint_residual(
         self,
-        residual: problems.Residual,
+        residual: problems.JetResidual,
         *,
         taylor_point: taylor_points.TaylorPoint | None = None,
     ):

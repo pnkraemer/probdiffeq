@@ -299,14 +299,16 @@ class DenseOdeTs1(ssm_impl_api.AbstractOde):
         fx = fx.reshape((m * d,))
         J = J.reshape((m * d, -1))
 
-        # Bulletproof construction of selection operators via jacobian(slicing).
+        # Bulletproof construction of selection operators via jacobian(slicing)
+        # instead of instantiating identity matrices and selecting rows
+
         @func.jacfwd
         def e1(s):
             s_tree = rv.tree_flatten.unflatten_array(s)
             return tree.ravel_pytree(s_tree[self.ode.num_tcoeffs_in_args])[0]
 
         # Complete the expressions for bias and linop
-        fx = J @ m0 - fx
+        fx = J @ rv.mean_flat - fx
         E1 = e1(rv.mean_flat)
         linop = E1 - J
 
@@ -552,7 +554,7 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
 
     def prior_exponential(
         self,
-        ode: problems.ODEFunctionAutonomous,
+        ode: problems.JetOdeAutonomous,
         tcoeffs_mean: C,
         /,
         *,
@@ -591,7 +593,7 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
 
     def prior_exponential_diffuse(
         self,
-        ode: problems.ODEFunctionAutonomous,
+        ode: problems.JetOdeAutonomous,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
@@ -743,23 +745,23 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         base_scale, _ = tree.ravel_pytree(base_scale)
         return linalg.diagonal_matrix(base_scale)
 
-    def constraint_ode_ts0(self, ode: problems.ODEFunction, /) -> DenseOdeTs0:
-        if not isinstance(ode, problems.ODEFunction):
+    def constraint_ode_ts0(self, ode: problems.JetOde, /) -> DenseOdeTs0:
+        if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
         return DenseOdeTs0(ode=ode)
 
-    def constraint_ode_ts1(self, ode: problems.ODEFunction, /) -> DenseOdeTs1:
-        if not isinstance(ode, problems.ODEFunction):
+    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> DenseOdeTs1:
+        if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
         return DenseOdeTs1(ode=ode)
 
     def constraint_residual(
         self,
-        residual: problems.Residual,
+        residual: problems.JetResidual,
         *,
         taylor_point: taylor_points.TaylorPoint | None = None,
     ) -> DenseResidual:
-        if not isinstance(residual, problems.Residual):
+        if not isinstance(residual, problems.JetResidual):
             raise TypeError(residual)
         if taylor_point is None:
             taylor_point = taylor_points.taylor_point_prior()

@@ -570,15 +570,15 @@ class state_space_model_isotropic(ssm_impl_api.StateSpaceModel):
         tcoeffs_std = [*tcoeffs_std, *[unknowns for _ in range(diffuse_derivatives)]]
         return tcoeffs_mean, tcoeffs_std
 
-    def constraint_ode_ts0(self, ode: problems.ODEFunction, /) -> IsotropicOdeTs0:
-        if not isinstance(ode, problems.ODEFunction):
+    def constraint_ode_ts0(self, ode: problems.JetOde, /) -> IsotropicOdeTs0:
+        if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
         return IsotropicOdeTs0(ode=ode)
 
-    def constraint_ode_ts1(self, ode: problems.ODEFunction, /) -> IsotropicOdeTs1:
-        if not isinstance(ode, problems.ODEFunction):
+    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> IsotropicOdeTs1:
+        if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
         return IsotropicOdeTs1(ode=ode)
 
-    def constraint_residual(self, residual: problems.Residual, *, taylor_point=None):
+    def constraint_residual(self, residual: problems.JetResidual, *, taylor_point=None):
         raise NotImplementedError

@@ -18,7 +18,7 @@ Examples
 ...     return y
 >>>
 >>> print(f)
-ODEFunction(num_tcoeffs_in_args=1, jacobian=jacobian_monte_carlo_fwd(seed=1, num_probes=10))
+JetOde(num_tcoeffs_in_args=1, jacobian=jacobian_monte_carlo_fwd(seed=1, num_probes=10))
 
 
 Higher-order problems:
@@ -28,7 +28,7 @@ Higher-order problems:
 ...     return y + dy
 >>>
 >>> print(f)
-ODEFunction(num_tcoeffs_in_args=2, jacobian=jacobian_monte_carlo_fwd(seed=1, num_probes=10))
+JetOde(num_tcoeffs_in_args=2, jacobian=jacobian_monte_carlo_fwd(seed=1, num_probes=10))
 
 General constraints:
 
@@ -39,7 +39,7 @@ General constraints:
 ...     return jnp.abs2(y)
 >>>
 >>> print(g)
-Residual(num_tcoeffs_in_args=1, jacobian=jacobian_monte_carlo_fwd(seed=1, num_probes=10))
+JetResidual(num_tcoeffs_in_args=1, jacobian=jacobian_monte_carlo_fwd(seed=1, num_probes=10))
 
 Higher-order constraints:
 
@@ -48,7 +48,7 @@ Higher-order constraints:
 ...     return jnp.abs2(dy)
 >>>
 >>> print(g)
-Residual(num_tcoeffs_in_args=2, jacobian=jacobian_monte_carlo_fwd(seed=1, num_probes=10))
+JetResidual(num_tcoeffs_in_args=2, jacobian=jacobian_monte_carlo_fwd(seed=1, num_probes=10))
 
 
 
@@ -59,8 +59,10 @@ from probdiffeq.backend import func, tree
 from probdiffeq.backend.typing import Any, Array, Generic, Protocol, Sequence, TypeVar
 
 __all__ = [
-    "ODEFunction",
-    "ODEFunctionAutonomous",
+    "JetAbstract",
+    "JetOde",
+    "JetOdeAutonomous",
+    "JetResidual",
     "ProtocolODEAutonomous",
     "ProtocolODEAutonomousOrderTwo",
     "ProtocolODEFirstOrder",
@@ -68,12 +70,10 @@ __all__ = [
     "ProtocolResidualAcceleration",
     "ProtocolResidualPosition",
     "ProtocolResidualVelocity",
-    "Residual",
     "ode",
     "ode_autonomous",
     "ode_autonomous_order_arbitrary",
     "ode_autonomous_order_two",
-    "ode_jet_lift",
     "ode_order_arbitrary",
     "ode_order_two",
     "residual_acceleration",
@@ -88,7 +88,7 @@ T = TypeVar("T")
 T_contra = TypeVar("T_contra", contravariant=True)
 
 
-class _AbstractJetFunction:
+class JetAbstract:
     """A jet function, ie a function that operates on jet coordinates (y, y', ..., t).
 
     This is typically used to define right-hand sides of (high-order) ODEs
@@ -115,7 +115,7 @@ class ProtocolODEOrderTwo(Protocol[T]):
     def __call__(self, u: T, du: T, /, *, t: float) -> T: ...
 
 
-class ODEFunction(_AbstractJetFunction, Generic[T]):
+class JetOde(JetAbstract, Generic[T]):
     def __init__(
         self, vector_field, jacobian: jacobians.Jacobian, num_tcoeffs_in_args: int
     ):
@@ -127,7 +127,7 @@ class ODEFunction(_AbstractJetFunction, Generic[T]):
         return self.vector_field(jet_coords=jet_coords, t=t)
 
 
-class ODEFunctionAutonomous(ODEFunction[T]):
+class JetOdeAutonomous(JetOde[T]):
     """An autonomous ODE y^(k) = f(y, y', ...) where f does not depend on t."""
 
     def __init__(
@@ -153,7 +153,7 @@ def ode(func: ProtocolODEFirstOrder, /, *, jacobian: jacobians.Jacobian | None =
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_fwd()
 
-    return ODEFunction(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=1)
+    return JetOde(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=1)
 
 
 def ode_order_two(
@@ -168,7 +168,7 @@ def ode_order_two(
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_fwd()
 
-    return ODEFunction(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=2)
+    return JetOde(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=2)
 
 
 # No typing because arbitrary order is difficult to type (unlike ode and ode_order_two)
@@ -185,9 +185,7 @@ def ode_order_arbitrary(
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_fwd()
 
-    return ODEFunction(
-        jetfunc, jacobian=jacobian, num_tcoeffs_in_args=num_tcoeffs_in_args
-    )
+    return JetOde(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=num_tcoeffs_in_args)
 
 
 class ProtocolODEAutonomous(Protocol[T]):
@@ -206,7 +204,7 @@ def ode_autonomous(
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_fwd()
 
-    return ODEFunctionAutonomous(autonomous, jacobian=jacobian, num_tcoeffs_in_args=1)
+    return JetOdeAutonomous(autonomous, jacobian=jacobian, num_tcoeffs_in_args=1)
 
 
 class ProtocolODEAutonomousOrderTwo(Protocol[T]):
@@ -228,7 +226,7 @@ def ode_autonomous_order_two(
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_fwd()
 
-    return ODEFunctionAutonomous(autonomous, jacobian=jacobian, num_tcoeffs_in_args=2)
+    return JetOdeAutonomous(autonomous, jacobian=jacobian, num_tcoeffs_in_args=2)
 
 
 # No typing because arbitrary order is difficult to type (unlike ode and ode_order_two)
@@ -236,7 +234,7 @@ def ode_autonomous_order_two(
 
 def ode_autonomous_order_arbitrary(
     func, /, *, num_tcoeffs_in_args: int, jacobian: jacobians.Jacobian | None = None
-) -> "ODEFunctionAutonomous":
+) -> "JetOdeAutonomous":
     """Construct an autonomous ODE of arbitrary order."""
 
     def autonomous(*, jet_coords: Sequence[T]) -> T:
@@ -245,12 +243,12 @@ def ode_autonomous_order_arbitrary(
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_fwd()
 
-    return ODEFunctionAutonomous(
+    return JetOdeAutonomous(
         autonomous, jacobian=jacobian, num_tcoeffs_in_args=num_tcoeffs_in_args
     )
 
 
-class Residual(_AbstractJetFunction):
+class JetResidual(JetAbstract):
     """A residual on jet coordinates, ie a function that operates on (y, y', ..., t)."""
 
     def __init__(
@@ -271,7 +269,7 @@ class ProtocolResidualPosition(Protocol[T_contra]):
 
 def residual_position(
     func: ProtocolResidualPosition, /, *, jacobian: jacobians.Jacobian | None = None
-) -> Residual:
+) -> JetResidual:
     """Construct a description of a residual f(u, t) = 0."""
 
     # No implementation difference between ode and implicit, but
@@ -284,10 +282,10 @@ def residual_position(
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_fwd()
 
-    return Residual(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=1)
+    return JetResidual(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=1)
 
 
-def residual_from_stack(*residual_stack: *tuple[Residual, ...]) -> Residual:
+def residual_from_stack(*residual_stack: *tuple[JetResidual, ...]) -> JetResidual:
     """Construct a description of a residual by stacking other residuals."""
 
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> list[T]:
@@ -299,7 +297,7 @@ def residual_from_stack(*residual_stack: *tuple[Residual, ...]) -> Residual:
     nums = [r.num_tcoeffs_in_args for r in residual_stack]
     num_args = max(nums)
     jacobian = residual_stack[0].jacobian
-    return Residual(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=num_args)
+    return JetResidual(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=num_args)
 
 
 class ProtocolResidualVelocity(Protocol[T_contra]):
@@ -308,7 +306,7 @@ class ProtocolResidualVelocity(Protocol[T_contra]):
 
 def residual_velocity(
     func: ProtocolResidualVelocity, /, *, jacobian: jacobians.Jacobian | None = None
-) -> Residual:
+) -> JetResidual:
     """Construct a description of a residual f(u, du, t) = 0."""
 
     # No implementation difference between ode and implicit, but
@@ -321,7 +319,7 @@ def residual_velocity(
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_fwd()
 
-    return Residual(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=2)
+    return JetResidual(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=2)
 
 
 class ProtocolResidualAcceleration(Protocol[T_contra]):
@@ -332,7 +330,7 @@ class ProtocolResidualAcceleration(Protocol[T_contra]):
 
 def residual_acceleration(
     func: ProtocolResidualAcceleration, /, *, jacobian: jacobians.Jacobian | None = None
-) -> Residual:
+) -> JetResidual:
     """Construct a description of a residual f(u, du, t) = 0."""
 
     # No implementation difference between ode and implicit, but
@@ -345,10 +343,10 @@ def residual_acceleration(
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_fwd()
 
-    return Residual(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=3)
+    return JetResidual(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=3)
 
 
-def residual_jet_lift(residual: Residual, lift_by: int) -> Residual:
+def residual_jet_lift(residual: JetResidual, lift_by: int) -> JetResidual:
     """Lift a function on k-jet coordinates to one on (k+m)-jet coordinates."""
     if not isinstance(lift_by, int):
         raise TypeError
@@ -390,53 +388,6 @@ def residual_jet_lift(residual: Residual, lift_by: int) -> Residual:
         return [primals, *series]
 
     order = residual.num_tcoeffs_in_args + lift_by
-    return Residual(
+    return JetResidual(
         residual_lifted, num_tcoeffs_in_args=order, jacobian=residual.jacobian
-    )
-
-
-def ode_jet_lift(ode_fun: ODEFunction, lift_by: int) -> ODEFunction:
-    """Lift a function on k-jet coordinates to one on (k+m)-jet coordinates."""
-    if not isinstance(lift_by, int):
-        raise TypeError
-
-    def residual_lifted(*, jet_coords: Sequence[T], t) -> Sequence[T]:
-        tcoeffs_all = jet_coords
-        _, unravel_one = tree.ravel_pytree(tcoeffs_all[0])
-
-        lift_by_upper = len(tcoeffs_all) - residual.num_tcoeffs_in_args
-        if lift_by < 0 or lift_by > lift_by_upper:
-            msg = "The provided jet-order is incompatible with the residual order."
-            msg += f" Expected: 0 <= lift_by <= {lift_by_upper}."
-            msg += f" Received: lift_by == {lift_by}."
-            raise ValueError(msg)
-        order = residual.num_tcoeffs_in_args + lift_by
-        tcoeffs = tcoeffs_all[:order]
-
-        # Flatten the residual because jax.jet is a bit high maintenance :)
-        def jet_call(*y):
-            y_tree = [unravel_one(s) for s in y]
-            fx = residual.residual_function(jet_coords=y_tree, t=t)
-            return tree.ravel_pytree(fx)[0]
-
-        flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
-
-        ps, ss = utilities.jet_coords_to_primals_and_series(
-            flat, residual.num_tcoeffs_in_args
-        )
-
-        if len(tree.tree_leaves(ss)) == 0:
-            fx = jet_call(*ps)
-
-            # Return a sequence to be compatible with Taylor-coeff logic,
-            # but don't bother unflattening the content
-            # because the result will be compared to zero anyway
-            return [fx]
-
-        primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
-        return [primals, *series]
-
-    order = ode_fun.num_tcoeffs_in_args + lift_by
-    return ODEFunction(
-        residual_lifted, num_tcoeffs_in_args=order, jacobian=ode_fun.jacobian
     )

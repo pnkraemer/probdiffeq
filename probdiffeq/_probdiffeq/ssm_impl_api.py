@@ -341,7 +341,7 @@ class StateSpaceModel(abc.ABC):
     @abc.abstractmethod
     def prior_exponential(
         self,
-        ode: problems.ODEFunctionAutonomous,
+        ode: problems.JetOdeAutonomous,
         tcoeffs: C,
         /,
         *,
@@ -361,7 +361,7 @@ class StateSpaceModel(abc.ABC):
     @abc.abstractmethod
     def prior_exponential_diffuse(
         self,
-        ode: problems.ODEFunctionAutonomous,
+        ode: problems.JetOdeAutonomous,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
@@ -394,7 +394,7 @@ class StateSpaceModel(abc.ABC):
         def autonomous(*, jet_coords):
             return linop(jet_coords[-1])
 
-        ode: problems.ODEFunctionAutonomous = problems.ODEFunctionAutonomous(
+        ode: problems.JetOdeAutonomous = problems.JetOdeAutonomous(
             autonomous,
             jacobian=jacobians.jacobian_monte_carlo_fwd(),
             num_tcoeffs_in_args=len(tcoeffs),
@@ -425,7 +425,7 @@ class StateSpaceModel(abc.ABC):
         def autonomous(*, jet_coords):
             return linop(jet_coords[-1])
 
-        ode: problems.ODEFunctionAutonomous = problems.ODEFunctionAutonomous(
+        ode: problems.JetOdeAutonomous = problems.JetOdeAutonomous(
             autonomous,
             jacobian=jacobians.jacobian_monte_carlo_fwd(),
             num_tcoeffs_in_args=len(tcoeffs_mean),
@@ -442,7 +442,7 @@ class StateSpaceModel(abc.ABC):
     # --- Linearization constructors ---
 
     @abc.abstractmethod
-    def constraint_ode_ts0(self, ode: problems.ODEFunction, /) -> AbstractOde:
+    def constraint_ode_ts0(self, ode: problems.JetOde, /) -> AbstractOde:
         r"""Create an ODE constraint with zeroth-order Taylor linearisation.
 
         This constraint handles ODEs of the form
@@ -458,7 +458,7 @@ class StateSpaceModel(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def constraint_ode_ts1(self, ode: problems.ODEFunction, /) -> AbstractOde:
+    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> AbstractOde:
         r"""Create an ODE constraint and linearise with a first-order Taylor approximation.
 
         This constraint handles ODEs of the form
@@ -476,7 +476,7 @@ class StateSpaceModel(abc.ABC):
     @abc.abstractmethod
     def constraint_residual(
         self,
-        residual: problems.Residual,
+        residual: problems.JetResidual,
         *,
         taylor_point: "taylor_points.TaylorPoint | None" = None,
     ) -> AbstractResidual:
