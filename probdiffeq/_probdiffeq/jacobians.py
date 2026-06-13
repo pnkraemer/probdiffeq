@@ -53,10 +53,15 @@ class Jacobian:
         # of this code were lose *and different*.
         msg = "'fun' must map an (n, d) array to an (m, d) array."
         msg += f" Received: f(x).shape = {tree.tree_map(np.shape, fx_like)}"
-        msg += " for x.shape == {tree.tree_map(np.shape, x)}. "
-        if not isinstance(x, Array) or not isinstance(
-            fx_like, structs.ShapeDtypeStruct
-        ):
+        msg += f" for x.shape == {tree.tree_map(np.shape, x)}. "
+
+        # fx is the result of func.eval_shape, so if it is a
+        # ShapeDtypeStruct, the function would have returned an array
+        # (which is expected). If it returns something else (eg. list, tuple),
+        # we raise an error.
+        x_is_array = isinstance(x, Array)
+        fx_is_array_like = isinstance(fx_like, structs.ShapeDtypeStruct)
+        if not x_is_array or not fx_is_array_like:
             raise TypeError(msg)
 
         if x.ndim != 2 or fx_like.ndim != 2:

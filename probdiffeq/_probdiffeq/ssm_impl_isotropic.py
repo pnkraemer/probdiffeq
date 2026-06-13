@@ -343,15 +343,16 @@ class IsotropicOdeTs1(ssm_impl_api.AbstractOde):
         J_trace /= d
 
         # Complete the linearisation
-        E1 = np.eye(n)[np.asarray([self.ode.num_tcoeffs_in_args])]
+        idx = np.asarray([self.ode.num_tcoeffs_in_args])
+        E1 = np.eye(n)[idx]
         linop = E1 - J_trace
-        fx = rv.mean_flat[self.ode.num_tcoeffs_in_args, ...] - fx
-        fx = fx - (linop @ rv.mean_flat).reshape(fx.shape)
+        fx = rv.mean_flat[idx, ...] - fx
+        fx = fx - linop @ rv.mean_flat
 
         # Turn fx into the correct pytree
         m0_tree = rv.mean[:1]
         rv0 = IsotropicNormal.from_dirac(m0_tree, damp=0.0)
-        fx = rv0.tree_flatten.unflatten_array(fx[None, ...])
+        fx = rv0.tree_flatten.unflatten_array(fx)
 
         # Turn fx and J_trace into an observation model
         noise = IsotropicNormal.from_dirac(fx, damp=damp)

@@ -274,7 +274,7 @@ class DenseOdeTs1(ssm_impl_api.AbstractOde):
         # Rewrite the vector field as one that maps
         # Arrays to arrays.
         # Maps (n, d) to (1, d) to conform the Jacobian API
-        def vf(s: Array) -> Array:
+        def fun(s: Array) -> Array:
             # Move to latent space
             s = np.reshape(s, (-1,))
 
@@ -292,7 +292,7 @@ class DenseOdeTs1(ssm_impl_api.AbstractOde):
 
         # Materialize the Jacobian
         m0 = rv.mean_flat.reshape((n, d))
-        fx, J, state = self.ode.jacobian.materialize_dense(vf, m0, state)
+        fx, J, state = self.ode.jacobian.materialize_dense(fun, m0, state)
 
         # Flatten fx and J correctly (from [m, d, n, d] to [md,nd])
         m, d = fx.shape
@@ -358,20 +358,41 @@ class DenseResidual(ssm_impl_api.AbstractResidual):
         # Get the linearization point (i.e., prior or posterior linearisation)
         xi = self.taylor_point(constraint_flat, rv, t=t)
 
-        # Evaluate the linearization
-        jacobian = self.residual.jacobian.materialize_dense
-        fx, linop, state = jacobian(constraint_flat, xi, state, t=t)
-        fx = fx - linop @ xi
+        # Read n and d so that we can turn latent arrays into
+        # (n, d) arrays, which Jacobians require
+        m_tree = rv.mean
+        n = len(m_tree)
+        d = rv.mean_flat.size // n
 
-        if linop.shape[0] > linop.shape[1]:
-            msg = f"There are more constraints ({linop.shape[0]}) than variables ({linop.shape[1]})."
+        # Rewrite the constraint as one that maps 2d arrays to 2d arrays.
+        # Maps (n, d) to (1, d) to conform the Jacobian API.
+        def fun(s: Array) -> Array:
+            # Move from (n, d) shape into latent space: (-1,) shape
+            s = np.reshape(s, (-1,))
+
+            # Evaluate the actual constraint
+            fs0 = constraint_flat(s, t=t)
+
+            # Bring back into (m, d) form.
+            return fs0[None, :]
+
+        # Evaluate the linearization
+        xi_2d = xi.reshape((n, d))
+        fx, J, state = self.residual.jacobian.materialize_dense(fun, xi_2d, state)
+        m, d = fx.shape
+        fx = fx.reshape((m * d,))
+        J = J.reshape((m * d, -1))
+        fx = fx - J @ xi
+
+        if J.shape[0] > J.shape[1]:
+            msg = f"There are more constraints ({J.shape[0]}) than variables ({J.shape[1]})."
             msg += " This will likely cause an error in the conditioning."
             warnings.warn(msg, stacklevel=1)
 
         # Turn the linearization into a conditional
         noise = DenseNormal.from_dirac([fx], damp=damp)
 
-        cond = DenseLatentCond.from_linop_and_noise(linop, noise)
+        cond = DenseLatentCond.from_linop_and_noise(J, noise)
         return cond, state
 
 
