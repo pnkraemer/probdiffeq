@@ -365,19 +365,20 @@ class DenseResidual(ssm_impl_api.AbstractResidual):
         d = rv.mean_flat.size // n
 
         # Rewrite the constraint as one that maps 2d arrays to 2d arrays.
-        # Maps (n, d) to (1, d) to conform the Jacobian API.
+        # Here, write the fun as (d, 1) to (d', 1) because the Jacobian
+        # logic requires 2d to 2d arrays. Since we materialize the full
+        # Jacobian, everything is still fine.
         def fun(s: Array) -> Array:
             # Move from (n, d) shape into latent space: (-1,) shape
             s = np.reshape(s, (-1,))
 
             # Evaluate the actual constraint
             fs0 = constraint_flat(s, t=t)
-
             # Bring back into (m, d) form.
-            return fs0[None, :]
+            return fs0[:, None]
 
         # Evaluate the linearization
-        xi_2d = xi.reshape((n, d))
+        xi_2d = xi.reshape((-1, 1))
         fx, J, state = self.residual.jacobian.materialize_dense(fun, xi_2d, state)
         m, d = fx.shape
         fx = fx.reshape((m * d,))

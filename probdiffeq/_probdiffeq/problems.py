@@ -18,7 +18,7 @@ Examples
 ...     return y
 >>>
 >>> print(f)
-JetOde(num_tcoeffs_in_args=1, jacobian=jacobian_monte_carlo_fwd(seed=1, num_probes=10))
+JetOde(num_tcoeffs_in_args=1, jacobian=jacobian_monte_carlo_rev(seed=1, num_probes=10))
 
 
 Higher-order problems:
@@ -28,7 +28,7 @@ Higher-order problems:
 ...     return y + dy
 >>>
 >>> print(f)
-JetOde(num_tcoeffs_in_args=2, jacobian=jacobian_monte_carlo_fwd(seed=1, num_probes=10))
+JetOde(num_tcoeffs_in_args=2, jacobian=jacobian_monte_carlo_rev(seed=1, num_probes=10))
 
 General constraints:
 
@@ -39,7 +39,7 @@ General constraints:
 ...     return jnp.abs2(y)
 >>>
 >>> print(g)
-JetResidual(num_tcoeffs_in_args=1, jacobian=jacobian_monte_carlo_fwd(seed=1, num_probes=10))
+JetResidual(num_tcoeffs_in_args=1, jacobian=jacobian_monte_carlo_rev(seed=1, num_probes=10))
 
 Higher-order constraints:
 
@@ -48,7 +48,7 @@ Higher-order constraints:
 ...     return jnp.abs2(dy)
 >>>
 >>> print(g)
-JetResidual(num_tcoeffs_in_args=2, jacobian=jacobian_monte_carlo_fwd(seed=1, num_probes=10))
+JetResidual(num_tcoeffs_in_args=2, jacobian=jacobian_monte_carlo_rev(seed=1, num_probes=10))
 
 
 
@@ -151,7 +151,7 @@ def ode(func: ProtocolODEFirstOrder, /, *, jacobian: jacobians.Jacobian | None =
         return func(y, t=t)
 
     if jacobian is None:
-        jacobian = jacobians.jacobian_monte_carlo_fwd()
+        jacobian = jacobians.jacobian_monte_carlo_rev()
 
     return JetOde(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=1)
 
@@ -166,7 +166,7 @@ def ode_order_two(
         return func(y, dy, t=t)
 
     if jacobian is None:
-        jacobian = jacobians.jacobian_monte_carlo_fwd()
+        jacobian = jacobians.jacobian_monte_carlo_rev()
 
     return JetOde(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=2)
 
@@ -183,7 +183,7 @@ def ode_order_arbitrary(
         return func(*jet_coords[:num_tcoeffs_in_args], t=t)
 
     if jacobian is None:
-        jacobian = jacobians.jacobian_monte_carlo_fwd()
+        jacobian = jacobians.jacobian_monte_carlo_rev()
 
     return JetOde(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=num_tcoeffs_in_args)
 
@@ -202,7 +202,7 @@ def ode_autonomous(
         return func(y)
 
     if jacobian is None:
-        jacobian = jacobians.jacobian_monte_carlo_fwd()
+        jacobian = jacobians.jacobian_monte_carlo_rev()
 
     return JetOdeAutonomous(autonomous, jacobian=jacobian, num_tcoeffs_in_args=1)
 
@@ -224,7 +224,7 @@ def ode_autonomous_order_two(
         return func(y, dy)
 
     if jacobian is None:
-        jacobian = jacobians.jacobian_monte_carlo_fwd()
+        jacobian = jacobians.jacobian_monte_carlo_rev()
 
     return JetOdeAutonomous(autonomous, jacobian=jacobian, num_tcoeffs_in_args=2)
 
@@ -241,7 +241,7 @@ def ode_autonomous_order_arbitrary(
         return func(*jet_coords[:num_tcoeffs_in_args])
 
     if jacobian is None:
-        jacobian = jacobians.jacobian_monte_carlo_fwd()
+        jacobian = jacobians.jacobian_monte_carlo_rev()
 
     return JetOdeAutonomous(
         autonomous, jacobian=jacobian, num_tcoeffs_in_args=num_tcoeffs_in_args
@@ -280,7 +280,7 @@ def residual_position(
         return func(y, t=t)
 
     if jacobian is None:
-        jacobian = jacobians.jacobian_monte_carlo_fwd()
+        jacobian = jacobians.jacobian_monte_carlo_rev()
 
     return JetResidual(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=1)
 
@@ -317,7 +317,7 @@ def residual_velocity(
         return func(y, dy, t=t)
 
     if jacobian is None:
-        jacobian = jacobians.jacobian_monte_carlo_fwd()
+        jacobian = jacobians.jacobian_monte_carlo_rev()
 
     return JetResidual(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=2)
 
@@ -341,7 +341,7 @@ def residual_acceleration(
         return func(y, dy, ddy, t=t)
 
     if jacobian is None:
-        jacobian = jacobians.jacobian_monte_carlo_fwd()
+        jacobian = jacobians.jacobian_monte_carlo_rev()
 
     return JetResidual(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=3)
 

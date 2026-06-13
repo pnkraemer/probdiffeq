@@ -81,7 +81,7 @@ class jacobian_materialize(Jacobian):
     Use this Jacobian if the dimension of the problem is relatively small.
     """
 
-    def __init__(self, *, jacfun=func.jacfwd) -> None:
+    def __init__(self, *, jacfun=func.jacrev) -> None:
         self.jacfun = jacfun
 
     def __repr__(self) -> str:
