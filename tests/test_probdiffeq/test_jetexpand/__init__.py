@@ -1,1 +1,1 @@
-"""Tests for Taylor-series functionalities."""
+"""Tests for Taylor series linearization."""
