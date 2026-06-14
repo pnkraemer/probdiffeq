@@ -6,6 +6,7 @@ from probdiffeq.backend import func, linalg, np, random, testing, tree
 
 @testing.parametrize("ssm_factory", [probdiffeq.state_space_model_dense])
 def test_exponential_prior_matches_ioup(ssm_factory):
+    """Assert that the exponential prior with IOUP drift matches prior_ornstein_uhlenbeck_integrated."""
     u = np.ones((4,))
     M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
     tcoeffs = [u, u, u, u]
@@ -33,6 +34,7 @@ def test_exponential_prior_matches_ioup(ssm_factory):
 
 @testing.parametrize("ssm_factory", [probdiffeq.state_space_model_dense])
 def test_exponential_prior_matches_iwp(ssm_factory):
+    """Assert that the exponential prior with zero drift matches the IWP."""
     u = np.ones((2,))
     tcoeffs = [u, u, u, u]
 
@@ -57,6 +59,7 @@ def test_exponential_prior_matches_iwp(ssm_factory):
 
 @testing.parametrize("ssm_factory", [probdiffeq.state_space_model_dense])
 def test_exponential_raises_error_if_vf_linear_is_bad(ssm_factory):
+    """Assert that a mismatched Taylor-coefficient count raises a TypeError."""
     u = np.ones((3,))
     M = random.normal(random.prng_key(seed=1), shape=(u.size, u.size))
     tcoeffs = [u] * 2
@@ -116,7 +119,7 @@ def test_exponential_transition_as_expected(ode_shape, ssm_factory):
     [probdiffeq.state_space_model_isotropic, probdiffeq.state_space_model_blockdiag],
 )
 def test_exponential_not_implemented_for_isotropic_or_blockdiag(ssm_factory):
-
+    """Assert that the exponential prior raises NotImplementedError for non-dense models."""
     ssm = ssm_factory()
 
     @func.partial(probdiffeq.ode_autonomous_order_arbitrary, num_tcoeffs_in_args=3)

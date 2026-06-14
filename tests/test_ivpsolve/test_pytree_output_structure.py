@@ -1,4 +1,4 @@
-"""Tests for interaction with the solution API."""
+"""Tests for pytree output structure."""
 
 from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, structs, testing
@@ -23,6 +23,7 @@ class Taylor(structs.NamedTuple):
     ],
 )
 def fixture_pn_solution(ssm_factory):
+    """Solve the Lotka-Volterra IVP with a custom Taylor pytree and return the solution."""
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     # Generate a solver
@@ -42,9 +43,7 @@ def fixture_pn_solution(ssm_factory):
     return func.jit(solve)(iwp, save_at=save_at, atol=1e-2, rtol=1e-2)
 
 
-def test_u_inherits_data_structure(pn_solution) -> None:
+def test_u_mean_and_std_inherit_data_structure(pn_solution) -> None:
+    """Assert that u.mean and u.std both inherit the custom Taylor pytree structure."""
     assert isinstance(pn_solution.u.mean, Taylor)
-
-
-def test_u_std_inherits_data_structure(pn_solution) -> None:
     assert isinstance(pn_solution.u.std, Taylor)

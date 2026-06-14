@@ -14,6 +14,7 @@ from probdiffeq.util import test_util
     ],
 )
 def test_warning_for_fixedpoint_in_save_every_step_mode(ssm_factory) -> None:
+    """Assert that the fixed point smoother warns when used with the save-every-step solver."""
     vf, _, _ = ode.ivp_lotka_volterra()
 
     vf = probdiffeq.ode(vf)
@@ -36,6 +37,7 @@ def test_warning_for_fixedpoint_in_save_every_step_mode(ssm_factory) -> None:
     ],
 )
 def test_warning_for_smoother_in_save_at_mode(ssm_factory) -> None:
+    """Assert that the fixed interval smoother warns when used with the save-at solver."""
     vf, _, _ = ode.ivp_lotka_volterra()
 
     vf = probdiffeq.ode(vf)

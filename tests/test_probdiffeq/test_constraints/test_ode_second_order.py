@@ -1,4 +1,4 @@
-"""Tests for sampling behaviour."""
+"""Tests for second-order ODE constraints."""
 
 from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, testing
@@ -13,8 +13,8 @@ from probdiffeq.backend import func, np, testing
     ],
 )
 @testing.parametrize("constraint", ["ts0", "ts1"])
-def test_solution_is_accurate(ssm_factory, constraint):
-
+def test_harmonic_oscillator_solution_is_accurate(ssm_factory, constraint):
+    """Assert that the second-order harmonic oscillator solution matches the exact cosine."""
     jacobian = probdiffeq.jacobian_materialize()
 
     @func.partial(probdiffeq.ode_order_two, jacobian=jacobian)

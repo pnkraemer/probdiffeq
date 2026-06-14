@@ -23,6 +23,7 @@ class Root:
 
 @testing.fixture(name="residual")
 def fixture_residual_sir():
+    """Construct the SIR model as a Root struct with ODE and DAE residuals."""
 
     def residual(u, du, /, *, t):
         linear = imex_linear(u, du, t=t)
@@ -85,6 +86,8 @@ def fixture_residual_sir():
 @testing.fixture(name="expected")
 @testing.parametrize("derivatives", [1, 5])
 def fixture_expected(residual, derivatives):
+    """Compute expected jet expansion coefficients via the ODE vector field."""
+
     @probdiffeq.ode
     def vf(y, /, *, t):
         return residual.ode_vf(y, t=t)
@@ -95,6 +98,7 @@ def fixture_expected(residual, derivatives):
 
 
 def case_residual_jet_lift_dae(residual):
+    """Use the DAE residual with separate differential and algebraic parts."""
     taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
 
     def constraint_residual(ssm, lift_by: int):
@@ -111,6 +115,7 @@ def case_residual_jet_lift_dae(residual):
 
 
 def case_residual_jet_lift_residual(residual):
+    """Use the implicit residual formulation."""
     taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
 
     def constraint_residual(ssm, lift_by: int):
@@ -131,6 +136,7 @@ def test_posterior_linearisation_matches_closed_form_recursion(
     lift_by: int | Literal["max"],
     ssm_factory,
 ):
+    """Assert that jet-lifted posterior linearization matches the ODE recursion."""
     derivatives = len(expected) - 1
     ssm = ssm_factory()
     iwp = ssm.prior_wiener_integrated([residual.u0], diffuse_derivatives=derivatives)
@@ -157,6 +163,7 @@ def test_posterior_linearisation_matches_closed_form_recursion(
 def test_wrong_lift_by_raises_error(
     residual: Root, jet_factory: Callable, wrong_lift_by, ssm_factory
 ):
+    """Assert that an out-of-range lift-by index raises a ValueError."""
     # 5 Taylor coefficients + residual-orders of 2 (constraints depend on u and du).
     ssm = ssm_factory()
     iwp = ssm.prior_wiener_integrated([residual.u0], diffuse_derivatives=4)

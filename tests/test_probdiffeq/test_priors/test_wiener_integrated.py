@@ -9,6 +9,7 @@ from probdiffeq.backend import np, testing
     [probdiffeq.state_space_model_isotropic, probdiffeq.state_space_model_dense],
 )
 def test_transitions_are_correct_in_1d(ssm_factory) -> None:
+    """Assert that the IWP transition matrix and noise covariance match the analytical formulas in 1d."""
     tcoeffs = [2.0, 3.0, 4.0, 5.0]
     ssm = ssm_factory()
     iwp = ssm.prior_wiener_integrated(tcoeffs)
@@ -38,6 +39,7 @@ def test_transitions_are_correct_in_1d(ssm_factory) -> None:
 
 # Separate test because conditional shapes differ
 def test_transitions_are_correct_in_1d_blockdiag() -> None:
+    """Assert the same for the blockdiag model, where the conditional has an extra leading batch dimension."""
     tcoeffs = [2.0, 3.0, 4.0, 5.0]
     ssm = probdiffeq.state_space_model_blockdiag()
     iwp = ssm.prior_wiener_integrated(tcoeffs)

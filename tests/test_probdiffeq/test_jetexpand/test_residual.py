@@ -6,6 +6,7 @@ from probdiffeq.backend import func, np, testing
 
 @testing.parametrize("num", [0, 1, 10])
 def test_residual_init_matches_expectation_on_sir_model(num):
+    """Assert that the residual jet expansion matches the ODE jet expansion on the SIR model."""
     # todo: rename linearization to meanfinding or so
     # Baseline
     y0 = [np.asarray([0.99, 0.01, 0.0])]

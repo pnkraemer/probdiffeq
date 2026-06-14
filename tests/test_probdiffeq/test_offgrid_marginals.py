@@ -1,4 +1,4 @@
-"""Tests for IVP solvers."""
+"""Tests for off-grid marginal interpolation."""
 
 from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, testing, tree

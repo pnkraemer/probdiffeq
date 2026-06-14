@@ -1,4 +1,4 @@
-"""Tests for logpdfs.
+"""Tests for the logpdf.
 
 Necessary because the implementation has been faulty in the past.
 """
@@ -16,6 +16,7 @@ from probdiffeq.backend import func, np, random, testing, tree
     ],
 )
 def test_logpdf(ssm_factory) -> None:
+    """Assert that logpdf_tree matches the multivariate normal logpdf."""
     rv, _ssm = create_random_variable(ssm_factory=ssm_factory)
 
     u = tree.tree_map(np.ones_like, rv.mean)
@@ -36,7 +37,8 @@ def test_logpdf(ssm_factory) -> None:
         probdiffeq.state_space_model_blockdiag,
     ],
 )
-def test_grad_not_none(ssm_factory) -> None:
+def test_logpdf_gradient_is_finite(ssm_factory) -> None:
+    """Assert that the gradient of logpdf_tree is finite and free of NaN."""
     rv, _ssm = create_random_variable(ssm_factory=ssm_factory)
     u = tree.tree_map(np.ones_like, rv.mean)
 

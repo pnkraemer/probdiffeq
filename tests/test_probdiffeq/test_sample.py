@@ -14,6 +14,7 @@ from probdiffeq.backend import func, np, ode, random, testing, tree
     ],
 )
 def fixture_solution(ssm_factory):
+    """Solve the Lotka-Volterra IVP with a fixed point smoother and return the solution."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     vf = probdiffeq.ode(vf)
@@ -34,6 +35,7 @@ def fixture_solution(ssm_factory):
 
 @testing.parametrize("shape", [(), (2,), (2, 2)], ids=["()", "(n,)", "(n,n)"])
 def test_sample_shape(solution, shape) -> None:
+    """Assert that sampled trajectories have shape equal to the requested sample shape prepended to the state shape."""
     key = random.prng_key(seed=15)
     samples = solution.solution_full.sample(key, shape=shape)
 

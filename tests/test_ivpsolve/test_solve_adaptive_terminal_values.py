@@ -1,4 +1,4 @@
-"""Assert that the base adaptive solver is accurate."""
+"""Assert that the terminal-values solver is accurate."""
 
 from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, testing, tree
@@ -12,7 +12,8 @@ from probdiffeq.backend import func, np, ode, testing, tree
         probdiffeq.state_space_model_blockdiag,
     ],
 )
-def test_output_matches_reference(ssm_factory) -> None:
+def test_terminal_values_match_reference(ssm_factory) -> None:
+    """Assert that the terminal-values solver closely matches a high-accuracy reference solution."""
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     # Don't try all solvers because they're tested in a different file.
@@ -24,9 +25,9 @@ def test_output_matches_reference(ssm_factory) -> None:
     iwp = ssm.prior_wiener_integrated(tcoeffs)
 
     strategy = probdiffeq.strategy_smoother_fixedpoint()
-    constraint = ssm.constraint_ode_ts0(vf)
-    solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=constraint)
-    error = probdiffeq.error_residual_std(constraint=constraint)
+    ts0 = ssm.constraint_ode_ts0(vf)
+    solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=ts0)
+    error = probdiffeq.error_residual_std(constraint=ts0)
 
     # Compute the PN solution
     dt0 = ivpsolve.dt0_adaptive(

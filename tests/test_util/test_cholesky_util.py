@@ -12,6 +12,7 @@ _SHAPES = ([(4, 3), (3, 3), (4, 4)], [(2, 3), (3, 3), (2, 2)])
 @testing.parametrize("HCshape, Cshape, Xshape", _SHAPES)
 @testing.parametrize("solve_triu", [linalg.solve_triu, linalg.lstsq_svd])
 def test_revert_conditional(HCshape, Cshape, Xshape, solve_triu) -> None:
+    """Assert that revert_conditional returns the correct gain, joint covariance, and backward noise covariance."""
     HC = _some_array(HCshape) + 1.0
     C = _some_array(Cshape) + 2.0
     X = _some_array(Xshape) + 3.0 + np.eye(Xshape[0])

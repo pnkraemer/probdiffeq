@@ -5,22 +5,27 @@ from probdiffeq.util import gram_util, test_util
 
 
 def case_method_pade_legendre_13():
+    """Use the 13th-order Pade-Legendre method."""
     return gram_util.pade_and_legendre_13()
 
 
 def case_method_pade_legendre_9():
+    """Use the 9th-order Pade-Legendre method."""
     return gram_util.pade_and_legendre_9()
 
 
 def case_method_pade_legendre_7():
+    """Use the 7th-order Pade-Legendre method."""
     return gram_util.pade_and_legendre_7()
 
 
 def case_method_pade_legendre_5():
+    """Use the 5th-order Pade-Legendre method."""
     return gram_util.pade_and_legendre_5()
 
 
 def case_method_pade_legendre_3():
+    """Use the 3rd-order Pade-Legendre method."""
     return gram_util.pade_and_legendre_3()
 
 
@@ -29,8 +34,10 @@ def case_method_pade_legendre_3():
 @testing.parametrize("ncols", [2, 8], ids=["tall", "square"])
 @testing.parametrize("use_triu", [True, False], ids=["triu", "dense"])
 @testing.parametrize_with_cases("pade_legendre", ".", prefix="case_method_")
-def test_exact(seed, nrows, ncols, pade_legendre, use_triu):
-
+def test_exp_gram_cholesky_matches_matrix_fraction_baseline(
+    seed, nrows, ncols, pade_legendre, use_triu
+):
+    """Assert that exp_gram_cholesky matches the matrix-fraction baseline for both tall and square B."""
     # Define the problem
     key = random.prng_key(seed=seed)
     A = 0.01 * random.normal(key, shape=(nrows, nrows))

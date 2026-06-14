@@ -18,6 +18,7 @@ from probdiffeq.util import test_util
     ],
 )
 def fixture_solver_setup(ssm_factory):
+    """Set up the Lotka-Volterra IVP and jet expansion for the smoother equivalence tests."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
     vf = probdiffeq.ode(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
@@ -33,6 +34,7 @@ def fixture_solver_setup(ssm_factory):
 
 @testing.fixture(name="solution_smoother")
 def fixture_solution_smoother(solver_setup):
+    """Solve adaptively with the fixed interval smoother using save-every-step."""
     tcoeffs = solver_setup["tcoeffs"]
     ssm = solver_setup["ssm_factory"]()
     iwp = ssm.prior_wiener_integrated(tcoeffs)

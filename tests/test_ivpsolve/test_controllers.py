@@ -8,6 +8,7 @@ from probdiffeq.backend import testing
 @testing.parametrize("error_power", [3.142])
 @testing.parametrize("num_applies", [4])
 def test_equivalence_pi_vs_i(dt, error_power, num_applies) -> None:
+    """Assert that PI and I controllers converge to the same dt when the proportional gain is zero."""
     ctrl_pi = ivpsolve.control_proportional_integral(
         power_integral_unscaled=1.0, power_proportional_unscaled=0.0
     )

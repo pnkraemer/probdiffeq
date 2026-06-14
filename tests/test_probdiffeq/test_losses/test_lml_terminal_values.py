@@ -6,16 +6,19 @@ from probdiffeq.backend import func, np, ode, testing, tree
 
 @testing.case()
 def case_strategy_filter():
+    """Use the filter strategy."""
     return probdiffeq.strategy_filter
 
 
 @testing.case()
 def case_strategy_smoother_fixedinterval():
+    """Use the fixed interval smoother strategy."""
     return probdiffeq.strategy_smoother_fixedinterval
 
 
 @testing.case()
 def case_strategy_smoother_fixedpoint():
+    """Use the fixed point smoother strategy."""
     return probdiffeq.strategy_smoother_fixedpoint
 
 
@@ -30,6 +33,7 @@ def case_strategy_smoother_fixedpoint():
     ],
 )
 def fixture_solution_and_loss_and_data(strategy_func, ssm_factory):
+    """Solve the Lotka-Volterra IVP and set up the terminal-values LML loss and data."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     vf = probdiffeq.ode(vf)
@@ -54,7 +58,8 @@ def fixture_solution_and_loss_and_data(strategy_func, ssm_factory):
     return sol, loss, data, std
 
 
-def test_output_is_scalar(solution_and_loss_and_data) -> None:
+def test_lml_is_scalar_and_finite(solution_and_loss_and_data) -> None:
+    """Assert that the terminal-values LML is a finite scalar."""
     solution, loss, data, std = solution_and_loss_and_data
 
     mll = func.jit(loss)(data, std=std, marginals=solution.u)
@@ -65,6 +70,7 @@ def test_output_is_scalar(solution_and_loss_and_data) -> None:
 
 
 def test_raise_error_if_std_shape_is_wrong(solution_and_loss_and_data) -> None:
+    """Assert that a std with the wrong container structure raises a ValueError."""
     solution, loss, data, std = solution_and_loss_and_data
 
     std = tree.tree_map(lambda s: s[None], std)
