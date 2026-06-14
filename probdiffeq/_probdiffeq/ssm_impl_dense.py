@@ -98,7 +98,6 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         return DenseNormal(mean, cholesky, self.noise.tree_flatten)
 
     def marginalise(self, rv, /):
-        raise RuntimeError
         mean = self.to_latent * rv.mean_flat
         cholesky = self.to_latent[:, None] * rv.cholesky_flat
 
@@ -155,7 +154,7 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCond):
 
         mean = self.to_observed * mean_observed
         cholesky = self.to_observed[:, None] * r_obs.T
-        cholesky = _remove_offdiag(cholesky, n=1, d=d)
+        cholesky = _remove_offdiag(cholesky, n=len(rv.mean) - 1, d=d)
         observed = DenseNormal(mean, cholesky, self.noise.tree_flatten)
         return observed, cond_new
 
@@ -549,6 +548,81 @@ class DenseResidual(ssm_impl_api.AbstractResidual):
         noise = DenseNormal.from_dirac([fx], damp=damp)
 
         cond = DenseLatentCond.from_linop_and_noise(J, noise)
+        return cond, state
+
+
+class DenseResidualProjected(ssm_impl_api.AbstractResidual):
+    """Construct a dense implementation of residual-TS1 linearization."""
+
+    def __init__(self, residual, *, taylor_point) -> None:
+        super().__init__(residual)
+        self.taylor_point = taylor_point
+
+    def init_linearization(self):
+        return self.residual.jacobian.init_jacobian_handler()
+
+    def constraint_flat(self, *, tree_flatten) -> Callable:
+        """Evaluate a flattened version of the residual constraint."""
+
+        def fun(m: Array, *, t):
+            # Unravel the location and extract derivatives
+            m_tree = tree_flatten.unflatten_array(m)
+            relevant_tcoeffs = m_tree[: self.residual.num_tcoeffs_in_args]
+
+            # Evaluate the residual
+            residual_eval = self.residual.residual_function(
+                jet_coords=relevant_tcoeffs, t=t
+            )
+
+            # Flatten the output so that the Jacobians are matrices, not Pytrees.
+            return tree.ravel_pytree(residual_eval)[0]
+
+        return fun
+
+    def linearize(self, rv, state, *, damp: float, t):
+
+        # Fix all arguments except the Array ones
+        constraint_flat = self.constraint_flat(tree_flatten=rv.tree_flatten)
+
+        # Get the linearization point (i.e., prior or posterior linearisation)
+        xi = self.taylor_point(constraint_flat, rv, t=t)
+
+        # Read n and d so that we can turn latent arrays into
+        # (n, d) arrays, which Jacobians require
+        m_tree = rv.mean
+        n = len(m_tree)
+        d = rv.mean_flat.size // n
+
+        # Rewrite the constraint as one that maps 2d arrays to 2d arrays.
+        # Here, write the fun as (d, 1) to (d', 1) because the Jacobian
+        # logic requires 2d to 2d arrays. Since we materialize the full
+        # Jacobian, everything is still fine.
+        def fun(s: Array) -> Array:
+            # Move from (n, d) shape into latent space: (-1,) shape
+            s = np.reshape(s, (-1,))
+
+            # Evaluate the actual constraint
+            fs0 = constraint_flat(s, t=t)
+            # Bring back into (m, d) form.
+            return fs0[:, None]
+
+        # Evaluate the linearization
+        xi_2d = xi.reshape((-1, 1))
+        fx, J, state = self.residual.jacobian.materialize_dense(fun, xi_2d, state)
+        m, d = fx.shape
+        fx = fx.reshape((m * d,))
+        J = J.reshape((m * d, -1))
+        fx = fx - J @ xi
+
+        if J.shape[0] > J.shape[1]:
+            msg = f"There are more constraints ({J.shape[0]}) than variables ({J.shape[1]})."
+            msg += " This will likely cause an error in the conditioning."
+            warnings.warn(msg, stacklevel=1)
+
+        # Turn the linearization into a conditional
+        noise = DenseNormal.from_dirac([fx], damp=damp)
+
+        cond = DenseLatentCondProjected.from_linop_and_noise(J, noise)
         return cond, state
 
 
@@ -950,3 +1024,15 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         if taylor_point is None:
             taylor_point = taylor_points.taylor_point_prior()
         return DenseResidual(residual, taylor_point=taylor_point)
+
+    def constraint_residual_projected(
+        self,
+        residual: problems.JetResidual,
+        *,
+        taylor_point: taylor_points.TaylorPoint | None = None,
+    ) -> DenseResidual:
+        if not isinstance(residual, problems.JetResidual):
+            raise TypeError(residual)
+        if taylor_point is None:
+            taylor_point = taylor_points.taylor_point_prior()
+        return DenseResidualProjected(residual, taylor_point=taylor_point)
