@@ -234,7 +234,7 @@ def jetexpand_ode_doubling_unroll(
         taylor_coefficients = [u0]
         for _ in range(num_doublings):
             taylor_coefficients, _ = double(vf, taylor_coefficients, t=t)
-        return _unnormalise(*taylor_coefficients), {}
+        return _apply_factorial_scaling(*taylor_coefficients), {}
 
     return expand
 
@@ -304,8 +304,8 @@ def jetexpand_ode_coefficient_double() -> JetExpansionAlg[problems.JetOde]:
     return double
 
 
-def _unnormalise(primals, *series):
-    """Normalised Taylor series to un-normalised Taylor series."""
+def _apply_factorial_scaling(primals, *series):
+    """Convert normalized Taylor coefficients to unnormalized by multiplying by k!."""
     series_new = [s * np.factorial(i + 1) for i, s in enumerate(series)]
     return [primals, *series_new]
 

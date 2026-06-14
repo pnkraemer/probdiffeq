@@ -118,7 +118,7 @@ def _transpose(matrix):
 
 
 class BlockDiagOdeTs0(ssm_impl_api.AbstractOde):
-    """Construct a block-diagonal implementation of ODE-TS0 linearization."""
+    """Block-diagonal ODE linearization via TS0 (zeroth-degree Taylor series: evaluate at the prior mean, no Jacobian)."""
 
     def init_linearization(self) -> None:
         return None
@@ -141,7 +141,7 @@ class BlockDiagOdeTs0(ssm_impl_api.AbstractOde):
 
 
 class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
-    """Construct a block-diagonal implementation of ODE-TS1 linearization."""
+    """Block-diagonal ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
 
     def init_linearization(self):
         return self.ode.jacobian.init_jacobian_handler()
@@ -276,16 +276,16 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
         std_flat = func.vmap(func.vmap(linalg.vector_norm))(self.cholesky_flat)
         return self.tree_flatten.unflatten_array(std_flat)
 
-    def residual_white_rms_tree(self, u, /):
+    def residual_whitened_rms_tree(self, u, /):
         # todo: add sth like an "axis" argument to make it more obvious
         # to a user that this one here is vector-valued?
 
         # assumes rv.chol = (d,1,1)
         # return array of norms! See calibration
         u_latent = self.tree_flatten.flatten_tree(u)
-        return self.residual_white_rms_flat(u_latent)
+        return self.residual_whitened_rms_flat(u_latent)
 
-    def residual_white_rms_flat(self, u_latent, /):
+    def residual_whitened_rms_flat(self, u_latent, /):
         mean = np.reshape(self.mean_flat - u_latent, (-1,))
         cholesky = np.reshape(self.cholesky_flat, (-1,))
         return mean / cholesky / np.sqrt(mean.size)

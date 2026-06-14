@@ -149,11 +149,11 @@ class DenseNormal(ssm_impl_api.AbstractTreeNormal[DenseTreeFlatten]):
         std_flat = np.abs(std_flat.reshape((-1,)))
         return self.tree_flatten.unflatten_array(std_flat)
 
-    def residual_white_rms_tree(self, u):
+    def residual_whitened_rms_tree(self, u):
         u, _ = tree.ravel_pytree(u)
-        return self.residual_white_rms_flat(u)
+        return self.residual_whitened_rms_flat(u)
 
-    def residual_white_rms_flat(self, u):
+    def residual_whitened_rms_flat(self, u):
         dx = u - self.mean_flat
         residual_white = linalg.solve_triu(self.cholesky_flat.T, dx, trans="T")
         mahalanobis = linalg.qr_r(residual_white[:, None])
@@ -235,7 +235,7 @@ DenseNormal.register_pytree_node()
 
 
 class DenseOdeTs0(ssm_impl_api.AbstractOde):
-    """Construct a dense implementation of ODE-TS0 linearization."""
+    """Dense ODE linearization via TS0 (zeroth-degree Taylor series: evaluate at the prior mean, no Jacobian)."""
 
     def init_linearization(self) -> None:
         return None
@@ -243,8 +243,8 @@ class DenseOdeTs0(ssm_impl_api.AbstractOde):
     def linearize(self, rv: DenseNormal, state: None, *, damp: float, t):
         del state
 
-        def a1(m: Array) -> Array:
-            """Select the 'n'-th derivative."""
+        def derivative_selector(m: Array) -> Array:
+            """Select the n-th derivative from the Taylor coefficient stack."""
             m0 = rv.tree_flatten.unflatten_array(m)[self.ode.num_tcoeffs_in_args]
             return tree.ravel_pytree(m0)[0]
 
@@ -252,14 +252,14 @@ class DenseOdeTs0(ssm_impl_api.AbstractOde):
 
         fm = self.ode.vector_field(jet_coords=Ms[: self.ode.num_tcoeffs_in_args], t=t)
         fx = tree.tree_map(lambda s: -s, [fm])
-        linop = func.jacrev(a1)(rv.mean_flat)
+        linop = func.jacrev(derivative_selector)(rv.mean_flat)
         noise = DenseNormal.from_dirac(fx, damp=damp)
         cond = DenseLatentCond.from_linop_and_noise(linop, noise)
         return cond, None
 
 
 class DenseOdeTs1(ssm_impl_api.AbstractOde):
-    """Construct a dense implementation of ODE-TS1 linearization."""
+    """Dense ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
 
     def init_linearization(self):
         return self.ode.jacobian.init_jacobian_handler()
@@ -303,13 +303,13 @@ class DenseOdeTs1(ssm_impl_api.AbstractOde):
         # instead of instantiating identity matrices and selecting rows
 
         @func.jacfwd
-        def e1(s):
+        def projection_e1(s):
             s_tree = rv.tree_flatten.unflatten_array(s)
             return tree.ravel_pytree(s_tree[self.ode.num_tcoeffs_in_args])[0]
 
         # Complete the expressions for bias and linop
         fx = J @ rv.mean_flat - fx
-        E1 = e1(rv.mean_flat)
+        E1 = projection_e1(rv.mean_flat)
         linop = E1 - J
 
         # Flatten fx into the correct pytree structure

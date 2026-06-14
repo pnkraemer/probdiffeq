@@ -123,10 +123,10 @@ class AbstractLatentCond:
         updated = reverted.apply_flat(data_flat)
         return logpdf, updated
 
-    def bayes_rule_and_residual_white_rms_tree(self, data, rv, /, *, solve_triu):
+    def bayes_rule_and_residual_whitened_rms_tree(self, data, rv, /, *, solve_triu):
         """Apply Bayes' rule; also return the whitened residual RMS."""
         observed, reverted = self.revert(rv, solve_triu=solve_triu)
-        mahalanobis = observed.residual_white_rms_tree(data)
+        mahalanobis = observed.residual_whitened_rms_tree(data)
         data_flat = observed.tree_flatten.flatten_tree(data)
         updated = reverted.apply_flat(data_flat)
         return mahalanobis, updated
@@ -240,11 +240,11 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def residual_white_rms_tree(self, u):
+    def residual_whitened_rms_tree(self, u):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def residual_white_rms_flat(self, u):
+    def residual_whitened_rms_flat(self, u):
         raise NotImplementedError
 
     @abc.abstractmethod

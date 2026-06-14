@@ -181,7 +181,7 @@ class _RejectionLoopState:
     """
 
     dt: float
-    error_norm_proposed: float
+    acceptance_factor_proposed: float
     control: Any
     proposed: Any
     step_from: Any
@@ -250,8 +250,8 @@ class RejectionLoop:
         s, t1, atol, rtol, damp = s_and_t1_and_tols_and_damp
 
         def cond(state: _RejectionLoopState) -> bool:
-            # error_norm_proposed is EEst ** (-1/rate), thus "<"
-            return state.error_norm_proposed < 1.0
+            # acceptance_factor_proposed is error_norm ** (-1/rate), thus "<"
+            return state.acceptance_factor_proposed < 1.0
 
         init = self.step_init_loopstate(s)
         step_attempt = func.partial(
@@ -266,9 +266,11 @@ class RejectionLoop:
         def _ones_like(pytree):
             return tree.tree_map(np.ones_like, pytree)
 
-        smaller_than_1 = 0.9  # the cond() must return True
+        acceptance_factor_init = (
+            0.9  # must be less than 1.0 to enter the while loop on the first iteration
+        )
         return _RejectionLoopState(
-            error_norm_proposed=smaller_than_1,
+            acceptance_factor_proposed=acceptance_factor_init,
             dt=s0.dt,
             control=s0.control,
             step_from=s0.step_from,
@@ -313,7 +315,7 @@ class RejectionLoop:
         )
         return _RejectionLoopState(
             dt=dt,  # new
-            error_norm_proposed=error_power,  # new
+            acceptance_factor_proposed=error_power,  # new
             proposed=state_proposed,  # new
             control=state_control,  # new
             error_proposed=errorstate,  # new

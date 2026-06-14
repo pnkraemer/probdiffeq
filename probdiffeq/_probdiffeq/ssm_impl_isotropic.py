@@ -193,13 +193,13 @@ class IsotropicNormal(ssm_impl_api.AbstractTreeNormal[IsotropicTreeFlatten]):
         std_flat = func.vmap(linalg.vector_norm)(self.cholesky_flat)
         return self.tree_flatten.unflatten_array_scalar(std_flat)
 
-    def residual_white_rms_tree(self, u):
+    def residual_whitened_rms_tree(self, u):
         if self.cholesky_flat.size > 1:
             raise ValueError
         u_latent = self.tree_flatten.flatten_tree(u)
-        return self.residual_white_rms_flat(u_latent)
+        return self.residual_whitened_rms_flat(u_latent)
 
-    def residual_white_rms_flat(self, u_latent, /):
+    def residual_whitened_rms_flat(self, u_latent, /):
         residual_white = (self.mean_flat - u_latent) / self.cholesky_flat
         residual_white_matrix = linalg.qr_r(residual_white.T)
         return np.reshape(
@@ -293,7 +293,7 @@ IsotropicNormal.register_pytree_node()
 
 
 class IsotropicOdeTs0(ssm_impl_api.AbstractOde):
-    """Construct an isotropic implementation of ODE-TS0 linearization."""
+    """Isotropic ODE linearization via TS0 (zeroth-degree Taylor series: evaluate at the prior mean, no Jacobian)."""
 
     def init_linearization(self) -> None:
         return None
@@ -315,7 +315,7 @@ class IsotropicOdeTs0(ssm_impl_api.AbstractOde):
 
 
 class IsotropicOdeTs1(ssm_impl_api.AbstractOde):
-    """Construct an isotropic implementation of ODE-TS1 linearization."""
+    """Isotropic ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
 
     def init_linearization(self):
         return self.ode.jacobian.init_jacobian_handler()

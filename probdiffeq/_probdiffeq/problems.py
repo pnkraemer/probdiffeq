@@ -89,12 +89,12 @@ T_contra = TypeVar("T_contra", contravariant=True)
 
 
 class JetAbstract:
-    """A jet function, ie a function that operates on jet coordinates (y, y', ..., t).
+    """A jet function, ie a function that operates on jet coordinates (u, u', ..., t).
 
     This is typically used to define right-hand sides of (high-order) ODEs
     and residuals in implicit differential equations.
 
-    Specifications include JetFunctions (y, y', ..., t) -> Any, which define DAEs
+    Specifications include JetFunctions (u, u', ..., t) -> Any, which define DAEs
     and implicit differential equations, as well as ODEs, where the output type
     matches the input types.
     """
@@ -128,7 +128,7 @@ class JetOde(JetAbstract, Generic[T]):
 
 
 class JetOdeAutonomous(JetOde[T]):
-    """An autonomous ODE y^(k) = f(y, y', ...) where f does not depend on t."""
+    """An autonomous ODE u^(k) = f(u, u', ...) where f does not depend on t."""
 
     def __init__(
         self, autonomous, jacobian: jacobians.Jacobian, num_tcoeffs_in_args: int
@@ -144,7 +144,7 @@ class JetOdeAutonomous(JetOde[T]):
 
 
 def ode(func: ProtocolODEFirstOrder, /, *, jacobian: jacobians.Jacobian | None = None):
-    """Construct a description of an  ODE y' = f(y, t)."""
+    """Construct a description of an ODE u' = f(u, t)."""
 
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
         (y,) = jet_coords
@@ -159,7 +159,7 @@ def ode(func: ProtocolODEFirstOrder, /, *, jacobian: jacobians.Jacobian | None =
 def ode_order_two(
     func: ProtocolODEOrderTwo, /, *, jacobian: jacobians.Jacobian | None = None
 ):
-    """Construct a description of an  ODE y'' = f(y, y', t)."""
+    """Construct a description of an ODE u'' = f(u, u', t)."""
 
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
         (y, dy) = jet_coords
@@ -195,7 +195,7 @@ class ProtocolODEAutonomous(Protocol[T]):
 def ode_autonomous(
     func: ProtocolODEAutonomous, /, *, jacobian: jacobians.Jacobian | None = None
 ):
-    """Construct a description of an autonomous ODE y' = f(y)."""
+    """Construct a description of an autonomous ODE u' = f(u)."""
 
     def autonomous(*, jet_coords: Sequence[T]) -> T:
         (y,) = jet_coords
@@ -217,7 +217,7 @@ def ode_autonomous_order_two(
     *,
     jacobian: jacobians.Jacobian | None = None,
 ):
-    """Construct a description of an autonomous ODE y'' = f(y, y')."""
+    """Construct a description of an autonomous ODE u'' = f(u, u')."""
 
     def autonomous(*, jet_coords: Sequence[T]) -> T:
         (y, dy) = jet_coords
@@ -249,7 +249,7 @@ def ode_autonomous_order_arbitrary(
 
 
 class JetResidual(JetAbstract):
-    """A residual on jet coordinates, ie a function that operates on (y, y', ..., t)."""
+    """A residual on jet coordinates, ie a function that operates on (u, u', ..., t)."""
 
     def __init__(
         self, residual_function, jacobian: jacobians.Jacobian, num_tcoeffs_in_args: int
@@ -331,7 +331,7 @@ class ProtocolResidualAcceleration(Protocol[T_contra]):
 def residual_acceleration(
     func: ProtocolResidualAcceleration, /, *, jacobian: jacobians.Jacobian | None = None
 ) -> JetResidual:
-    """Construct a description of a residual f(u, du, t) = 0."""
+    """Construct a description of a residual f(u, du, ddu, t) = 0."""
 
     # No implementation difference between ode and implicit, but
     # we don't want to force the user to think in terms of jet functions
