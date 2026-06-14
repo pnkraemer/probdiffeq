@@ -1,14 +1,13 @@
 """Customise the constraints.
 
-This tutorial extends the demonstration of solving second-order problems directly.
+The default ODE constraint checks whether the numerical solution satisfies the ODE.
+A custom residual constraint can enforce any additional structure on top,
+for example conservation of a physical invariant such as the Hamiltonian energy.
+The custom residual solver preserves the invariant more accurately
+than the standard solver.
 
-For background information on what's presented below, see:
-
-  > Bosch, Nathanael, Filip Tronarp, and Philipp Hennig.
-    "Pick-and-mix information operators for probabilistic ODE solvers."
-    International Conference on Artificial Intelligence and Statistics.
-    PMLR, 2022.
-
+Source: Bosch, Tronarp, Hennig (2022). Pick and mix information operators
+for probabilistic ODE solvers. AISTATS 2022.
 """
 
 import jax
@@ -25,7 +24,7 @@ def main():
     """Enforce the probabilistic solver to preserve Hamiltonians."""
     # Define the problem.
     # Solve at relatively poor tolerances to make the Hamiltonian drift more obvious.
-    t0, t1 = 0.0, 100.0  # reeeeally long time-integration
+    t0, t1 = 0.0, 100.0
     save_at = jnp.linspace(t0, t1, endpoint=True, num=500)
     atol, rtol = 1e-2, 1e-2
 
@@ -81,7 +80,7 @@ def main():
     # Plot both solutions.
     # See how much better the custom residual solver preserves the Hamiltonian?
 
-    _fig, ax = plt.subplots(ncols=2, figsize=(8, 3), constrained_layout=True)
+    fig, ax = plt.subplots(ncols=2, figsize=(8, 3), constrained_layout=True)
 
     ax[0].set_title("Differential equation solution", fontsize="medium")
     ax[0].plot(
@@ -101,6 +100,7 @@ def main():
     ax[1].set_xlabel("Time $t$")
     ax[1].set_ylabel("Error")
     ax[1].legend()
+    fig.align_ylabels()
     plt.show()
 
 

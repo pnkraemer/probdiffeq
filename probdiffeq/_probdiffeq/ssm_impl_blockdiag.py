@@ -118,7 +118,7 @@ def _transpose(matrix):
 
 
 class BlockDiagOdeTs0(ssm_impl_api.AbstractOde):
-    """Construct a block-diagonal implementation of ODE-TS0 linearization."""
+    """Block-diagonal ODE linearization via TS0 (zeroth-degree Taylor series: evaluate at the prior mean, no Jacobian)."""
 
     def init_linearization(self) -> None:
         return None
@@ -141,35 +141,43 @@ class BlockDiagOdeTs0(ssm_impl_api.AbstractOde):
 
 
 class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
-    """Construct a block-diagonal implementation of ODE-TS1 linearization."""
+    """Block-diagonal ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
 
     def init_linearization(self):
         return self.ode.jacobian.init_jacobian_handler()
 
     def linearize(self, rv, state, *, damp: float, t):
 
-        m0_tree = rv.mean[0]
-        rv0 = BlockDiagNormal.from_dirac([m0_tree], damp=0.0)
+        # Understand flattening and unflattening for
+        # single Taylor coefficients
+        rv0 = BlockDiagNormal.from_dirac([rv.mean[0]], damp=0.0)
 
         def a1(s):
-            return s[[1], ...]
+            return s[[self.ode.num_tcoeffs_in_args], ...]
 
         linop = func.vmap(func.jacrev(a1))(rv.mean_flat)
 
         def vf_flat(u):
-            u_tree = rv0.tree_flatten.unflatten_array(u[:, None])
+            u_tree = rv.tree_flatten.unflatten_array(u.T)
+            u_tree = u_tree[: self.ode.num_tcoeffs_in_args]
             fu_tree = self.ode.vector_field(jet_coords=u_tree, t=t)
-            return rv0.tree_flatten.flatten_tree([fu_tree]).reshape((-1,))
+            return rv0.tree_flatten.flatten_tree([fu_tree]).T
 
         # Evaluate the linearisation
-        m0 = rv.mean_flat[:, 0]
-        fx, J_diag, state = self.ode.jacobian.calculate_diagonal(vf_flat, m0, state)
+        # Not 100% the most efficient because we compute the diagonal of
+        # the function of all tcoeffs instead of just the relevant ones.
+        # But if we use reverse-Jacobians, things should be fine.
+        fx, J_diag, state = self.ode.jacobian.calculate_diagonal_along_d(
+            vf_flat, rv.mean_flat.T, state
+        )
 
-        E1 = func.jacrev(lambda s: s[0])(rv.mean_flat[0])
-        linop = linop - J_diag[:, None, None] * E1[None, None, :]
+        # Jacobian objects work with (n, d) arrays but block-diagonal models with (d, n) arrays
+        fx = fx.T
 
-        fx = rv.mean_flat[:, 1] - fx
-        fx = fx[..., None]
+        # J_diag.shape = (d, 1, n)
+        # linop.shape: (d, 1, n)
+        linop = linop - J_diag
+        fx = rv.mean_flat[:, self.ode.num_tcoeffs_in_args][:, None] - fx
         diff = func.vmap(lambda a, b: a @ b)(linop, rv.mean_flat)
         fx = fx - diff
         fx = rv0.tree_flatten.unflatten_array(fx)
@@ -268,16 +276,16 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
         std_flat = func.vmap(func.vmap(linalg.vector_norm))(self.cholesky_flat)
         return self.tree_flatten.unflatten_array(std_flat)
 
-    def residual_white_rms_tree(self, u, /):
+    def residual_whitened_rms_tree(self, u, /):
         # todo: add sth like an "axis" argument to make it more obvious
         # to a user that this one here is vector-valued?
 
         # assumes rv.chol = (d,1,1)
         # return array of norms! See calibration
         u_latent = self.tree_flatten.flatten_tree(u)
-        return self.residual_white_rms_flat(u_latent)
+        return self.residual_whitened_rms_flat(u_latent)
 
-    def residual_white_rms_flat(self, u_latent, /):
+    def residual_whitened_rms_flat(self, u_latent, /):
         mean = np.reshape(self.mean_flat - u_latent, (-1,))
         cholesky = np.reshape(self.cholesky_flat, (-1,))
         return mean / cholesky / np.sqrt(mean.size)
@@ -562,22 +570,19 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
         msg += " If you need them, reach out."
         raise NotImplementedError(msg)
 
-    def constraint_ode_ts0(self, ode: problems.ODEFunction, /) -> BlockDiagOdeTs0:
-        if not isinstance(ode, problems.ODEFunction):
+    def constraint_ode_ts0(self, ode: problems.JetOde, /) -> BlockDiagOdeTs0:
+        if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
         return BlockDiagOdeTs0(ode=ode)
 
-    def constraint_ode_ts1(self, ode: problems.ODEFunction, /) -> BlockDiagOdeTs1:
-        if not isinstance(ode, problems.ODEFunction):
+    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> BlockDiagOdeTs1:
+        if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
-        if ode.num_tcoeffs_in_args > 2:
-            msg = "This linearization is not compatible with high-order ODEs as of yet."
-            raise ValueError(msg)
         return BlockDiagOdeTs1(ode=ode)
 
     def constraint_residual(
         self,
-        residual: problems.Residual,
+        residual: problems.JetResidual,
         *,
         taylor_point: taylor_points.TaylorPoint | None = None,
     ):

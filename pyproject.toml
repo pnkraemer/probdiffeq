@@ -29,9 +29,9 @@ cpu = [
     "jax[cpu]",
 ]
 test =[
-    "pytest",
+    "pytest < 9.0",  # pinned in June '26; revisit soon
     "pytest-xdist",
-    "pytest-cases",
+    "pytest-cases < 3.10", # pinned in June '26; revisit soon
     "diffeqzoo",
     "diffrax",
     "equinox",
@@ -156,9 +156,7 @@ split-on-trailing-comma = false
 # so we ignore 'unused import' in this file
 "probdiffeq/backend/typing*" = ["F401"]
 # Auxiliary functions and tests don't need docstring-enforcement:
-"probdiffeq/util/*" = ["D102", "D103", "ANN"]
 "probdiffeq/backend/*" = ["D103", "ANN"]
-"tests/*" = ["D103", "ANN"]
 # Examples shouldn't fail with print statements:
 "examples/*" = ["T20"]
 "benchmarks/*" = ["T20"]

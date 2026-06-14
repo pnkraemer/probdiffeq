@@ -19,6 +19,8 @@ class ScaleShapeRules:
 
 
 def case_scale_rules_iwp_dense() -> ScaleShapeRules:
+    """Output scale shape rules for the IWP with the dense state space model."""
+
     def prior(ssm, tcoeffs, **kw):
         return ssm.prior_wiener_integrated(tcoeffs, **kw)
 
@@ -34,6 +36,8 @@ def case_scale_rules_iwp_dense() -> ScaleShapeRules:
 
 
 def case_scale_rules_ioup_dense() -> ScaleShapeRules:
+    """Output scale shape rules for the IOUP with the dense state space model."""
+
     def linop(s):
         return tree.tree_map(np.zeros_like, s)
 
@@ -52,6 +56,8 @@ def case_scale_rules_ioup_dense() -> ScaleShapeRules:
 
 
 def case_scale_rules_iwp_blockdiag() -> ScaleShapeRules:
+    """Output scale shape rules for the IWP with the blockdiag state space model."""
+
     def prior(ssm, tcoeffs, **kw):
         return ssm.prior_wiener_integrated(tcoeffs, **kw)
 
@@ -67,6 +73,8 @@ def case_scale_rules_iwp_blockdiag() -> ScaleShapeRules:
 
 
 def case_scale_rules_iwp_isotropic() -> ScaleShapeRules:
+    """Output scale shape rules for the IWP with the isotropic state space model."""
+
     def prior(ssm, tcoeffs, **kw):
         return ssm.prior_wiener_integrated(tcoeffs, **kw)
 
@@ -83,6 +91,7 @@ def case_scale_rules_iwp_isotropic() -> ScaleShapeRules:
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_covariances_scaled_correctly_default(rules: ScaleShapeRules):
+    """Assert that transition covariances scale correctly with the default output scale."""
     # Test that the transition covariances are scaled correctly
     ssm = rules.ssm_factory()
 
@@ -98,6 +107,7 @@ def test_output_scales_covariances_scaled_correctly_default(rules: ScaleShapeRul
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_covariances_scaled_correctly_custom(rules: ScaleShapeRules):
+    """Assert that transition covariances scale correctly with a custom base output scale."""
     # Test that the transition covariances are scaled correctly
     ssm = rules.ssm_factory()
 
@@ -114,6 +124,7 @@ def test_output_scales_covariances_scaled_correctly_custom(rules: ScaleShapeRule
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_wrong_shape_raises_error_at_construction(rules: ScaleShapeRules):
+    """Assert that a wrong output scale shape raises a ValueError at prior construction."""
     ssm = rules.ssm_factory()
 
     # Sanity check: assert that the same error does not happen with the correct shape
@@ -129,6 +140,7 @@ def test_output_scales_wrong_shape_raises_error_at_construction(rules: ScaleShap
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_wrong_shape_raises_error_at_calling(rules: ScaleShapeRules):
+    """Assert that a wrong output scale shape raises a ValueError when calling the transition."""
     ssm = rules.ssm_factory()
 
     tcoeffs = [np.ones(rules.ode), np.ones(rules.ode)]
@@ -144,6 +156,7 @@ def test_output_scales_wrong_shape_raises_error_at_calling(rules: ScaleShapeRule
 
 @testing.parametrize_with_cases("rules", cases=".", prefix="case_scale_rules_")
 def test_output_scales_wrong_type_raises_error(rules: ScaleShapeRules):
+    """Assert that an unexpected pytree structure raises a TypeError at prior construction."""
     ssm = rules.ssm_factory()
 
     # Sanity check: assert that the same error does not happen with the correct shape

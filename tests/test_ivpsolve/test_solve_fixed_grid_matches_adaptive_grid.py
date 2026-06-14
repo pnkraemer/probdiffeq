@@ -17,6 +17,7 @@ from probdiffeq.util import test_util
 def test_fixed_grid_result_matches_adaptive_grid_result_when_reusing_grid(
     ssm_factory,
 ) -> None:
+    """Assert that the fixed-grid solver reproduces the adaptive solution when given the adaptive grid."""
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     class Taylor(structs.NamedTuple):

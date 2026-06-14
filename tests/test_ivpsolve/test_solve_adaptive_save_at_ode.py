@@ -7,6 +7,7 @@ from probdiffeq.backend.typing import Callable
 
 @testing.fixture(name="ivp")
 def ivp_lotka_volterra():
+    """Return the Lotka-Volterra IVP tuple."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
     return vf, (u0,), (t0, t1)
 
@@ -44,6 +45,8 @@ class Factory:
 
 @testing.case
 def case_factory_prior_wiener_integrated():
+    """Use the integrated Wiener process prior."""
+
     def prior(ssm, tcoeffs, **kw):
         return ssm.prior_wiener_integrated(tcoeffs, **kw)
 
@@ -52,6 +55,8 @@ def case_factory_prior_wiener_integrated():
 
 @testing.case
 def case_factory_prior_ioup():
+    """Use the integrated Ornstein-Uhlenbeck process prior."""
+
     def prior(ssm, tcoeffs, **kwargs):
         try:
 
@@ -69,26 +74,31 @@ def case_factory_prior_ioup():
 
 @testing.case
 def case_factory_strategy_filter():
+    """Use the filter strategy."""
     return Factory(strategy=probdiffeq.strategy_filter)
 
 
 @testing.case
 def case_factory_strategy_smoother_fixedpoint():
+    """Use the fixed point smoother strategy."""
     return Factory(strategy=probdiffeq.strategy_smoother_fixedpoint)
 
 
 @testing.case
 def case_factory_solver_solver():
+    """Use the base solver."""
     return Factory(solver=probdiffeq.solver)
 
 
 @testing.case
 def case_factory_solver_mle():
+    """Use the MLE solver."""
     return Factory(solver=probdiffeq.solver_mle)
 
 
 @testing.case
 def case_factory_solver_dynamic_without_relinearization():
+    """Use the dynamic solver without relinearization after calibration."""
     dynamic = func.partial(
         probdiffeq.solver_dynamic, re_linearize_after_calibration=False
     )
@@ -97,6 +107,7 @@ def case_factory_solver_dynamic_without_relinearization():
 
 @testing.case
 def case_factory_solver_dynamic_with_relinearization():
+    """Use the dynamic solver with relinearization after calibration."""
     dynamic = func.partial(
         probdiffeq.solver_dynamic, re_linearize_after_calibration=True
     )
@@ -105,32 +116,38 @@ def case_factory_solver_dynamic_with_relinearization():
 
 @testing.case
 def case_factory_constraint_ode_ts0():
+    """Use the TS0 ODE constraint."""
     return Factory(constraint=lambda ssm, ode: ssm.constraint_ode_ts0(ode))
 
 
 @testing.case
 def case_factory_constraint_ode_ts1():
+    """Use the TS1 ODE constraint."""
     return Factory(constraint=lambda ssm, ode: ssm.constraint_ode_ts1(ode))
 
 
 @testing.case
 @testing.parametrize("jacfun", [func.jacfwd, func.jacrev])
 def case_factory_jacobian_materialize(jacfun):
+    """Use a materialized Jacobian with the specified autodiff mode."""
     return Factory(jacobian=probdiffeq.jacobian_materialize(jacfun=jacfun))
 
 
 @testing.case
 def case_factory_jacobian_monte_carlo_fwd():
+    """Use a Monte Carlo Jacobian in forward mode."""
     return Factory(jacobian=probdiffeq.jacobian_monte_carlo_fwd())
 
 
 @testing.case
 def case_factory_jacobian_monte_carlo_rev():
+    """Use a Monte Carlo Jacobian in reverse mode."""
     return Factory(jacobian=probdiffeq.jacobian_monte_carlo_rev())
 
 
 @testing.case
 def case_factory_constraint_residual_ts1(ivp):
+    """Use a residual based constraint in place of TS1."""
     vf, _u0, (_t0, _t1) = ivp
     vf = probdiffeq.ode(vf)
 
@@ -155,24 +172,28 @@ def case_factory_constraint_residual_ts1(ivp):
 
 @testing.case
 def case_factory_error_state_std_cached():
+    """Use state-std error with relinearization before the error step."""
     error = func.partial(probdiffeq.error_state_std, re_linearize_before_error=True)
     return Factory(error=error)
 
 
 @testing.case
 def case_factory_error_state_std_not_cached():
-    error = func.partial(probdiffeq.error_state_std, re_linearize_before_error=True)
+    """Use state-std error without relinearization before the error step."""
+    error = func.partial(probdiffeq.error_state_std, re_linearize_before_error=False)
     return Factory(error=error)
 
 
 @testing.case
 def case_factory_error_residual_std_cached():
+    """Use residual-std error with relinearization before the error step."""
     error = func.partial(probdiffeq.error_residual_std, re_linearize_before_error=True)
     return Factory(error=error)
 
 
 @testing.case
 def case_factory_error_residual_std_not_cached():
+    """Use residual-std error without relinearization before the error step."""
     error = func.partial(probdiffeq.error_residual_std, re_linearize_before_error=False)
     return Factory(error=error)
 
@@ -187,6 +208,7 @@ def case_factory_error_residual_std_not_cached():
 )
 @testing.parametrize_with_cases("factory", ".", prefix="case_factory_")
 def test_output_matches_reference(ivp, ssm_factory, factory: Factory) -> None:
+    """Assert that the adaptive save-at solver closely matches a high-accuracy reference solution."""
     vf, u0, (t0, t1) = ivp
 
     vf = probdiffeq.ode(vf, jacobian=factory.jacobian)

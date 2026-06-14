@@ -1,4 +1,4 @@
-"""Tests for sampling behaviour."""
+"""Tests for second-order ODE constraints."""
 
 from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, testing
@@ -12,9 +12,12 @@ from probdiffeq.backend import func, np, testing
         probdiffeq.state_space_model_blockdiag,
     ],
 )
-def test_solution_is_accurate(ssm_factory):
+@testing.parametrize("constraint", ["ts0", "ts1"])
+def test_harmonic_oscillator_solution_is_accurate(ssm_factory, constraint):
+    """Assert that the second-order harmonic oscillator solution matches the exact cosine."""
+    jacobian = probdiffeq.jacobian_materialize()
 
-    @probdiffeq.ode_order_two
+    @func.partial(probdiffeq.ode_order_two, jacobian=jacobian)
     def vf(u, du, /, *, t):
         del t
         del du
@@ -25,7 +28,11 @@ def test_solution_is_accurate(ssm_factory):
 
     ssm = ssm_factory()
     iwp = ssm.prior_wiener_integrated(tcoeffs)
-    ts0 = ssm.constraint_ode_ts0(vf)
+    ts0 = (
+        ssm.constraint_ode_ts0(vf)
+        if constraint == "ts0"
+        else ssm.constraint_ode_ts1(vf)
+    )
     strategy = probdiffeq.strategy_filter()
     solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
     error = probdiffeq.error_state_std(constraint=ts0)

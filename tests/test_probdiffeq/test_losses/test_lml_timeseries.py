@@ -14,6 +14,7 @@ from probdiffeq.backend import func, np, ode, testing, tree
     ],
 )
 def fixture_solution(ssm_factory):
+    """Solve the Lotka-Volterra IVP and set up the timeseries LML loss and data."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
     vf = probdiffeq.ode(vf)
@@ -42,7 +43,8 @@ def fixture_solution(ssm_factory):
     return sol, loss, data, std
 
 
-def test_output_is_a_scalar(solution) -> None:
+def test_lml_is_scalar_and_finite(solution) -> None:
+    """Assert that the timeseries LML is a finite scalar."""
     sol, loss, data, std = solution
 
     lml = func.jit(loss)(data, posterior=sol.solution_full, std=std)

@@ -1,4 +1,4 @@
-"""Assert that the base adaptive solver is accurate."""
+"""Assert that the solver uses the constraint initialisation."""
 
 from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, testing, tree
@@ -6,18 +6,22 @@ from probdiffeq.backend import func, np, ode, testing, tree
 
 @testing.fixture(name="ivp")
 def ivp_lotka_volterra():
+    """Return the Lotka-Volterra IVP tuple."""
     return ode.ivp_lotka_volterra()
 
 
 def case_solver_standard():
+    """Use the base solver."""
     return probdiffeq.solver
 
 
 def case_solver_mle():
+    """Use the MLE solver."""
     return probdiffeq.solver_mle
 
 
 def case_solver_dynamic():
+    """Use the dynamic solver."""
     return probdiffeq.solver_dynamic
 
 
@@ -27,6 +31,7 @@ def case_solver_dynamic():
 def test_output_matches_reference(
     ivp, solver_factory, derivatives, ssm_factory
 ) -> None:
+    """Assert that the solver uses the constraint init to set the first-step state accurately."""
     vf, (u0,), (t0, t1) = ivp
 
     @func.partial(probdiffeq.residual_jet_lift, lift_by=derivatives - 1)
@@ -53,7 +58,7 @@ def test_output_matches_reference(
     # Only use the dense factorisation because this test uses JET constraints
     # and they have not been implemented for isotropic or blockdiagonal models
     ssm = ssm_factory()
-    prior = ssm.prior_wiener_integrated([u0], diffuse_derivatives=derivatives)
+    iwp = ssm.prior_wiener_integrated([u0], diffuse_derivatives=derivatives)
 
     # Build a solver
     nlstsq = probdiffeq.lstsq_constrained_gauss_newton(maxiter=50, tol=1e-10)
@@ -67,6 +72,6 @@ def test_output_matches_reference(
 
     # Compute the PN solution
     grid = np.linspace(t0, t1, endpoint=True, num=10)
-    solution = func.jit(solve)(prior, grid=grid)
+    solution = func.jit(solve)(iwp, grid=grid)
     received = tree.tree_map(lambda s: s[0], solution.u.mean)
     assert testing.allclose(received, expected)

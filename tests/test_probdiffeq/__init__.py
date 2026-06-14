@@ -1,1 +1,1 @@
-"""Test the solvers."""
+"""Tests for the probdiffeq solver API."""

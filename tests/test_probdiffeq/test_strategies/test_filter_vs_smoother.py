@@ -14,6 +14,7 @@ from probdiffeq.backend import func, linalg, np, ode, testing, tree
     ],
 )
 def fixture_solver_setup(ssm_factory):
+    """Set up the Lotka-Volterra IVP and jet expansion for the filter vs smoother comparison."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
     vf = probdiffeq.ode(vf)
     grid = np.linspace(t0, t1, endpoint=True, num=12)
@@ -24,6 +25,7 @@ def fixture_solver_setup(ssm_factory):
 
 @testing.fixture(name="filter_solution")
 def fixture_filter_solution(solver_setup):
+    """Solve the IVP on a fixed grid with the filter strategy."""
     tcoeffs = solver_setup["tcoeffs"]
     ssm = solver_setup["ssm_factory"]()
     iwp = ssm.prior_wiener_integrated(tcoeffs)
@@ -36,6 +38,7 @@ def fixture_filter_solution(solver_setup):
 
 @testing.fixture(name="smoother_solution")
 def fixture_smoother_solution(solver_setup):
+    """Solve the IVP on a fixed grid with the fixed interval smoother strategy."""
     tcoeffs = solver_setup["tcoeffs"]
     ssm = solver_setup["ssm_factory"]()
     iwp = ssm.prior_wiener_integrated(tcoeffs)
@@ -46,7 +49,10 @@ def fixture_smoother_solution(solver_setup):
     return func.jit(solve)(iwp, grid=solver_setup["grid"])
 
 
-def test_compare_filter_smoother_rmse(filter_solution, smoother_solution) -> None:
+def test_filter_and_smoother_have_similar_rmse(
+    filter_solution, smoother_solution
+) -> None:
+    """Assert that filter and smoother RMSE are within a factor of two and both below 0.01."""
     assert testing.allclose(filter_solution.t, smoother_solution.t)  # sanity check
 
     reference = _reference_solution(filter_solution.t)

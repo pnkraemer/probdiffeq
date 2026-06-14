@@ -1,8 +1,8 @@
 """Estimate parameters (via Optax).
 
 We create some data,
-compute the marginal likelihood of this data _under the ODE posterior_
-(which is something you cannot do with non-probabilistic solvers!),
+compute the marginal likelihood of this data under the ODE posterior
+(which is something deterministic solvers cannot do),
 and optimize the parameters with `optax`.
 """
 
@@ -11,34 +11,33 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import optax
-from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, probdiffeq
 
-if not backend.has_been_selected:
-    backend.select("jax")  # ivp examples in jax
-
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
+
+# Lotka-Volterra predator-prey model
+u0 = jnp.asarray([20.0, 20.0])
+t0, t1 = 0.0, 20.0
+rate_constants = jnp.asarray([0.5, 0.05, 0.5, 0.05])  # (a, b, c, d)
 
 
 def main():
     """Learn an ODE with Optax."""
     # Define the problem
 
-    f, u0, (t0, t1), f_args = ivps.lotka_volterra()
-    f_args = jnp.asarray(f_args)
-
     def vf(y, t, *, p):  # noqa: ARG001
         """Evaluate the Lotka-Volterra vector field."""
-        return f(y, *p)
+        a, b, c, d = p[0], p[1], p[2], p[3]
+        return jnp.asarray([a * y[0] - b * y[0] * y[1], -c * y[1] + d * y[0] * y[1]])
 
     grid = jnp.linspace(t0, t1, endpoint=True, num=50)
     solve = solver(vf, u0, grid=grid)
 
     # Create a dataset
-    parameter_true = f_args + 0.05
-    parameter_guess = f_args
+    parameter_true = rate_constants + 0.05
+    parameter_guess = rate_constants
     solution_true = solve(parameter_true)
     data = solution_true.u.mean[0]
 
@@ -68,7 +67,7 @@ def main():
 
     # The solution looks much better:
     final = solve(p)
-    _fig, ax = plt.subplots(figsize=(5, 3), dpi=100, constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(5, 3), dpi=100, constrained_layout=True)
     ax.set_title("Learning a Predator-Prey model", fontsize="medium")
     ax.set_xlabel("Predators", fontsize="medium")
     ax.set_ylabel("Prey", fontsize="medium")
@@ -84,6 +83,7 @@ def main():
     )
     ax.plot(final.u.mean[0][:, 0], final.u.mean[0][:, 1], color="C1", label="Optimised")
     ax.legend(fontsize="small")
+    fig.align_ylabels()
     plt.show()
 
 

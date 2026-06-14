@@ -19,6 +19,7 @@ from probdiffeq.backend import func, np, ode, testing
     ],
 )
 def case_solve_fixed_grid(ssm_factory):
+    """Produce a solver-to-solution function via solve_fixed_grid."""
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
     vf = probdiffeq.ode(vf)
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=4)
@@ -48,6 +49,7 @@ def case_solve_fixed_grid(ssm_factory):
     ],
 )
 def case_simulate_terminal_values(ssm_factory):
+    """Produce a solver-to-solution function via solve_adaptive_terminal_values."""
     # Since simulate_terminal_values calls simulate_save_at,
     # this test-case covers both solvers
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
@@ -81,6 +83,7 @@ def case_simulate_terminal_values(ssm_factory):
     ],
 )
 def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
+    """Run both uncalibrated and MLE solvers and return both solutions."""
     uncalib = solver_to_solution(probdiffeq.solver, strategy_fun)
     mle = solver_to_solution(probdiffeq.solver_mle, strategy_fun)
     return (uncalib, mle)
@@ -90,6 +93,7 @@ def fixture_uncalibrated_and_mle_solution(solver_to_solution, strategy_fun):
 # (which raises a warning), but the test remains valid!
 @testing.filterwarnings("ignore")
 def test_calibration_changes_the_posterior(uncalibrated_and_mle_solution) -> None:
+    """Assert that MLE calibration changes the output scale and posterior std but not the mean."""
     (uncalibrated, mle) = uncalibrated_and_mle_solution
 
     # Assert the means are identical, but the stds & scales are not.

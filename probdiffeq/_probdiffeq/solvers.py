@@ -339,7 +339,7 @@ class solver_mle(ProbabilisticSolver):
             )
             zeros = tree.tree_map(np.zeros_like, fx_init.noise.mean)
             output_scale_running, updates = (
-                fx_init.bayes_rule_and_residual_white_rms_tree(
+                fx_init.bayes_rule_and_residual_whitened_rms_tree(
                     zeros, u_pred, solve_triu=linalg.lstsq_svd
                 )
             )
@@ -385,7 +385,7 @@ class solver_mle(ProbabilisticSolver):
 
         # Do the full correction step
         zeros = tree.tree_map(np.zeros_like, fx.noise.mean)
-        new_term, updates = fx.bayes_rule_and_residual_white_rms_tree(
+        new_term, updates = fx.bayes_rule_and_residual_whitened_rms_tree(
             zeros, u, solve_triu=linalg.solve_triu
         )
         u, posterior = self.strategy.apply_updates(
@@ -522,7 +522,7 @@ class solver_dynamic(ProbabilisticSolver):
         )
         observed = fx.marginalise(u)
         zeros = tree.tree_map(np.zeros_like, fx.noise.mean)
-        output_scale = observed.residual_white_rms_tree(zeros)
+        output_scale = observed.residual_whitened_rms_tree(zeros)
 
         if self.stop_gradient_through_calibration:
             output_scale = func.stop_gradient(output_scale)
@@ -902,7 +902,7 @@ class error_residual_std(ErrorEstimator):
         # Extract the local residual std from the linearization
         observed = linearized.marginalise(rv)
         zeros = tree.tree_map(np.zeros_like, linearized.noise.mean)
-        output_scale = observed.residual_white_rms_tree(zeros)
+        output_scale = observed.residual_whitened_rms_tree(zeros)
         observed = observed.rescale_cholesky(output_scale)
         error = observed.std
         error, _ = tree.ravel_pytree(error)
@@ -1002,8 +1002,10 @@ class error_state_std(ErrorEstimator):
 
         # Extract the local residual std from the linearization
         zeros = tree.tree_map(np.zeros_like, linearized.noise.mean)
-        output_scale, conditional = linearized.bayes_rule_and_residual_white_rms_tree(
-            zeros, rv, solve_triu=linalg.solve_triu
+        output_scale, conditional = (
+            linearized.bayes_rule_and_residual_whitened_rms_tree(
+                zeros, rv, solve_triu=linalg.solve_triu
+            )
         )
 
         # Measure error on the n-th state (usually, n=0 because why not)

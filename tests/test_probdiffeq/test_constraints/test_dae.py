@@ -1,10 +1,11 @@
-"""Tests for sampling behaviour."""
+"""Tests for DAE constraints."""
 
 from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, testing
 
 
-def test_solution_matches_odesolve():
+def test_dae_solution_matches_ode_solution():
+    """Assert that the DAE and ODE formulations produce matching solutions for the SIR model."""
     y0 = [np.asarray([0.99, 0.01, 0.0])]
     solution_ode = solve_ode(y0, num=3)
     solution_dae = solve_dae(y0, num=3)

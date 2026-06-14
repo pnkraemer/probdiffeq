@@ -1,4 +1,11 @@
-"""Taylor coefficients as central data structures."""
+"""Taylor coefficients as central data structures.
+
+Taylor coefficients are passed through the entire solver pipeline.
+Any sequence type works: lists, tuples, and named tuples all behave identically.
+Statistical outputs inherit the same container structure as the initial coefficients:
+means, standard deviations, and posterior samples all match the type
+and field names of the Taylor coefficient container.
+"""
 
 import collections
 
@@ -24,9 +31,7 @@ def main():
     u0 = jnp.asarray(0.1)
     t0, t1 = 0.0, 5.0
 
-    # Here is a wrapper arounds Probdiffeq's solution routine.
-
-    # It's time to solve some ODEs:
+    # Solve with a list of Taylor coefficients:
 
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     tcoeffs_list, _ = jetexpand(vf, (u0,), t=t0)
@@ -43,7 +48,7 @@ def main():
     print(jax.tree.map(jnp.shape, tcoeffs_list))
     print(jax.tree.map(jnp.shape, solution.u))
 
-    # Anything that behaves like a list work.
+    # Anything that behaves like a list works.
     # For example, we can use lists or tuples, but also named tuples.
 
     CustomTCoeffs = collections.namedtuple(

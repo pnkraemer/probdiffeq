@@ -17,7 +17,8 @@ from probdiffeq.backend import func, linalg, np, ode, testing, tree
         probdiffeq.state_space_model_blockdiag,
     ],
 )
-def test_exponential_approximated_well(ssm_factory) -> None:
+def test_dynamic_solver_tracks_exponential_output_scale(ssm_factory) -> None:
+    """Assert that the dynamic solver achieves low RMSE on a problem with exponentially increasing output scale."""
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     tcoeffs = (*u0, vf(*u0, t=t0))

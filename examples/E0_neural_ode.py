@@ -1,4 +1,13 @@
-"""Learn neural ODEs with diffusion tempering."""
+"""Learn neural ODEs with diffusion tempering.
+
+A neural ODE uses a neural network as the vector field of a differential equation.
+Training minimises the negative log-marginal-likelihood of observed data
+under the ODE posterior, computed by a probabilistic ODE solver.
+
+Diffusion tempering gradually reduces the output scale during training.
+This widens the posterior early on, helping escape local optima,
+and sharpens it as training progresses.
+"""
 
 import equinox as eqx
 import jax
@@ -19,14 +28,14 @@ def main(num_data=20, epochs=1000, print_every=100, hidden=(20,), lr=0.2) -> Non
     data = jnp.sin(2.5 * jnp.pi * grid) * jnp.pi * grid
     std = 1e-1
     output_scale = 1e1
-    vf, u0, (t0, _t1), f_args = vf_neural_ode(hidden=hidden, t0=0.0, t1=1)
+    vf, u0, (t0, _t1), params = vf_neural_ode(hidden=hidden, t0=0.0, t1=1)
 
     # Create a loss (this is where probabilistic numerics enters!)
     loss = loss_log_marginal_likelihood(vf=vf, t0=t0)
 
     # Evaluate once to get the mean before optimisation
     _, info0 = loss(
-        f_args, u0=u0, grid=grid, data=data, std=std, output_scale=output_scale
+        params, u0=u0, grid=grid, data=data, std=std, output_scale=output_scale
     )
 
     # Construct an optimiser
@@ -36,10 +45,10 @@ def main(num_data=20, epochs=1000, print_every=100, hidden=(20,), lr=0.2) -> Non
     # Train the model
     print()
     print("Loss after...")
-    state = optim.init(f_args)
+    state = optim.init(params)
     for i in range(epochs):
-        (f_args, state), info = train_step(
-            f_args,
+        (params, state), info = train_step(
+            params,
             state,
             u0=u0,
             grid=grid,
@@ -52,9 +61,8 @@ def main(num_data=20, epochs=1000, print_every=100, hidden=(20,), lr=0.2) -> Non
         if i % print_every == print_every - 1:
             print(f"...{(i + 1)} epochs: loss={info['loss']:.7e}")
 
-        # Diffusion tempering: https://arxiv.org/abs/2402.12231
-        # To all users: Adjust this tempering and
-        # see how it affects parameter estimation.
+        # Diffusion tempering (https://arxiv.org/abs/2402.12231):
+        # scale down the output scale periodically to sharpen the posterior.
         if i % 100 == 99:
             output_scale /= 10.0
 
@@ -69,7 +77,7 @@ def main(num_data=20, epochs=1000, print_every=100, hidden=(20,), lr=0.2) -> Non
 
 def vf_neural_ode(*, hidden: tuple, t0: float, t1: float):
     """Build a neural ODE."""
-    f_args, mlp = model_mlp(hidden=hidden, shape_in=(2,), shape_out=(1,))
+    params, mlp = model_mlp(hidden=hidden, shape_in=(2,), shape_out=(1,))
     u0 = jnp.asarray(0.0)
 
     @jax.jit
@@ -78,7 +86,7 @@ def vf_neural_ode(*, hidden: tuple, t0: float, t1: float):
         y_and_t = jnp.concatenate([y[None], t[None]])
         return mlp(p, y_and_t).reshape(())
 
-    return vf, (u0,), (t0, t1), f_args
+    return vf, (u0,), (t0, t1), params
 
 
 def model_mlp(
@@ -102,12 +110,12 @@ def model_mlp(
 
     p_flat, unravel = jax.flatten_util.ravel_pytree(weights)
 
-    def fwd(w, x):
-        for A, b in w[:-1]:
+    def fwd(params, x):
+        for A, b in params[:-1]:
             x = jnp.dot(A, x) + b
             x = activation(x)
 
-        A, b = w[-1]
+        A, b = params[-1]
         return jnp.dot(A, x) + b
 
     key = jax.random.PRNGKey(1)

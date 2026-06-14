@@ -12,29 +12,28 @@ import jax
 import jax.experimental.ode
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-from diffeqzoo import backend, ivps
 
 from probdiffeq import ivpsolve, probdiffeq
 
-# IVP examples in JAX
-if not backend.has_been_selected:
-    backend.select("jax")
+# Lotka-Volterra predator-prey model
+u0 = jnp.asarray([20.0, 20.0])
+t0, t1 = 0.0, 20.0
 
 
 def main():
     """Use BlackJAX's samplers to estimate ODE parameters."""
     # Set up an initial value problem
 
-    f, u0, (t0, t1), f_args = ivps.lotka_volterra()
-
     @probdiffeq.ode
     def vf(y, /, *, t):
         """Evaluate the Lotka-Volterra vector field."""
         del t
-        return f(y, *f_args)
+        return jnp.asarray(
+            [0.5 * y[0] - 0.05 * y[0] * y[1], -0.5 * y[1] + 0.05 * y[0] * y[1]]
+        )
 
     # Construct solvers. Use fixed steps
-    # because window adaptation runs maaaany iterations
+    # because window adaptation runs many iterations
     # and values and gradients of fixed-step solvers are
     # faster than for adaptive solvers (if the ODE allows fixed steps)
     solve = solve_fixed(vf, t0=t0, t1=t1, num=250)
@@ -79,7 +78,7 @@ def main():
 
     # Create the plot
     mosaic = [["smp", "dens"]]
-    _fig, ax = plt.subplot_mosaic(mosaic, sharex=True, sharey=True, figsize=(8, 3))
+    fig, ax = plt.subplot_mosaic(mosaic, sharex=True, sharey=True, figsize=(8, 3))
 
     # Plot the samples
     ax["smp"].set_title("Posterior samples", fontsize="medium")
@@ -95,18 +94,19 @@ def main():
     ymax = jnp.maximum(jnp.amax(samples[:, 1]), theta0[1]) + 1.5
     xs = jnp.linspace(xmin, xmax, endpoint=True, num=200)
     ys = jnp.linspace(ymin, ymax, endpoint=True, num=200)
-    Xs, Ys = jnp.meshgrid(xs, ys)
+    xs_grid, ys_grid = jnp.meshgrid(xs, ys)
 
     # Evaluate the density
-    Thetas = jnp.stack((Xs, Ys))
+    thetas = jnp.stack((xs_grid, ys_grid))
     log_M_vmapped_x = jax.vmap(log_M, in_axes=-1, out_axes=-1)
     log_M_vmapped = jax.vmap(log_M_vmapped_x, in_axes=-1, out_axes=-1)
-    Zs = jax.jit(log_M_vmapped)(Thetas)
+    log_densities = jax.jit(log_M_vmapped)(thetas)
 
     # Plot the density
     ax["dens"].set_title("Target density", fontsize="medium")
-    im = ax["dens"].pcolormesh(Xs, Ys, jnp.exp(Zs), cmap="cividis")
+    im = ax["dens"].pcolormesh(xs_grid, ys_grid, jnp.exp(log_densities), cmap="cividis")
     plt.colorbar(im)
+    fig.align_ylabels()
     plt.show()
 
 

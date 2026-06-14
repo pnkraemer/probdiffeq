@@ -1,4 +1,11 @@
-"""Leverage dynamic calibration."""
+"""Leverage dynamic calibration.
+
+The output scale controls how much the solver trusts its prior relative to the ODE.
+The dynamic solver adapts this scale at every step, tracking the local magnitude
+of the solution.
+The MLE solver fits a single constant scale across all steps.
+The two solvers are compared on a test problem where their difference is clearly visible.
+"""
 
 import jax
 import jax.numpy as jnp

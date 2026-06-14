@@ -149,11 +149,11 @@ class DenseNormal(ssm_impl_api.AbstractTreeNormal[DenseTreeFlatten]):
         std_flat = np.abs(std_flat.reshape((-1,)))
         return self.tree_flatten.unflatten_array(std_flat)
 
-    def residual_white_rms_tree(self, u):
+    def residual_whitened_rms_tree(self, u):
         u, _ = tree.ravel_pytree(u)
-        return self.residual_white_rms_flat(u)
+        return self.residual_whitened_rms_flat(u)
 
-    def residual_white_rms_flat(self, u):
+    def residual_whitened_rms_flat(self, u):
         dx = u - self.mean_flat
         residual_white = linalg.solve_triu(self.cholesky_flat.T, dx, trans="T")
         mahalanobis = linalg.qr_r(residual_white[:, None])
@@ -235,7 +235,7 @@ DenseNormal.register_pytree_node()
 
 
 class DenseOdeTs0(ssm_impl_api.AbstractOde):
-    """Construct a dense implementation of ODE-TS0 linearization."""
+    """Dense ODE linearization via TS0 (zeroth-degree Taylor series: evaluate at the prior mean, no Jacobian)."""
 
     def init_linearization(self) -> None:
         return None
@@ -243,8 +243,8 @@ class DenseOdeTs0(ssm_impl_api.AbstractOde):
     def linearize(self, rv: DenseNormal, state: None, *, damp: float, t):
         del state
 
-        def a1(m: Array) -> Array:
-            """Select the 'n'-th derivative."""
+        def derivative_selector(m: Array) -> Array:
+            """Select the n-th derivative from the Taylor coefficient stack."""
             m0 = rv.tree_flatten.unflatten_array(m)[self.ode.num_tcoeffs_in_args]
             return tree.ravel_pytree(m0)[0]
 
@@ -252,43 +252,71 @@ class DenseOdeTs0(ssm_impl_api.AbstractOde):
 
         fm = self.ode.vector_field(jet_coords=Ms[: self.ode.num_tcoeffs_in_args], t=t)
         fx = tree.tree_map(lambda s: -s, [fm])
-        linop = func.jacrev(a1)(rv.mean_flat)
+        linop = func.jacrev(derivative_selector)(rv.mean_flat)
         noise = DenseNormal.from_dirac(fx, damp=damp)
         cond = DenseLatentCond.from_linop_and_noise(linop, noise)
         return cond, None
 
 
 class DenseOdeTs1(ssm_impl_api.AbstractOde):
-    """Construct a dense implementation of ODE-TS1 linearization."""
+    """Dense ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
 
     def init_linearization(self):
         return self.ode.jacobian.init_jacobian_handler()
 
-    def linearize(self, rv, state: None, *, damp: float, t):
+    def linearize(self, rv, state, *, damp: float, t: float):
+        # Read n and d so that we can turn latent arrays into
+        # (n, d) arrays, which Jacobians require
         m_tree = rv.mean
+        n = len(m_tree)
+        d = rv.mean_flat.size // n
 
-        rv0 = DenseNormal.from_dirac([m_tree[0]], damp=0.0)
+        # Rewrite the vector field as one that maps
+        # Arrays to arrays.
+        # Maps (n, d) to (1, d) to conform the Jacobian API
+        def fun(s: Array) -> Array:
+            # Move to latent space
+            s = np.reshape(s, (-1,))
 
-        def vf_flat(s: Array) -> Array:
-            [s0] = rv0.tree_flatten.unflatten_array(s)
-            fs0 = self.ode.vector_field(jet_coords=[s0], t=t)
-            return rv0.tree_flatten.flatten_tree([fs0])
+            # Extract all tcoeffs
+            jet_coords = rv.tree_flatten.unflatten_array(s)
 
-        def select_i(i) -> Callable[[Array], Array]:
-            def select(s: Array) -> Array:
-                s_tree = rv.tree_flatten.unflatten_array(s)
-                return rv0.tree_flatten.flatten_tree(s_tree[i])
+            # Extract relevant tcoeffs ("jet-coordinates")
+            jet_coords = jet_coords[: self.ode.num_tcoeffs_in_args]
 
-            return select
+            # Evaluate the actual vector field
+            fs0 = self.ode.vector_field(jet_coords=jet_coords, t=t)
 
-        E0 = func.jacfwd(select_i(i=0))(rv.mean_flat)
-        E1 = func.jacfwd(select_i(i=1))(rv.mean_flat)
+            # Bring back into (m, d) form.
+            return tree.ravel_pytree(fs0)[0][None, :]
 
-        m0 = rv0.mean_flat
-        fx, J, state = self.ode.jacobian.materialize_dense(vf_flat, m0, state)
-        linop = E1 - J @ E0
-        fx = -(fx - J @ m0)
-        fx = rv0.tree_flatten.unflatten_array(fx)
+        # Materialize the Jacobian
+        m0 = rv.mean_flat.reshape((n, d))
+        fx, J, state = self.ode.jacobian.materialize_dense(fun, m0, state)
+
+        # Flatten fx and J correctly (from [m, d, n, d] to [md,nd])
+        m, d = fx.shape
+        fx = fx.reshape((m * d,))
+        J = J.reshape((m * d, -1))
+
+        # Bulletproof construction of selection operators via jacobian(slicing)
+        # instead of instantiating identity matrices and selecting rows
+
+        @func.jacfwd
+        def projection_e1(s):
+            s_tree = rv.tree_flatten.unflatten_array(s)
+            return tree.ravel_pytree(s_tree[self.ode.num_tcoeffs_in_args])[0]
+
+        # Complete the expressions for bias and linop
+        fx = J @ rv.mean_flat - fx
+        E1 = projection_e1(rv.mean_flat)
+        linop = E1 - J
+
+        # Flatten fx into the correct pytree structure
+        f0 = DenseNormal.from_dirac([m_tree[self.ode.num_tcoeffs_in_args]], damp=0.0)
+        fx = f0.tree_flatten.unflatten_array(fx)
+
+        # Collect all quantities and return
         noise = DenseNormal.from_dirac(fx, damp=damp)
         cond = DenseLatentCond.from_linop_and_noise(linop, noise)
         return cond, state
@@ -330,20 +358,42 @@ class DenseResidual(ssm_impl_api.AbstractResidual):
         # Get the linearization point (i.e., prior or posterior linearisation)
         xi = self.taylor_point(constraint_flat, rv, t=t)
 
-        # Evaluate the linearization
-        jacobian = self.residual.jacobian.materialize_dense
-        fx, linop, state = jacobian(constraint_flat, xi, state, t=t)
-        fx = fx - linop @ xi
+        # Read n and d so that we can turn latent arrays into
+        # (n, d) arrays, which Jacobians require
+        m_tree = rv.mean
+        n = len(m_tree)
+        d = rv.mean_flat.size // n
 
-        if linop.shape[0] > linop.shape[1]:
-            msg = f"There are more constraints ({linop.shape[0]}) than variables ({linop.shape[1]})."
+        # Rewrite the constraint as one that maps 2d arrays to 2d arrays.
+        # Here, write the fun as (d, 1) to (d', 1) because the Jacobian
+        # logic requires 2d to 2d arrays. Since we materialize the full
+        # Jacobian, everything is still fine.
+        def fun(s: Array) -> Array:
+            # Move from (n, d) shape into latent space: (-1,) shape
+            s = np.reshape(s, (-1,))
+
+            # Evaluate the actual constraint
+            fs0 = constraint_flat(s, t=t)
+            # Bring back into (m, d) form.
+            return fs0[:, None]
+
+        # Evaluate the linearization
+        xi_2d = xi.reshape((-1, 1))
+        fx, J, state = self.residual.jacobian.materialize_dense(fun, xi_2d, state)
+        m, d = fx.shape
+        fx = fx.reshape((m * d,))
+        J = J.reshape((m * d, -1))
+        fx = fx - J @ xi
+
+        if J.shape[0] > J.shape[1]:
+            msg = f"There are more constraints ({J.shape[0]}) than variables ({J.shape[1]})."
             msg += " This will likely cause an error in the conditioning."
             warnings.warn(msg, stacklevel=1)
 
         # Turn the linearization into a conditional
         noise = DenseNormal.from_dirac([fx], damp=damp)
 
-        cond = DenseLatentCond.from_linop_and_noise(linop, noise)
+        cond = DenseLatentCond.from_linop_and_noise(J, noise)
         return cond, state
 
 
@@ -526,7 +576,7 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
 
     def prior_exponential(
         self,
-        ode: problems.ODEFunctionAutonomous,
+        ode: problems.JetOdeAutonomous,
         tcoeffs_mean: C,
         /,
         *,
@@ -565,7 +615,7 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
 
     def prior_exponential_diffuse(
         self,
-        ode: problems.ODEFunctionAutonomous,
+        ode: problems.JetOdeAutonomous,
         tcoeffs_mean: C,
         tcoeffs_std: C,
         /,
@@ -717,27 +767,23 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         base_scale, _ = tree.ravel_pytree(base_scale)
         return linalg.diagonal_matrix(base_scale)
 
-    def constraint_ode_ts0(self, ode: problems.ODEFunction, /) -> DenseOdeTs0:
-        if not isinstance(ode, problems.ODEFunction):
+    def constraint_ode_ts0(self, ode: problems.JetOde, /) -> DenseOdeTs0:
+        if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
         return DenseOdeTs0(ode=ode)
 
-    def constraint_ode_ts1(self, ode: problems.ODEFunction, /) -> DenseOdeTs1:
-        if not isinstance(ode, problems.ODEFunction):
+    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> DenseOdeTs1:
+        if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
-        if ode.num_tcoeffs_in_args > 1:
-            msg = "Not implemented."
-            msg += " Try zeroth-order methods or residual-based constraints instead."
-            raise ValueError(msg)
         return DenseOdeTs1(ode=ode)
 
     def constraint_residual(
         self,
-        residual: problems.Residual,
+        residual: problems.JetResidual,
         *,
         taylor_point: taylor_points.TaylorPoint | None = None,
     ) -> DenseResidual:
-        if not isinstance(residual, problems.Residual):
+        if not isinstance(residual, problems.JetResidual):
             raise TypeError(residual)
         if taylor_point is None:
             taylor_point = taylor_points.taylor_point_prior()

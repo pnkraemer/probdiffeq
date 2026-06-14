@@ -1,1 +1,1 @@
-"""Tests for utilities."""
+"""Tests for utility functions."""
