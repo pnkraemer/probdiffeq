@@ -50,6 +50,7 @@ def test_logpdf_gradient_is_finite(ssm_factory) -> None:
 
 
 def create_random_variable(ssm_factory):
+    """Create a random IWP noise sample for use in logpdf tests."""
     tcoeffs = [np.ones((3,))] * 5  # values irrelevant
     ssm = ssm_factory()
     iwp = ssm.prior_wiener_integrated(tcoeffs, is_exact=False, inexact_eps=1.0)

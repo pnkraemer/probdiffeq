@@ -31,6 +31,7 @@ def test_residual_init_matches_expectation_on_sir_model(num):
 
 @probdiffeq.ode
 def vf_ode(y, /, *, t):
+    """SIR model ODE vector field."""
     del t
     beta, gamma = 2.0, 0.5  # infection and recovery rates
     S, I, _R = y  # noqa: E741 ("I" is a good variable name in an SIR model)
@@ -44,6 +45,7 @@ def vf_ode(y, /, *, t):
 
 @probdiffeq.residual_position
 def algebraic(u, /, *, t):
+    """SIR algebraic residual: enforces that total population equals N."""
     del t
     N = 1.0  # total population
     return u[0] + u[1] + u[2] - N
@@ -51,6 +53,7 @@ def algebraic(u, /, *, t):
 
 @probdiffeq.residual_velocity
 def differential(u, du, /, *, t):
+    """SIR differential residual for the S and I velocities."""
     del t
     beta, gamma = 2.0, 0.5
     S, I, _R = u  # noqa: E741 ("I" is a good variable name in an SIR model)

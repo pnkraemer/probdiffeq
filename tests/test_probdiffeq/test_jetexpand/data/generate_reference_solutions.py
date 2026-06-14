@@ -5,6 +5,7 @@ from probdiffeq.backend import np, ode
 
 
 def three_body_first(num_derivatives_max=10):
+    """Compute jet expanded Taylor coefficients for the three body first order problem."""
     vf, (u0,), (t0, _) = ode.ivp_three_body_1st()
     vf = probdiffeq.ode(vf)
     jetexpand = probdiffeq.jetexpand_ode_unroll(num=num_derivatives_max)
@@ -12,6 +13,7 @@ def three_body_first(num_derivatives_max=10):
 
 
 def van_der_pol_second(num_derivatives_max=10):
+    """Compute jet expanded Taylor coefficients for the Van der Pol second order problem."""
     vf, (u0, du0), (t0, _) = ode.ivp_van_der_pol_2nd()
     vf = probdiffeq.ode(vf)
     jetexpand = probdiffeq.jetexpand_ode_unroll(num=num_derivatives_max)
