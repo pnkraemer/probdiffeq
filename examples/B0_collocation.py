@@ -1,4 +1,4 @@
-"""ProbNum as collocation.
+"""Understand the ODE posterior.
 
 Diffuse initialisation of the prior yields samples that do not satisfy the ODE.
 Taylor-coefficient initialisation yields samples that approximately satisfy it.
