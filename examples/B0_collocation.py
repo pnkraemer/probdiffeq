@@ -1,4 +1,9 @@
-"""ProbNum as collocation."""
+"""ProbNum as collocation.
+
+Diffuse initialisation of the prior yields samples that do not satisfy the ODE.
+Taylor-coefficient initialisation yields samples that approximately satisfy it.
+Conditioning on the ODE (forming the posterior) collapses residuals near zero.
+"""
 
 import jax
 import jax.numpy as jnp
@@ -81,7 +86,7 @@ def main():
         figsize=(8, 5),
     )
     axes_state[0].set_title("IWP w/ diffuse initialisation", fontsize="medium")
-    axes_state[1].set_title("IOUP w/ Taylor coefficients", fontsize="medium")
+    axes_state[1].set_title("IWP w/ Taylor coefficients", fontsize="medium")
     axes_state[2].set_title("Posterior", fontsize="medium")
 
     axes_state[0].set_xticks((t0, (t0 + t1) / 2, t1))
@@ -100,32 +105,23 @@ def main():
     axes_log_abs[1].set_xlabel("Time $t$", fontsize="medium")
     axes_log_abs[2].set_xlabel("Time $t$", fontsize="medium")
 
-    for i in range(num_samples):
-        # Plot all state-samples
-        axes_state[0].plot(ts, samples_prior[0][i, ...], **sample_style, color="C0")
-        axes_state[1].plot(ts, samples_tcoeffs[0][i, ...], **sample_style, color="C1")
-        axes_state[2].plot(ts, samples_posterior[0][i, ...], **sample_style, color="C2")
+    axes_state[0].plot(ts, samples_prior[0].T, **sample_style, color="C0")
+    axes_state[1].plot(ts, samples_tcoeffs[0].T, **sample_style, color="C1")
+    axes_state[2].plot(ts, samples_posterior[0].T, **sample_style, color="C2")
 
-        # Plot all residual-samples
-        axes_residual[0].plot(ts, residual_prior[i, ...], **sample_style, color="C0")
-        axes_residual[1].plot(ts, residual_tcoeffs[i, ...], **sample_style, color="C1")
-        axes_residual[2].plot(
-            ts, residual_posterior[i, ...], **sample_style, color="C2"
-        )
+    axes_residual[0].plot(ts, residual_prior.T, **sample_style, color="C0")
+    axes_residual[1].plot(ts, residual_tcoeffs.T, **sample_style, color="C1")
+    axes_residual[2].plot(ts, residual_posterior.T, **sample_style, color="C2")
 
-        # Plot all log-residual samples
-        axes_log_abs[0].plot(
-            ts, jnp.log10(jnp.abs(residual_prior))[i, ...], **sample_style, color="C0"
-        )
-        axes_log_abs[1].plot(
-            ts, jnp.log10(jnp.abs(residual_tcoeffs))[i, ...], **sample_style, color="C1"
-        )
-        axes_log_abs[2].plot(
-            ts,
-            jnp.log10(jnp.abs(residual_posterior))[i, ...],
-            **sample_style,
-            color="C2",
-        )
+    axes_log_abs[0].plot(
+        ts, jnp.log10(jnp.abs(residual_prior)).T, **sample_style, color="C0"
+    )
+    axes_log_abs[1].plot(
+        ts, jnp.log10(jnp.abs(residual_tcoeffs)).T, **sample_style, color="C1"
+    )
+    axes_log_abs[2].plot(
+        ts, jnp.log10(jnp.abs(residual_posterior)).T, **sample_style, color="C2"
+    )
 
     fig.align_ylabels()
     plt.show()

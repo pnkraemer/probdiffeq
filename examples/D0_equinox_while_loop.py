@@ -1,7 +1,12 @@
 """Enable reverse-mode derivatives.
 
-Use [Equinox's](https://docs.kidger.site/equinox/)
-bounded while loop to enable reverse-mode differentiation of adaptive IVP solvers.
+Reverse-mode differentiation through a `jax.lax.while_loop` is not supported
+by default, because JAX cannot trace through a loop with a data-dependent
+iteration count.
+Equinox provides a bounded while loop that unrolls up to a fixed number of steps,
+making the gradient tractable.
+This example shows how switching to `equinox.internal.while_loop` enables
+reverse-mode differentiation of adaptive IVP solvers.
 """
 
 import equinox

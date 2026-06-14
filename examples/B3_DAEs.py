@@ -1,21 +1,16 @@
 """Simulate DAEs.
 
 Solve a differential-algebraic equation, namely, the Robertson problem.
-The Robertson problem is interesting for many reasons:
-  - It comes in DAE, and ODE form
-    so we can compare different information operators
-  - It has an exponential timescale so (good) adaptive
-    steps are needed; fixed steps are hopeless.
-  - Its y-states have wildly different scales,
-    so a good prior model is important.
-
-
+The Robertson problem is interesting for several reasons.
+It comes in both DAE and ODE form, so we can compare different information operators.
+It has an exponential timescale, so adaptive steps are essential.
+Its solution components live on vastly different scales,
+so a good prior model is important.
 """
 
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-import scipy.special
 
 from probdiffeq import ivpsolve, probdiffeq
 
@@ -75,15 +70,13 @@ def main(t0=1e-6, t1=1e5) -> None:
     ax[0][0].set_title("Robertson solution", fontsize="medium")
     ax[0][1].set_title("Standard deviations", fontsize="medium")
 
-    # Plot a special index
-    i = 0
-    ax[0][0].semilogx(save_at, solution.u.mean[i][:, 0] / scipy.special.factorial(i))
-    ax[1][0].semilogx(save_at, solution.u.mean[i][:, 1] / scipy.special.factorial(i))
-    ax[2][0].semilogx(save_at, solution.u.mean[i][:, 2] / scipy.special.factorial(i))
+    ax[0][0].semilogx(save_at, solution.u.mean[0][:, 0])
+    ax[1][0].semilogx(save_at, solution.u.mean[0][:, 1])
+    ax[2][0].semilogx(save_at, solution.u.mean[0][:, 2])
 
-    ax[0][1].loglog(save_at, solution.u.std[i][:, 0] / scipy.special.factorial(i))
-    ax[1][1].loglog(save_at, solution.u.std[i][:, 1] / scipy.special.factorial(i))
-    ax[2][1].loglog(save_at, solution.u.std[i][:, 2] / scipy.special.factorial(i))
+    ax[0][1].loglog(save_at, solution.u.std[0][:, 0])
+    ax[1][1].loglog(save_at, solution.u.std[0][:, 1])
+    ax[2][1].loglog(save_at, solution.u.std[0][:, 2])
 
     ax[0][0].set_ylabel("State $y_1$", fontsize="medium")
     ax[1][0].set_ylabel("State $y_2$", fontsize="medium")

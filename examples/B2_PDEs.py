@@ -1,8 +1,9 @@
 """Simulate PDEs.
 
-This tutorial replicates Figure 1 from https://arxiv.org/abs/2110.11812,
-but uses some advanced features in Probdiffeq, namely, solving matrix-valued problems
-and adaptive simulation with fixedpoint smoothing.
+Solve the FitzHugh-Nagumo PDE using the block-diagonal state-space model,
+which handles matrix-valued ODEs natively.
+Adaptive fixedpoint smoothing produces means and uncertainty estimates
+at each saved time point.
 """
 
 import jax
@@ -43,7 +44,7 @@ def main() -> None:
     simulate = simulator(save_at=save_at, error=error, solver=solver)
     (u, u_std) = simulate(iwp)
 
-    _fig, axes = plt.subplots(
+    fig, axes = plt.subplots(
         nrows=2, ncols=len(u), figsize=(2 * len(u), 3), tight_layout=True
     )
     for t_i, u_i, std_i, ax_i in zip(save_at, u, u_std, axes.T):
@@ -62,6 +63,7 @@ def main() -> None:
 
     axes[0][0].set_ylabel("PDE solution", fontsize="medium")
     axes[1][0].set_ylabel("log(std)", fontsize="medium")
+    fig.align_ylabels()
     plt.show()
 
 

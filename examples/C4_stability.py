@@ -1,12 +1,11 @@
 """Some solvers are more stable than others.
 
-This tutorial reproduces Figure 1 from:
+IWP and IOUP priors combined with TS0 or TS1 constraints differ widely in stability.
+The IOUP prior and the TS1 constraint each improve stability, and their combination
+requires an order of magnitude fewer steps than IWP with TS0.
 
-> Bosch, N., Hennig, P., & Tronarp, F. (2023).
-  Probabilistic exponential integrators.
-  Advances in Neural Information Processing Systems, 36, 40450-40467.
-
-It shows the stability of first and zeroth-order methods with different priors.
+Source: Bosch, Hennig, Tronarp (2023), "Probabilistic exponential integrators",
+NeurIPS 36, 40450-40467.
 """
 
 import functools
@@ -51,7 +50,7 @@ def main():
     ts1 = ssm.constraint_ode_ts1(vf)
 
     # Prepare the plot
-    _fig, axes = plt.subplots(ncols=4, figsize=(13, 3), constrained_layout=True)
+    fig, axes = plt.subplots(ncols=4, figsize=(13, 3), constrained_layout=True)
     solvers = [
         ("IWP + TS0 (300 steps)", iwp, ts0, 300),
         ("IOUP + TS0 (275 steps)", ioup, ts0, 275),
@@ -93,6 +92,7 @@ def main():
         ax.set_xlabel("Time", fontsize="medium")
 
     axes[0].set_ylabel("State", fontsize="medium")
+    fig.align_ylabels()
     plt.show()
 
 

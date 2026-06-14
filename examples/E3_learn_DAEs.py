@@ -1,10 +1,17 @@
-"""Learn a DAE."""
+"""Fit the Robertson DAE to data.
+
+The Robertson problem is a stiff differential-algebraic equation (DAE)
+whose solution components span many orders of magnitude.
+This example estimates the unknown initial conditions from synthetic observations
+by minimising the negative log-marginal-likelihood via gradient descent.
+"""
 
 import functools
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import optax
 
 from probdiffeq import ivpsolve, probdiffeq
@@ -19,7 +26,7 @@ jax.config.update("jax_enable_x64", True)
 jnp.set_printoptions(3)
 
 
-class Trafo:
+class SimplexTransform:
     """Coordinate transformation to make the optimisation problem well-posed."""
 
     def __init__(self, scale):
@@ -71,7 +78,7 @@ def main(
     # the solutions live on vastly different scales
     # (but don't vary much within these scales).
     output_scale = jnp.asarray([0.8, 2e-05, 0.2])
-    trafo = Trafo(output_scale)
+    trafo = SimplexTransform(output_scale)
 
     # Linear spacing on a log-scale
     save_at = 2.0 ** jnp.linspace(jnp.log2(t0), jnp.log2(t1), num=num_data)
@@ -127,6 +134,32 @@ def main(
     y_true = trafo.latent_to_observed(p_true)
     assert jnp.allclose(y_guess, y_true, atol=1e-4, rtol=1e-4)
 
+    # Compare estimated and true trajectories
+    solution_guess = solve(p_guess, save_at=save_at, output_scale=output_scale)
+    fig, ax = plt.subplots(ncols=2, figsize=(8, 3), constrained_layout=True)
+    ax[0].set_title("Robertson trajectory", fontsize="medium")
+    ax[0].set_xlabel("Time $t$", fontsize="medium")
+    ax[0].set_ylabel("State", fontsize="medium")
+    for k in range(3):
+        ax[0].semilogx(
+            save_at,
+            solution_true.u.mean[0][:, k],
+            color=f"C{k}",
+            label=f"True $y_{k + 1}$",
+        )
+        ax[0].semilogx(
+            save_at, solution_guess.u.mean[0][:, k], color=f"C{k}", linestyle="dashed"
+        )
+    ax[0].legend(fontsize="x-small")
+    ax[1].set_title("Absolute error", fontsize="medium")
+    ax[1].set_xlabel("Time $t$", fontsize="medium")
+    ax[1].set_ylabel("Error", fontsize="medium")
+    for k in range(3):
+        err = jnp.abs(solution_true.u.mean[0][:, k] - solution_guess.u.mean[0][:, k])
+        ax[1].loglog(save_at, err + 1e-16, color=f"C{k}")
+    fig.align_ylabels()
+    plt.show()
+
 
 def loss_data_fit(solve, *, inputs, labels):
     """Create a loss that measures the data fit."""
@@ -148,9 +181,9 @@ def solver(residual, tol, while_loop, trafo):
     """Create a reverse-mode differentiable probabilistic solver."""
 
     @jax.jit
-    def solve(p_sqrt, save_at, output_scale):
+    def solve(p_latent, save_at, output_scale):
 
-        y0 = trafo.latent_to_observed(p_sqrt)
+        y0 = trafo.latent_to_observed(p_latent)
         t0, _t1 = save_at[0], save_at[-1]
 
         nlstsq = probdiffeq.lstsq_constrained_gauss_newton(

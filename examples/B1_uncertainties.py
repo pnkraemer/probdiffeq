@@ -1,4 +1,10 @@
-"""Compare UQ of solvers."""
+"""Visualise solution uncertainty.
+
+Probabilistic ODE solvers return a posterior distribution over trajectories,
+not just a single mean trajectory.
+This example plots the posterior mean together with uncertainty bands
+for the state and its first few derivatives.
+"""
 
 # Set up the ODE
 
@@ -29,8 +35,6 @@ def main():
     u0 = jnp.asarray([20.0, 20.0])
 
     # Set up a solver.
-    #
-    # To all users: Try replacing the fixedpoint-smoother with a filter!
 
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=3)
     tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
@@ -57,21 +61,15 @@ def main():
         tight_layout=True,
         figsize=(len(sol.u.mean) * 2, 5),
     )
+    _titles = ["State", "1st deriv.", "2nd deriv.", "3rd deriv."]
     for i, (u_i, std_i, ax_i) in enumerate(zip(sol.u.mean, sol.u.std, axes.T)):
         # Set up titles and axis descriptions
+        title = _titles[i] if i < len(_titles) else f"{i}th deriv."
+        ax_i[0].set_title(title, fontsize="medium")
         if i == 0:
-            ax_i[0].set_title("State", fontsize="medium")
             ax_i[0].set_ylabel("Prey", fontsize="medium")
             ax_i[1].set_ylabel("Predators", fontsize="medium")
             ax_i[2].set_ylabel("Std.-dev.", fontsize="medium")
-        elif i == 1:
-            ax_i[0].set_title(f"{i}st deriv.", fontsize="medium")
-        elif i == 2:
-            ax_i[0].set_title(f"{i}nd deriv.", fontsize="medium")
-        elif i == 3:
-            ax_i[0].set_title(f"{i}rd deriv.", fontsize="medium")
-        else:
-            ax_i[0].set_title(f"{i}th deriv.", fontsize="medium")
 
         ax_i[-1].set_xlabel("Time", fontsize="medium")
 

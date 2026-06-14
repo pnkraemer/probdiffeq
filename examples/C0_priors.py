@@ -1,6 +1,10 @@
 """Choose between prior distributions.
 
-See also: https://nathanaelbosch.github.io/ProbNumDiffEq.jl/stable/priors/
+Every probabilistic ODE solver is built on a Gauss Markov prior.
+Four prior types are compared here side by side:
+the integrated Wiener process (IWP), the integrated Ornstein-Uhlenbeck process (IOUP),
+a Matern 5/2 prior, and an oscillating prior.
+Each encodes a different assumption about the smoothness of the ODE solution.
 """
 
 import jax

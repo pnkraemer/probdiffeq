@@ -1,6 +1,8 @@
 """Get started.
 
-Solve the logistic equation and explore different solvers.
+Set up the complete solver pipeline step by step:
+define an ODE, expand Taylor coefficients, build a prior, a strategy, a constraint,
+and an error estimator, then call the adaptive solver.
 """
 
 import jax
