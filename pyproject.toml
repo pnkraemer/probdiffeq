@@ -29,9 +29,9 @@ cpu = [
     "jax[cpu]",
 ]
 test =[
-    "pytest",
+    "pytest < 9.0",  # pinned in June '26; revisit soon
     "pytest-xdist",
-    "pytest-cases",
+    "pytest-cases < 3.10", # pinned in June '26; revisit soon
     "diffeqzoo",
     "diffrax",
     "equinox",
