@@ -66,8 +66,8 @@ class IsotropicTreeFlatten(ssm_impl_api.AbstractTreeFlatten):
         return cls(treedef, unravel_leaf)
 
 
-class IsotropicLatentCond(ssm_impl_api.AbstractLatentCond):
-    """Isotropic (scalar-variance) implementation of LatentCond operations."""
+class IsotropicLatentCondMaterialized(ssm_impl_api.AbstractLatentCondMaterialized):
+    """Isotropic (scalar-variance) implementation of LatentCondMaterialized operations."""
 
     def apply_flat(self, x, /):
         x = self.to_latent[:, None] * x
@@ -85,7 +85,9 @@ class IsotropicLatentCond(ssm_impl_api.AbstractLatentCond):
         cholesky_new = self.to_observed[:, None] * cholesky_new
         return IsotropicNormal(mean_new, cholesky_new, self.noise.tree_flatten)
 
-    def merge(self, other: "IsotropicLatentCond", /) -> "IsotropicLatentCond":
+    def merge(
+        self, other: "IsotropicLatentCondMaterialized", /
+    ) -> "IsotropicLatentCondMaterialized":
         # self = cond1 (outer), other = cond2 (inner)
         T = self.to_latent * other.to_observed
 
@@ -97,7 +99,7 @@ class IsotropicLatentCond(ssm_impl_api.AbstractLatentCond):
         Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
 
         noise = IsotropicNormal(xi, Xi.T, self.noise.tree_flatten)
-        return IsotropicLatentCond(
+        return IsotropicLatentCondMaterialized(
             g, noise, to_latent=other.to_latent, to_observed=self.to_observed
         )
 
@@ -117,7 +119,7 @@ class IsotropicLatentCond(ssm_impl_api.AbstractLatentCond):
         mean_corrected = mean - gain @ mean_observed
         cholesky_corrected = r_cor.T
         corrected = IsotropicNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
-        cond_new = IsotropicLatentCond(
+        cond_new = IsotropicLatentCondMaterialized(
             gain,
             corrected,
             to_latent=1 / self.to_observed,
@@ -134,10 +136,10 @@ class IsotropicLatentCond(ssm_impl_api.AbstractLatentCond):
         mean = self.to_observed[:, None] * self.noise.mean_flat
         cholesky = self.to_observed[:, None] * self.noise.cholesky_flat
         noise = IsotropicNormal(mean, cholesky, self.noise.tree_flatten)
-        return IsotropicLatentCond.from_linop_and_noise(A, noise)
+        return IsotropicLatentCondMaterialized.from_linop_and_noise(A, noise)
 
 
-IsotropicLatentCond._register_as_pytree()
+IsotropicLatentCondMaterialized._register_as_pytree()
 
 
 class IsotropicNormal(ssm_impl_api.AbstractTreeNormal[IsotropicTreeFlatten]):
@@ -254,13 +256,13 @@ class IsotropicNormal(ssm_impl_api.AbstractTreeNormal[IsotropicTreeFlatten]):
         base = random.normal(key, shape=(n,))
         return self.mean_flat + (self.cholesky_flat @ base)[:, None]
 
-    def identity_conditional(self) -> IsotropicLatentCond:
+    def identity_conditional(self) -> IsotropicLatentCondMaterialized:
         num, d = self.mean_flat.shape
         m0 = np.zeros((num, d))
         c0 = np.zeros((num, num))
         noise = IsotropicNormal(m0, c0, self.tree_flatten)
         matrix = np.eye(num)
-        return IsotropicLatentCond.from_linop_and_noise(matrix, noise)
+        return IsotropicLatentCondMaterialized.from_linop_and_noise(matrix, noise)
 
     def prototype_output_scale_calibrated(self):
         return np.ones(())
@@ -272,7 +274,7 @@ class IsotropicNormal(ssm_impl_api.AbstractTreeNormal[IsotropicTreeFlatten]):
 
         u_like = tree.tree_map(np.zeros_like, self.mean[0])
         noise = IsotropicNormal.from_mean_and_std([u_like], [std])
-        return IsotropicLatentCond.from_linop_and_noise(linop, noise)
+        return IsotropicLatentCondMaterialized.from_linop_and_noise(linop, noise)
 
     @staticmethod
     def register_pytree_node() -> None:
@@ -310,7 +312,7 @@ class IsotropicOdeTs0(ssm_impl_api.AbstractOde):
         linop = func.jacrev(lambda s: s[[self.ode.num_tcoeffs_in_args], ...])(
             rv.mean_flat[..., 0]
         )
-        cond = IsotropicLatentCond.from_linop_and_noise(linop, bias)
+        cond = IsotropicLatentCondMaterialized.from_linop_and_noise(linop, bias)
         return cond, None
 
 
@@ -356,7 +358,7 @@ class IsotropicOdeTs1(ssm_impl_api.AbstractOde):
 
         # Turn fx and J_trace into an observation model
         noise = IsotropicNormal.from_dirac(fx, damp=damp)
-        cond = IsotropicLatentCond.from_linop_and_noise(linop, noise)
+        cond = IsotropicLatentCondMaterialized.from_linop_and_noise(linop, noise)
         return cond, state
 
 
@@ -380,7 +382,9 @@ class IsotropicWienerIntegrated(ssm_impl_api.AbstractPrior):
         scale = self.output_scale * output_scale
         noise = IsotropicNormal(self.q0, scale * self.q_sqrtm, self.tree_flatten)
         p, p_inv = self.precon_fun(dt)
-        return IsotropicLatentCond(self.A, noise, to_latent=p_inv, to_observed=p)
+        return IsotropicLatentCondMaterialized(
+            self.A, noise, to_latent=p_inv, to_observed=p
+        )
 
     @staticmethod
     def register_pytree():

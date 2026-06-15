@@ -32,7 +32,7 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class AbstractLatentCond:
+class AbstractLatentCondMaterialized:
     """Conditional distributions in latent space.
 
     Subclasses implement the SSM-specific operations (marginalise, revert, etc.).
@@ -132,7 +132,7 @@ class AbstractLatentCond:
         return mahalanobis, updated
 
 
-AbstractLatentCond._register_as_pytree()
+AbstractLatentCondMaterialized._register_as_pytree()
 
 
 class AbstractLinearization(abc.ABC):
@@ -274,7 +274,7 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def identity_conditional(self) -> AbstractLatentCond:
+    def identity_conditional(self) -> AbstractLatentCondMaterialized:
         """Return the identity transition compatible with this distribution."""
         raise NotImplementedError
 
@@ -284,7 +284,7 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def to_derivative(self, i, std) -> AbstractLatentCond:
+    def to_derivative(self, i, std) -> AbstractLatentCondMaterialized:
         """Construct an observation model that extracts the i-th Taylor coefficient."""
         raise NotImplementedError
 
@@ -298,7 +298,9 @@ class AbstractPrior(abc.ABC):
         return f"{self.__class__.__name__}(init={self.init}, output_scale={self.output_scale})"
 
     @abc.abstractmethod
-    def transition(self, *, dt: float, output_scale: Array) -> AbstractLatentCond:
+    def transition(
+        self, *, dt: float, output_scale: Array
+    ) -> AbstractLatentCondMaterialized:
         """Discretize the prior at a time step."""
         raise NotImplementedError
 
