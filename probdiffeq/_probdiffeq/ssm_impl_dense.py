@@ -154,7 +154,7 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCond):
 
         mean = self.to_observed * mean_observed
         cholesky = self.to_observed[:, None] * r_obs.T
-        cholesky = _remove_offdiag(cholesky, n=len(rv.mean) - 1, d=d)
+        cholesky = _remove_offdiag(cholesky, n=mean.size // d, d=d)
         observed = DenseNormal(mean, cholesky, self.noise.tree_flatten)
         return observed, cond_new
 
