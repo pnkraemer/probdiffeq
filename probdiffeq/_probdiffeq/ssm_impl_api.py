@@ -67,7 +67,7 @@ class AbstractLatentCond:
     def from_linop_and_noise(cls, A, noise):
         """Construct a latent conditional with unit en- and decoders."""
         # Hack for blockdiagonal models (and possibly dense evaluations)
-        if A.ndim > 2:
+        if len(noise.batch_shape) > 0:
             return func.vmap(cls.from_linop_and_noise)(A, noise)
 
         d_out, d_in = A.shape
@@ -211,6 +211,12 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
     def __repr__(self) -> str:
         name = self.__class__.__name__
         return f"{name}({self.mean_flat}, {self.cholesky_flat}, {self.tree_flatten})"
+
+    @property
+    @abc.abstractmethod
+    def batch_shape(self):
+        """Evaluate the batch-shape."""
+        raise NotImplementedError
 
     @property
     @abc.abstractmethod

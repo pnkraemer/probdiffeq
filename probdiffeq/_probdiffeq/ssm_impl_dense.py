@@ -49,31 +49,38 @@ class DenseLatentCond(ssm_impl_api.AbstractLatentCond):
         )
 
     def revert(self, rv: "DenseNormal", /, *, solve_triu: Callable):
+        noise = self.noise
+
+        # Pull into latent space
         mean = self.to_latent * rv.mean_flat
         cholesky = self.to_latent[:, None] * rv.cholesky_flat
 
+        # QR decomposition
         R_X_F = (self.A @ cholesky).T
         R_X = cholesky.T
-        R_YX = self.noise.cholesky_flat.T
-        tmp = cholesky_util.revert_conditional(
+        R_YX = noise.cholesky_flat.T
+        r_obs, (r_cor, gain) = cholesky_util.revert_conditional(
             R_X_F=R_X_F, R_X=R_X, R_YX=R_YX, solve_triu=solve_triu
         )
-        r_obs, (r_cor, gain) = tmp
 
-        mean_observed = self.A @ mean + self.noise.mean_flat
+        # Complete update from QR results (keep in latent space)
+        mean_observed = self.A @ mean + noise.mean_flat
         mean_corrected = mean - gain @ mean_observed
         cholesky_corrected = r_cor.T
         corrected = DenseNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
+
+        # Save the conditional
         cond_new = DenseLatentCond(
             gain,
             corrected,
-            to_latent=1 / self.to_observed,
-            to_observed=1 / self.to_latent,
+            to_latent=1 / self.to_observed,  # is diagonal
+            to_observed=1 / self.to_latent,  # is diagonal
         )
 
+        # Push marginals into latent space and remove offdiagonals from the Cholesky
         mean = self.to_observed * mean_observed
         cholesky = self.to_observed[:, None] * r_obs.T
-        observed = DenseNormal(mean, cholesky, self.noise.tree_flatten)
+        observed = DenseNormal(mean, cholesky, noise.tree_flatten)
         return observed, cond_new
 
     def preconditioner_apply(self, /):
@@ -85,84 +92,6 @@ class DenseLatentCond(ssm_impl_api.AbstractLatentCond):
 
 
 DenseLatentCond._register_as_pytree()
-
-
-class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCond):
-    """Dense (full-covariance) implementation of LatentCond operations."""
-
-    def apply_flat(self, x, /):
-        x = self.to_latent * x
-        mean = self.to_observed * (self.A @ x + self.noise.mean_flat)
-        cholesky = self.to_observed[:, None] * self.noise.cholesky_flat
-        return DenseNormal(mean, cholesky, self.noise.tree_flatten)
-
-    def marginalise(self, rv, /):
-        mean = self.to_latent * rv.mean_flat
-        cholesky = self.to_latent[:, None] * rv.cholesky_flat
-
-        R_stack = ((self.A @ cholesky).T, self.noise.cholesky_flat.T)
-        cholesky_new = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
-
-        mean_new = self.to_observed * (self.A @ mean + self.noise.mean_flat)
-        cholesky_new = self.to_observed[:, None] * cholesky_new
-        return DenseNormal(mean_new, cholesky_new, self.noise.tree_flatten)
-
-    def revert(self, rv, /, *, solve_triu: Callable):
-        # Pull into latent space
-        mean = self.to_latent * rv.mean_flat
-        cholesky = self.to_latent[:, None] * rv.cholesky_flat
-
-        # QR decomposition
-        R_X_F = (self.A @ cholesky).T
-        R_X = cholesky.T
-        R_YX = self.noise.cholesky_flat.T
-        r_obs, (r_cor, gain) = cholesky_util.revert_conditional(
-            R_X_F=R_X_F, R_X=R_X, R_YX=R_YX, solve_triu=solve_triu
-        )
-
-        # Complete update from QR results (keep in latent space)
-        mean_observed = self.A @ mean + self.noise.mean_flat
-        mean_corrected = mean - gain @ mean_observed
-        cholesky_corrected = r_cor.T
-
-        # Remove offdiagonals from the corrected Cholesky
-        n = len(rv.mean)
-        d = mean_corrected.size // n
-        cholesky_corrected = self._remove_offdiag(cholesky_corrected, n=n, d=d)
-        corrected = DenseNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
-
-        # Save the conditional
-        cond_new = DenseLatentCondProjected(
-            gain,
-            corrected,
-            to_latent=1 / self.to_observed,  # is diagonal
-            to_observed=1 / self.to_latent,  # is diagonal
-        )
-
-        # Push marginals into latent space and remove offdiagonals from the Cholesky
-        mean = self.to_observed * mean_observed
-        cholesky = self.to_observed[:, None] * r_obs.T
-        cholesky = self._remove_offdiag(cholesky, n=mean.size // d, d=d)
-        observed = DenseNormal(mean, cholesky, self.noise.tree_flatten)
-
-        # Return the results
-        return observed, cond_new
-
-    def merge(self, other, /):
-        raise NotImplementedError
-
-    def preconditioner_apply(self, /):
-        raise NotImplementedError
-
-    @staticmethod
-    def _remove_offdiag(cholesky, n, d):
-        cholesky_4tensor = cholesky.reshape((n, d, n, d))
-        eye = np.eye(d)
-        cholesky_removed = np.einsum("ijkl,jl->ijkl", cholesky_4tensor, eye)
-        return cholesky_removed.reshape((n * d, n * d))
-
-
-DenseLatentCondProjected._register_as_pytree()
 
 
 @structs.dataclass
@@ -205,6 +134,11 @@ class DenseNormal(ssm_impl_api.AbstractTreeNormal[DenseTreeFlatten]):
         assert mean_flat.shape == std_flat.shape
         cholesky = linalg.diagonal_matrix(std_flat)
         return cls(mean_flat, cholesky, tree_flatten)
+
+    @property
+    def batch_shape(self):
+        *shape, _n = self.mean_flat.shape
+        return shape
 
     @property
     def mean(self):
@@ -391,76 +325,12 @@ class DenseOdeTs1(ssm_impl_api.AbstractOde):
         linop = E1 - J
 
         # Flatten fx into the correct pytree structure
-        f0 = DenseNormal.from_dirac([m_tree[self.ode.num_tcoeffs_in_args]], damp=0.0)
+        f0 = DenseNormal.from_dirac([m_tree[self.ode.num_tcoeffs_in_args]], damp=damp)
         fx = f0.tree_flatten.unflatten_array(fx)
 
         # Collect all quantities and return
         noise = DenseNormal.from_dirac(fx, damp=damp)
         cond = DenseLatentCond.from_linop_and_noise(linop, noise)
-        return cond, state
-
-
-class DenseOdeTs1Projected(ssm_impl_api.AbstractOde):
-    """Dense ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
-
-    def init_linearization(self):
-        return self.ode.jacobian.init_jacobian_handler()
-
-    def linearize(self, rv, state, *, damp: float, t: float):
-        # Read n and d so that we can turn latent arrays into
-        # (n, d) arrays, which Jacobians require
-        m_tree = rv.mean
-        n = len(m_tree)
-        d = rv.mean_flat.size // n
-
-        # Rewrite the vector field as one that maps
-        # Arrays to arrays.
-        # Maps (n, d) to (1, d) to conform the Jacobian API
-        def fun(s: Array) -> Array:
-            # Move to latent space
-            s = np.reshape(s, (-1,))
-
-            # Extract all tcoeffs
-            jet_coords = rv.tree_flatten.unflatten_array(s)
-
-            # Extract relevant tcoeffs ("jet-coordinates")
-            jet_coords = jet_coords[: self.ode.num_tcoeffs_in_args]
-
-            # Evaluate the actual vector field
-            fs0 = self.ode.vector_field(jet_coords=jet_coords, t=t)
-
-            # Bring back into (m, d) form.
-            return tree.ravel_pytree(fs0)[0][None, :]
-
-        # Materialize the Jacobian
-        m0 = rv.mean_flat.reshape((n, d))
-        fx, J, state = self.ode.jacobian.materialize_dense(fun, m0, state)
-
-        # Flatten fx and J correctly (from [m, d, n, d] to [md,nd])
-        m, d = fx.shape
-        fx = fx.reshape((m * d,))
-        J = J.reshape((m * d, -1))
-
-        # Bulletproof construction of selection operators via jacobian(slicing)
-        # instead of instantiating identity matrices and selecting rows
-
-        @func.jacfwd
-        def projection_e1(s):
-            s_tree = rv.tree_flatten.unflatten_array(s)
-            return tree.ravel_pytree(s_tree[self.ode.num_tcoeffs_in_args])[0]
-
-        # Complete the expressions for bias and linop
-        fx = J @ rv.mean_flat - fx
-        E1 = projection_e1(rv.mean_flat)
-        linop = E1 - J
-
-        # Flatten fx into the correct pytree structure
-        f0 = DenseNormal.from_dirac([m_tree[self.ode.num_tcoeffs_in_args]], damp=0.0)
-        fx = f0.tree_flatten.unflatten_array(fx)
-
-        # Collect all quantities and return
-        noise = DenseNormal.from_dirac(fx, damp=damp)
-        cond = DenseLatentCondProjected.from_linop_and_noise(linop, noise)
         return cond, state
 
 
@@ -536,81 +406,6 @@ class DenseResidual(ssm_impl_api.AbstractResidual):
         noise = DenseNormal.from_dirac([fx], damp=damp)
 
         cond = DenseLatentCond.from_linop_and_noise(J, noise)
-        return cond, state
-
-
-class DenseResidualProjected(ssm_impl_api.AbstractResidual):
-    """Construct a dense implementation of residual-TS1 linearization."""
-
-    def __init__(self, residual, *, taylor_point) -> None:
-        super().__init__(residual)
-        self.taylor_point = taylor_point
-
-    def init_linearization(self):
-        return self.residual.jacobian.init_jacobian_handler()
-
-    def constraint_flat(self, *, tree_flatten) -> Callable:
-        """Evaluate a flattened version of the residual constraint."""
-
-        def fun(m: Array, *, t):
-            # Unravel the location and extract derivatives
-            m_tree = tree_flatten.unflatten_array(m)
-            relevant_tcoeffs = m_tree[: self.residual.num_tcoeffs_in_args]
-
-            # Evaluate the residual
-            residual_eval = self.residual.residual_function(
-                jet_coords=relevant_tcoeffs, t=t
-            )
-
-            # Flatten the output so that the Jacobians are matrices, not Pytrees.
-            return tree.ravel_pytree(residual_eval)[0]
-
-        return fun
-
-    def linearize(self, rv, state, *, damp: float, t):
-
-        # Fix all arguments except the Array ones
-        constraint_flat = self.constraint_flat(tree_flatten=rv.tree_flatten)
-
-        # Get the linearization point (i.e., prior or posterior linearisation)
-        xi = self.taylor_point(constraint_flat, rv, t=t)
-
-        # Read n and d so that we can turn latent arrays into
-        # (n, d) arrays, which Jacobians require
-        m_tree = rv.mean
-        n = len(m_tree)
-        d = rv.mean_flat.size // n
-
-        # Rewrite the constraint as one that maps 2d arrays to 2d arrays.
-        # Here, write the fun as (d, 1) to (d', 1) because the Jacobian
-        # logic requires 2d to 2d arrays. Since we materialize the full
-        # Jacobian, everything is still fine.
-        def fun(s: Array) -> Array:
-            # Move from (n, d) shape into latent space: (-1,) shape
-            s = np.reshape(s, (-1,))
-
-            # Evaluate the actual constraint
-            fs0 = constraint_flat(s, t=t)
-            # Bring back into (m, d) form.
-            return fs0[:, None]
-
-        # Evaluate the linearization
-        xi_2d = xi.reshape((-1, 1))
-        fx, J, state = self.residual.jacobian.materialize_dense(fun, xi_2d, state)
-        m, d = fx.shape
-        fx = fx.reshape((m * d,))
-        J = J.reshape((m * d, -1))
-        fx = fx - J @ xi
-
-        if J.shape[0] > J.shape[1]:
-            msg = f"There are more constraints ({J.shape[0]}) than variables ({J.shape[1]})."
-            msg += " This will likely cause an error in the conditioning."
-            warnings.warn(msg, stacklevel=1)
-
-        # Turn the linearization into a conditional
-        noise = DenseNormal.from_dirac([fx], damp=damp)
-
-        cond = DenseLatentCondProjected.from_linop_and_noise(J, noise)
         return cond, state
 
 
@@ -994,13 +789,6 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
             raise TypeError(ode)
         return DenseOdeTs1(ode=ode)
 
-    def constraint_ode_ts1_projected(
-        self, ode: problems.JetOde, /
-    ) -> DenseOdeTs1Projected:
-        if not isinstance(ode, problems.JetOde):
-            raise TypeError(ode)
-        return DenseOdeTs1Projected(ode=ode)
-
     def constraint_residual(
         self,
         residual: problems.JetResidual,
@@ -1012,15 +800,3 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         if taylor_point is None:
             taylor_point = taylor_points.taylor_point_prior()
         return DenseResidual(residual, taylor_point=taylor_point)
-
-    def constraint_residual_projected(
-        self,
-        residual: problems.JetResidual,
-        *,
-        taylor_point: taylor_points.TaylorPoint | None = None,
-    ) -> DenseResidualProjected:
-        if not isinstance(residual, problems.JetResidual):
-            raise TypeError(residual)
-        if taylor_point is None:
-            taylor_point = taylor_points.taylor_point_prior()
-        return DenseResidualProjected(residual, taylor_point=taylor_point)

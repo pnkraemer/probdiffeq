@@ -1,6 +1,6 @@
 from probdiffeq._probdiffeq import problems, ssm_impl_api, taylor_points, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
-from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar
+from probdiffeq.backend.typing import Any, Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
 
 __all__ = ["state_space_model_blockdiag"]
@@ -113,6 +113,50 @@ class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
 BlockDiagLatentCond._register_as_pytree()
 
 
+class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
+    """Dense (full-covariance) implementation of LatentCond operations."""
+
+    def apply_flat(self, x, /):
+        from probdiffeq._probdiffeq import ssm_impl_dense
+
+        noise = self.noise.to_dense_normal()
+        dense_cond = ssm_impl_dense.DenseLatentCond.from_linop_and_noise(self.A, noise)
+
+        d, n = x.shape
+        x_dense = x.T.reshape((d * n,))
+        x_new = dense_cond.apply_flat(x_dense)
+        return BlockDiagNormal.from_dense_via_truncation(x_new)
+
+    def marginalise(self, rv, /):
+        raise NotImplementedError
+
+    def revert(self, rv, /, *, solve_triu: Callable):
+
+        from probdiffeq._probdiffeq import ssm_impl_dense
+
+        noise = self.noise.to_dense_normal()
+        rv = rv.to_dense_normal()
+
+        dense_cond = ssm_impl_dense.DenseLatentCond.from_linop_and_noise(self.A, noise)
+
+        observed, cond_new = dense_cond.revert(rv, solve_triu=solve_triu)
+
+        observed = BlockDiagNormal.from_dense_via_truncation(observed)
+
+        noise = BlockDiagNormal.from_dense_via_truncation(cond_new.noise)
+        cond = BlockDiagLatentCondProjected.from_linop_and_noise(cond_new.A, noise)
+        return observed, cond
+
+    def merge(self, other, /):
+        raise NotImplementedError
+
+    def preconditioner_apply(self, /):
+        raise NotImplementedError
+
+
+BlockDiagLatentCondProjected._register_as_pytree()
+
+
 def _transpose(matrix):
     return np.transpose(matrix, axes=(0, 2, 1))
 
@@ -150,7 +194,7 @@ class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
 
         # Understand flattening and unflattening for
         # single Taylor coefficients
-        rv0 = BlockDiagNormal.from_dirac([rv.mean[0]], damp=0.0)
+        rv0 = BlockDiagNormal.from_dirac([rv.mean[0]], damp=damp)
 
         def a1(s):
             return s[[self.ode.num_tcoeffs_in_args], ...]
@@ -183,6 +227,73 @@ class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
         fx = rv0.tree_flatten.unflatten_array(fx)
         bias = BlockDiagNormal.from_dirac([fx], damp=damp)
         cond = BlockDiagLatentCond.from_linop_and_noise(linop, bias)
+        return cond, state
+
+
+class BlockDiagOdeTs1Projected(ssm_impl_api.AbstractOde):
+    """Dense ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
+
+    def init_linearization(self):
+        return self.ode.jacobian.init_jacobian_handler()
+
+    def linearize(self, rv, state, *, damp: float, t: float):
+        # Read n and d so that we can turn latent arrays into
+        # (n, d) arrays, which Jacobians require
+        m_tree = rv.mean
+        n = len(m_tree)
+        d = rv.mean_flat.size // n
+
+        # Rewrite the vector field as one that maps
+        # Arrays to arrays.
+        # Maps (n, d) to (1, d) to conform the Jacobian API
+        def fun(s: Array) -> Array:
+            # Move to latent space
+            s = s.T
+
+            # Extract all tcoeffs
+            jet_coords = rv.tree_flatten.unflatten_array(s)
+
+            # Extract relevant tcoeffs ("jet-coordinates")
+            jet_coords = jet_coords[: self.ode.num_tcoeffs_in_args]
+
+            # Evaluate the actual vector field
+            fs0 = self.ode.vector_field(jet_coords=jet_coords, t=t)
+
+            # Bring back into (m, d) form.
+            return tree.ravel_pytree(fs0)[0][None, :]
+
+        # Materialize the Jacobian
+        m0 = rv.mean_flat.T
+        fx, J, state = self.ode.jacobian.materialize_dense(fun, m0, state)
+
+        # Flatten fx and J correctly (from [m, d, n, d] to [md,nd])
+        m, d = fx.shape
+        fx = fx.reshape((m * d,))
+
+        # Bulletproof construction of selection operators via jacobian(slicing)
+        # instead of instantiating identity matrices and selecting rows
+
+        @func.jacfwd
+        def projection_e1(s):
+            idx = np.asarray([self.ode.num_tcoeffs_in_args])
+            return s[idx]
+
+        # Complete the expressions for bias and linop
+
+        fx = linalg.einsum("ijkl,kl->ij", J, rv.mean_flat.T) - fx
+        E1 = projection_e1(rv.mean_flat.T)
+        linop = E1 - J
+
+        # Flatten fx into the correct pytree structure
+        f0 = BlockDiagNormal.from_dirac(
+            [m_tree[self.ode.num_tcoeffs_in_args]], damp=damp
+        )
+        fx = f0.tree_flatten.unflatten_array(fx.T)
+
+        # Collect all quantities and return
+        noise = BlockDiagNormal.from_dirac(fx, damp=damp)
+        linop = linop.reshape((m * d, -1))
+        cond = BlockDiagLatentCondProjected.from_linop_and_noise(linop, noise)
         return cond, state
 
 
@@ -254,6 +365,42 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
         cholesky = linalg.diagonal_matrix(d)
         cholesky_flat = scale_flat[..., None] * cholesky[None, ...]
         return cls(loc_flat, cholesky_flat, tree_flatten)
+
+    @classmethod
+    def from_dense_via_truncation(cls, rv):
+
+        n = len(rv.mean)
+        d = rv.mean_flat.size // n
+        cholesky = BlockDiagNormal._remove_offdiag(rv.cholesky_flat, n=n, d=d)
+        mean = rv.mean_flat.reshape((n, d)).T
+
+        tree_flatten = BlockDiagNormal.from_dirac(rv.mean, damp=0.0).tree_flatten
+        return cls(mean, cholesky, tree_flatten)
+
+    @staticmethod
+    def _remove_offdiag(cholesky, n, d):
+        cholesky_4tensor = cholesky.reshape((n, d, n, d))
+        cholesky_removed = np.einsum("ijkl,jl->ijkl", cholesky_4tensor, np.eye(d))
+        return np.einsum("ndmd->dnm", cholesky_removed)
+
+    def to_dense_normal(self):
+        # TODO: ensure we have the same ordering of D's vs N's
+        mean = self.mean_flat.T.reshape((-1,))
+        d, n = self.mean_flat.shape
+
+        cholesky = np.einsum("dnm,dt->ndmt", self.cholesky_flat, np.eye(d))
+        cholesky = cholesky.reshape((d * n, d * n))
+
+        from probdiffeq._probdiffeq import ssm_impl_dense
+
+        _, unravel = tree.ravel_pytree(self.mean)
+        tree_flatten = ssm_impl_dense.DenseTreeFlatten(unravel)
+        return ssm_impl_dense.DenseNormal(mean, cholesky, tree_flatten)
+
+    @property
+    def batch_shape(self):
+        *shape, _d, _n = self.mean_flat.shape
+        return shape
 
     @property
     def mean(self):
@@ -579,6 +726,14 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
         if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
         return BlockDiagOdeTs1(ode=ode)
+
+    def constraint_ode_ts1_projected(
+        self, ode: problems.JetOde, /
+    ) -> BlockDiagOdeTs1Projected:
+        if not isinstance(ode, problems.JetOde):
+            raise TypeError(ode)
+
+        return BlockDiagOdeTs1Projected(ode=ode)
 
     def constraint_residual(
         self,

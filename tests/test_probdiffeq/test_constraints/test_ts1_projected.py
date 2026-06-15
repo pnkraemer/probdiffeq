@@ -15,7 +15,7 @@ def test_residual_matches_ts1():
     save_at = np.linspace(t0, t1, num=100, endpoint=True)
 
     # Build the rest of the solver (projected)
-    ssm = probdiffeq.state_space_model_dense()
+    ssm = probdiffeq.state_space_model_blockdiag()
     prior = ssm.prior_wiener_integrated(tcoeffs)
     ode_ts1_projected = ssm.constraint_ode_ts1_projected(vf)
     solver = probdiffeq.solver(strategy=strategy, constraint=ode_ts1_projected)
@@ -24,9 +24,9 @@ def test_residual_matches_ts1():
     solution_projected = solve(prior, save_at=save_at, atol=1e-4, rtol=1e-4)
 
     # Build the rest of the solver (dense reference)
-    ssm = probdiffeq.state_space_model_dense()
-    prior = ssm.prior_wiener_integrated(tcoeffs)
-    ode_ts1_reference = ssm.constraint_ode_ts1(vf)
+    ssm_dense = probdiffeq.state_space_model_dense()
+    prior = ssm_dense.prior_wiener_integrated(tcoeffs)
+    ode_ts1_reference = ssm_dense.constraint_ode_ts1(vf)
     solver = probdiffeq.solver(strategy=strategy, constraint=ode_ts1_reference)
     error = probdiffeq.error_state_std(constraint=ode_ts1_reference)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
