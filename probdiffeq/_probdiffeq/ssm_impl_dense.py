@@ -1030,7 +1030,7 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         residual: problems.JetResidual,
         *,
         taylor_point: taylor_points.TaylorPoint | None = None,
-    ) -> DenseResidual:
+    ) -> DenseResidualProjected:
         if not isinstance(residual, problems.JetResidual):
             raise TypeError(residual)
         if taylor_point is None:
