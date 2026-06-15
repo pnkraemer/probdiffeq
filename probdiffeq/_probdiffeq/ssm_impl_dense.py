@@ -91,7 +91,6 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCond):
     """Dense (full-covariance) implementation of LatentCond operations."""
 
     def apply_flat(self, x, /):
-        raise RuntimeError
         x = self.to_latent * x
         mean = self.to_observed * (self.A @ x + self.noise.mean_flat)
         cholesky = self.to_observed[:, None] * self.noise.cholesky_flat
@@ -108,70 +107,59 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         cholesky_new = self.to_observed[:, None] * cholesky_new
         return DenseNormal(mean_new, cholesky_new, self.noise.tree_flatten)
 
-    def merge(self, other: "DenseLatentCond", /) -> "DenseLatentCond":
-        raise RuntimeError
-        # self = cond1 (outer), other = cond2 (inner)
-        T = self.to_latent * other.to_observed
-
-        g = self.A @ (T[:, None] * other.A)
-        xi = self.A @ (T * other.noise.mean_flat) + self.noise.mean_flat
-
-        R1 = (self.A @ (T[:, None] * other.noise.cholesky_flat)).T
-        R2 = self.noise.cholesky_flat.T
-        Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
-
-        noise = DenseNormal(xi, Xi.T, self.noise.tree_flatten)
-        return DenseLatentCond(
-            g, noise, to_latent=other.to_latent, to_observed=self.to_observed
-        )
-
-    def revert(self, rv: "DenseNormal", /, *, solve_triu: Callable):
+    def revert(self, rv, /, *, solve_triu: Callable):
+        # Pull into latent space
         mean = self.to_latent * rv.mean_flat
         cholesky = self.to_latent[:, None] * rv.cholesky_flat
 
+        # QR decomposition
         R_X_F = (self.A @ cholesky).T
         R_X = cholesky.T
         R_YX = self.noise.cholesky_flat.T
-        tmp = cholesky_util.revert_conditional(
+        r_obs, (r_cor, gain) = cholesky_util.revert_conditional(
             R_X_F=R_X_F, R_X=R_X, R_YX=R_YX, solve_triu=solve_triu
         )
-        r_obs, (r_cor, gain) = tmp
 
+        # Complete update from QR results (keep in latent space)
         mean_observed = self.A @ mean + self.noise.mean_flat
         mean_corrected = mean - gain @ mean_observed
         cholesky_corrected = r_cor.T
 
+        # Remove offdiagonals from the corrected Cholesky
         n = len(rv.mean)
         d = mean_corrected.size // n
-        cholesky_corrected = _remove_offdiag(cholesky_corrected, n=n, d=d)
+        cholesky_corrected = self._remove_offdiag(cholesky_corrected, n=n, d=d)
         corrected = DenseNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
-        cond_new = DenseLatentCond(
+
+        # Save the conditional
+        cond_new = DenseLatentCondProjected(
             gain,
             corrected,
-            to_latent=1 / self.to_observed,
-            to_observed=1 / self.to_latent,
+            to_latent=1 / self.to_observed,  # is diagonal
+            to_observed=1 / self.to_latent,  # is diagonal
         )
 
+        # Push marginals into latent space and remove offdiagonals from the Cholesky
         mean = self.to_observed * mean_observed
         cholesky = self.to_observed[:, None] * r_obs.T
-        cholesky = _remove_offdiag(cholesky, n=mean.size // d, d=d)
+        cholesky = self._remove_offdiag(cholesky, n=mean.size // d, d=d)
         observed = DenseNormal(mean, cholesky, self.noise.tree_flatten)
+
+        # Return the results
         return observed, cond_new
 
+    def merge(self, other, /):
+        raise NotImplementedError
+
     def preconditioner_apply(self, /):
-        raise RuntimeError
-        A = self.to_observed[:, None] * self.A * self.to_latent[None, :]
-        mean = self.to_observed * self.noise.mean_flat
-        cholesky = self.to_observed[:, None] * self.noise.cholesky_flat
-        noise = DenseNormal(mean, cholesky, self.noise.tree_flatten)
-        return DenseLatentCond.from_linop_and_noise(A, noise)
+        raise NotImplementedError
 
-
-def _remove_offdiag(cholesky, n, d):
-    cholesky_4tensor = cholesky.reshape((n, d, n, d))
-    eye = np.eye(d)
-    cholesky_removed = np.einsum("ijkl,jl->ijkl", cholesky_4tensor, eye)
-    return cholesky_removed.reshape((n * d, n * d))
+    @staticmethod
+    def _remove_offdiag(cholesky, n, d):
+        cholesky_4tensor = cholesky.reshape((n, d, n, d))
+        eye = np.eye(d)
+        cholesky_removed = np.einsum("ijkl,jl->ijkl", cholesky_4tensor, eye)
+        return cholesky_removed.reshape((n * d, n * d))
 
 
 DenseLatentCondProjected._register_as_pytree()
