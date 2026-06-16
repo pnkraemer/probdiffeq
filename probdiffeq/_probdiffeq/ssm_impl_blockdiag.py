@@ -194,6 +194,7 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
 
         msg = "Next up: slowly replace calling the dense transitions "
         msg += "with manual truncation via trace estimation."
+        msg += " (Start here, which should be quite easy. Use it as practice for handling revert().)"
         msg += " Then, consider how we can reuse trace estimators between Jacobians and this one here."
         msg += " (do Jacobians implement linear operators? Merge the two classes?)"
         msg += " Then, update the remaining tests (there is much code that doesnt use the linops quite yet)."
