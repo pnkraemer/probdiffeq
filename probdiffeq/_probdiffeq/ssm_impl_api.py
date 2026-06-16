@@ -45,11 +45,28 @@ class AbstractLinOp:
         return msg
 
     @classmethod
-    def from_matrix_ndnd(cls, matrix):
+    def from_matrix_ndnd(cls, matrix, /):
+        raise NotImplementedError
+
+    @classmethod
+    def from_matrix_dnn(cls, matrix, /):
+        raise NotImplementedError
+
+    @classmethod
+    def from_matrix_flat(cls, matrix, /):
+        raise NotImplementedError
+
+    def matvec_ndnd(self, x, /):
+        raise NotImplementedError
+
+    def matvec_dnn(self, x, /):
+        raise NotImplementedError
+
+    def matvec_flat(self, x, /):
         raise NotImplementedError
 
     @property
-    def precon_prototype(self):
+    def precon_prototype(self):  # return ones (todo: rename?)
         raise NotImplementedError
 
 
@@ -62,6 +79,9 @@ class AbstractLatentCond:
     def __init__(self, A, noise, to_latent, to_observed) -> None:
 
         # TODO: assert that A is a linear operator, not an array
+        if not isinstance(A, AbstractLinOp):
+            msg = f"Linear operator expected, but {A} received."
+            raise TypeError(msg)
 
         self.A = A
         self.noise = noise

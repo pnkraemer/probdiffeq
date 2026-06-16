@@ -14,17 +14,23 @@ For example, this variable is used to type Taylor coefficients.
 
 
 class BlockDiagLinOp(ssm_impl_api.AbstractLinOp):
-    def __init__(self, matvec_ndnd, *, n_in, n_out, d_in, d_out):
+    def __init__(self, *, data_ndnd, n_in, n_out, d_in, d_out):
         super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
-        self.matvec_ndnd = matvec_ndnd
+        self.data_ndnd = data_ndnd
+
+    def matvec_ndnd(self, vec, /):
+        return linalg.einsum("...ijkl,...kl->...ij", self.data_ndnd, vec)
 
     @classmethod
     def from_matrix_ndnd(cls, matrix):
-        def matvec_ndnd(vec):
-            return linalg.einsum("...ijkl,...kl->...ij", matrix, vec)
-
         *_batch, n_out, d_out, n_in, d_in = matrix.shape
-        return cls(matvec_ndnd, n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
+        return cls(data_ndnd=matrix, n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
+
+    @classmethod
+    def from_matrix_dnn(cls, matrix):
+        *_batch, d, _n_out, _n_in = matrix.shape
+        matrix_ndnd = np.einsum("dnm,dt->ndmt", matrix, np.eye(d))
+        return cls.from_matrix_ndnd(matrix_ndnd)
 
     @property
     def precon_prototype(self):
@@ -42,11 +48,33 @@ class BlockDiagLinOp(ssm_impl_api.AbstractLinOp):
         matrix_ndnd = linop.materialize_ndnd()
         return cls.from_matrix_ndnd(matrix_ndnd)
 
+    @classmethod
+    def _register_as_pytree(cls) -> None:
+        """Register this class (or a subclass) as a JAX pytree."""
+
+        def flatten(linop):
+            children = (linop.data_ndnd,)
+            aux = linop.n_in, linop.n_out, linop.d_in, linop.d_out
+            return children, aux
+
+        def unflatten(aux, children):
+            n_in, n_out, d_in, d_out = aux
+            (data_ndnd,) = children
+            return cls(
+                data_ndnd=data_ndnd, n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out
+            )
+
+        tree.register_pytree_node(cls, flatten, unflatten)
+
+
+BlockDiagLinOp._register_as_pytree()
+
 
 class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
     """Block-diagonal implementation of LatentCond operations."""
 
     def apply_flat(self, x, /):
+        # This approach requires that the LinOp batches correctly.
         def apply_unbatch(s, c):
             s = c.to_latent * s
             m_new = c.to_observed * (c.A @ s + c.noise.mean_flat)
@@ -57,6 +85,9 @@ class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
 
     def marginalise(self, rv, /):
         matrix, noise = self.A, self.noise
+        # TODO: give the linop multiple matvecs -> ndnd, dnn, and flat?
+        #   then, handle all matvecs via interfaces and only store the data
+        #   (and fix tests -> will end up at this matrix.ndim==3 eventually)
         assert matrix.ndim == 3
         mean = self.to_latent * rv.mean_flat
         cholesky = self.to_latent[:, :, None] * rv.cholesky_flat
@@ -596,9 +627,10 @@ class BlockDiagWienerIntegrated(ssm_impl_api.AbstractPrior):
         noise = BlockDiagNormal(mean, cholesky, self.tree_flatten)
 
         A_batch = np.ones((d, 1, 1)) * self.a[None, :, :]
+        A = BlockDiagLinOp.from_matrix_dnn(A_batch)
         p = np.ones((d, 1)) * p[None, :]
         p_inv = np.ones((d, 1)) * p_inv[None, :]
-        return BlockDiagLatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
+        return BlockDiagLatentCond(A, noise, to_latent=p_inv, to_observed=p)
 
     @staticmethod
     def register_pytree():

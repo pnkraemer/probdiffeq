@@ -13,10 +13,9 @@ For example, this variable is used to type Taylor coefficients.
 
 
 class DenseLinOp(ssm_impl_api.AbstractLinOp):
-    def __init__(self, matvec_flat, *, n_in, n_out, d_in, d_out):
+    def __init__(self, *, data_ndnd, n_in, n_out, d_in, d_out):
         super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
-
-        self.matvec_flat = matvec_flat
+        self.data_ndnd = data_ndnd
 
     @classmethod
     def from_matrix_ndnd(cls, matrix):
