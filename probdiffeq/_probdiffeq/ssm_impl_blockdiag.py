@@ -192,6 +192,12 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
     def apply_flat(self, x, /):
         from probdiffeq._probdiffeq import ssm_impl_dense
 
+        msg = "Next up: slowly replace calling the dense transitions "
+        msg += "with manual truncation via trace estimation."
+        msg += " Then, consider how we can reuse trace estimators between Jacobians and this one here."
+        msg += " (do Jacobians implement linear operators? Merge the two classes?)"
+        msg += " Then, update the remaining tests (there is much code that doesnt use the linops quite yet)."
+        raise RuntimeError(msg)
         noise = self.noise.to_dense_normal()
         A = self.A.to_dense_linop()
         dense_cond = ssm_impl_dense.DenseLatentCond.from_linop_and_noise(A, noise)
