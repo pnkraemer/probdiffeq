@@ -1,5 +1,5 @@
 from probdiffeq._probdiffeq import jacobians, problems
-from probdiffeq.backend import abc, func, np, tree
+from probdiffeq.backend import abc, func, tree
 from probdiffeq.backend.typing import (
     TYPE_CHECKING,
     Array,
@@ -32,13 +32,37 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class AbstractLatentCondMaterialized:
+class AbstractLinOp:
+    def __init__(self, *, n_in, n_out, d_in, d_out):
+        self.n_in = n_in
+        self.n_out = n_out
+        self.d_in = d_in
+        self.d_out = d_out
+
+    def __repr__(self) -> str:
+        msg = f"{self.__class__.__name__}(n_out={self.n_out}, d_out={self.d_out}"
+        msg += f", n_in={self.n_in}, d_in={self.d_in})"
+        return msg
+
+    @classmethod
+    def from_matrix_ndnd(cls, matrix):
+        raise NotImplementedError
+
+    @property
+    def precon_prototype(self):
+        raise NotImplementedError
+
+
+class AbstractLatentCond:
     """Conditional distributions in latent space.
 
     Subclasses implement the SSM-specific operations (marginalise, revert, etc.).
     """
 
     def __init__(self, A, noise, to_latent, to_observed) -> None:
+
+        # TODO: assert that A is a linear operator, not an array
+
         self.A = A
         self.noise = noise
         self.to_latent = to_latent
@@ -64,15 +88,15 @@ class AbstractLatentCondMaterialized:
         tree.register_pytree_node(cls, flatten, unflatten)
 
     @classmethod
-    def from_linop_and_noise(cls, A, noise):
+    def from_linop_and_noise(cls, A: AbstractLinOp, noise):
         """Construct a latent conditional with unit en- and decoders."""
-        # Hack for blockdiagonal models (and possibly dense evaluations)
         if len(noise.batch_shape) > 0:
             return func.vmap(cls.from_linop_and_noise)(A, noise)
 
-        d_out, d_in = A.shape
-        to_latent, to_observed = np.ones((d_in,)), np.ones((d_out,))
+        if not isinstance(A, AbstractLinOp):
+            raise TypeError(A)
 
+        to_latent, to_observed = A.precon_prototype
         return cls(A, noise=noise, to_latent=to_latent, to_observed=to_observed)
 
     def rescale_noise(self, factor, /):
@@ -132,7 +156,7 @@ class AbstractLatentCondMaterialized:
         return mahalanobis, updated
 
 
-AbstractLatentCondMaterialized._register_as_pytree()
+AbstractLatentCond._register_as_pytree()
 
 
 class AbstractLinearization(abc.ABC):
@@ -274,7 +298,7 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def identity_conditional(self) -> AbstractLatentCondMaterialized:
+    def identity_conditional(self) -> AbstractLatentCond:
         """Return the identity transition compatible with this distribution."""
         raise NotImplementedError
 
@@ -284,7 +308,7 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def to_derivative(self, i, std) -> AbstractLatentCondMaterialized:
+    def to_derivative(self, i, std) -> AbstractLatentCond:
         """Construct an observation model that extracts the i-th Taylor coefficient."""
         raise NotImplementedError
 
@@ -298,9 +322,7 @@ class AbstractPrior(abc.ABC):
         return f"{self.__class__.__name__}(init={self.init}, output_scale={self.output_scale})"
 
     @abc.abstractmethod
-    def transition(
-        self, *, dt: float, output_scale: Array
-    ) -> AbstractLatentCondMaterialized:
+    def transition(self, *, dt: float, output_scale: Array) -> AbstractLatentCond:
         """Discretize the prior at a time step."""
         raise NotImplementedError
 

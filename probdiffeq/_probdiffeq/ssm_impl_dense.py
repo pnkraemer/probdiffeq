@@ -12,12 +12,40 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class DenseLatentCondMaterialized(ssm_impl_api.AbstractLatentCondMaterialized):
-    """Dense (full-covariance) implementation of LatentCondMaterialized operations."""
+class DenseLinOp(ssm_impl_api.AbstractLinOp):
+    def __init__(self, matvec_flat, *, n_in, n_out, d_in, d_out):
+        super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
+
+        self.matvec_flat = matvec_flat
+
+    @classmethod
+    def from_matrix_ndnd(cls, matrix):
+        *_batch, n_out, d_out, n_in, d_in = matrix.shape
+
+        def matvec_flat(vec):
+            vec_nd = vec.reshape((n_in, d_in))
+            vec_nd = linalg.einsum("...ijkl,...kl->...ij", matrix, vec_nd)
+            return vec_nd.reshape((n_out * d_out,))
+
+        return cls(matvec_flat, n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
+
+    @property
+    def precon_prototype(self):
+        return np.ones((self.d_in * self.n_in,)), np.ones((self.d_out * self.n_out,))
+
+    def materialize_ndnd(self):
+        dummy = np.ones((self.d_in * self.n_in,))
+        A_flat = func.jacfwd(self.matvec_flat)(dummy)
+        return A_flat.reshape((self.n_out, self.d_out, self.n_in, self.d_in))
+
+
+class DenseLatentCond(ssm_impl_api.AbstractLatentCond):
+    """Dense (full-covariance) implementation of LatentCond operations."""
 
     def apply_flat(self, x, /):
         x = self.to_latent * x
-        mean = self.to_observed * (self.A @ x + self.noise.mean_flat)
+        Ax = self.A.matvec_flat(x)
+        mean = self.to_observed * (Ax + self.noise.mean_flat)
         cholesky = self.to_observed[:, None] * self.noise.cholesky_flat
         return DenseNormal(mean, cholesky, self.noise.tree_flatten)
 
@@ -32,9 +60,7 @@ class DenseLatentCondMaterialized(ssm_impl_api.AbstractLatentCondMaterialized):
         cholesky_new = self.to_observed[:, None] * cholesky_new
         return DenseNormal(mean_new, cholesky_new, self.noise.tree_flatten)
 
-    def merge(
-        self, other: "DenseLatentCondMaterialized", /
-    ) -> "DenseLatentCondMaterialized":
+    def merge(self, other: "DenseLatentCond", /) -> "DenseLatentCond":
         # self = cond1 (outer), other = cond2 (inner)
         T = self.to_latent * other.to_observed
 
@@ -46,7 +72,7 @@ class DenseLatentCondMaterialized(ssm_impl_api.AbstractLatentCondMaterialized):
         Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
 
         noise = DenseNormal(xi, Xi.T, self.noise.tree_flatten)
-        return DenseLatentCondMaterialized(
+        return DenseLatentCond(
             g, noise, to_latent=other.to_latent, to_observed=self.to_observed
         )
 
@@ -58,7 +84,8 @@ class DenseLatentCondMaterialized(ssm_impl_api.AbstractLatentCondMaterialized):
         cholesky = self.to_latent[:, None] * rv.cholesky_flat
 
         # QR decomposition
-        R_X_F = (self.A @ cholesky).T
+        matmat = func.vmap(self.A.matvec_flat, in_axes=-1, out_axes=-1)
+        R_X_F = matmat(cholesky).T
         R_X = cholesky.T
         R_YX = noise.cholesky_flat.T
         r_obs, (r_cor, gain) = cholesky_util.revert_conditional(
@@ -66,14 +93,15 @@ class DenseLatentCondMaterialized(ssm_impl_api.AbstractLatentCondMaterialized):
         )
 
         # Complete update from QR results (keep in latent space)
-        mean_observed = self.A @ mean + noise.mean_flat
+        mean_observed = self.A.matvec_flat(mean) + noise.mean_flat
         mean_corrected = mean - gain @ mean_observed
         cholesky_corrected = r_cor.T
         corrected = DenseNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
 
         # Save the conditional
-        cond_new = DenseLatentCondMaterialized(
-            gain,
+        gain_ndnd = gain.reshape((self.A.n_in, self.A.d_in, self.A.n_out, self.A.d_out))
+        cond_new = DenseLatentCond(
+            DenseLinOp.from_matrix_ndnd(gain_ndnd),
             corrected,
             to_latent=1 / self.to_observed,  # is diagonal
             to_observed=1 / self.to_latent,  # is diagonal
@@ -90,10 +118,10 @@ class DenseLatentCondMaterialized(ssm_impl_api.AbstractLatentCondMaterialized):
         mean = self.to_observed * self.noise.mean_flat
         cholesky = self.to_observed[:, None] * self.noise.cholesky_flat
         noise = DenseNormal(mean, cholesky, self.noise.tree_flatten)
-        return DenseLatentCondMaterialized.from_linop_and_noise(A, noise)
+        return DenseLatentCond.from_linop_and_noise(A, noise)
 
 
-DenseLatentCondMaterialized._register_as_pytree()
+DenseLatentCond._register_as_pytree()
 
 
 @structs.dataclass
@@ -207,11 +235,11 @@ class DenseNormal(ssm_impl_api.AbstractTreeNormal[DenseTreeFlatten]):
         base = random.normal(key, shape=self.mean_flat.shape)
         return self.mean_flat + self.cholesky_flat @ base
 
-    def identity_conditional(self) -> DenseLatentCondMaterialized:
+    def identity_conditional(self) -> DenseLatentCond:
         (n,) = self.mean_flat.shape
         A = np.eye(n)
         noise = DenseNormal(np.zeros((n,)), np.zeros((n, n)), self.tree_flatten)
-        return DenseLatentCondMaterialized.from_linop_and_noise(A, noise)
+        return DenseLatentCond.from_linop_and_noise(A, noise)
 
     # TODO: move prototype_output_scale_calibrated to the prior?
     def prototype_output_scale_calibrated(self):
@@ -228,7 +256,7 @@ class DenseNormal(ssm_impl_api.AbstractTreeNormal[DenseTreeFlatten]):
 
         data_like = all_unravel(x)[0]
         noise = DenseNormal.from_mean_and_std([data_like], [std])
-        return DenseLatentCondMaterialized.from_linop_and_noise(linop, noise)
+        return DenseLatentCond.from_linop_and_noise(linop, noise)
 
     @staticmethod
     def register_pytree_node() -> None:
@@ -268,7 +296,7 @@ class DenseOdeTs0(ssm_impl_api.AbstractOde):
         fx = tree.tree_map(lambda s: -s, [fm])
         linop = func.jacrev(derivative_selector)(rv.mean_flat)
         noise = DenseNormal.from_dirac(fx, damp=damp)
-        cond = DenseLatentCondMaterialized.from_linop_and_noise(linop, noise)
+        cond = DenseLatentCond.from_linop_and_noise(linop, noise)
         return cond, None
 
 
@@ -332,7 +360,7 @@ class DenseOdeTs1(ssm_impl_api.AbstractOde):
 
         # Collect all quantities and return
         noise = DenseNormal.from_dirac(fx, damp=damp)
-        cond = DenseLatentCondMaterialized.from_linop_and_noise(linop, noise)
+        cond = DenseLatentCond.from_linop_and_noise(linop, noise)
         return cond, state
 
 
@@ -407,7 +435,7 @@ class DenseResidual(ssm_impl_api.AbstractResidual):
         # Turn the linearization into a conditional
         noise = DenseNormal.from_dirac([fx], damp=damp)
 
-        cond = DenseLatentCondMaterialized.from_linop_and_noise(J, noise)
+        cond = DenseLatentCond.from_linop_and_noise(J, noise)
         return cond, state
 
 
@@ -435,9 +463,7 @@ class DenseWienerIntegrated(ssm_impl_api.AbstractPrior):
 
         # Q contains the base-output scale, so we only multiply with output_scale
         noise = DenseNormal(self.q0, output_scale * self.Q, self.tree_flatten)
-        return DenseLatentCondMaterialized(
-            self.A, noise, to_latent=p_inv, to_observed=p
-        )
+        return DenseLatentCond(self.A, noise, to_latent=p_inv, to_observed=p)
 
     @staticmethod
     def register_pytree():
@@ -499,7 +525,7 @@ class DenseExponential(ssm_impl_api.AbstractPrior):
         # so we only multiply with the incoming output scale
         noise = DenseNormal(self.q0, output_scale * L, self.tree_flatten)
 
-        return DenseLatentCondMaterialized(eA, noise, to_latent=p_inv, to_observed=p)
+        return DenseLatentCond(eA, noise, to_latent=p_inv, to_observed=p)
 
     @staticmethod
     def register_pytree():

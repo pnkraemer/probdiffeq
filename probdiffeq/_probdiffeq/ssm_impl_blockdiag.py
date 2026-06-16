@@ -13,8 +13,38 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class BlockDiagLatentCondMaterialized(ssm_impl_api.AbstractLatentCondMaterialized):
-    """Block-diagonal implementation of LatentCondMaterialized operations."""
+class BlockDiagLinOp(ssm_impl_api.AbstractLinOp):
+    def __init__(self, matvec_ndnd, *, n_in, n_out, d_in, d_out):
+        super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
+        self.matvec_ndnd = matvec_ndnd
+
+    @classmethod
+    def from_matrix_ndnd(cls, matrix):
+        def matvec_ndnd(vec):
+            return linalg.einsum("...ijkl,...kl->...ij", matrix, vec)
+
+        *_batch, n_out, d_out, n_in, d_in = matrix.shape
+        return cls(matvec_ndnd, n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
+
+    @property
+    def precon_prototype(self):
+        return np.ones((self.d_in,)), np.ones((self.d_out,))
+
+    def to_dense_linop(self):
+        from probdiffeq._probdiffeq import ssm_impl_dense
+
+        dummy = np.ones((self.n_in, self.d_in))
+        matrix = func.jacfwd(self.matvec_ndnd)(dummy)
+        return ssm_impl_dense.DenseLinOp.from_matrix_ndnd(matrix)
+
+    @classmethod
+    def from_dense_linop(cls, linop):
+        matrix_ndnd = linop.materialize_ndnd()
+        return cls.from_matrix_ndnd(matrix_ndnd)
+
+
+class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
+    """Block-diagonal implementation of LatentCond operations."""
 
     def apply_flat(self, x, /):
         def apply_unbatch(s, c):
@@ -42,9 +72,7 @@ class BlockDiagLatentCondMaterialized(ssm_impl_api.AbstractLatentCondMaterialize
         cholesky_new = self.to_observed[:, :, None] * _transpose(cholesky)
         return BlockDiagNormal(mean_new, cholesky_new, self.noise.tree_flatten)
 
-    def merge(
-        self, other: "BlockDiagLatentCondMaterialized", /
-    ) -> "BlockDiagLatentCondMaterialized":
+    def merge(self, other: "BlockDiagLatentCond", /) -> "BlockDiagLatentCond":
         # self = cond1 (outer), other = cond2 (inner)
         T = self.to_latent * other.to_observed
 
@@ -61,7 +89,7 @@ class BlockDiagLatentCondMaterialized(ssm_impl_api.AbstractLatentCondMaterialize
         Xi = _transpose(Xi)
 
         noise = BlockDiagNormal(xi, Xi, self.noise.tree_flatten)
-        return BlockDiagLatentCondMaterialized(
+        return BlockDiagLatentCond(
             g, noise, to_latent=other.to_latent, to_observed=self.to_observed
         )
 
@@ -86,7 +114,7 @@ class BlockDiagLatentCondMaterialized(ssm_impl_api.AbstractLatentCondMaterialize
         mean_observed = (self.A @ mean[..., None])[..., 0] + self.noise.mean_flat
         mean_corrected = mean - (gain @ (mean_observed[..., None]))[..., 0]
         corrected = BlockDiagNormal(mean_corrected, cholesky_cor, rv.tree_flatten)
-        bwd = BlockDiagLatentCondMaterialized(
+        bwd = BlockDiagLatentCond(
             gain,
             corrected,
             to_latent=1 / self.to_observed,
@@ -107,24 +135,21 @@ class BlockDiagLatentCondMaterialized(ssm_impl_api.AbstractLatentCondMaterialize
         noise = BlockDiagNormal(mean, cholesky, self.noise.tree_flatten)
         to_observed = np.ones_like(self.to_observed)
         to_latent = np.ones_like(self.to_latent)
-        return BlockDiagLatentCondMaterialized(
+        return BlockDiagLatentCond(
             A, noise, to_observed=to_observed, to_latent=to_latent
         )
 
 
-BlockDiagLatentCondMaterialized._register_as_pytree()
+BlockDiagLatentCond._register_as_pytree()
 
 
-class BlockDiagLatentCondMatfree(ssm_impl_api.AbstractLatentCondMaterialized):
-    """Dense (full-covariance) implementation of LatentCondMaterialized operations."""
-
+class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
     def apply_flat(self, x, /):
         from probdiffeq._probdiffeq import ssm_impl_dense
 
         noise = self.noise.to_dense_normal()
-        dense_cond = ssm_impl_dense.DenseLatentCondMaterialized.from_linop_and_noise(
-            self.A, noise
-        )
+        A = self.A.to_dense_linop()
+        dense_cond = ssm_impl_dense.DenseLatentCond.from_linop_and_noise(A, noise)
 
         d, n = x.shape
         x_dense = x.T.reshape((d * n,))
@@ -138,19 +163,20 @@ class BlockDiagLatentCondMatfree(ssm_impl_api.AbstractLatentCondMaterialized):
 
         from probdiffeq._probdiffeq import ssm_impl_dense
 
+        # Transform into dense RVs
         noise = self.noise.to_dense_normal()
+        A = self.A.to_dense_linop()
         rv = rv.to_dense_normal()
+        dense_cond = ssm_impl_dense.DenseLatentCond.from_linop_and_noise(A, noise)
 
-        dense_cond = ssm_impl_dense.DenseLatentCondMaterialized.from_linop_and_noise(
-            self.A, noise
-        )
-
+        # Call dense operations
         observed, cond_new = dense_cond.revert(rv, solve_triu=solve_triu)
 
+        # Transform back into blockdiagonal RVs
         observed = BlockDiagNormal.from_dense_via_truncation(observed)
-
         noise = BlockDiagNormal.from_dense_via_truncation(cond_new.noise)
-        cond = BlockDiagLatentCondMatfree.from_linop_and_noise(cond_new.A, noise)
+        A_new = BlockDiagLinOp.from_dense_linop(cond_new.A)
+        cond = BlockDiagLatentCondProjected.from_linop_and_noise(A_new, noise)
         return observed, cond
 
     def merge(self, other, /):
@@ -160,7 +186,7 @@ class BlockDiagLatentCondMatfree(ssm_impl_api.AbstractLatentCondMaterialized):
         raise NotImplementedError
 
 
-BlockDiagLatentCondMatfree._register_as_pytree()
+BlockDiagLatentCondProjected._register_as_pytree()
 
 
 def _transpose(matrix):
@@ -186,7 +212,7 @@ class BlockDiagOdeTs0(ssm_impl_api.AbstractOde):
 
         linop = func.vmap(func.jacrev(a1))(rv.mean_flat)
 
-        cond = BlockDiagLatentCondMaterialized.from_linop_and_noise(linop, bias)
+        cond = BlockDiagLatentCond.from_linop_and_noise(linop, bias)
         return cond, None
 
 
@@ -232,7 +258,7 @@ class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
         fx = fx - diff
         fx = rv0.tree_flatten.unflatten_array(fx)
         bias = BlockDiagNormal.from_dirac([fx], damp=damp)
-        cond = BlockDiagLatentCondMaterialized.from_linop_and_noise(linop, bias)
+        cond = BlockDiagLatentCond.from_linop_and_noise(linop, bias)
         return cond, state
 
 
@@ -298,8 +324,9 @@ class BlockDiagOdeTs1Projected(ssm_impl_api.AbstractOde):
 
         # Collect all quantities and return
         noise = BlockDiagNormal.from_dirac(fx, damp=damp)
-        linop = linop.reshape((m * d, -1))
-        cond = BlockDiagLatentCondMatfree.from_linop_and_noise(linop, noise)
+
+        linop = BlockDiagLinOp.from_matrix_ndnd(linop)
+        cond = BlockDiagLatentCondProjected.from_linop_and_noise(linop, noise)
         return cond, state
 
 
@@ -496,13 +523,13 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
         base = random.normal(key, shape=(d, n))
         return self.mean_flat + np.einsum("ijk,ij->ik", self.cholesky_flat, base)
 
-    def identity_conditional(self) -> BlockDiagLatentCondMaterialized:
+    def identity_conditional(self) -> BlockDiagLatentCond:
         (d, ndim) = self.mean_flat.shape
         m0 = np.zeros((d, ndim))
         c0 = np.zeros((d, ndim, ndim))
         noise = BlockDiagNormal(m0, c0, self.tree_flatten)
         matrix = np.ones((d, 1, 1)) * np.eye(ndim, ndim)[None, ...]
-        return BlockDiagLatentCondMaterialized.from_linop_and_noise(matrix, noise)
+        return BlockDiagLatentCond.from_linop_and_noise(matrix, noise)
 
     def prototype_output_scale_calibrated(self):
         single_flat, _ = tree.ravel_pytree(self.mean[0])
@@ -520,7 +547,7 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
 
         u_like = tree.tree_map(np.zeros_like, self.mean[0])
         noise = BlockDiagNormal.from_mean_and_std([u_like], [std])
-        return BlockDiagLatentCondMaterialized.from_linop_and_noise(linop, noise)
+        return BlockDiagLatentCond.from_linop_and_noise(linop, noise)
 
     @staticmethod
     def register_pytree_node() -> None:
@@ -549,9 +576,7 @@ class BlockDiagWienerIntegrated(ssm_impl_api.AbstractPrior):
         self.tree_flatten = tree_flatten
         self.precon_fun = precon_fun
 
-    def transition(
-        self, *, dt: float, output_scale: Array
-    ) -> BlockDiagLatentCondMaterialized:
+    def transition(self, *, dt: float, output_scale: Array) -> BlockDiagLatentCond:
         p, p_inv = self.precon_fun(dt)
 
         output_scale = np.asarray(output_scale)
@@ -573,9 +598,7 @@ class BlockDiagWienerIntegrated(ssm_impl_api.AbstractPrior):
         A_batch = np.ones((d, 1, 1)) * self.a[None, :, :]
         p = np.ones((d, 1)) * p[None, :]
         p_inv = np.ones((d, 1)) * p_inv[None, :]
-        return BlockDiagLatentCondMaterialized(
-            A_batch, noise, to_latent=p_inv, to_observed=p
-        )
+        return BlockDiagLatentCond(A_batch, noise, to_latent=p_inv, to_observed=p)
 
     @staticmethod
     def register_pytree():
