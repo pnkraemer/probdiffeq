@@ -13,20 +13,24 @@ For example, this variable is used to type Taylor coefficients.
 
 
 class DenseLinOp(ssm_impl_api.AbstractLinOp):
-    def __init__(self, *, data_ndnd, n_in, n_out, d_in, d_out):
+    def __init__(self, *, data_ndnd):
+        *_batch, n_out, d_out, n_in, d_in = data_ndnd.shape
         super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
         self.data_ndnd = data_ndnd
 
+    def matvec_flat(self, vec):
+        vec_nd = vec.reshape((self.n_in, self.d_in))
+        vec_nd = linalg.einsum("...ijkl,...kl->...ij", self.data_ndnd, vec_nd)
+        return vec_nd.reshape((self.n_out * self.d_out,))
+
     @classmethod
-    def from_matrix_ndnd(cls, matrix):
-        *_batch, n_out, d_out, n_in, d_in = matrix.shape
+    def from_matrix_ndnd(cls, matrix, /):
+        return cls(data_ndnd=matrix)
 
-        def matvec_flat(vec):
-            vec_nd = vec.reshape((n_in, d_in))
-            vec_nd = linalg.einsum("...ijkl,...kl->...ij", matrix, vec_nd)
-            return vec_nd.reshape((n_out * d_out,))
-
-        return cls(matvec_flat, n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
+    @classmethod
+    def from_matrix_flat(cls, matrix, /, *, n_in, n_out, d_in, d_out):
+        matrix_ndnd = matrix.reshape((n_out, d_out, n_in, d_in))
+        return cls.from_matrix_ndnd(matrix_ndnd)
 
     @property
     def precon_prototype(self):
@@ -36,6 +40,23 @@ class DenseLinOp(ssm_impl_api.AbstractLinOp):
         dummy = np.ones((self.d_in * self.n_in,))
         A_flat = func.jacfwd(self.matvec_flat)(dummy)
         return A_flat.reshape((self.n_out, self.d_out, self.n_in, self.d_in))
+
+    @classmethod
+    def _register_as_pytree(cls) -> None:
+        """Register this class (or a subclass) as a JAX pytree."""
+
+        def flatten(linop):
+            children = (linop.data_ndnd,)
+            return children, ()
+
+        def unflatten(_aux, children):
+            (data_ndnd,) = children
+            return cls(data_ndnd=data_ndnd)
+
+        tree.register_pytree_node(cls, flatten, unflatten)
+
+
+DenseLinOp._register_as_pytree()
 
 
 class DenseLatentCond(ssm_impl_api.AbstractLatentCond):
@@ -52,10 +73,10 @@ class DenseLatentCond(ssm_impl_api.AbstractLatentCond):
         mean = self.to_latent * rv.mean_flat
         cholesky = self.to_latent[:, None] * rv.cholesky_flat
 
-        R_stack = ((self.A @ cholesky).T, self.noise.cholesky_flat.T)
+        R_stack = (self.A.matmat_flat(cholesky).T, self.noise.cholesky_flat.T)
         cholesky_new = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
 
-        mean_new = self.to_observed * (self.A @ mean + self.noise.mean_flat)
+        mean_new = self.to_observed * (self.A.matvec_flat(mean) + self.noise.mean_flat)
         cholesky_new = self.to_observed[:, None] * cholesky_new
         return DenseNormal(mean_new, cholesky_new, self.noise.tree_flatten)
 
@@ -359,6 +380,7 @@ class DenseOdeTs1(ssm_impl_api.AbstractOde):
 
         # Collect all quantities and return
         noise = DenseNormal.from_dirac(fx, damp=damp)
+        linop = DenseLinOp.from_matrix_flat(linop, n_out=m, d_out=d, n_in=n, d_in=d)
         cond = DenseLatentCond.from_linop_and_noise(linop, noise)
         return cond, state
 
@@ -611,6 +633,9 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         q0 = np.zeros(((num_derivatives + 1) * d,))
         tf = DenseTreeFlatten.from_example(tcoeffs_mean)
         precon_fun = utilities.preconditioner_taylor(num_derivatives)
+
+        n = len(tcoeffs_mean)
+        A = DenseLinOp.from_matrix_flat(A, n_in=n, n_out=n, d_in=d, d_out=d)
         return DenseWienerIntegrated(
             init, Lambda, d=d, A=A, Q=Q, q0=q0, tree_flatten=tf, precon_fun=precon_fun
         )

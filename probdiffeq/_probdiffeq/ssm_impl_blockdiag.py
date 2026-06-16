@@ -14,7 +14,39 @@ For example, this variable is used to type Taylor coefficients.
 
 
 class BlockDiagLinOp(ssm_impl_api.AbstractLinOp):
-    def __init__(self, *, data_ndnd, n_in, n_out, d_in, d_out):
+    def __init__(self, *, data_dnn):
+        d, n_out, n_in = data_dnn.shape
+        super().__init__(n_in=n_in, n_out=n_out, d_in=d, d_out=d)
+        self.data_dnn = data_dnn
+
+    @classmethod
+    def from_matrix_dnn(cls, matrix, /):
+        return cls(data_dnn=matrix)
+
+    def matvec_dnn(self, vec, /):
+        return linalg.einsum("...nm,...m->...n", self.data_dnn, vec)
+
+    @classmethod
+    def _register_as_pytree(cls) -> None:
+        """Register this class (or a subclass) as a JAX pytree."""
+
+        def flatten(linop):
+            children = (linop.data_dnn,)
+            return children, ()
+
+        def unflatten(_aux, children):
+            (data_dnn,) = children
+            return cls(data_dnn=data_dnn)
+
+        tree.register_pytree_node(cls, flatten, unflatten)
+
+
+BlockDiagLinOp._register_as_pytree()
+
+
+class MatfreeLinOp(ssm_impl_api.AbstractLinOp):
+    def __init__(self, *, data_ndnd):
+        *_batch, n_out, d_out, n_in, d_in = data_ndnd.shape
         super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
         self.data_ndnd = data_ndnd
 
@@ -23,14 +55,7 @@ class BlockDiagLinOp(ssm_impl_api.AbstractLinOp):
 
     @classmethod
     def from_matrix_ndnd(cls, matrix):
-        *_batch, n_out, d_out, n_in, d_in = matrix.shape
-        return cls(data_ndnd=matrix, n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
-
-    @classmethod
-    def from_matrix_dnn(cls, matrix):
-        *_batch, d, _n_out, _n_in = matrix.shape
-        matrix_ndnd = np.einsum("dnm,dt->ndmt", matrix, np.eye(d))
-        return cls.from_matrix_ndnd(matrix_ndnd)
+        return cls(data_ndnd=matrix)
 
     @property
     def precon_prototype(self):
@@ -54,47 +79,36 @@ class BlockDiagLinOp(ssm_impl_api.AbstractLinOp):
 
         def flatten(linop):
             children = (linop.data_ndnd,)
-            aux = linop.n_in, linop.n_out, linop.d_in, linop.d_out
-            return children, aux
+            return children, ()
 
-        def unflatten(aux, children):
-            n_in, n_out, d_in, d_out = aux
+        def unflatten(_aux, children):
             (data_ndnd,) = children
-            return cls(
-                data_ndnd=data_ndnd, n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out
-            )
+            return cls(data_ndnd=data_ndnd)
 
         tree.register_pytree_node(cls, flatten, unflatten)
 
 
-BlockDiagLinOp._register_as_pytree()
+MatfreeLinOp._register_as_pytree()
 
 
 class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
     """Block-diagonal implementation of LatentCond operations."""
 
     def apply_flat(self, x, /):
-        # This approach requires that the LinOp batches correctly.
-        def apply_unbatch(s, c):
-            s = c.to_latent * s
-            m_new = c.to_observed * (c.A @ s + c.noise.mean_flat)
-            c_new = c.to_observed[:, None] * c.noise.cholesky_flat
-            return BlockDiagNormal(m_new, c_new, self.noise.tree_flatten)
-
-        return func.vmap(apply_unbatch)(x, self)
+        x_latent = self.to_latent * x
+        m_new = self.A.matvec_dnn(x_latent) + self.noise.mean_flat
+        m_obs = self.to_observed * m_new
+        c_obs = self.to_observed[..., None] * self.noise.cholesky_flat
+        return BlockDiagNormal(m_obs, c_obs, self.noise.tree_flatten)
 
     def marginalise(self, rv, /):
         matrix, noise = self.A, self.noise
-        # TODO: give the linop multiple matvecs -> ndnd, dnn, and flat?
-        #   then, handle all matvecs via interfaces and only store the data
-        #   (and fix tests -> will end up at this matrix.ndim==3 eventually)
-        assert matrix.ndim == 3
         mean = self.to_latent * rv.mean_flat
         cholesky = self.to_latent[:, :, None] * rv.cholesky_flat
 
-        mean_marg = np.einsum("ijk,ik->ij", matrix, mean) + noise.mean_flat
+        mean_marg = matrix.matvec_dnn(mean) + noise.mean_flat
 
-        chol1 = _transpose(matrix @ cholesky)
+        chol1 = _transpose(matrix.matmat_dnn(cholesky))
         chol2 = _transpose(noise.cholesky_flat)
         R_stack = (chol1, chol2)
         cholesky = func.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack)
@@ -206,7 +220,7 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         # Transform back into blockdiagonal RVs
         observed = BlockDiagNormal.from_dense_via_truncation(observed)
         noise = BlockDiagNormal.from_dense_via_truncation(cond_new.noise)
-        A_new = BlockDiagLinOp.from_dense_linop(cond_new.A)
+        A_new = MatfreeLinOp.from_dense_linop(cond_new.A)
         cond = BlockDiagLatentCondProjected.from_linop_and_noise(A_new, noise)
         return observed, cond
 
@@ -356,7 +370,7 @@ class BlockDiagOdeTs1Projected(ssm_impl_api.AbstractOde):
         # Collect all quantities and return
         noise = BlockDiagNormal.from_dirac(fx, damp=damp)
 
-        linop = BlockDiagLinOp.from_matrix_ndnd(linop)
+        linop = MatfreeLinOp.from_matrix_ndnd(linop)
         cond = BlockDiagLatentCondProjected.from_linop_and_noise(linop, noise)
         return cond, state
 

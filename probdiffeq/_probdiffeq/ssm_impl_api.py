@@ -53,8 +53,18 @@ class AbstractLinOp:
         raise NotImplementedError
 
     @classmethod
-    def from_matrix_flat(cls, matrix, /):
+    def from_matrix_flat(cls, matrix, /, *, n_in, n_out, d_in, d_out):
         raise NotImplementedError
+
+    def matmat_dnn(self, M, /):
+        matvec = self.matvec_dnn
+        matmat = func.vmap(matvec, in_axes=-1, out_axes=-1)
+        return matmat(M)
+
+    def matmat_flat(self, M, /):
+        matvec = self.matvec_flat
+        matmat = func.vmap(matvec, in_axes=-1, out_axes=-1)
+        return matmat(M)
 
     def matvec_ndnd(self, x, /):
         raise NotImplementedError
@@ -63,6 +73,9 @@ class AbstractLinOp:
         raise NotImplementedError
 
     def matvec_flat(self, x, /):
+        raise NotImplementedError
+
+    def to_dense_linop(self):
         raise NotImplementedError
 
     @property
@@ -78,7 +91,6 @@ class AbstractLatentCond:
 
     def __init__(self, A, noise, to_latent, to_observed) -> None:
 
-        # TODO: assert that A is a linear operator, not an array
         if not isinstance(A, AbstractLinOp):
             msg = f"Linear operator expected, but {A} received."
             raise TypeError(msg)
@@ -114,7 +126,8 @@ class AbstractLatentCond:
             return func.vmap(cls.from_linop_and_noise)(A, noise)
 
         if not isinstance(A, AbstractLinOp):
-            raise TypeError(A)
+            msg = f"Linear operator expected, but {A} received."
+            raise TypeError(msg)
 
         to_latent, to_observed = A.precon_prototype
         return cls(A, noise=noise, to_latent=to_latent, to_observed=to_observed)
