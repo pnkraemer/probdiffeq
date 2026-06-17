@@ -35,7 +35,7 @@ For example, this variable is used to type Taylor coefficients.
 # TODO (cont'd): (do Jacobians implement linear operators? Merge the two classes?)
 
 
-class AbstractLinOp:
+class AbstractLinOp(abc.ABC):
     def __init__(self, *, n_in, n_out, d_in, d_out):
         self.n_in = n_in
         self.n_out = n_out
@@ -47,18 +47,6 @@ class AbstractLinOp:
         msg += f", n_in={self.n_in}, d_in={self.d_in})"
         return msg
 
-    # @classmethod
-    # def from_matrix_ndnd(cls, matrix, /):
-    #     raise NotImplementedError
-
-    # @classmethod
-    # def from_matrix_dnn(cls, matrix, /):
-    #     raise NotImplementedError
-
-    # @classmethod
-    # def from_matrix_flat(cls, matrix, /, *, n_in, n_out, d_in, d_out):
-    #     raise NotImplementedError
-
     def matmat_dnn(self, M, /):
         matvec = self.matvec_dnn
         matmat = func.vmap(matvec, in_axes=-1, out_axes=-1)
@@ -69,21 +57,23 @@ class AbstractLinOp:
         matmat = func.vmap(matvec, in_axes=-1, out_axes=-1)
         return matmat(M)
 
-    # def matvec_ndnd(self, x, /):
-    #     raise NotImplementedError
+    def matvec_ndnd(self, x, /):
+        raise NotImplementedError
 
-    # def matvec_dnn(self, x, /):
-    #     raise NotImplementedError
+    def matvec_dnn(self, x, /):
+        raise NotImplementedError
 
-    # def matvec_flat(self, x, /):
-    #     raise NotImplementedError
+    def matvec_flat(self, x, /):
+        raise NotImplementedError
 
     # def to_dense_linop(self):
     #     raise NotImplementedError
 
-    # @property
-    # def precon_prototype(self):  # return ones (todo: rename?)
-    #     raise NotImplementedError
+    @property
+    @abc.abstractmethod
+    def precon_prototype(self):  # TODO: rename?
+        # return ones...
+        raise NotImplementedError
 
 
 class AbstractLatentCond:

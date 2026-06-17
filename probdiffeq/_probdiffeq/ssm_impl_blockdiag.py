@@ -56,6 +56,10 @@ class MatfreeLinOpNdNd(ssm_impl_api.AbstractLinOp):
     def matvec_ndnd(self, vec):
         return linalg.einsum("...ijkl,...kl->...ij", self.matrix_ndnd, vec)
 
+    def matvec_dnn(self, vec_dn):
+        vec_nd = vec_dn.T
+        return self.matvec_ndnd(vec_nd).T
+
     def matvec_flat(self, vec_flat):
         vec = vec_flat.reshape((self.n_in, self.d_in))
         return self.matvec_ndnd(vec).reshape((-1,))
@@ -105,6 +109,11 @@ class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
     def precon_prototype(self):
         return np.ones((self.d_in,)), np.ones((self.d_out,))
 
+    def matvec_dnn(self, vec_dn):
+        vec_flat = vec_dn.T.reshape((self.n_in * self.d_in,))
+        Avec_flat = self.matvec_flat(vec_flat)
+        return Avec_flat.reshape((self.n_out, self.d_out)).T
+
     def matvec_ndnd(self, vec):
         vec_flat = vec.reshape((self.n_in * self.d_in,))
         Avec_flat = self.matvec_flat(vec_flat)
@@ -112,6 +121,7 @@ class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
 
     def matvec_flat(self, vec):
 
+        # Materialise matrices (TODO: make matrix-free!)
         # Blockdiag in the correct N/D ordering
         eye = np.eye(self.d_in)
         B = linalg.einsum("dnm,dt->ndmt", self.cholesky_x, eye).reshape(
@@ -123,12 +133,11 @@ class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
 
         x_like = np.ones((self.n_out * self.d_out,))
         A = func.jacfwd(self.matfree_linop.matvec_flat)(x_like)
-
-        n_out, n_in = A.shape
         matrix = np.concatenate([A @ B, D], axis=1)
-        # lstsq_sol = matrix.T @ linalg.solve_lu(matrix @ matrix.T, vec)
+
+        # TODO: use LSMR?
         lstsq_sol = linalg.lstsq_svd(matrix, vec)
-        return B @ lstsq_sol[:n_in]
+        return B @ lstsq_sol[: A.shape[1]]
 
 
 class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
@@ -231,7 +240,7 @@ BlockDiagLatentCond._register_as_pytree()
 class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
     def __init__(self, *args, num=100, **kwargs):
         super().__init__(*args, **kwargs)
-        self.num = num  # TODO: actually include this in the constructors
+        self.num = num  # TODO: actually make this user-facing
 
     def apply_flat(self, x, /):
         y = self.A.matvec_ndnd(x.T).T
@@ -244,64 +253,47 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         raise NotImplementedError
 
     def revert(self, rv, /, *, solve_triu: Callable):
+        del solve_triu  # unused
 
         # TODO: use preconditioning (currently assume P=1)
+
+        # Observed mean
+        obs_mean = self.A.matvec_dnn(rv.mean_flat) + self.noise.mean_flat
+
+        # Samples
         key = random.prng_key(seed=1)
         key_rv, key_noise = random.split(key, num=2)
-
-        # AX.shape = (S, d, n)
         keys = random.split(key_rv, num=self.num)
         X = func.vmap(rv.sample_flat)(keys)
-        AX = func.vmap(lambda s: self.A.matvec_ndnd(s.T).T)(X)
-
-        # Y.shape = (S, d, n)
         keys = random.split(key_noise, num=self.num)
         Y = func.vmap(self.noise.sample_flat)(keys)
 
-        # (S, d, n)
-        AX += Y
-
-        # (d, n)
-        obs_mean = AX.mean(axis=0)
-
-        # (S, d, n)
+        # Observed covariance
+        AX = func.vmap(lambda s: self.A.matvec_ndnd(s.T).T)(X) + Y
         AX -= obs_mean[None, ...]
         AX /= np.sqrt(AX.shape[0] - 1)
-
-        # (d, n, n)
         obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=1)(AX)
         observed = BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
 
-        A_new = MatfreeLinOpLstSq(rv.cholesky_flat, self.noise.cholesky_flat, self.A)
-        print(func.jacfwd(A_new.matvec_flat)(self.noise.mean_flat.reshape((-1,))))
+        # Gain & conditioning
+        K = MatfreeLinOpLstSq(rv.cholesky_flat, self.noise.cholesky_flat, self.A)
 
-        # Reference:
-        from probdiffeq._probdiffeq import ssm_impl_dense
+        def condition(a, b):
+            h = self.A.matvec_dnn(a) + b
+            return a - K.matvec_dnn(h)
 
-        # Transform into dense RVs
-        noise = self.noise.to_dense_normal()
-        A = self.A.to_dense_linop()
-        rv = rv.to_dense_normal()
-        dense_cond = ssm_impl_dense.DenseLatentCond.from_linop_and_noise(A, noise)
+        # Posterior mean:
+        cond_mean = condition(rv.mean_flat, self.noise.mean_flat)
 
-        # Call dense operations
-        _observed, cond_new = dense_cond.revert(rv, solve_triu=solve_triu)
+        # Posterior covariance
+        KX = func.vmap(condition)(X, Y)
+        KX -= KX.mean(axis=0, keepdims=True)
+        KX /= np.sqrt(KX.shape[0] - 1)
+        cond_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=1)(KX)
+        noise = BlockDiagNormal(cond_mean, cond_chol, rv.tree_flatten)
 
-        M = func.jacfwd(self.A.matvec_flat)(rv.mean_flat.reshape((-1,)))
-        C = rv.cholesky_flat
-        D = noise.cholesky_flat
-
-        print()
-        print(C @ C.T @ M.T @ linalg.inv(M @ C @ C.T @ M.T + D @ D.T))
-        # Transform back into blockdiagonal RVs
-        print()
-        print(func.jacfwd(cond_new.A.matvec_flat)(self.noise.mean_flat.reshape((-1,))))
-        assert False
-
-        noise = BlockDiagNormal.from_dense_via_truncation(cond_new.noise)
-        cond = BlockDiagLatentCondProjected.from_linop_and_noise(A_new, noise)
-
-        # Compare
+        # Group and return
+        cond = BlockDiagLatentCondProjected.from_linop_and_noise(K, noise)
         return observed, cond
 
     @staticmethod
