@@ -224,12 +224,11 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
 
         # (S, d, n)
         AX -= obs_mean[None, ...]
-        AX /= np.sqrt(AX.shape[0])
+        AX /= np.sqrt(AX.shape[0] - 1)
 
         # (d, n, n)
         obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=1)(AX)
-        obs = BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
-        print("Estimate\n\t", obs.to_multivariate_normal())
+        observed = BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
 
         # Reference:
         from probdiffeq._probdiffeq import ssm_impl_dense
@@ -241,18 +240,15 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         dense_cond = ssm_impl_dense.DenseLatentCond.from_linop_and_noise(A, noise)
 
         # Call dense operations
-        observed, cond_new = dense_cond.revert(rv, solve_triu=solve_triu)
+        _observed, cond_new = dense_cond.revert(rv, solve_triu=solve_triu)
 
         # Transform back into blockdiagonal RVs
-        observed = BlockDiagNormal.from_dense_via_truncation(observed)
+        # _observed = BlockDiagNormal.from_dense_via_truncation(observed)
         noise = BlockDiagNormal.from_dense_via_truncation(cond_new.noise)
         A_new = MatfreeLinOp.from_dense_linop(cond_new.A)
         cond = BlockDiagLatentCondProjected.from_linop_and_noise(A_new, noise)
 
         # Compare
-        print("Ref (after condensing)\n\t", observed.to_multivariate_normal())
-        assert False
-
         return observed, cond
 
     def merge(self, other, /):
