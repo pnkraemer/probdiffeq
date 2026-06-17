@@ -37,10 +37,15 @@ class MatfreeLinOpNdNd(ssm_impl_api.AbstractLinOp):
     # TODO: don't pass the matrix but make this into MatfreeLinOpODE
     # because then we can pass the ODE and do the linop internally
     # otherwise we have d^2 costs again...
-    def __init__(self, *, matrix_ndnd):
+    def __init__(self, *, matrix_ndnd: Array):
         *_batch, n_out, d_out, n_in, d_in = matrix_ndnd.shape
         super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
         self.matrix_ndnd = matrix_ndnd
+
+        msg = "Next up: make everything matrix-free."
+        msg += " To this end, change LinOpNdNd into an ODE JVP linop."
+        msg += " Then, use LSMR in the LstSq linop."
+        assert False, msg
 
     def matvec_ndmd(self, vec):
         return linalg.einsum("...ijkl,...kl->...ij", self.matrix_ndnd, vec)
