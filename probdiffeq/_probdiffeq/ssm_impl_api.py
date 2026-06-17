@@ -47,8 +47,8 @@ class AbstractLinOp(abc.ABC):
         msg += f", n_in={self.n_in}, d_in={self.d_in})"
         return msg
 
-    def matmat_dnn(self, M, /):
-        matvec = self.matvec_dnn
+    def matmat_dndm(self, M, /):
+        matvec = self.matvec_dndm
         matmat = func.vmap(matvec, in_axes=-1, out_axes=-1)
         return matmat(M)
 
@@ -57,17 +57,17 @@ class AbstractLinOp(abc.ABC):
         matmat = func.vmap(matvec, in_axes=-1, out_axes=-1)
         return matmat(M)
 
-    def matvec_ndnd(self, x, /):
+    @abc.abstractmethod
+    def matvec_ndmd(self, x, /):
         raise NotImplementedError
 
-    def matvec_dnn(self, x, /):
+    @abc.abstractmethod
+    def matvec_dndm(self, x, /):
         raise NotImplementedError
 
+    @abc.abstractmethod
     def matvec_flat(self, x, /):
         raise NotImplementedError
-
-    # def to_dense_linop(self):
-    #     raise NotImplementedError
 
     @property
     @abc.abstractmethod

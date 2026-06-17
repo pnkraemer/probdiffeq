@@ -12,31 +12,33 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class DenseLinOp(ssm_impl_api.AbstractLinOp):
-    def __init__(self, *, data_ndnd):
-        *_batch, n_out, d_out, n_in, d_in = data_ndnd.shape
+class DenseMatrix(ssm_impl_api.AbstractLinOp):
+    def __init__(self, *, matrix_ndmd):
+        *_batch, n_out, d_out, n_in, d_in = matrix_ndmd.shape
         super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
-        self.data_ndnd = data_ndnd
+        self.matrix_ndmd = matrix_ndmd
+
+    def matvec_dndm(self, vec):
+        raise NotImplementedError
+
+    def matvec_ndmd(self, vec):
+        raise NotImplementedError
 
     def matvec_flat(self, vec):
         vec_nd = vec.reshape((self.n_in, self.d_in))
-        vec_nd = linalg.einsum("...ijkl,...kl->...ij", self.data_ndnd, vec_nd)
+        vec_nd = linalg.einsum("...ijkl,...kl->...ij", self.matrix_ndmd, vec_nd)
         return vec_nd.reshape((self.n_out * self.d_out,))
 
     @classmethod
-    def from_matrix_ndnd(cls, matrix, /):
-        return cls(data_ndnd=matrix)
-
-    @classmethod
-    def from_matrix_flat(cls, matrix, /, *, n_in, n_out, d_in, d_out):
-        matrix_ndnd = matrix.reshape((n_out, d_out, n_in, d_in))
-        return cls.from_matrix_ndnd(matrix_ndnd)
+    def from_flat(cls, matrix, /, *, n_in, n_out, d_in, d_out):
+        matrix_ndmd = matrix.reshape((n_out, d_out, n_in, d_in))
+        return cls(matrix_ndmd=matrix_ndmd)
 
     @property
     def precon_prototype(self):
         return np.ones((self.d_in * self.n_in,)), np.ones((self.d_out * self.n_out,))
 
-    def materialize_ndnd(self):
+    def materialize_ndmd(self):
         dummy = np.ones((self.d_in * self.n_in,))
         A_flat = func.jacfwd(self.matvec_flat)(dummy)
         return A_flat.reshape((self.n_out, self.d_out, self.n_in, self.d_in))
@@ -46,17 +48,17 @@ class DenseLinOp(ssm_impl_api.AbstractLinOp):
         """Register this class (or a subclass) as a JAX pytree."""
 
         def flatten(linop):
-            children = (linop.data_ndnd,)
+            children = (linop.matrix_ndmd,)
             return children, ()
 
         def unflatten(_aux, children):
-            (data_ndnd,) = children
-            return cls(data_ndnd=data_ndnd)
+            (matrix_ndmd,) = children
+            return cls(matrix_ndmd=matrix_ndmd)
 
         tree.register_pytree_node(cls, flatten, unflatten)
 
 
-DenseLinOp._register_as_pytree()
+DenseMatrix._register_as_pytree()
 
 
 class DenseLatentCond(ssm_impl_api.AbstractLatentCond):
@@ -119,9 +121,9 @@ class DenseLatentCond(ssm_impl_api.AbstractLatentCond):
         corrected = DenseNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
 
         # Save the conditional
-        gain_ndnd = gain.reshape((self.A.n_in, self.A.d_in, self.A.n_out, self.A.d_out))
+        gain_ndmd = gain.reshape((self.A.n_in, self.A.d_in, self.A.n_out, self.A.d_out))
         cond_new = DenseLatentCond(
-            DenseLinOp.from_matrix_ndnd(gain_ndnd),
+            DenseMatrix(matrix_ndmd=gain_ndmd),
             corrected,
             to_latent=1 / self.to_observed,  # is diagonal
             to_observed=1 / self.to_latent,  # is diagonal
@@ -380,7 +382,7 @@ class DenseOdeTs1(ssm_impl_api.AbstractOde):
 
         # Collect all quantities and return
         noise = DenseNormal.from_dirac(fx, damp=damp)
-        linop = DenseLinOp.from_matrix_flat(linop, n_out=m, d_out=d, n_in=n, d_in=d)
+        linop = DenseMatrix.from_flat(linop, n_out=m, d_out=d, n_in=n, d_in=d)
         cond = DenseLatentCond.from_linop_and_noise(linop, noise)
         return cond, state
 
@@ -635,7 +637,7 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         precon_fun = utilities.preconditioner_taylor(num_derivatives)
 
         n = len(tcoeffs_mean)
-        A = DenseLinOp.from_matrix_flat(A, n_in=n, n_out=n, d_in=d, d_out=d)
+        A = DenseMatrix.from_flat(A, n_in=n, n_out=n, d_in=d, d_out=d)
         return DenseWienerIntegrated(
             init, Lambda, d=d, A=A, Q=Q, q0=q0, tree_flatten=tf, precon_fun=precon_fun
         )

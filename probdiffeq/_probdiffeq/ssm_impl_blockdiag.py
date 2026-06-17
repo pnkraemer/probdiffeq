@@ -13,35 +13,24 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class BlockDiagLinOp(ssm_impl_api.AbstractLinOp):
-    def __init__(self, *, data_dnn):
-        d, n_out, n_in = data_dnn.shape
+class BlockDiagMatrix(ssm_impl_api.AbstractLinOp):
+    def __init__(self, *, matrix_dnm):
+        d, n_out, n_in = matrix_dnm.shape
         super().__init__(n_in=n_in, n_out=n_out, d_in=d, d_out=d)
-        self.data_dnn = data_dnn
+        self.matrix_dnm = matrix_dnm
 
-    @classmethod
-    def from_matrix_dnn(cls, matrix, /):
-        return cls(data_dnn=matrix)
+    def matvec_flat(self, vec, /):
+        raise NotImplementedError
 
-    def matvec_dnn(self, vec, /):
-        return linalg.einsum("...nm,...m->...n", self.data_dnn, vec)
+    def matvec_ndmd(self, vec, /):
+        raise NotImplementedError
 
-    @classmethod
-    def _register_as_pytree(cls) -> None:
-        """Register this class (or a subclass) as a JAX pytree."""
+    def matvec_dndm(self, vec, /):
+        return linalg.einsum("...nm,...m->...n", self.matrix_dnm, vec)
 
-        def flatten(linop):
-            children = (linop.data_dnn,)
-            return children, ()
-
-        def unflatten(_aux, children):
-            (data_dnn,) = children
-            return cls(data_dnn=data_dnn)
-
-        tree.register_pytree_node(cls, flatten, unflatten)
-
-
-BlockDiagLinOp._register_as_pytree()
+    @property
+    def precon_prototype(self):
+        return np.ones((self.d_in,)), np.ones((self.d_out,))
 
 
 class MatfreeLinOpNdNd(ssm_impl_api.AbstractLinOp):
@@ -53,23 +42,16 @@ class MatfreeLinOpNdNd(ssm_impl_api.AbstractLinOp):
         super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
         self.matrix_ndnd = matrix_ndnd
 
-    def matvec_ndnd(self, vec):
+    def matvec_ndmd(self, vec):
         return linalg.einsum("...ijkl,...kl->...ij", self.matrix_ndnd, vec)
 
-    def matvec_dnn(self, vec_dn):
+    def matvec_dndm(self, vec_dn):
         vec_nd = vec_dn.T
-        return self.matvec_ndnd(vec_nd).T
+        return self.matvec_ndmd(vec_nd).T
 
     def matvec_flat(self, vec_flat):
         vec = vec_flat.reshape((self.n_in, self.d_in))
-        return self.matvec_ndnd(vec).reshape((-1,))
-
-    def to_dense_linop(self):
-        from probdiffeq._probdiffeq import ssm_impl_dense
-
-        dummy = np.ones((self.n_in, self.d_in))
-        matrix = func.jacfwd(self.matvec_ndnd)(dummy)
-        return ssm_impl_dense.DenseLinOp.from_matrix_ndnd(matrix)
+        return self.matvec_ndmd(vec).reshape((-1,))
 
     @property
     def precon_prototype(self):
@@ -109,12 +91,12 @@ class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
     def precon_prototype(self):
         return np.ones((self.d_in,)), np.ones((self.d_out,))
 
-    def matvec_dnn(self, vec_dn):
+    def matvec_dndm(self, vec_dn):
         vec_flat = vec_dn.T.reshape((self.n_in * self.d_in,))
         Avec_flat = self.matvec_flat(vec_flat)
         return Avec_flat.reshape((self.n_out, self.d_out)).T
 
-    def matvec_ndnd(self, vec):
+    def matvec_ndmd(self, vec):
         vec_flat = vec.reshape((self.n_in * self.d_in,))
         Avec_flat = self.matvec_flat(vec_flat)
         return Avec_flat.reshape((self.n_out, self.d_out))
@@ -145,7 +127,7 @@ class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
 
     def apply_flat(self, x, /):
         x_latent = self.to_latent * x
-        m_new = self.A.matvec_dnn(x_latent) + self.noise.mean_flat
+        m_new = self.A.matvec_dndm(x_latent) + self.noise.mean_flat
         m_obs = self.to_observed * m_new
         c_obs = self.to_observed[..., None] * self.noise.cholesky_flat
         return BlockDiagNormal(m_obs, c_obs, self.noise.tree_flatten)
@@ -155,9 +137,9 @@ class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
         mean = self.to_latent * rv.mean_flat
         cholesky = self.to_latent[:, :, None] * rv.cholesky_flat
 
-        mean_marg = matrix.matvec_dnn(mean) + noise.mean_flat
+        mean_marg = matrix.matvec_dndm(mean) + noise.mean_flat
 
-        chol1 = _transpose(matrix.matmat_dnn(cholesky))
+        chol1 = _transpose(matrix.matmat_dndm(cholesky))
         chol2 = _transpose(noise.cholesky_flat)
         R_stack = (chol1, chol2)
         cholesky = func.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack)
@@ -243,7 +225,7 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         self.num = num  # TODO: actually make this user-facing
 
     def apply_flat(self, x, /):
-        y = self.A.matvec_ndnd(x.T).T
+        y = self.A.matvec_ndmd(x.T).T
         m = y + self.noise.mean_flat
         c = self.noise.cholesky_flat
         tree_flatten = self.noise.tree_flatten
@@ -258,7 +240,7 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         # TODO: use preconditioning (currently assume P=1)
 
         # Observed mean
-        obs_mean = self.A.matvec_dnn(rv.mean_flat) + self.noise.mean_flat
+        obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
 
         # Samples
         key = random.prng_key(seed=1)
@@ -269,7 +251,7 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         Y = func.vmap(self.noise.sample_flat)(keys)
 
         # Observed covariance
-        AX = func.vmap(lambda s: self.A.matvec_ndnd(s.T).T)(X) + Y
+        AX = func.vmap(lambda s: self.A.matvec_ndmd(s.T).T)(X) + Y
         AX -= obs_mean[None, ...]
         AX /= np.sqrt(AX.shape[0] - 1)
         obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=1)(AX)
@@ -279,8 +261,8 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         K = MatfreeLinOpLstSq(rv.cholesky_flat, self.noise.cholesky_flat, self.A)
 
         def condition(a, b):
-            h = self.A.matvec_dnn(a) + b
-            return a - K.matvec_dnn(h)
+            h = self.A.matvec_dndm(a) + b
+            return a - K.matvec_dndm(h)
 
         # Posterior mean:
         cond_mean = condition(rv.mean_flat, self.noise.mean_flat)
@@ -717,7 +699,7 @@ class BlockDiagWienerIntegrated(ssm_impl_api.AbstractPrior):
         noise = BlockDiagNormal(mean, cholesky, self.tree_flatten)
 
         A_batch = np.ones((d, 1, 1)) * self.a[None, :, :]
-        A = BlockDiagLinOp.from_matrix_dnn(A_batch)
+        A = BlockDiagMatrix(matrix_dnm=A_batch)
         p = np.ones((d, 1)) * p[None, :]
         p_inv = np.ones((d, 1)) * p_inv[None, :]
         return BlockDiagLatentCond(A, noise, to_latent=p_inv, to_observed=p)
