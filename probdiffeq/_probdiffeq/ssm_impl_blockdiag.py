@@ -45,6 +45,9 @@ BlockDiagLinOp._register_as_pytree()
 
 
 class MatfreeLinOpNdNd(ssm_impl_api.AbstractLinOp):
+    # TODO: don't pass the matrix but make this into MatfreeLinOpODE
+    # because then we can pass the ODE and do the linop internally
+    # otherwise we have d^2 costs again...
     def __init__(self, *, matrix_ndnd):
         *_batch, n_out, d_out, n_in, d_in = matrix_ndnd.shape
         super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
@@ -52,6 +55,10 @@ class MatfreeLinOpNdNd(ssm_impl_api.AbstractLinOp):
 
     def matvec_ndnd(self, vec):
         return linalg.einsum("...ijkl,...kl->...ij", self.matrix_ndnd, vec)
+
+    def matvec_flat(self, vec_flat):
+        vec = vec_flat.reshape((self.n_in, self.d_in))
+        return self.matvec_ndnd(vec).reshape((-1,))
 
     def to_dense_linop(self):
         from probdiffeq._probdiffeq import ssm_impl_dense
@@ -83,12 +90,16 @@ MatfreeLinOpNdNd._register_as_pytree()
 
 
 class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
-    def __init__(self, X, AX):
-        _s, d_in, n_in = AX.shape  # LstSq is an inverse, thus AX="in"
-        _s, d_out, n_out = X.shape
-        super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
-        self.X = X
-        self.AX = AX
+    def __init__(self, cholesky_x, cholesky_yx, matfree_linop):
+        super().__init__(
+            n_in=matfree_linop.n_out,
+            n_out=matfree_linop.n_in,
+            d_in=matfree_linop.d_out,
+            d_out=matfree_linop.d_in,
+        )
+        self.cholesky_x = cholesky_x
+        self.cholesky_yx = cholesky_yx
+        self.matfree_linop = matfree_linop
 
     @property
     def precon_prototype(self):
@@ -100,84 +111,24 @@ class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
         return Avec_flat.reshape((self.n_out, self.d_out))
 
     def matvec_flat(self, vec):
-        x = np.transpose(self.X, axes=(0, 2, 1)).reshape((self.X.shape[0], -1))
-        Ax = np.transpose(self.AX, axes=(0, 2, 1)).reshape((self.X.shape[0], -1))
-        return x.T @ linalg.lstsq_svd(Ax.T, vec)
 
-    # print(X.shape)
-    # print(AX.shape)
-    # print(x_flat)
-    # print(Ax_flat)
+        # Blockdiag in the correct N/D ordering
+        eye = np.eye(self.d_in)
+        B = linalg.einsum("dnm,dt->ndmt", self.cholesky_x, eye).reshape(
+            (self.d_out * self.n_out, -1)
+        )
+        D = linalg.einsum("dnm,dt->ndmt", self.cholesky_yx, eye).reshape(
+            (self.d_in * self.n_in, -1)
+        )
 
-    # assert False
-    # super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
-    # self._matvec_flat = matvec_flat
-    # self.data = data
+        x_like = np.ones((self.n_out * self.d_out,))
+        A = func.jacfwd(self.matfree_linop.matvec_flat)(x_like)
 
-    # def matvec_ndnd(self, vec, /):
-    #     return self.matvec_flat(vec.reshape((-1))).reshape((self.n_out, self.d_out))
-
-    # def matvec_flat(self, vec, /):
-    #     return self._matvec_flat(vec, self.data)
-
-    # @classmethod
-    # def from_matvec_flat(cls, matvec, data, *, n_out, d_out, n_in, d_in):
-    #     return cls(matvec, data, n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
-
-    # @classmethod
-    # def from_matrix_ndnd(cls, matrix_ndnd):
-    #     raise RuntimeError
-
-    #     def matvec_ndnd(s, data):
-    #         return linalg.einsum("...ijkl,...kl->...ij", data, s)
-
-    #     n_out, d_out, n_in, d_in = matrix_ndnd.shape
-    #     return cls(
-    #         matvec=matvec_ndnd,
-    #         data=matrix_ndnd,
-    #         n_in=n_in,
-    #         n_out=n_out,
-    #         d_in=d_in,
-    #         d_out=d_out,
-    #     )
-
-    # @property
-    # def precon_prototype(self):
-    #     return np.ones((self.d_in,)), np.ones((self.d_out,))
-
-    # def to_dense_linop(self):
-    #     from probdiffeq._probdiffeq import ssm_impl_dense
-
-    #     dummy = np.ones((self.n_in, self.d_in))
-    #     matrix = func.jacfwd(self.matvec_ndnd)(dummy)
-    #     return ssm_impl_dense.DenseLinOp.from_matrix_ndnd(matrix)
-
-    # @classmethod
-    # def from_dense_linop(cls, linop):
-    #     raise RuntimeError
-    #     matrix_ndnd = linop.materialize_ndnd()
-    #     return cls.from_matrix_ndnd(matrix_ndnd)
-
-    # @classmethod
-    # def _register_as_pytree(cls) -> None:
-    #     """Register this class (or a subclass) as a JAX pytree."""
-
-    #     def flatten(linop):
-    #         children = (linop.data,)
-    #         aux = (linop._matvec_flat, linop.n_in, linop.n_out, linop.d_in, linop.d_out)
-    #         return children, aux
-
-    #     def unflatten(aux, children):
-    #         (data,) = children
-    #         matvec, n_in, n_out, d_in, d_out = aux
-    #         return cls(
-    #             matvec, data=data, n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out
-    #         )
-
-    #     tree.register_pytree_node(cls, flatten, unflatten)
-
-
-# MatfreeLinOpLstSq._register_as_pytree()
+        n_out, n_in = A.shape
+        matrix = np.concatenate([A @ B, D], axis=1)
+        # lstsq_sol = matrix.T @ linalg.solve_lu(matrix @ matrix.T, vec)
+        lstsq_sol = linalg.lstsq_svd(matrix, vec)
+        return B @ lstsq_sol[:n_in]
 
 
 class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
@@ -321,10 +272,9 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=1)(AX)
         observed = BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
 
-        X -= X.mean(axis=0)[None, ...]
-        X /= np.sqrt(X.shape[0] - 1)
+        A_new = MatfreeLinOpLstSq(rv.cholesky_flat, self.noise.cholesky_flat, self.A)
+        print(func.jacfwd(A_new.matvec_flat)(self.noise.mean_flat.reshape((-1,))))
 
-        A_new = MatfreeLinOpLstSq(X, AX)
         # Reference:
         from probdiffeq._probdiffeq import ssm_impl_dense
 
@@ -337,7 +287,17 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         # Call dense operations
         _observed, cond_new = dense_cond.revert(rv, solve_triu=solve_triu)
 
+        M = func.jacfwd(self.A.matvec_flat)(rv.mean_flat.reshape((-1,)))
+        C = rv.cholesky_flat
+        D = noise.cholesky_flat
+
+        print()
+        print(C @ C.T @ M.T @ linalg.inv(M @ C @ C.T @ M.T + D @ D.T))
         # Transform back into blockdiagonal RVs
+        print()
+        print(func.jacfwd(cond_new.A.matvec_flat)(self.noise.mean_flat.reshape((-1,))))
+        assert False
+
         noise = BlockDiagNormal.from_dense_via_truncation(cond_new.noise)
         cond = BlockDiagLatentCondProjected.from_linop_and_noise(A_new, noise)
 
@@ -586,7 +546,7 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
         return np.einsum("ndmd->dnm", cholesky_removed)
 
     def to_dense_normal(self):
-        # TODO: ensure we have the same ordering of D's vs N's
+        # Transpose before flattening
         mean = self.mean_flat.T.reshape((-1,))
         d, n = self.mean_flat.shape
 
