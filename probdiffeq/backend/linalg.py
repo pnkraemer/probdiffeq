@@ -98,3 +98,7 @@ def expm(arr, /):
 
 def einsum(expression, *args):
     return jnp.einsum(expression, *args)
+
+
+def cholesky(A, /):
+    return jnp.linalg.cholesky(A)

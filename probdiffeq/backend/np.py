@@ -256,5 +256,9 @@ def mean(arr, /, axis=None):
     return jnp.mean(arr, axis=axis)
 
 
+def cov(arr, /):
+    return jnp.cov(arr)
+
+
 def std(arr, /, *, ddof=0):
     return jnp.std(arr, ddof=ddof)

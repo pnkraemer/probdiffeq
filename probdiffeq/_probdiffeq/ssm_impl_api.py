@@ -31,6 +31,9 @@ C = TypeVar("C", bound=Sequence)
 For example, this variable is used to type Taylor coefficients.
 """
 
+# TODO: Consider how we can reuse trace estimators between Jacobians and this one here.
+# TODO (cont'd): (do Jacobians implement linear operators? Merge the two classes?)
+
 
 class AbstractLinOp:
     def __init__(self, *, n_in, n_out, d_in, d_out):

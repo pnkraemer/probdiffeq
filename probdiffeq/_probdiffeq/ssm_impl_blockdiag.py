@@ -190,29 +190,48 @@ BlockDiagLatentCond._register_as_pytree()
 
 class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
     def apply_flat(self, x, /):
-        from probdiffeq._probdiffeq import ssm_impl_dense
 
-        msg = "Next up: slowly replace calling the dense transitions "
-        msg += "with manual truncation via trace estimation."
-        msg += " (Start here, which should be quite easy. Use it as practice for handling revert().)"
-        msg += " Then, consider how we can reuse trace estimators between Jacobians and this one here."
-        msg += " (do Jacobians implement linear operators? Merge the two classes?)"
-        msg += " Then, update the remaining tests (there is much code that doesnt use the linops quite yet)."
-        raise RuntimeError(msg)
-        noise = self.noise.to_dense_normal()
-        A = self.A.to_dense_linop()
-        dense_cond = ssm_impl_dense.DenseLatentCond.from_linop_and_noise(A, noise)
-
-        d, n = x.shape
-        x_dense = x.T.reshape((d * n,))
-        x_new = dense_cond.apply_flat(x_dense)
-        return BlockDiagNormal.from_dense_via_truncation(x_new)
+        y = self.A.matvec_ndnd(x.T).T
+        m = y + self.noise.mean_flat
+        c = self.noise.cholesky_flat
+        tree_flatten = self.noise.tree_flatten
+        return BlockDiagNormal(m, c, tree_flatten)
 
     def marginalise(self, rv, /):
         raise NotImplementedError
 
     def revert(self, rv, /, *, solve_triu: Callable):
 
+        # TODO: use preconditioning (currently assume P=1)
+        num = 100
+        key = random.prng_key(seed=1)
+        key_rv, key_noise = random.split(key, num=2)
+
+        # AX.shape = (S, d, n)
+        keys = random.split(key_rv, num=num)
+        X = func.vmap(rv.sample_flat)(keys)
+        AX = func.vmap(lambda s: self.A.matvec_ndnd(s.T).T)(X)
+
+        # Y.shape = (S, d, n)
+        keys = random.split(key_noise, num=num)
+        Y = func.vmap(self.noise.sample_flat)(keys)
+
+        # (S, d, n)
+        AX += Y
+
+        # (d, n)
+        obs_mean = AX.mean(axis=0)
+
+        # (S, d, n)
+        AX -= obs_mean[None, ...]
+        AX /= np.sqrt(AX.shape[0])
+
+        # (d, n, n)
+        obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=1)(AX)
+        obs = BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
+        print("Estimate\n\t", obs.to_multivariate_normal())
+
+        # Reference:
         from probdiffeq._probdiffeq import ssm_impl_dense
 
         # Transform into dense RVs
@@ -229,6 +248,11 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         noise = BlockDiagNormal.from_dense_via_truncation(cond_new.noise)
         A_new = MatfreeLinOp.from_dense_linop(cond_new.A)
         cond = BlockDiagLatentCondProjected.from_linop_and_noise(A_new, noise)
+
+        # Compare
+        print("Ref (after condensing)\n\t", observed.to_multivariate_normal())
+        assert False
+
         return observed, cond
 
     def merge(self, other, /):
@@ -453,7 +477,6 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
 
     @classmethod
     def from_dense_via_truncation(cls, rv):
-
         n = len(rv.mean)
         d = rv.mean_flat.size // n
         cholesky = BlockDiagNormal._remove_offdiag(rv.cholesky_flat, n=n, d=d)
@@ -571,9 +594,9 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
             keys = random.split(key, num=d)
             return func.vmap(BlockDiagNormal.sample_flat)(self, keys)
 
-        d, _n, n = self.cholesky_flat.shape
+        d, n, _n = self.cholesky_flat.shape
         base = random.normal(key, shape=(d, n))
-        return self.mean_flat + np.einsum("ijk,ij->ik", self.cholesky_flat, base)
+        return self.mean_flat + np.einsum("ijk,ik->ij", self.cholesky_flat, base)
 
     def identity_conditional(self) -> BlockDiagLatentCond:
         (d, ndim) = self.mean_flat.shape
