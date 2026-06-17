@@ -44,22 +44,14 @@ class BlockDiagLinOp(ssm_impl_api.AbstractLinOp):
 BlockDiagLinOp._register_as_pytree()
 
 
-class MatfreeLinOp(ssm_impl_api.AbstractLinOp):
-    def __init__(self, *, data_ndnd):
-        *_batch, n_out, d_out, n_in, d_in = data_ndnd.shape
+class MatfreeLinOpNdNd(ssm_impl_api.AbstractLinOp):
+    def __init__(self, *, matrix_ndnd):
+        *_batch, n_out, d_out, n_in, d_in = matrix_ndnd.shape
         super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
-        self.data_ndnd = data_ndnd
+        self.matrix_ndnd = matrix_ndnd
 
-    def matvec_ndnd(self, vec, /):
-        return linalg.einsum("...ijkl,...kl->...ij", self.data_ndnd, vec)
-
-    @classmethod
-    def from_matrix_ndnd(cls, matrix):
-        return cls(data_ndnd=matrix)
-
-    @property
-    def precon_prototype(self):
-        return np.ones((self.d_in,)), np.ones((self.d_out,))
+    def matvec_ndnd(self, vec):
+        return linalg.einsum("...ijkl,...kl->...ij", self.matrix_ndnd, vec)
 
     def to_dense_linop(self):
         from probdiffeq._probdiffeq import ssm_impl_dense
@@ -68,27 +60,124 @@ class MatfreeLinOp(ssm_impl_api.AbstractLinOp):
         matrix = func.jacfwd(self.matvec_ndnd)(dummy)
         return ssm_impl_dense.DenseLinOp.from_matrix_ndnd(matrix)
 
-    @classmethod
-    def from_dense_linop(cls, linop):
-        matrix_ndnd = linop.materialize_ndnd()
-        return cls.from_matrix_ndnd(matrix_ndnd)
+    @property
+    def precon_prototype(self):
+        return np.ones((self.d_in,)), np.ones((self.d_out,))
 
     @classmethod
     def _register_as_pytree(cls) -> None:
         """Register this class (or a subclass) as a JAX pytree."""
 
         def flatten(linop):
-            children = (linop.data_ndnd,)
+            children = (linop.matrix_ndnd,)
             return children, ()
 
         def unflatten(_aux, children):
-            (data_ndnd,) = children
-            return cls(data_ndnd=data_ndnd)
+            (matrix_ndnd,) = children
+            return cls(matrix_ndnd=matrix_ndnd)
 
         tree.register_pytree_node(cls, flatten, unflatten)
 
 
-MatfreeLinOp._register_as_pytree()
+MatfreeLinOpNdNd._register_as_pytree()
+
+
+class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
+    def __init__(self, X, AX):
+        _s, d_in, n_in = AX.shape  # LstSq is an inverse, thus AX="in"
+        _s, d_out, n_out = X.shape
+        super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
+        self.X = X
+        self.AX = AX
+
+    @property
+    def precon_prototype(self):
+        return np.ones((self.d_in,)), np.ones((self.d_out,))
+
+    def matvec_ndnd(self, vec):
+        vec_flat = vec.reshape((self.n_in * self.d_in,))
+        Avec_flat = self.matvec_flat(vec_flat)
+        return Avec_flat.reshape((self.n_out, self.d_out))
+
+    def matvec_flat(self, vec):
+        x = np.transpose(self.X, axes=(0, 2, 1)).reshape((self.X.shape[0], -1))
+        Ax = np.transpose(self.AX, axes=(0, 2, 1)).reshape((self.X.shape[0], -1))
+        return x.T @ linalg.lstsq_svd(Ax.T, vec)
+
+    # print(X.shape)
+    # print(AX.shape)
+    # print(x_flat)
+    # print(Ax_flat)
+
+    # assert False
+    # super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
+    # self._matvec_flat = matvec_flat
+    # self.data = data
+
+    # def matvec_ndnd(self, vec, /):
+    #     return self.matvec_flat(vec.reshape((-1))).reshape((self.n_out, self.d_out))
+
+    # def matvec_flat(self, vec, /):
+    #     return self._matvec_flat(vec, self.data)
+
+    # @classmethod
+    # def from_matvec_flat(cls, matvec, data, *, n_out, d_out, n_in, d_in):
+    #     return cls(matvec, data, n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
+
+    # @classmethod
+    # def from_matrix_ndnd(cls, matrix_ndnd):
+    #     raise RuntimeError
+
+    #     def matvec_ndnd(s, data):
+    #         return linalg.einsum("...ijkl,...kl->...ij", data, s)
+
+    #     n_out, d_out, n_in, d_in = matrix_ndnd.shape
+    #     return cls(
+    #         matvec=matvec_ndnd,
+    #         data=matrix_ndnd,
+    #         n_in=n_in,
+    #         n_out=n_out,
+    #         d_in=d_in,
+    #         d_out=d_out,
+    #     )
+
+    # @property
+    # def precon_prototype(self):
+    #     return np.ones((self.d_in,)), np.ones((self.d_out,))
+
+    # def to_dense_linop(self):
+    #     from probdiffeq._probdiffeq import ssm_impl_dense
+
+    #     dummy = np.ones((self.n_in, self.d_in))
+    #     matrix = func.jacfwd(self.matvec_ndnd)(dummy)
+    #     return ssm_impl_dense.DenseLinOp.from_matrix_ndnd(matrix)
+
+    # @classmethod
+    # def from_dense_linop(cls, linop):
+    #     raise RuntimeError
+    #     matrix_ndnd = linop.materialize_ndnd()
+    #     return cls.from_matrix_ndnd(matrix_ndnd)
+
+    # @classmethod
+    # def _register_as_pytree(cls) -> None:
+    #     """Register this class (or a subclass) as a JAX pytree."""
+
+    #     def flatten(linop):
+    #         children = (linop.data,)
+    #         aux = (linop._matvec_flat, linop.n_in, linop.n_out, linop.d_in, linop.d_out)
+    #         return children, aux
+
+    #     def unflatten(aux, children):
+    #         (data,) = children
+    #         matvec, n_in, n_out, d_in, d_out = aux
+    #         return cls(
+    #             matvec, data=data, n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out
+    #         )
+
+    #     tree.register_pytree_node(cls, flatten, unflatten)
+
+
+# MatfreeLinOpLstSq._register_as_pytree()
 
 
 class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
@@ -189,8 +278,11 @@ BlockDiagLatentCond._register_as_pytree()
 
 
 class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
-    def apply_flat(self, x, /):
+    def __init__(self, *args, num=100, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.num = num  # TODO: actually include this in the constructors
 
+    def apply_flat(self, x, /):
         y = self.A.matvec_ndnd(x.T).T
         m = y + self.noise.mean_flat
         c = self.noise.cholesky_flat
@@ -203,17 +295,16 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
     def revert(self, rv, /, *, solve_triu: Callable):
 
         # TODO: use preconditioning (currently assume P=1)
-        num = 100
         key = random.prng_key(seed=1)
         key_rv, key_noise = random.split(key, num=2)
 
         # AX.shape = (S, d, n)
-        keys = random.split(key_rv, num=num)
+        keys = random.split(key_rv, num=self.num)
         X = func.vmap(rv.sample_flat)(keys)
         AX = func.vmap(lambda s: self.A.matvec_ndnd(s.T).T)(X)
 
         # Y.shape = (S, d, n)
-        keys = random.split(key_noise, num=num)
+        keys = random.split(key_noise, num=self.num)
         Y = func.vmap(self.noise.sample_flat)(keys)
 
         # (S, d, n)
@@ -230,6 +321,10 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=1)(AX)
         observed = BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
 
+        X -= X.mean(axis=0)[None, ...]
+        X /= np.sqrt(X.shape[0] - 1)
+
+        A_new = MatfreeLinOpLstSq(X, AX)
         # Reference:
         from probdiffeq._probdiffeq import ssm_impl_dense
 
@@ -243,13 +338,16 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         _observed, cond_new = dense_cond.revert(rv, solve_triu=solve_triu)
 
         # Transform back into blockdiagonal RVs
-        # _observed = BlockDiagNormal.from_dense_via_truncation(observed)
         noise = BlockDiagNormal.from_dense_via_truncation(cond_new.noise)
-        A_new = MatfreeLinOp.from_dense_linop(cond_new.A)
         cond = BlockDiagLatentCondProjected.from_linop_and_noise(A_new, noise)
 
         # Compare
         return observed, cond
+
+    @staticmethod
+    def gain_matvec(s, x_and_ax):
+        x, ax = x_and_ax
+        return x.T @ linalg.lstsq_svd(ax.T, s)
 
     def merge(self, other, /):
         raise NotImplementedError
@@ -397,7 +495,7 @@ class BlockDiagOdeTs1Projected(ssm_impl_api.AbstractOde):
         # Collect all quantities and return
         noise = BlockDiagNormal.from_dirac(fx, damp=damp)
 
-        linop = MatfreeLinOp.from_matrix_ndnd(linop)
+        linop = MatfreeLinOpNdNd(matrix_ndnd=linop)
         cond = BlockDiagLatentCondProjected.from_linop_and_noise(linop, noise)
         return cond, state
 
