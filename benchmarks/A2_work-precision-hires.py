@@ -1,6 +1,5 @@
 """Walltime | Hires."""
 
-import functools
 from collections.abc import Callable
 
 import jax
@@ -40,7 +39,6 @@ def main(start=1.0, stop=10.0, step=2.0, repeats=2) -> None:
     # Assemble algorithms
     algorithms = {
         r"ProbDiffEq: TS1($3$, projected)": solver_projected(num_derivatives=3),
-        r"ProbDiffEq: TS1($5$, projected)": solver_projected(num_derivatives=5),
         r"ProbDiffEq: TS1($3$)": solver(num_derivatives=3),
         r"ProbDiffEq: TS1($5$)": solver(num_derivatives=5),
         r"ProbDiffEq: TS1($7$)": solver(num_derivatives=7),
@@ -154,11 +152,6 @@ def solver(*, num_derivatives: int) -> Callable:
 def solver_projected(*, num_derivatives: int) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
-    @functools.partial(probdiffeq.residual_jet_lift, lift_by=num_derivatives - 1)
-    @probdiffeq.residual_velocity
-    def residual(u, du, *, t):
-        return du - vf(u, t=t)
-
     @probdiffeq.ode
     def vf(u, /, *, t):  # noqa: ARG001
         """High irradiance response."""
@@ -182,13 +175,11 @@ def solver_projected(*, num_derivatives: int) -> Callable:
         # Build a solver
         jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives)
         tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
-        ssm = probdiffeq.state_space_model_dense()
+
+        ssm = probdiffeq.state_space_model_blockdiag()
 
         iwp = ssm.prior_wiener_integrated(tcoeffs)
-
-        taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
-        ts1 = ssm.constraint_residual_projected(residual, taylor_point=taylor_point)
-
+        ts1 = ssm.constraint_ode_ts1_projected(vf)
         strategy = probdiffeq.strategy_filter()
         solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=ts1)
         error = probdiffeq.error_state_std(constraint=ts1)

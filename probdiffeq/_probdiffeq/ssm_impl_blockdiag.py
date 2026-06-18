@@ -271,7 +271,28 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         return BlockDiagNormal(m, c, tree_flatten)
 
     def marginalise(self, rv, /):
-        raise NotImplementedError
+
+        # Sample count. See p. 6 in
+        # https://arxiv.org/abs/2606.08203
+        num = len(rv.mean) * 2
+
+        # Observed mean
+        obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
+
+        # Samples
+        key = random.prng_key(seed=1)
+        key_rv, key_noise = random.split(key, num=2)
+        keys = random.split(key_rv, num=num)
+        X = func.vmap(rv.sample_flat)(keys)
+        keys = random.split(key_noise, num=num)
+        Y = func.vmap(self.noise.sample_flat)(keys)
+
+        # Observed covariance
+        AX = func.vmap(lambda s: self.A.matvec_ndmd(s.T).T)(X) + Y
+        AX -= obs_mean[None, ...]
+        AX /= np.sqrt(AX.shape[0] - 1)
+        obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=1)(AX)
+        return BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
 
     def revert(self, rv, /, *, solve_triu: Callable):
         del solve_triu  # unused
@@ -285,6 +306,7 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
 
         # Samples
+        # TODO: this should be some form of state
         key = random.prng_key(seed=1)
         key_rv, key_noise = random.split(key, num=2)
         keys = random.split(key_rv, num=num)
