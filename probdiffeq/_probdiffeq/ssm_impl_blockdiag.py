@@ -271,7 +271,7 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         return BlockDiagNormal(m, c, tree_flatten)
 
     def marginalise(self, rv, /):
-
+        raise RuntimeError
         # Sample count. See p. 6 in
         # https://arxiv.org/abs/2606.08203
         num = len(rv.mean) * 2
@@ -305,41 +305,36 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         # Observed mean
         obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
 
-        # Samples
-        # TODO: this should be some form of state
-        key = random.prng_key(seed=1)
-        key_rv, key_noise = random.split(key, num=2)
-        keys = random.split(key_rv, num=num)
-        X = func.vmap(rv.sample_flat)(keys)
-        keys = random.split(key_noise, num=num)
-        Y = func.vmap(self.noise.sample_flat)(keys)
-
-        # Observed covariance
-        AX = func.vmap(lambda s: self.A.matvec_ndmd(s.T).T)(X) + Y
-        AX -= obs_mean[None, ...]
-        AX /= np.sqrt(AX.shape[0] - 1)
-        obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=1)(AX)
-        observed = BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
-
         # Gain & conditioning
         K = MatfreeLinOpLstSq(rv.cholesky_flat, self.noise.cholesky_flat, self.A)
 
-        def condition(a, b):
-            h = self.A.matvec_dndm(a) + b
-            return a - K.matvec_dndm(h)
-
         # Posterior mean:
-        cond_mean = condition(rv.mean_flat, self.noise.mean_flat)
+        cond_mean = rv.mean_flat - K.matvec_dndm(
+            self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
+        )
+        # Samples
+        key = random.prng_key(seed=1)  # TODO: this seed should be in some form of state
+        n = len(rv.mean)
+        d = rv.mean_flat.size // n
+        S = 2 * n
+        normals = random.rademacher(key, shape=(S, n, d), dtype=rv.mean_flat.dtype)
+        normals = linalg.einsum("dnm,smd->snd", rv.cholesky_flat, normals)
 
-        # Posterior covariance
-        KX = func.vmap(condition)(X, Y)
-        KX -= KX.mean(axis=0, keepdims=True)
-        KX /= np.sqrt(KX.shape[0] - 1)
-        cond_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=1)(KX)
+        # Posteriors
+        chols = func.vmap(lambda s: s - K.matvec_ndmd(self.A.matvec_ndmd(s)))(normals)
+        chols /= np.sqrt(S)
+        cond_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=-1)(chols)
         noise = BlockDiagNormal(cond_mean, cond_chol, rv.tree_flatten)
+        cond = BlockDiagLatentCondProjected.from_linop_and_noise(K, noise)
+
+        # Marginals (redo samples)
+        normals = random.rademacher(key, shape=(S, n, d), dtype=rv.mean_flat.dtype)
+        chols = func.vmap(self.A.matvec_ndmd)(normals)
+        chols /= np.sqrt(S)
+        obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=-1)(chols)
+        observed = BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
 
         # Group and return
-        cond = BlockDiagLatentCondProjected.from_linop_and_noise(K, noise)
         return observed, cond
 
     def merge(self, other, /):
@@ -357,7 +352,7 @@ def _transpose(matrix):
 
 
 class BlockDiagOdeTs0(ssm_impl_api.AbstractOde):
-    """Block-diagonal ODE linearization via TS0 (zeroth-degree Taylor series: evaluate at the prior mean, no Jacobian)."""
+    """Block-diagonal ODE linearization via TS0 (zeroth-degree Taylor series: evaluate at the or mean, no Jacobian)."""
 
     def init_linearization(self) -> None:
         return None
@@ -652,8 +647,13 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
         return -0.5 * (logdet_term + maha_term + u.size * np.log(np.pi() * 2))
 
     def to_multivariate_normal(self):
-        mean = np.reshape(self.mean_flat.T, (-1,), order="F")
-        cov = np.block_diag(self._cov_dense())
+        mean = np.reshape(self.mean_flat.T, (-1,))
+
+        cov = self._cov_dense()
+        *_batch, d, n, _n = cov.shape
+        eye = np.eye(d)
+        cov_full = linalg.einsum("dnm,dt->ndmt", cov, eye)
+        cov = cov_full.reshape((n * d, -1))
         return mean, cov
 
     def _cov_dense(self):

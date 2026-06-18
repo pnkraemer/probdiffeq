@@ -205,6 +205,7 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         cholesky_corrected = r_cor.T
         n = len(rv.mean)
         d = rv.mean_flat.size // n
+        cov_expected = cholesky_corrected @ cholesky_corrected.T
         cholesky_corrected = self._remove_offdiag(cholesky_corrected, n=n, d=d)
         corrected = DenseNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
 
@@ -235,25 +236,15 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCond):
 
     @staticmethod
     def _remove_offdiag(cholesky, n, d):
-        S = 10 * n
-        cholesky = cholesky.reshape((n, d, n, d))
-        key = random.prng_key(seed=1)
-        normals = random.rademacher(key, shape=(S, n, d), dtype=cholesky.dtype)
-        chols = linalg.einsum("ijkl,...kl->...ji", cholesky, normals)
-        chols /= np.sqrt(S - 1)
-        chols = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=1)(chols)
-        chols = linalg.einsum("dnm,dt->ndmt", chols, np.eye(d))
-        return chols.reshape((n * d, n * d))
-
-    @staticmethod
-    def _remove_offdiag(cholesky, n, d):
         S = 2 * n
         cholesky = cholesky.reshape((n, d, n, d))
         key = random.prng_key(seed=1)
         normals = random.rademacher(key, shape=(S, n, d), dtype=cholesky.dtype)
-        chols = linalg.einsum("ijkl,...kl->...ji", cholesky, normals)
-        chols /= np.sqrt(S - 1)
-        chols = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=1)(chols)
+
+        chols = linalg.einsum("ijkl,...kl->...ij", cholesky, normals)
+        chols /= np.sqrt(S)
+
+        chols = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=-1)(chols)
         chols = linalg.einsum("dnm,dt->ndmt", chols, np.eye(d))
         return chols.reshape((n * d, n * d))
 
