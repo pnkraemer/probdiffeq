@@ -272,7 +272,6 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         return BlockDiagNormal(m, c, tree_flatten)
 
     def marginalise(self, rv, /):
-
         # Observed mean
         obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
 
