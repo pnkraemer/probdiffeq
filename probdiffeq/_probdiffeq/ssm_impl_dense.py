@@ -148,97 +148,64 @@ DenseLatentCond._register_as_pytree()
 
 class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCond):
     def apply_flat(self, x, /):
-        x = self.to_latent * x
-        Ax = self.A.matvec_flat(x)
-        mean = self.to_observed * (Ax + self.noise.mean_flat)
-        cholesky = self.to_observed[:, None] * self.noise.cholesky_flat
-        return DenseNormal(mean, cholesky, self.noise.tree_flatten)
+        dense_cond = DenseLatentCond(
+            A=self.A,
+            noise=self.noise,
+            to_latent=self.to_latent,
+            to_observed=self.to_observed,
+        )
+        return dense_cond.apply_flat(x)
 
     def marginalise(self, rv, /):
-        n = len(rv.mean)
-        d = rv.mean_flat.size // n
-        mean = self.to_latent * rv.mean_flat
-        cholesky = self.to_latent[:, None] * rv.cholesky_flat
-
-        R_stack = (self.A.matmat_flat(cholesky).T, self.noise.cholesky_flat.T)
-        cholesky_new = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
-
-        mean_new = self.to_observed * (self.A.matvec_flat(mean) + self.noise.mean_flat)
-        cholesky_new = self.to_observed[:, None] * cholesky_new
-        n = mean_new.size // d
-        cholesky_new = self._remove_offdiag(cholesky_new, n=n, d=d)
-        return DenseNormal(mean_new, cholesky_new, self.noise.tree_flatten)
+        dense_cond = DenseLatentCond(
+            A=self.A,
+            noise=self.noise,
+            to_latent=self.to_latent,
+            to_observed=self.to_observed,
+        )
+        observed = dense_cond.marginalise(rv)
+        m = len(observed.mean)
+        d = observed.mean_flat.size // n
+        cholesky = self._remove_offdiag(observed.cholesky_flat, n=m, d=d)
+        return DenseNormal(observed.mean_flat, cholesky, noise.tree_flatten)
 
     def merge(self, other: "DenseLatentCondProjected", /) -> "DenseLatentCondProjected":
         raise RuntimeError
-        # self = cond1 (outer), other = cond2 (inner)
-        T = self.to_latent * other.to_observed
-
-        g = self.A @ (T[:, None] * other.A)
-        xi = self.A @ (T * other.noise.mean_flat) + self.noise.mean_flat
-
-        R1 = (self.A @ (T[:, None] * other.noise.cholesky_flat)).T
-        R2 = self.noise.cholesky_flat.T
-        Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
-
-        noise = DenseNormal(xi, Xi.T, self.noise.tree_flatten)
-        return DenseLatentCondProjected(
-            g, noise, to_latent=other.to_latent, to_observed=self.to_observed
-        )
 
     def revert(self, rv: "DenseNormal", /, *, solve_triu: Callable):
-        noise = self.noise
+        dense_cond = DenseLatentCond(
+            A=self.A,
+            noise=self.noise,
+            to_latent=self.to_latent,
+            to_observed=self.to_observed,
+        )
+        observed, cond_new = dense_cond.revert(rv, solve_triu=solve_triu)
 
-        # Pull into latent space
-        mean = self.to_latent * rv.mean_flat
-        cholesky = self.to_latent[:, None] * rv.cholesky_flat
-
-        # QR decomposition
-        matmat = func.vmap(self.A.matvec_flat, in_axes=-1, out_axes=-1)
-        R_X_F = matmat(cholesky).T
-        R_X = cholesky.T
-        R_YX = noise.cholesky_flat.T
-        r_obs, (r_cor, gain) = cholesky_util.revert_conditional(
-            R_X_F=R_X_F, R_X=R_X, R_YX=R_YX, solve_triu=solve_triu
+        # Reduce noise
+        noise = cond_new.noise
+        n = len(cond_new.noise.mean)
+        d = cond_new.noise.mean_flat.size // n
+        cholesky = self._remove_offdiag(noise.cholesky_flat, n=n, d=d)
+        noise = DenseNormal(noise.mean_flat, cholesky, noise.tree_flatten)
+        cond_new = DenseLatentCondProjected.from_linop_and_noise(
+            cond_new.A, noise=noise
         )
 
-        # Complete update from QR results (keep in latent space)
-        mean_observed = self.A.matvec_flat(mean) + noise.mean_flat
-        mean_corrected = mean - gain @ mean_observed
-        cholesky_corrected = r_cor.T
-        n = len(rv.mean)
-        d = rv.mean_flat.size // n
-        cholesky_corrected = self._remove_offdiag(cholesky_corrected, n=n, d=d)
-        corrected = DenseNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
+        # Reduce observed
+        m = len(observed.mean)
+        d = observed.mean_flat.size // m
+        cholesky = self._remove_offdiag(observed.cholesky_flat, n=m, d=d)
+        observed = DenseNormal(observed.mean_flat, cholesky, noise.tree_flatten)
 
-        # Save the conditional
-        gain_ndmd = gain.reshape((self.A.n_in, self.A.d_in, self.A.n_out, self.A.d_out))
-        cond_new = DenseLatentCondProjected(
-            DenseMatrix(matrix_ndmd=gain_ndmd),
-            corrected,
-            to_latent=1 / self.to_observed,  # is diagonal
-            to_observed=1 / self.to_latent,  # is diagonal
-        )
-
-        # Push marginals into latent space and remove offdiagonals from the Cholesky
-        mean = self.to_observed * mean_observed
-        cholesky = self.to_observed[:, None] * r_obs.T
-        n = mean.size // d
-        cholesky = self._remove_offdiag(cholesky, n=n, d=d)
-        observed = DenseNormal(mean, cholesky, noise.tree_flatten)
+        # Return values
         return observed, cond_new
 
     def preconditioner_apply(self, /):
         raise RuntimeError
-        A = self.to_observed[:, None] * self.A * self.to_latent[None, :]
-        mean = self.to_observed * self.noise.mean_flat
-        cholesky = self.to_observed[:, None] * self.noise.cholesky_flat
-        noise = DenseNormal(mean, cholesky, self.noise.tree_flatten)
-        return DenseLatentCondProjected.from_linop_and_noise(A, noise)
 
     @staticmethod
     def _remove_offdiag(cholesky, n, d):
-        S = 2 * n
+        S = 10_000
         cholesky = cholesky.reshape((n, d, n, d))
         key = random.prng_key(seed=1)
         normals = random.rademacher(key, shape=(S, n, d), dtype=cholesky.dtype)
