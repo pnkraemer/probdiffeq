@@ -34,18 +34,10 @@ class BlockDiagMatrix(ssm_impl_api.AbstractLinOp):
 
 
 class MatfreeLinOpNdNd(ssm_impl_api.AbstractLinOp):
-    # TODO: don't pass the matrix but make this into MatfreeLinOpODE
-    # because then we can pass the ODE and do the linop internally
-    # otherwise we have d^2 costs again...
     def __init__(self, *, matrix_ndnd: Array):
         *_batch, n_out, d_out, n_in, d_in = matrix_ndnd.shape
         super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
         self.matrix_ndnd = matrix_ndnd
-
-        msg = "Next up: make everything matrix-free."
-        msg += " To this end, change LinOpNdNd into an ODE JVP linop."
-        msg += " Then, use LSMR in the LstSq linop."
-        assert False, msg
 
     def matvec_ndmd(self, vec):
         return linalg.einsum("...ijkl,...kl->...ij", self.matrix_ndnd, vec)
@@ -225,10 +217,6 @@ BlockDiagLatentCond._register_as_pytree()
 
 
 class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
-    def __init__(self, *args, num=100, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.num = num  # TODO: actually make this user-facing
-
     def apply_flat(self, x, /):
         y = self.A.matvec_ndmd(x.T).T
         m = y + self.noise.mean_flat
@@ -241,8 +229,11 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
 
     def revert(self, rv, /, *, solve_triu: Callable):
         del solve_triu  # unused
-
         # TODO: use preconditioning (currently assume P=1)
+
+        # Sample count. See p. 6 in
+        # https://arxiv.org/abs/2606.08203
+        num = len(rv.mean) * 2
 
         # Observed mean
         obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
@@ -250,9 +241,9 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         # Samples
         key = random.prng_key(seed=1)
         key_rv, key_noise = random.split(key, num=2)
-        keys = random.split(key_rv, num=self.num)
+        keys = random.split(key_rv, num=num)
         X = func.vmap(rv.sample_flat)(keys)
-        keys = random.split(key_noise, num=self.num)
+        keys = random.split(key_noise, num=num)
         Y = func.vmap(self.noise.sample_flat)(keys)
 
         # Observed covariance
@@ -282,11 +273,6 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         # Group and return
         cond = BlockDiagLatentCondProjected.from_linop_and_noise(K, noise)
         return observed, cond
-
-    @staticmethod
-    def gain_matvec(s, x_and_ax):
-        x, ax = x_and_ax
-        return x.T @ linalg.lstsq_svd(ax.T, s)
 
     def merge(self, other, /):
         raise NotImplementedError
