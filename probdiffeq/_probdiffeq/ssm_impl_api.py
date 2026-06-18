@@ -1,5 +1,5 @@
 from probdiffeq._probdiffeq import jacobians, problems
-from probdiffeq.backend import abc, func, tree
+from probdiffeq.backend import abc, func, np, tree
 from probdiffeq.backend.typing import (
     TYPE_CHECKING,
     Array,
@@ -56,6 +56,12 @@ class AbstractLinOp(abc.ABC):
         matvec = self.matvec_flat
         matmat = func.vmap(matvec, in_axes=-1, out_axes=-1)
         return matmat(M)
+
+    def vecmat_flat(self, y, /):
+        x = np.zeros((self.d_in * self.n_in,))
+        vjp = func.linear_transpose(self.matvec_flat, x)
+        (vjpx,) = vjp(y)
+        return vjpx
 
     @abc.abstractmethod
     def matvec_ndmd(self, x, /):

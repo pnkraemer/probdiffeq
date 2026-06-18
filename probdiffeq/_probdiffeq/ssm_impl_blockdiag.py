@@ -34,13 +34,40 @@ class BlockDiagMatrix(ssm_impl_api.AbstractLinOp):
 
 
 class MatfreeLinOpODEConstraint(ssm_impl_api.AbstractLinOp):
-    def __init__(self, *, ode, n_out, d_out, n_in, d_in):
-        super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
+    def __init__(self, *, ode, tree_flatten, x, t):
         self.ode = ode
+        self.tree_flatten = tree_flatten
+        self.t = t
+        self.x = x
+
+        *_batch, n_in, d_in = x.shape
+        x_like = structs.ShapeDtypeStruct(shape=(n_in, d_in), dtype=x.dtype)
+        n_out, d_out = func.eval_shape(self._information_operator, x_like).shape
+        super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
 
     def matvec_ndmd(self, vec):
-        vec1 = vec[np.asarray([self.ode.num_tcoeffs_in_args])]
-        return vec1 - self.ode.jacobian.matvec_ndmd(vec)
+        # TODO: this line implies we do sooo many unnecessary function evals...
+        _, jvp = func.linearize(self._information_operator, self.x)
+
+        x1 = vec[np.asarray([self.ode.num_tcoeffs_in_args])]
+        fx0 = jvp(vec)
+        return x1 - fx0
+
+    def _information_operator(self, s: Array) -> Array:
+        # Move to latent space (arg is (n, d) but latent space is (d, n))
+        s = s.T
+
+        # Extract all tcoeffs
+        jet_coords = self.tree_flatten.unflatten_array(s)
+
+        # Extract relevant tcoeffs ("jet-coordinates")
+        jet_coords = jet_coords[: self.ode.num_tcoeffs_in_args]
+
+        # Evaluate the actual vector field
+        fs0 = self.ode.vector_field(jet_coords=jet_coords, t=self.t)
+
+        # Bring back into (m, d) form.
+        return tree.ravel_pytree(fs0)[0][None, :]
 
     def matvec_dndm(self, vec_dn):
         vec_nd = vec_dn.T
@@ -59,12 +86,14 @@ class MatfreeLinOpODEConstraint(ssm_impl_api.AbstractLinOp):
         """Register this class (or a subclass) as a JAX pytree."""
 
         def flatten(linop):
-            aux = (linop.ode, linop.n_in, linop.n_out, linop.d_in, linop.d_out)
-            return (), aux
+            children = linop.t, linop.x
+            aux = (linop.ode, linop.tree_flatten)
+            return children, aux
 
-        def unflatten(aux, _children):
-            ode, n_in, n_out, d_in, d_out = aux
-            return cls(ode=ode, n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
+        def unflatten(aux, children):
+            (t, x) = children
+            ode, tree_flatten = aux
+            return cls(ode=ode, tree_flatten=tree_flatten, t=t, x=x)
 
         tree.register_pytree_node(cls, flatten, unflatten)
 
@@ -108,8 +137,7 @@ class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
     def _matvec_flat_nonzero(self, vec):
 
         def vecmat(s):
-            # Jacobian-vector product
-            x_like = np.ones((self.n_out * self.d_out,))
+            # vector-Jacobian product
             Ats = self.matfree_linop.vecmat_flat(s)
 
             # Cholesky-vector products
@@ -388,46 +416,19 @@ class BlockDiagOdeTs1Projected(ssm_impl_api.AbstractOde):
         n = len(m_tree)
         d = rv.mean_flat.size // n
 
-        # Rewrite the vector field as one that maps
-        # Arrays to arrays.
-        # Maps (n, d) to (1, d) to conform the Jacobian API
-        def fun(s: Array) -> Array:
-            # Move to latent space
-            s = s.T
-
-            # Extract all tcoeffs
-            jet_coords = rv.tree_flatten.unflatten_array(s)
-
-            # Extract relevant tcoeffs ("jet-coordinates")
-            jet_coords = jet_coords[: self.ode.num_tcoeffs_in_args]
-
-            # Evaluate the actual vector field
-            fs0 = self.ode.vector_field(jet_coords=jet_coords, t=t)
-
-            # Bring back into (m, d) form.
-            return tree.ravel_pytree(fs0)[0][None, :]
-
         # Materialize the Jacobian
         m0 = rv.mean_flat.T
-        fx, J, state = self.ode.jacobian.materialize_dense(fun, m0, state)
+        fun = func.partial(self.information_operator, tree_flatten=rv.tree_flatten, t=t)
+        fx, JVP = func.linearize(fun, m0)
 
         # Flatten fx and J correctly (from [m, d, n, d] to [md,nd])
         m, d = fx.shape
         fx = fx.reshape((m * d,))
 
-        # Bulletproof construction of selection operators via jacobian(slicing)
-        # instead of instantiating identity matrices and selecting rows
-
-        @func.jacfwd
-        def projection_e1(s):
-            idx = np.asarray([self.ode.num_tcoeffs_in_args])
-            return s[idx]
-
         # Complete the expressions for bias and linop
 
-        fx = linalg.einsum("ijkl,kl->ij", J, rv.mean_flat.T) - fx
-        E1 = projection_e1(rv.mean_flat.T)
-        linop = E1 - J
+        fx = JVP(rv.mean_flat.T) - fx
+        # E1 = projection_e1(rv.mean_flat.T)
 
         # Flatten fx into the correct pytree structure
         f0 = BlockDiagNormal.from_dirac(
@@ -438,12 +439,31 @@ class BlockDiagOdeTs1Projected(ssm_impl_api.AbstractOde):
         # Collect all quantities and return
         noise = BlockDiagNormal.from_dirac(fx, damp=damp)
 
-        n_out, d_out, n_in, d_in = E1.shape
+        # n_out, d_out, n_in, d_in = E1.shape
         linop = MatfreeLinOpODEConstraint(
-            ode=self.ode, n_in=n_in, d_out=d_out, n_out=n_out, d_in=d_in
+            ode=self.ode, tree_flatten=rv.tree_flatten, t=t, x=m0
         )
         cond = BlockDiagLatentCondProjected.from_linop_and_noise(linop, noise)
         return cond, state
+
+    # Rewrite the vector field as one that maps
+    # Arrays to arrays.
+    # Maps (n, d) to (1, d) to conform the Jacobian API
+    def information_operator(self, s: Array, *, tree_flatten, t) -> Array:
+        # Move to latent space (arg is (n, d) but latent space is (d, n))
+        s = s.T
+
+        # Extract all tcoeffs
+        jet_coords = tree_flatten.unflatten_array(s)
+
+        # Extract relevant tcoeffs ("jet-coordinates")
+        jet_coords = jet_coords[: self.ode.num_tcoeffs_in_args]
+
+        # Evaluate the actual vector field
+        fs0 = self.ode.vector_field(jet_coords=jet_coords, t=t)
+
+        # Bring back into (m, d) form.
+        return tree.ravel_pytree(fs0)[0][None, :]
 
 
 @structs.dataclass
