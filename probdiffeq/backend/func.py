@@ -32,6 +32,10 @@ def vjp(func, *args):
     return jax.vjp(func, *args)
 
 
+def linear_transpose(func, *args):
+    return jax.linear_transpose(func, *args)
+
+
 def jvp(func, /, primals, tangents):
     return jax.jvp(func, primals, tangents)
 

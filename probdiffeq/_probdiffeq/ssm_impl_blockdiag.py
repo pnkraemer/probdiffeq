@@ -99,33 +99,43 @@ class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
         return Avec_flat.reshape((self.n_out, self.d_out))
 
     def matvec_flat(self, vec):
+        # LSMR struggles with zero RHS's right now,
+        # so we shortcut.
         out_like = np.zeros((self.n_out * self.d_out,))
         cond = linalg.vector_norm(vec) == 0
         return np.where(cond, out_like, self._matvec_flat_nonzero(vec))
 
     def _matvec_flat_nonzero(self, vec):
-        # LSMR struggles with zero RHS's right now,
-        # so we shortcut.
-
-        # Materialise matrices (TODO: make matrix-free!)
-        # Blockdiag in the correct N/D ordering
-        eye = np.eye(self.d_in)
-        B = linalg.einsum("dnm,dt->ndmt", self.cholesky_x, eye).reshape(
-            (self.d_out * self.n_out, -1)
-        )
-        D = linalg.einsum("dnm,dt->ndmt", self.cholesky_yx, eye).reshape(
-            (self.d_in * self.n_in, -1)
-        )
-
-        x_like = np.ones((self.n_out * self.d_out,))
-        A = func.jacfwd(self.matfree_linop.matvec_flat)(x_like)
-        matrix = np.concatenate([A @ B, D], axis=1)
 
         def vecmat(s):
-            return matrix.T @ s
+            # Jacobian-vector product
+            x_like = np.ones((self.n_out * self.d_out,))
+            vecmat = func.linear_transpose(self.matfree_linop.matvec_flat, x_like)
+            (Ats,) = vecmat(s)
 
+            # Cholesky-vector products
+            BtAts = self.matvec_bd_transpose(self.cholesky_x, Ats)
+            Dts = self.matvec_bd_transpose(self.cholesky_yx, s)
+            return np.concatenate([BtAts, Dts], axis=0)
+
+        # TODO: turn "D" into a damping factor
         lstsq_sol = linalg.lstsq_lsmr(vecmat, vec)
-        return B @ lstsq_sol[: A.shape[1]]
+        return self.matvec_bd(self.cholesky_x, lstsq_sol[: (self.n_out * self.d_out)])
+
+    @staticmethod
+    def matvec_bd_transpose(M, v):
+        d, n, _m = M.shape
+        v_dn = v.reshape((n, d)).T
+        # transpose matvec, not matvec:
+        Mv = linalg.einsum("...mn,...m->...n", M, v_dn)
+        return Mv.T.reshape((-1,))
+
+    @staticmethod
+    def matvec_bd(M, v):
+        d, n, _m = M.shape
+        v_dn = v.reshape((n, d)).T
+        Mv = linalg.einsum("...nm,...m->...n", M, v_dn)
+        return Mv.T.reshape((-1,))
 
 
 class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
