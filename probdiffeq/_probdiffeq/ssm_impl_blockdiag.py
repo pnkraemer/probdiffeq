@@ -99,6 +99,13 @@ class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
         return Avec_flat.reshape((self.n_out, self.d_out))
 
     def matvec_flat(self, vec):
+        out_like = np.zeros((self.n_out * self.d_out,))
+        cond = linalg.vector_norm(vec) == 0
+        return np.where(cond, out_like, self._matvec_flat_nonzero(vec))
+
+    def _matvec_flat_nonzero(self, vec):
+        # LSMR struggles with zero RHS's right now,
+        # so we shortcut.
 
         # Materialise matrices (TODO: make matrix-free!)
         # Blockdiag in the correct N/D ordering
@@ -114,8 +121,10 @@ class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
         A = func.jacfwd(self.matfree_linop.matvec_flat)(x_like)
         matrix = np.concatenate([A @ B, D], axis=1)
 
-        # TODO: use LSMR?
-        lstsq_sol = linalg.lstsq_svd(matrix, vec)
+        def vecmat(s):
+            return matrix.T @ s
+
+        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec)
         return B @ lstsq_sol[: A.shape[1]]
 
 
