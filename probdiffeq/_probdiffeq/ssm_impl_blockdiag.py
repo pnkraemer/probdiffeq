@@ -146,7 +146,8 @@ class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
             return np.concatenate([BtAts, Dts], axis=0)
 
         # TODO: turn "D" into a damping factor
-        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec)
+        tol = np.finfo_eps(vec.dtype)
+        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec, atol=tol, btol=tol, ctol=tol)
         return self.matvec_bd(self.cholesky_x, lstsq_sol[: (self.n_out * self.d_out)])
 
     @staticmethod
@@ -271,28 +272,40 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         return BlockDiagNormal(m, c, tree_flatten)
 
     def marginalise(self, rv, /):
-        raise RuntimeError
-        # Sample count. See p. 6 in
-        # https://arxiv.org/abs/2606.08203
-        num = len(rv.mean) * 2
 
         # Observed mean
         obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
 
-        # Samples
-        key = random.prng_key(seed=1)
-        key_rv, key_noise = random.split(key, num=2)
-        keys = random.split(key_rv, num=num)
-        X = func.vmap(rv.sample_flat)(keys)
-        keys = random.split(key_noise, num=num)
-        Y = func.vmap(self.noise.sample_flat)(keys)
-
-        # Observed covariance
-        AX = func.vmap(lambda s: self.A.matvec_ndmd(s.T).T)(X) + Y
-        AX -= obs_mean[None, ...]
-        AX /= np.sqrt(AX.shape[0] - 1)
-        obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=1)(AX)
+        # TODO: use precon
+        # TODO: we currently ignore the noise?
+        key = random.prng_key(seed=1)  # TODO: this seed should be in some form of state
+        d, n = rv.mean_flat.shape
+        S = 2 * n
+        normals = random.rademacher(key, shape=(S, n, d), dtype=rv.mean_flat.dtype)
+        chols = func.vmap(self.A.matvec_ndmd)(normals)
+        chols /= np.sqrt(S)
+        obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=-1)(chols)
         return BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
+
+        # raise RuntimeError
+        # # Sample count. See p. 6 in
+        # # https://arxiv.org/abs/2606.08203
+        # num = len(rv.mean) * 2
+
+        # # Samples
+        # key = random.prng_key(seed=1)
+        # key_rv, key_noise = random.split(key, num=2)
+        # keys = random.split(key_rv, num=num)
+        # X = func.vmap(rv.sample_flat)(keys)
+        # keys = random.split(key_noise, num=num)
+        # Y = func.vmap(self.noise.sample_flat)(keys)
+
+        # # Observed covariance
+        # AX = func.vmap(lambda s: self.A.matvec_ndmd(s.T).T)(X) + Y
+        # AX -= obs_mean[None, ...]
+        # AX /= np.sqrt(AX.shape[0] - 1)
+        # obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=1)(AX)
+        # return BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
 
     def revert(self, rv, /, *, solve_triu: Callable):
         del solve_triu  # unused
@@ -328,6 +341,7 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         cond = BlockDiagLatentCondProjected.from_linop_and_noise(K, noise)
 
         # Marginals (redo samples)
+        S = 2 * n
         normals = random.rademacher(key, shape=(S, n, d), dtype=rv.mean_flat.dtype)
         chols = func.vmap(self.A.matvec_ndmd)(normals)
         chols /= np.sqrt(S)

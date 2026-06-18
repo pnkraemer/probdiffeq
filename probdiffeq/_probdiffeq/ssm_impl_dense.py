@@ -155,7 +155,8 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         return DenseNormal(mean, cholesky, self.noise.tree_flatten)
 
     def marginalise(self, rv, /):
-        raise RuntimeError
+        n = len(rv.mean)
+        d = rv.mean_flat.size // n
         mean = self.to_latent * rv.mean_flat
         cholesky = self.to_latent[:, None] * rv.cholesky_flat
 
@@ -164,6 +165,8 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCond):
 
         mean_new = self.to_observed * (self.A.matvec_flat(mean) + self.noise.mean_flat)
         cholesky_new = self.to_observed[:, None] * cholesky_new
+        n = mean_new.size // d
+        cholesky_new = self._remove_offdiag(cholesky_new, n=n, d=d)
         return DenseNormal(mean_new, cholesky_new, self.noise.tree_flatten)
 
     def merge(self, other: "DenseLatentCondProjected", /) -> "DenseLatentCondProjected":
@@ -205,7 +208,6 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         cholesky_corrected = r_cor.T
         n = len(rv.mean)
         d = rv.mean_flat.size // n
-        cov_expected = cholesky_corrected @ cholesky_corrected.T
         cholesky_corrected = self._remove_offdiag(cholesky_corrected, n=n, d=d)
         corrected = DenseNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
 

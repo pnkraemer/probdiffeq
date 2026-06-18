@@ -61,8 +61,8 @@ def lstsq_svd(matrix, rhs, /):
     return jnp.linalg.lstsq(matrix, rhs)[0]
 
 
-def lstsq_lsmr(vecmat_fun, rhs, /):
-    lsmr = lstsq.lsmr()
+def lstsq_lsmr(vecmat_fun, rhs, /, **lsmr_kwargs):
+    lsmr = lstsq.lsmr(**lsmr_kwargs)
     sol, _info = lsmr(vecmat_fun, rhs)
     return sol
 
