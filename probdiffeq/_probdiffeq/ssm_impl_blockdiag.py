@@ -33,14 +33,14 @@ class BlockDiagMatrix(ssm_impl_api.AbstractLinOp):
         return np.ones((self.d_in,)), np.ones((self.d_out,))
 
 
-class MatfreeLinOpNdNd(ssm_impl_api.AbstractLinOp):
-    def __init__(self, *, matrix_ndnd: Array):
-        *_batch, n_out, d_out, n_in, d_in = matrix_ndnd.shape
+class MatfreeLinOpODEConstraint(ssm_impl_api.AbstractLinOp):
+    def __init__(self, *, ode, n_out, d_out, n_in, d_in):
         super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
-        self.matrix_ndnd = matrix_ndnd
+        self.ode = ode
 
     def matvec_ndmd(self, vec):
-        return linalg.einsum("...ijkl,...kl->...ij", self.matrix_ndnd, vec)
+        vec1 = vec[np.asarray([self.ode.num_tcoeffs_in_args])]
+        return vec1 - self.ode.jacobian.matvec_ndmd(vec)
 
     def matvec_dndm(self, vec_dn):
         vec_nd = vec_dn.T
@@ -59,17 +59,17 @@ class MatfreeLinOpNdNd(ssm_impl_api.AbstractLinOp):
         """Register this class (or a subclass) as a JAX pytree."""
 
         def flatten(linop):
-            children = (linop.matrix_ndnd,)
-            return children, ()
+            aux = (linop.ode, linop.n_in, linop.n_out, linop.d_in, linop.d_out)
+            return (), aux
 
-        def unflatten(_aux, children):
-            (matrix_ndnd,) = children
-            return cls(matrix_ndnd=matrix_ndnd)
+        def unflatten(aux, _children):
+            ode, n_in, n_out, d_in, d_out = aux
+            return cls(ode=ode, n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
 
         tree.register_pytree_node(cls, flatten, unflatten)
 
 
-MatfreeLinOpNdNd._register_as_pytree()
+MatfreeLinOpODEConstraint._register_as_pytree()
 
 
 class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
@@ -110,8 +110,7 @@ class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
         def vecmat(s):
             # Jacobian-vector product
             x_like = np.ones((self.n_out * self.d_out,))
-            vecmat = func.linear_transpose(self.matfree_linop.matvec_flat, x_like)
-            (Ats,) = vecmat(s)
+            Ats = self.matfree_linop.vecmat_flat(s)
 
             # Cholesky-vector products
             BtAts = self.matvec_bd_transpose(self.cholesky_x, Ats)
@@ -439,7 +438,10 @@ class BlockDiagOdeTs1Projected(ssm_impl_api.AbstractOde):
         # Collect all quantities and return
         noise = BlockDiagNormal.from_dirac(fx, damp=damp)
 
-        linop = MatfreeLinOpNdNd(matrix_ndnd=linop)
+        n_out, d_out, n_in, d_in = E1.shape
+        linop = MatfreeLinOpODEConstraint(
+            ode=self.ode, n_in=n_in, d_out=d_out, n_out=n_out, d_in=d_in
+        )
         cond = BlockDiagLatentCondProjected.from_linop_and_noise(linop, noise)
         return cond, state
 

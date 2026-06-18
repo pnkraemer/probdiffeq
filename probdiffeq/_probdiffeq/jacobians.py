@@ -1,6 +1,6 @@
 """Jacobian matrix handling."""
 
-from probdiffeq.backend import func, linalg, np, random, structs, tree
+from probdiffeq.backend import abc, func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Array
 
 __all__ = [
@@ -11,9 +11,13 @@ __all__ = [
 ]
 
 
-class Jacobian:
+class Jacobian(abc.ABC):
     """An interface for working with Jacobian matrices."""
 
+    def matvec_ndmd(self, vec):
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def init_jacobian_handler(self):
         """Initialize the handler state.
 
@@ -22,6 +26,7 @@ class Jacobian:
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
     def materialize_dense(self, fun, x, state, /, **fun_kwargs):
         """Materialize a dense Jacobian.
 
@@ -30,6 +35,7 @@ class Jacobian:
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
     def calculate_trace_along_d(self, fun, x, state, /, **fun_kwargs):
         """Calculate the trace of a Jacobian.
 
@@ -38,6 +44,7 @@ class Jacobian:
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
     def calculate_diagonal_along_d(self, fun, x, state, /, **fun_kwargs):
         """Calculate the diagonal of a Jacobian.
 
