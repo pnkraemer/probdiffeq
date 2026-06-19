@@ -15,7 +15,7 @@ For example, this variable is used to type Taylor coefficients.
 
 class BlockDiagMatrix(ssm_impl_api.AbstractLinop):
     def __init__(self, *, matrix_dnm):
-        d, n_out, n_in = matrix_dnm.shape
+        *_batch, d, n_out, n_in = matrix_dnm.shape
         super().__init__(n_in=n_in, n_out=n_out, d_in=d, d_out=d)
         self.matrix_dnm = matrix_dnm
 
@@ -30,7 +30,24 @@ class BlockDiagMatrix(ssm_impl_api.AbstractLinop):
 
     @property
     def precon_prototype(self):
-        return np.ones((self.d_in,)), np.ones((self.d_out,))
+        return np.ones((self.d_in, self.n_in)), np.ones((self.d_out, self.n_out))
+
+    @classmethod
+    def _register_as_pytree(cls) -> None:
+        """Register this class (or a subclass) as a JAX pytree."""
+
+        def flatten(linop):
+            children = (linop.matrix_dnm,)
+            return children, ()
+
+        def unflatten(_aux, children):
+            (matrix_dnm,) = children
+            return cls(matrix_dnm=matrix_dnm)
+
+        tree.register_pytree_node(cls, flatten, unflatten)
+
+
+BlockDiagMatrix._register_as_pytree()
 
 
 class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
@@ -86,7 +103,7 @@ class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
 
         rv_chol_upper = _transpose(cholesky)
         noise_chol_upper = _transpose(self.noise.cholesky_flat)
-        A_rv_chol_upper = _transpose(self.A @ cholesky)
+        A_rv_chol_upper = _transpose(self.A.matmat_dndm(cholesky))
 
         revert_conditional = func.partial(
             cholesky_util.revert_conditional, solve_triu=solve_triu
@@ -98,11 +115,11 @@ class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
         cholesky_obs = np.transpose(r_obs, axes=(0, 2, 1))
         cholesky_cor = np.transpose(r_cor, axes=(0, 2, 1))
 
-        mean_observed = (self.A @ mean[..., None])[..., 0] + self.noise.mean_flat
+        mean_observed = self.A.matvec_dndm(mean) + self.noise.mean_flat
         mean_corrected = mean - (gain @ (mean_observed[..., None]))[..., 0]
         corrected = BlockDiagNormal(mean_corrected, cholesky_cor, rv.tree_flatten)
         bwd = BlockDiagLatentCond(
-            gain,
+            BlockDiagMatrix(matrix_dnm=gain),
             corrected,
             to_latent=1 / self.to_observed,
             to_observed=1 / self.to_latent,
@@ -152,7 +169,7 @@ class BlockDiagOdeTs0(ssm_impl_api.AbstractOde):
             return s[[self.ode.num_tcoeffs_in_args], ...]
 
         linop = func.vmap(func.jacrev(a1))(rv.mean_flat)
-
+        linop = BlockDiagMatrix(matrix_dnm=linop)
         cond = BlockDiagLatentCond.from_linop_and_noise(linop, bias)
         return cond, None
 
@@ -199,6 +216,7 @@ class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
         fx = fx - diff
         fx = rv0.tree_flatten.unflatten_array(fx)
         bias = BlockDiagNormal.from_dirac([fx], damp=damp)
+        linop = BlockDiagMatrix(matrix_dnm=linop)
         cond = BlockDiagLatentCond.from_linop_and_noise(linop, bias)
         return cond, state
 

@@ -39,7 +39,7 @@ class MatfreeLinopODEConstraint(ssm_impl_api.AbstractLinop):
         # should we add external parametrisation to all matvecs, as in
         # matvec_ndmd(vec, p=(...))?
         _, jvp = func.linearize(self._information_operator, self.x)
-        assert False
+
         x1 = vec[np.asarray([self.ode.num_tcoeffs_in_args])]
         fx0 = jvp(vec)
         return x1 - fx0
@@ -159,6 +159,7 @@ class MatfreeLinopLstSq(ssm_impl_api.AbstractLinop):
 
 class MatfreeLatentCond(ssm_impl_api.AbstractLatentCondProjected):
     def apply_flat(self, x, /):
+        # TODO: use preconditioning (currently assume Precon=1)
         y = self.A.matvec_ndmd(x.T).T
         m = y + self.noise.mean_flat
         c = self.noise.cholesky_flat
@@ -179,12 +180,10 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCondProjected):
         return blockdiag.BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
 
     def revert(self, rv, /, *, solve_triu: Callable):
+        # Sample count? See p. 6 in https://arxiv.org/abs/2606.08203
         del solve_triu  # unused
-        # TODO: use preconditioning (currently assume P=1)
-
-        # Sample count. See p. 6 in
-        # https://arxiv.org/abs/2606.08203
-        num = len(rv.mean) * 2
+        # TODO: use preconditioning (currently assume Precon=1)
+        # TODO: move the MatfreeDense stuff to a separate module? Or delete it? Also, undo all changes in the blockdiag module and remove linop requirement from impl_api because the matfree is in a separate module?
 
         # Observed mean
         obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat

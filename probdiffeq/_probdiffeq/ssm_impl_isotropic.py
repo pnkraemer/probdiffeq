@@ -19,6 +19,50 @@ For example, this variable is used to type Taylor coefficients.
 __all__ = ["state_space_model_isotropic"]
 
 
+class IsotropicMatrix(ssm_impl_api.AbstractLinop):
+    def __init__(self, matrix_nn):
+        *_batch, n_out, n_in = matrix_nn.shape
+        super().__init__(n_out=n_out, n_in=n_in, d_out=None, d_in=None)
+        self.matrix_nn = matrix_nn
+
+    def matmat_nn(self, mat_nn):
+        return func.vmap(self.matvec_nn, in_axes=-1, out_axes=-1)(mat_nn)
+
+    def matvec_nn(self, vec_n):
+        return self.matrix_nn @ vec_n
+
+    def matvec_ndmd(self, vec_md):
+        return linalg.einsum("...nm,md->...nd", self.matrix_nn, vec_md)
+
+    def matvec_dndm(self, vec_dm):
+        raise NotImplementedError
+
+    def matvec_flat(self, vec_flat):
+        raise NotImplementedError
+
+    @property
+    def precon_prototype(self):
+        *_batch, n, _n = self.matrix_nn.shape
+        return np.ones((n,)), np.ones((n,))
+
+    @classmethod
+    def _register_as_pytree(cls) -> None:
+        """Register this class (or a subclass) as a JAX pytree."""
+
+        def flatten(linop):
+            children = (linop.matrix_nn,)
+            return children, ()
+
+        def unflatten(_aux, children):
+            (matrix_nn,) = children
+            return cls(matrix_nn=matrix_nn)
+
+        tree.register_pytree_node(cls, flatten, unflatten)
+
+
+IsotropicMatrix._register_as_pytree()
+
+
 @structs.dataclass
 class IsotropicTreeFlatten(ssm_impl_api.AbstractTreeFlatten):
     """Flattening information for isotropic random variables."""
@@ -71,17 +115,21 @@ class IsotropicLatentCond(ssm_impl_api.AbstractLatentCond):
 
     def apply_flat(self, x, /):
         x = self.to_latent[:, None] * x
-        mean_new = self.to_observed[:, None] * self.A @ x + self.noise.mean_flat
+        mean_new = (
+            self.to_observed[:, None] * self.A.matvec_ndmd(x) + self.noise.mean_flat
+        )
         cholesky_new = self.to_observed[:, None] * self.noise.cholesky_flat
         return IsotropicNormal(mean_new, cholesky_new, self.noise.tree_flatten)
 
     def marginalise(self, rv, /):
         mean = self.to_latent[:, None] * rv.mean_flat
         cholesky = self.to_latent[:, None] * rv.cholesky_flat
-        R_stack = ((self.A @ cholesky).T, self.noise.cholesky_flat.T)
+        R_stack = (self.A.matmat_nn(cholesky).T, self.noise.cholesky_flat.T)
         cholesky_new = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
 
-        mean_new = self.to_observed[:, None] * (self.A @ mean + self.noise.mean_flat)
+        mean_new = self.to_observed[:, None] * (
+            self.A.matvec_ndmd(mean) + self.noise.mean_flat
+        )
         cholesky_new = self.to_observed[:, None] * cholesky_new
         return IsotropicNormal(mean_new, cholesky_new, self.noise.tree_flatten)
 
@@ -105,7 +153,7 @@ class IsotropicLatentCond(ssm_impl_api.AbstractLatentCond):
         mean = self.to_latent[:, None] * rv.mean_flat
         cholesky = self.to_latent[:, None] * rv.cholesky_flat
 
-        R_X_F = (self.A @ cholesky).T
+        R_X_F = self.A.matmat_nn(cholesky).T
         R_X = cholesky.T
         R_YX = self.noise.cholesky_flat.T
         tmp = cholesky_util.revert_conditional(
@@ -113,12 +161,12 @@ class IsotropicLatentCond(ssm_impl_api.AbstractLatentCond):
         )
         r_obs, (r_cor, gain) = tmp
 
-        mean_observed = self.A @ mean + self.noise.mean_flat
+        mean_observed = self.A.matvec_ndmd(mean) + self.noise.mean_flat
         mean_corrected = mean - gain @ mean_observed
         cholesky_corrected = r_cor.T
         corrected = IsotropicNormal(mean_corrected, cholesky_corrected, rv.tree_flatten)
         cond_new = IsotropicLatentCond(
-            gain,
+            IsotropicMatrix(gain),
             corrected,
             to_latent=1 / self.to_observed,
             to_observed=1 / self.to_latent,
@@ -173,6 +221,11 @@ class IsotropicNormal(ssm_impl_api.AbstractTreeNormal[IsotropicTreeFlatten]):
 
         cholesky_flat = linalg.diagonal_matrix(scale_flat)
         return cls(loc_flat, cholesky_flat, tree_flatten)
+
+    @property
+    def batch_shape(self):
+        *shape, _n, _d = self.mean_flat.shape
+        return shape
 
     @property
     def mean(self):
@@ -307,9 +360,11 @@ class IsotropicOdeTs0(ssm_impl_api.AbstractOde):
 
         bias = IsotropicNormal.from_dirac([fx], damp=damp)
 
-        linop = func.jacrev(lambda s: s[[self.ode.num_tcoeffs_in_args], ...])(
-            rv.mean_flat[..., 0]
-        )
+        def select(s):
+            return s[[self.ode.num_tcoeffs_in_args], ...]
+
+        linop = func.jacrev(select)(rv.mean_flat[..., 0])
+        linop = IsotropicMatrix(linop)
         cond = IsotropicLatentCond.from_linop_and_noise(linop, bias)
         return cond, None
 
@@ -479,7 +534,7 @@ class state_space_model_isotropic(ssm_impl_api.StateSpaceModel):
         return IsotropicWienerIntegrated(
             init,
             output_scale,
-            A=A,
+            A=IsotropicMatrix(A),
             q_sqrtm=q_sqrtm,
             q0=q0,
             tree_flatten=tf,
