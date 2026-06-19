@@ -264,6 +264,36 @@ BlockDiagLatentCond._register_as_pytree()
 
 
 class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
+    def __init__(self, A, *, noise, to_latent, to_observed, num_probes, key):
+        # TODO: this breaks the substitution principle because superclasses'
+        # from_linop_and_noise doesnt work any longer. Solve this later
+        # by giving all projected LatentConds the same interface, but different
+        # from the exact latent conds (sharing what's in common eg function calls)
+        # but having different constructors...
+        super().__init__(A, noise, to_latent, to_observed)
+
+        self.num_probes = num_probes
+        self.key = key
+
+    @classmethod
+    def from_linop_and_noise_and_stochtrace(cls, A, noise, *, key, num_probes):
+        """Construct a latent conditional with unit en- and decoders."""
+        if len(noise.batch_shape) > 0:
+            construct = func.partial(
+                cls.from_linop_and_noise_and_stochtrace, key=key, num_probes=num_probes
+            )
+            return func.vmap(construct)(A, noise)
+
+        to_latent, to_observed = A.precon_prototype
+        return cls(
+            A,
+            noise=noise,
+            to_latent=to_latent,
+            to_observed=to_observed,
+            key=key,
+            num_probes=num_probes,
+        )
+
     def apply_flat(self, x, /):
         y = self.A.matvec_ndmd(x.T).T
         m = y + self.noise.mean_flat
@@ -275,14 +305,12 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         # Observed mean
         obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
 
-        # TODO: use precon
-        # TODO: we currently ignore the noise?
-        key = random.prng_key(seed=1)  # TODO: this seed should be in some form of state
-        d, n = rv.mean_flat.shape
-        S = 10_000
-        normals = random.rademacher(key, shape=(S, n, d), dtype=rv.mean_flat.dtype)
-        chols = func.vmap(self.A.matvec_ndmd)(normals)
-        chols /= np.sqrt(S)
+        # TODO: we currently ignore the precon
+        # TODO: we currently ignore the noise
+        (d, n), dtype = rv.mean_flat.shape, rv.mean_flat.dtype
+        probes = random.normal(self.key, shape=(self.num_probes, n, d), dtype=dtype)
+        chols = func.vmap(self.A.matvec_ndmd)(probes)
+        chols /= np.sqrt(self.num_probes)
         obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=-1)(chols)
         return BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
 
@@ -306,25 +334,25 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         )
 
         # Samples
-        key = random.prng_key(seed=1)  # TODO: this seed should be in some form of state
         n = len(rv.mean)
         d = rv.mean_flat.size // n
-        S = 10_000
-        normals = random.rademacher(key, shape=(S, n, d), dtype=rv.mean_flat.dtype)
-        normals = linalg.einsum("dnm,smd->snd", rv.cholesky_flat, normals)
+        probes = random.normal(
+            self.key, shape=(self.num_probes, n, d), dtype=obs_mean.dtype
+        )
+        probes = linalg.einsum("dnm,smd->snd", rv.cholesky_flat, probes)
 
         # Posteriors
-        chols = func.vmap(lambda s: s - K.matvec_ndmd(self.A.matvec_ndmd(s)))(normals)
-        chols /= np.sqrt(S)
+        chols = func.vmap(lambda s: s - K.matvec_ndmd(self.A.matvec_ndmd(s)))(probes)
+        chols /= np.sqrt(self.num_probes)
         cond_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=-1)(chols)
         noise = BlockDiagNormal(cond_mean, cond_chol, rv.tree_flatten)
-        cond = BlockDiagLatentCondProjected.from_linop_and_noise(K, noise)
 
-        # Marginals (redo samples)
-        S = 10_000
-        normals = random.rademacher(key, shape=(S, n, d), dtype=rv.mean_flat.dtype)
-        chols = func.vmap(self.A.matvec_ndmd)(normals)
-        chols /= np.sqrt(S)
+        construct = BlockDiagLatentCondProjected.from_linop_and_noise_and_stochtrace
+        cond = construct(K, noise, key=self.key, num_probes=self.num_probes)
+
+        # Marginals (redo samples for whichever reason)
+        chols = func.vmap(self.A.matvec_ndmd)(probes)
+        chols /= np.sqrt(self.num_probes)
         obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=-1)(chols)
         observed = BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
 
@@ -336,6 +364,29 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
 
     def preconditioner_apply(self, /):
         raise NotImplementedError
+
+    @classmethod
+    def _register_as_pytree(cls) -> None:
+        """Register this class (or a subclass) as a JAX pytree."""
+
+        def flatten(cond):
+            children = cond.A, cond.noise, cond.to_latent, cond.to_observed, cond.key
+            aux = (cond.num_probes,)
+            return children, aux
+
+        def unflatten(aux, children):
+            A, noise, to_latent, to_observed, key = children
+            (num_probes,) = aux
+            return cls(
+                A,
+                noise=noise,
+                to_latent=to_latent,
+                to_observed=to_observed,
+                key=key,
+                num_probes=num_probes,
+            )
+
+        tree.register_pytree_node(cls, flatten, unflatten)
 
 
 BlockDiagLatentCondProjected._register_as_pytree()
@@ -417,8 +468,16 @@ class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
 class BlockDiagOdeTs1Projected(ssm_impl_api.AbstractOde):
     """Dense ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
 
+    def __init__(self, *, ode, key, num_probes):
+        super().__init__(ode=ode)
+        self.key = key
+        self.num_probes = num_probes
+
     def init_linearization(self):
-        return self.ode.jacobian.init_jacobian_handler()
+        # todo: we should move the trace estimation outside
+        # the jacobian object. Then, this bit here becomes simpler?
+        jac = self.ode.jacobian.init_jacobian_handler()
+        return self.key, jac
 
     def linearize(self, rv, state, *, damp: float, t: float):
         # Read n and d so that we can turn latent arrays into
@@ -454,8 +513,13 @@ class BlockDiagOdeTs1Projected(ssm_impl_api.AbstractOde):
         linop = MatfreeLinOpODEConstraint(
             ode=self.ode, tree_flatten=rv.tree_flatten, t=t, x=m0
         )
-        cond = BlockDiagLatentCondProjected.from_linop_and_noise(linop, noise)
-        return cond, state
+
+        construct = BlockDiagLatentCondProjected.from_linop_and_noise_and_stochtrace
+        key, jac = state
+        key, subkey = random.split(key, num=2)
+        cond = construct(linop, noise, key=subkey, num_probes=self.num_probes)
+
+        return cond, (key, jac)
 
     # Rewrite the vector field as one that maps
     # Arrays to arrays.
@@ -913,12 +977,12 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
         return BlockDiagOdeTs1(ode=ode)
 
     def constraint_ode_ts1_projected(
-        self, ode: problems.JetOde, /
+        self, ode: problems.JetOde, /, *, key, num_probes
     ) -> BlockDiagOdeTs1Projected:
         if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
 
-        return BlockDiagOdeTs1Projected(ode=ode)
+        return BlockDiagOdeTs1Projected(ode=ode, key=key, num_probes=num_probes)
 
     def constraint_residual(
         self,
