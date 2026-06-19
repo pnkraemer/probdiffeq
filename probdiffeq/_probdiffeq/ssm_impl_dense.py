@@ -146,7 +146,7 @@ class DenseLatentCond(ssm_impl_api.AbstractLatentCond):
 DenseLatentCond._register_as_pytree()
 
 
-class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCond):
+class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
     def apply_flat(self, x, /):
         dense_cond = DenseLatentCond(
             A=self.A,
@@ -187,8 +187,10 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCond):
         d = cond_new.noise.mean_flat.size // n
         cholesky = self._remove_offdiag(noise.cholesky_flat, n=n, d=d)
         noise = DenseNormal(noise.mean_flat, cholesky, noise.tree_flatten)
-        cond_new = DenseLatentCondProjected.from_linop_and_noise(
-            cond_new.A, noise=noise
+
+        construct = DenseLatentCondProjected.from_linop_and_noise_and_stochtrace
+        cond_new = construct(
+            cond_new.A, noise=noise, key=self.key, num_probes=self.num_probes
         )
 
         # Reduce observed
@@ -462,13 +464,15 @@ class DenseOdeTs1(ssm_impl_api.AbstractOde):
         return cond, state
 
 
-class DenseOdeTs1Projected(ssm_impl_api.AbstractOde):
-    """Dense ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
-
+class DenseOdeTs1Projected(ssm_impl_api.AbstractOdeProjected):
     def init_linearization(self):
-        return self.ode.jacobian.init_jacobian_handler()
+        jac = self.ode.jacobian.init_jacobian_handler()
+        return self.key, jac
 
     def linearize(self, rv, state, *, damp: float, t: float):
+        key, jacstate = state
+        del state
+
         # Read n and d so that we can turn latent arrays into
         # (n, d) arrays, which Jacobians require
         m_tree = rv.mean
@@ -496,7 +500,8 @@ class DenseOdeTs1Projected(ssm_impl_api.AbstractOde):
 
         # Materialize the Jacobian
         m0 = rv.mean_flat.reshape((n, d))
-        fx, J, state = self.ode.jacobian.materialize_dense(fun, m0, state)
+
+        fx, J, jacstate = self.ode.jacobian.materialize_dense(fun, m0, jacstate)
 
         # Flatten fx and J correctly (from [m, d, n, d] to [md,nd])
         m, d = fx.shape
@@ -523,8 +528,12 @@ class DenseOdeTs1Projected(ssm_impl_api.AbstractOde):
         # Collect all quantities and return
         noise = DenseNormal.from_dirac(fx, damp=damp)
         linop = DenseMatrix.from_flat(linop, n_out=m, d_out=d, n_in=n, d_in=d)
-        cond = DenseLatentCondProjected.from_linop_and_noise(linop, noise)
-        return cond, state
+
+        key, subkey = random.split(key, num=2)
+        construct = DenseLatentCondProjected.from_linop_and_noise_and_stochtrace
+        cond = construct(linop, noise, key=subkey, num_probes=self.num_probes)
+
+        return cond, (key, jacstate)
 
 
 class DenseResidual(ssm_impl_api.AbstractResidual):
@@ -986,11 +995,11 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         return DenseOdeTs1(ode=ode)
 
     def constraint_ode_ts1_projected(
-        self, ode: problems.JetOde, /
+        self, ode: problems.JetOde, /, key, num_probes
     ) -> DenseOdeTs1Projected:
         if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
-        return DenseOdeTs1Projected(ode=ode)
+        return DenseOdeTs1Projected(ode=ode, key=key, num_probes=num_probes)
 
     def constraint_residual(
         self,

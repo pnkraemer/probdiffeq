@@ -263,37 +263,7 @@ class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
 BlockDiagLatentCond._register_as_pytree()
 
 
-class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
-    def __init__(self, A, *, noise, to_latent, to_observed, num_probes, key):
-        # TODO: this breaks the substitution principle because superclasses'
-        # from_linop_and_noise doesnt work any longer. Solve this later
-        # by giving all projected LatentConds the same interface, but different
-        # from the exact latent conds (sharing what's in common eg function calls)
-        # but having different constructors...
-        super().__init__(A, noise, to_latent, to_observed)
-
-        self.num_probes = num_probes
-        self.key = key
-
-    @classmethod
-    def from_linop_and_noise_and_stochtrace(cls, A, noise, *, key, num_probes):
-        """Construct a latent conditional with unit en- and decoders."""
-        if len(noise.batch_shape) > 0:
-            construct = func.partial(
-                cls.from_linop_and_noise_and_stochtrace, key=key, num_probes=num_probes
-            )
-            return func.vmap(construct)(A, noise)
-
-        to_latent, to_observed = A.precon_prototype
-        return cls(
-            A,
-            noise=noise,
-            to_latent=to_latent,
-            to_observed=to_observed,
-            key=key,
-            num_probes=num_probes,
-        )
-
+class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
     def apply_flat(self, x, /):
         y = self.A.matvec_ndmd(x.T).T
         m = y + self.noise.mean_flat
@@ -364,29 +334,6 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCond):
 
     def preconditioner_apply(self, /):
         raise NotImplementedError
-
-    @classmethod
-    def _register_as_pytree(cls) -> None:
-        """Register this class (or a subclass) as a JAX pytree."""
-
-        def flatten(cond):
-            children = cond.A, cond.noise, cond.to_latent, cond.to_observed, cond.key
-            aux = (cond.num_probes,)
-            return children, aux
-
-        def unflatten(aux, children):
-            A, noise, to_latent, to_observed, key = children
-            (num_probes,) = aux
-            return cls(
-                A,
-                noise=noise,
-                to_latent=to_latent,
-                to_observed=to_observed,
-                key=key,
-                num_probes=num_probes,
-            )
-
-        tree.register_pytree_node(cls, flatten, unflatten)
 
 
 BlockDiagLatentCondProjected._register_as_pytree()
@@ -465,17 +412,16 @@ class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
         return cond, state
 
 
-class BlockDiagOdeTs1Projected(ssm_impl_api.AbstractOde):
+class BlockDiagOdeTs1Projected(ssm_impl_api.AbstractOdeProjected):
     """Dense ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
-
-    def __init__(self, *, ode, key, num_probes):
-        super().__init__(ode=ode)
-        self.key = key
-        self.num_probes = num_probes
 
     def init_linearization(self):
         # todo: we should move the trace estimation outside
         # the jacobian object. Then, this bit here becomes simpler?
+        # For example, we could even move the information operator
+        # to a method in the ODE, then call func.linearize() / vjp()
+        # in the constraints here, and then call the trace/diagonal estimators
+        # on this linearisation with a uniform API.
         jac = self.ode.jacobian.init_jacobian_handler()
         return self.key, jac
 

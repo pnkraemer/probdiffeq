@@ -82,14 +82,8 @@ class AbstractLinOp(abc.ABC):
         raise NotImplementedError
 
 
-class AbstractLatentCond:
-    """Conditional distributions in latent space.
-
-    Subclasses implement the SSM-specific operations (marginalise, revert, etc.).
-    """
-
+class AbstractLatentCondAPI:
     def __init__(self, A, noise, to_latent, to_observed) -> None:
-
         if not isinstance(A, AbstractLinOp):
             msg = f"Linear operator expected, but {A} received."
             raise TypeError(msg)
@@ -98,38 +92,6 @@ class AbstractLatentCond:
         self.noise = noise
         self.to_latent = to_latent
         self.to_observed = to_observed
-
-    def __repr__(self) -> str:
-        msg = f"{self.__class__.__name__}(A={self.A}, noise={self.noise}"
-        msg += f", to_latent={self.to_latent}, to_observed={self.to_observed})"
-        return msg
-
-    @classmethod
-    def _register_as_pytree(cls) -> None:
-        """Register this class (or a subclass) as a JAX pytree."""
-
-        def flatten(cond):
-            children = cond.A, cond.noise, cond.to_latent, cond.to_observed
-            return children, ()
-
-        def unflatten(_aux, children):
-            A, noise, to_latent, to_observed = children
-            return cls(A, noise, to_latent, to_observed)
-
-        tree.register_pytree_node(cls, flatten, unflatten)
-
-    @classmethod
-    def from_linop_and_noise(cls, A: AbstractLinOp, noise):
-        """Construct a latent conditional with unit en- and decoders."""
-        if len(noise.batch_shape) > 0:
-            return func.vmap(cls.from_linop_and_noise)(A, noise)
-
-        if not isinstance(A, AbstractLinOp):
-            msg = f"Linear operator expected, but {A} received."
-            raise TypeError(msg)
-
-        to_latent, to_observed = A.precon_prototype
-        return cls(A, noise=noise, to_latent=to_latent, to_observed=to_observed)
 
     def rescale_noise(self, factor, /):
         """Rescale the noise in a conditional."""
@@ -188,7 +150,98 @@ class AbstractLatentCond:
         return mahalanobis, updated
 
 
-AbstractLatentCond._register_as_pytree()
+class AbstractLatentCondProjected(AbstractLatentCondAPI):
+    def __init__(self, A, *, noise, to_latent, to_observed, num_probes, key):
+        super().__init__(A, noise, to_latent, to_observed)
+        self.num_probes = num_probes
+        self.key = key
+
+    def __repr__(self) -> str:
+        msg = f"{self.__class__.__name__}(A={self.A}, noise={self.noise}"
+        msg += f", to_latent={self.to_latent}, to_observed={self.to_observed}"
+        msg += f", num_probes={self.num_probes}, key={self.key})"
+        return msg
+
+    @classmethod
+    def from_linop_and_noise_and_stochtrace(cls, A, noise, *, key, num_probes):
+        """Construct a latent conditional with unit en- and decoders."""
+        if len(noise.batch_shape) > 0:
+            construct = func.partial(
+                cls.from_linop_and_noise_and_stochtrace, key=key, num_probes=num_probes
+            )
+            return func.vmap(construct)(A, noise)
+
+        to_latent, to_observed = A.precon_prototype
+        return cls(
+            A,
+            noise=noise,
+            to_latent=to_latent,
+            to_observed=to_observed,
+            key=key,
+            num_probes=num_probes,
+        )
+
+    @classmethod
+    def _register_as_pytree(cls) -> None:
+        """Register this class (or a subclass) as a JAX pytree."""
+
+        def flatten(cond):
+            children = cond.A, cond.noise, cond.to_latent, cond.to_observed, cond.key
+            aux = (cond.num_probes,)
+            return children, aux
+
+        def unflatten(aux, children):
+            A, noise, to_latent, to_observed, key = children
+            (num_probes,) = aux
+            return cls(
+                A,
+                noise=noise,
+                to_latent=to_latent,
+                to_observed=to_observed,
+                key=key,
+                num_probes=num_probes,
+            )
+
+        tree.register_pytree_node(cls, flatten, unflatten)
+
+
+class AbstractLatentCond(AbstractLatentCondAPI):
+    """Conditional distributions in latent space.
+
+    Subclasses implement the SSM-specific operations (marginalise, revert, etc.).
+    """
+
+    def __repr__(self) -> str:
+        msg = f"{self.__class__.__name__}(A={self.A}, noise={self.noise}"
+        msg += f", to_latent={self.to_latent}, to_observed={self.to_observed})"
+        return msg
+
+    @classmethod
+    def _register_as_pytree(cls) -> None:
+        """Register this class (or a subclass) as a JAX pytree."""
+
+        def flatten(cond):
+            children = cond.A, cond.noise, cond.to_latent, cond.to_observed
+            return children, ()
+
+        def unflatten(_aux, children):
+            A, noise, to_latent, to_observed = children
+            return cls(A, noise, to_latent, to_observed)
+
+        tree.register_pytree_node(cls, flatten, unflatten)
+
+    @classmethod
+    def from_linop_and_noise(cls, A: AbstractLinOp, noise):
+        """Construct a latent conditional with unit en- and decoders."""
+        if len(noise.batch_shape) > 0:
+            return func.vmap(cls.from_linop_and_noise)(A, noise)
+
+        if not isinstance(A, AbstractLinOp):
+            msg = f"Linear operator expected, but {A} received."
+            raise TypeError(msg)
+
+        to_latent, to_observed = A.precon_prototype
+        return cls(A, noise=noise, to_latent=to_latent, to_observed=to_observed)
 
 
 class AbstractLinearization(abc.ABC):
@@ -233,6 +286,17 @@ class AbstractOde(AbstractLinearization):
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(ode={self.ode})"
+
+
+class AbstractOdeProjected(AbstractLinearization):
+    def __init__(self, *, ode, key, num_probes) -> None:
+        self.ode = ode
+        self.key = key
+        self.num_probes = num_probes
+        self.residual_order = self.ode.num_tcoeffs_in_args + 1
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(ode={self.ode}, key={self.key},num_probes={self.num_probes})"
 
 
 class AbstractTreeFlatten(abc.ABC):
