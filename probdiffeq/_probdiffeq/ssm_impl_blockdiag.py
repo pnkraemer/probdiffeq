@@ -314,7 +314,8 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
             return p_nd - KAp_nd
 
         # Posteriors
-        C = self._blockdiag_cholesky_from_ensembles(matvec_ndmd, ensembles)
+        matvec_ensembles = func.vmap(matvec_ndmd)(ensembles)
+        C = self._blockdiag_cholesky_from_ensembles(matvec_ensembles)
         noise = BlockDiagNormal(cond_mean, C, rv.tree_flatten)
 
         # Backward linear operator
@@ -323,29 +324,29 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
         cond = construct(K, noise, key=subkey, num_probes=self.num_probes)
 
         # Marginals (redo samples for whichever reason)
-        C = self._blockdiag_cholesky_from_ensembles(self.A.matvec_ndmd, ensembles)
+        matvec_ensembles = func.vmap(self.A.matvec_ndmd)(ensembles)
+        C = self._blockdiag_cholesky_from_ensembles(matvec_ensembles)
         observed = BlockDiagNormal(obs_mean, C, self.noise.tree_flatten)
 
         # Group and return
         return observed, cond
 
     @staticmethod
-    def _blockdiag_cholesky_from_ensembles(matvec_ndmd, ensembles_smd):
+    def _blockdiag_cholesky_from_ensembles(ensembles_smd, bias: bool = False):
         S, _n, _d = ensembles_smd.shape
-        # Center, apply matvec, and normalise
-        ensembles_smd -= ensembles_smd.mean(axis=0, keepdims=True)
-        cholesky = func.vmap(matvec_ndmd)(ensembles_smd)
 
-        _S, m, _d = cholesky.shape
+        # Center the ensembles
+        ensembles_smd -= ensembles_smd.mean(axis=0, keepdims=True)
 
         def ensemble_to_sample_cholesky(s):
-            """Compute a sample Cholesky factor fro ensembles."""
+            """Compute a sample Cholesky factor from ensembles."""
             num, _n = s.shape
-            s /= np.sqrt(num)
+            s = s / np.sqrt(num) if bias else s / np.sqrt(num - 1)
             return linalg.qr_r(s).T
 
         # The QR decomposition is why we assume S >= n,
         # so let's check it briefly:
+        _S, m, _d = ensembles_smd.shape
         if m > S:
             msg = "The function requires at least as many ensembles as Taylor coefficients."
             msg += f" Received: S={S} < m={m}, which violates this assumption."
@@ -354,7 +355,7 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
         # Assume ensembles are shape (S, n, d), so we batch along d
         # but since we also want the output to be (d, n, n), the out_axes is 0.
         transform = func.vmap(ensemble_to_sample_cholesky, in_axes=-1, out_axes=0)
-        return transform(cholesky)
+        return transform(ensembles_smd)
 
     def merge(self, other, /):
         raise NotImplementedError

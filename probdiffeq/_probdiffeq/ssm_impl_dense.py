@@ -12,6 +12,158 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
+@structs.dataclass
+class DenseTreeFlatten(ssm_impl_api.AbstractTreeFlatten):
+    """Implementation of flattening information for dense models."""
+
+    unravel: Callable
+
+    def flatten_tree(self, x):
+        return tree.ravel_pytree(x)[0]
+
+    def unflatten_array(self, x):
+        return self.unravel(x)
+
+    @classmethod
+    def from_example(cls, x):
+        _, unravel = tree.ravel_pytree(x)
+        return cls(unravel)
+
+
+class DenseNormal(ssm_impl_api.AbstractTreeNormal[DenseTreeFlatten]):
+    """Construct a dense implementation of a normal distribution."""
+
+    @classmethod
+    def from_dirac(cls, mean, *, damp):
+        utilities.verify_taylor_coefficient_pytree(mean)
+        std = tree.tree_map(lambda x: np.ones_like(x) * damp, mean)
+        return DenseNormal.from_mean_and_std(mean, std)
+
+    @classmethod
+    def from_mean_and_std(cls, mean, std):
+        utilities.verify_taylor_coefficient_pytree(mean)
+        utilities.verify_taylor_coefficient_pytree(std)
+
+        tree_flatten = DenseTreeFlatten.from_example(mean)
+
+        mean_flat = tree_flatten.flatten_tree(mean)
+        std_flat = tree_flatten.flatten_tree(std)
+
+        assert mean_flat.shape == std_flat.shape
+        cholesky = linalg.diagonal_matrix(std_flat)
+        return cls(mean_flat, cholesky, tree_flatten)
+
+    @property
+    def batch_shape(self):
+        *shape, _n = self.mean_flat.shape
+        return shape
+
+    @property
+    def mean(self):
+        return self._mean_batched()
+
+    def _mean_batched(self):
+        if self.mean_flat.ndim > 1:
+            return func.vmap(DenseNormal._mean_batched)(self)
+        return self.tree_flatten.unflatten_array(self.mean_flat)
+
+    @property
+    def std(self):
+        return self._std_batched()
+
+    def _std_batched(self):
+        if self.mean_flat.ndim > 1:
+            return func.vmap(DenseNormal._std_batched)(self)
+
+        std_flat = func.vmap(linalg.qr_r)(self.cholesky_flat[..., None])
+        std_flat = np.abs(std_flat.reshape((-1,)))
+        return self.tree_flatten.unflatten_array(std_flat)
+
+    def residual_whitened_rms_tree(self, u):
+        u, _ = tree.ravel_pytree(u)
+        return self.residual_whitened_rms_flat(u)
+
+    def residual_whitened_rms_flat(self, u):
+        dx = u - self.mean_flat
+        residual_white = linalg.solve_triu(self.cholesky_flat.T, dx, trans="T")
+        mahalanobis = linalg.qr_r(residual_white[:, None])
+        return np.reshape(np.abs(mahalanobis) / np.sqrt(self.mean_flat.size), ())
+
+    def rescale_cholesky(self, factor, /):
+        cholesky = factor[..., None, None] * self.cholesky_flat
+        return DenseNormal(self.mean_flat, cholesky, self.tree_flatten)
+
+    def logpdf_tree(self, u, /):
+        u, _ = tree.ravel_pytree(u)
+        return self.logpdf_flat(u)
+
+    def logpdf_flat(self, u, /):
+        cholesky = linalg.qr_r(self.cholesky_flat.T).T
+        diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
+        slogdet = np.sum(np.log(np.abs(diagonal)))
+
+        dx = u - self.mean_flat
+        residual_white = linalg.solve_tril(cholesky, dx, trans=0)
+        sqrnorm = linalg.vector_dot(residual_white, residual_white)
+
+        const = np.log(np.pi() * 2)
+        return -1 / 2 * sqrnorm - u.size / 2 * const - slogdet
+
+    def to_multivariate_normal(self):
+        if self.mean_flat.ndim > 1:
+            return func.vmap(DenseNormal.to_multivariate_normal)(self)
+
+        return self.mean_flat, self.cholesky_flat @ self.cholesky_flat.T
+
+    def sample_tree(self, key):
+        sample_flat = self.sample_flat(key)
+        return self.tree_flatten.unflatten_array(sample_flat)
+
+    def sample_flat(self, key):
+        base = random.normal(key, shape=self.mean_flat.shape)
+        return self.mean_flat + self.cholesky_flat @ base
+
+    def identity_conditional(self) -> "DenseLatentCond":
+        (n,) = self.mean_flat.shape
+        A = np.eye(n)
+        noise = DenseNormal(np.zeros((n,)), np.zeros((n, n)), self.tree_flatten)
+        return DenseLatentCond.from_linop_and_noise(A, noise)
+
+    # TODO: move prototype_output_scale_calibrated to the prior?
+    def prototype_output_scale_calibrated(self):
+        return np.ones(())
+
+    def to_derivative(self, i, std):
+        all_flat, all_unravel = tree.ravel_pytree(self.mean)
+
+        def select(a):
+            return tree.ravel_pytree(all_unravel(a)[i])[0]
+
+        x = np.zeros(all_flat.shape)
+        linop = func.jacfwd(select)(x)
+
+        data_like = all_unravel(x)[0]
+        noise = DenseNormal.from_mean_and_std([data_like], [std])
+        return DenseLatentCond.from_linop_and_noise(linop, noise)
+
+    @staticmethod
+    def register_pytree_node() -> None:
+        def flatten(normal):
+            children = normal.mean_flat, normal.cholesky_flat
+            aux = (normal.tree_flatten,)
+            return children, aux
+
+        def unflatten(aux, children):
+            (tree_flatten,) = aux
+            mean, cholesky = children
+            return DenseNormal(mean, cholesky, tree_flatten)
+
+        tree.register_pytree_node(DenseNormal, flatten, unflatten)
+
+
+DenseNormal.register_pytree_node()
+
+
 class DenseMatrix(ssm_impl_api.AbstractLinOp):
     def __init__(self, *, matrix_ndmd):
         *_batch, n_out, d_out, n_in, d_in = matrix_ndmd.shape
@@ -172,7 +324,8 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
     def merge(self, other: "DenseLatentCondProjected", /) -> "DenseLatentCondProjected":
         raise RuntimeError
 
-    def revert(self, rv: "DenseNormal", /, *, solve_triu: Callable):
+    def revert(self, rv: DenseNormal, /, *, solve_triu: Callable):
+        # Compute the full conditional
         dense_cond = DenseLatentCond(
             A=self.A,
             noise=self.noise,
@@ -181,22 +334,32 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
         )
         observed, cond_new = dense_cond.revert(rv, solve_triu=solve_triu)
 
-        # Reduce noise
-        noise = cond_new.noise
-        n = len(cond_new.noise.mean)
-        d = cond_new.noise.mean_flat.size // n
-        cholesky = self._remove_offdiag(noise.cholesky_flat, n=n, d=d)
-        noise = DenseNormal(noise.mean_flat, cholesky, noise.tree_flatten)
+        # Remove off-block-diagonal entries
+        key, subkey = random.split(self.key, num=2)
 
+        # Posterior
+        cond = cond_new.noise
+        n = len(cond.mean)
+        d = cond.mean_flat.size // n
+        keys = random.split(subkey, num=self.num_probes)
+        ensembles = func.vmap(cond.sample_flat)(keys)
+        ensembles_nd = ensembles.reshape((self.num_probes, n, d))
+        cholesky = self._remove_offdiag_from_ensembles(ensembles_nd)
+        noise = DenseNormal(cond.mean_flat, cholesky, cond.tree_flatten)
+
+        key, subkey = random.split(self.key, num=2)
         construct = DenseLatentCondProjected.from_linop_and_noise_and_stochtrace
         cond_new = construct(
-            cond_new.A, noise=noise, key=self.key, num_probes=self.num_probes
+            cond_new.A, noise=noise, key=subkey, num_probes=self.num_probes
         )
 
         # Reduce observed
         m = len(observed.mean)
         d = observed.mean_flat.size // m
-        cholesky = self._remove_offdiag(observed.cholesky_flat, n=m, d=d)
+        keys = random.split(key, num=self.num_probes)
+        ensembles = func.vmap(observed.sample_flat)(keys)
+        ensembles_md = ensembles.reshape((self.num_probes, m, d))
+        cholesky = self._remove_offdiag_from_ensembles(ensembles_md)
         observed = DenseNormal(observed.mean_flat, cholesky, noise.tree_flatten)
 
         # Return values
@@ -206,173 +369,39 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
         raise RuntimeError
 
     @staticmethod
-    def _remove_offdiag(cholesky, n, d):
-        S = 10_000
-        cholesky = cholesky.reshape((n, d, n, d))
-        key = random.prng_key(seed=1)
-        normals = random.rademacher(key, shape=(S, n, d), dtype=cholesky.dtype)
+    def _remove_offdiag_from_ensembles(ensembles_snd, bias: bool = False):
+        # 'snd' encodes the shape (S, n, d), as opposed to (S, n*d).
 
-        chols = linalg.einsum("ijkl,...kl->...ij", cholesky, normals)
-        chols /= np.sqrt(S)
+        def ensemble_to_sample_cholesky(s):
+            """Compute a sample Cholesky factor from ensembles."""
+            num, _n = s.shape
+            s = s / np.sqrt(num) if bias else s / np.sqrt(num - 1)
+            return linalg.qr_r(s).T
 
-        chols = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=-1)(chols)
-        chols = linalg.einsum("dnm,dt->ndmt", chols, np.eye(d))
-        return chols.reshape((n * d, n * d))
+        # The QR decomposition is why we assume S >= n,
+        # so let's check it briefly:
+        S, m, d = ensembles_snd.shape
+        if m > S:
+            msg = "The function requires at least as many ensembles as Taylor coefficients."
+            msg += f" Received: S={S} < m={m}, which violates this assumption."
+            raise ValueError(msg)
+
+        # Center the ensembles
+        ensembles_snd -= ensembles_snd.mean(axis=0, keepdims=True)
+
+        # Assume ensembles are shape (S, n, d), so we batch along d,
+        # but since we also want the output to be (d, n, n), the out_axes is 0.
+        transform = func.vmap(ensemble_to_sample_cholesky, in_axes=-1, out_axes=0)
+        cholesky = transform(ensembles_snd)
+
+        # Reintroduce the diagonal: (d, n, n) -> (n, d, n, d)
+        cholesky = linalg.einsum("dnm,dt->ndmt", cholesky, np.eye(d))
+
+        # Flatten to conform with DenseNormal's hidden shape
+        return cholesky.reshape((m * d, m * d))
 
 
 DenseLatentCondProjected._register_as_pytree()
-
-
-@structs.dataclass
-class DenseTreeFlatten(ssm_impl_api.AbstractTreeFlatten):
-    """Implementation of flattening information for dense models."""
-
-    unravel: Callable
-
-    def flatten_tree(self, x):
-        return tree.ravel_pytree(x)[0]
-
-    def unflatten_array(self, x):
-        return self.unravel(x)
-
-    @classmethod
-    def from_example(cls, x):
-        _, unravel = tree.ravel_pytree(x)
-        return cls(unravel)
-
-
-class DenseNormal(ssm_impl_api.AbstractTreeNormal[DenseTreeFlatten]):
-    """Construct a dense implementation of a normal distribution."""
-
-    @classmethod
-    def from_dirac(cls, mean, *, damp):
-        utilities.verify_taylor_coefficient_pytree(mean)
-        std = tree.tree_map(lambda x: np.ones_like(x) * damp, mean)
-        return DenseNormal.from_mean_and_std(mean, std)
-
-    @classmethod
-    def from_mean_and_std(cls, mean, std):
-        utilities.verify_taylor_coefficient_pytree(mean)
-        utilities.verify_taylor_coefficient_pytree(std)
-
-        tree_flatten = DenseTreeFlatten.from_example(mean)
-
-        mean_flat = tree_flatten.flatten_tree(mean)
-        std_flat = tree_flatten.flatten_tree(std)
-
-        assert mean_flat.shape == std_flat.shape
-        cholesky = linalg.diagonal_matrix(std_flat)
-        return cls(mean_flat, cholesky, tree_flatten)
-
-    @property
-    def batch_shape(self):
-        *shape, _n = self.mean_flat.shape
-        return shape
-
-    @property
-    def mean(self):
-        return self._mean_batched()
-
-    def _mean_batched(self):
-        if self.mean_flat.ndim > 1:
-            return func.vmap(DenseNormal._mean_batched)(self)
-        return self.tree_flatten.unflatten_array(self.mean_flat)
-
-    @property
-    def std(self):
-        return self._std_batched()
-
-    def _std_batched(self):
-        if self.mean_flat.ndim > 1:
-            return func.vmap(DenseNormal._std_batched)(self)
-
-        std_flat = func.vmap(linalg.qr_r)(self.cholesky_flat[..., None])
-        std_flat = np.abs(std_flat.reshape((-1,)))
-        return self.tree_flatten.unflatten_array(std_flat)
-
-    def residual_whitened_rms_tree(self, u):
-        u, _ = tree.ravel_pytree(u)
-        return self.residual_whitened_rms_flat(u)
-
-    def residual_whitened_rms_flat(self, u):
-        dx = u - self.mean_flat
-        residual_white = linalg.solve_triu(self.cholesky_flat.T, dx, trans="T")
-        mahalanobis = linalg.qr_r(residual_white[:, None])
-        return np.reshape(np.abs(mahalanobis) / np.sqrt(self.mean_flat.size), ())
-
-    def rescale_cholesky(self, factor, /):
-        cholesky = factor[..., None, None] * self.cholesky_flat
-        return DenseNormal(self.mean_flat, cholesky, self.tree_flatten)
-
-    def logpdf_tree(self, u, /):
-        u, _ = tree.ravel_pytree(u)
-        return self.logpdf_flat(u)
-
-    def logpdf_flat(self, u, /):
-        cholesky = linalg.qr_r(self.cholesky_flat.T).T
-        diagonal = linalg.diagonal_along_axis(cholesky, axis1=-1, axis2=-2)
-        slogdet = np.sum(np.log(np.abs(diagonal)))
-
-        dx = u - self.mean_flat
-        residual_white = linalg.solve_tril(cholesky, dx, trans=0)
-        sqrnorm = linalg.vector_dot(residual_white, residual_white)
-
-        const = np.log(np.pi() * 2)
-        return -1 / 2 * sqrnorm - u.size / 2 * const - slogdet
-
-    def to_multivariate_normal(self):
-        if self.mean_flat.ndim > 1:
-            return func.vmap(DenseNormal.to_multivariate_normal)(self)
-
-        return self.mean_flat, self.cholesky_flat @ self.cholesky_flat.T
-
-    def sample_tree(self, key):
-        sample_flat = self.sample_flat(key)
-        return self.tree_flatten.unflatten_array(sample_flat)
-
-    def sample_flat(self, key):
-        base = random.normal(key, shape=self.mean_flat.shape)
-        return self.mean_flat + self.cholesky_flat @ base
-
-    def identity_conditional(self) -> DenseLatentCond:
-        (n,) = self.mean_flat.shape
-        A = np.eye(n)
-        noise = DenseNormal(np.zeros((n,)), np.zeros((n, n)), self.tree_flatten)
-        return DenseLatentCond.from_linop_and_noise(A, noise)
-
-    # TODO: move prototype_output_scale_calibrated to the prior?
-    def prototype_output_scale_calibrated(self):
-        return np.ones(())
-
-    def to_derivative(self, i, std):
-        all_flat, all_unravel = tree.ravel_pytree(self.mean)
-
-        def select(a):
-            return tree.ravel_pytree(all_unravel(a)[i])[0]
-
-        x = np.zeros(all_flat.shape)
-        linop = func.jacfwd(select)(x)
-
-        data_like = all_unravel(x)[0]
-        noise = DenseNormal.from_mean_and_std([data_like], [std])
-        return DenseLatentCond.from_linop_and_noise(linop, noise)
-
-    @staticmethod
-    def register_pytree_node() -> None:
-        def flatten(normal):
-            children = normal.mean_flat, normal.cholesky_flat
-            aux = (normal.tree_flatten,)
-            return children, aux
-
-        def unflatten(aux, children):
-            (tree_flatten,) = aux
-            mean, cholesky = children
-            return DenseNormal(mean, cholesky, tree_flatten)
-
-        tree.register_pytree_node(DenseNormal, flatten, unflatten)
-
-
-DenseNormal.register_pytree_node()
 
 
 class DenseOdeTs0(ssm_impl_api.AbstractOde):

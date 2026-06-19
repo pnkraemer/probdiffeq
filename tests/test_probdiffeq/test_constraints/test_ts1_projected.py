@@ -43,7 +43,7 @@ def test_accuracy_matches_dense_ts1(seed, num_probes):
 
 
 @testing.parametrize("seed", [1, 2])
-@testing.parametrize("num_probes", [1_000])
+@testing.parametrize("num_probes", [10_000])
 def test_both_projected_constraints_are_identical(seed, num_probes):
     """Assert that residual-based constraints and corresponding TS1 versions match."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
