@@ -315,24 +315,26 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
 
         # Posteriors
         matvec_ensembles = func.vmap(matvec_ndmd)(ensembles)
-        C = self._blockdiag_cholesky_from_ensembles(matvec_ensembles)
+        C = self._blockdiag_cholesky_from_ensembles(matvec_ensembles, bias=self.bias)
         noise = BlockDiagNormal(cond_mean, C, rv.tree_flatten)
 
         # Backward linear operator
         _key, subkey = random.split(self.key, num=2)
         construct = BlockDiagLatentCondProjected.from_linop_and_noise_and_stochtrace
-        cond = construct(K, noise, key=subkey, num_probes=self.num_probes)
+        cond = construct(
+            K, noise, key=subkey, num_probes=self.num_probes, bias=self.bias
+        )
 
         # Marginals (redo samples for whichever reason)
         matvec_ensembles = func.vmap(self.A.matvec_ndmd)(ensembles)
-        C = self._blockdiag_cholesky_from_ensembles(matvec_ensembles)
+        C = self._blockdiag_cholesky_from_ensembles(matvec_ensembles, bias=self.bias)
         observed = BlockDiagNormal(obs_mean, C, self.noise.tree_flatten)
 
         # Group and return
         return observed, cond
 
     @staticmethod
-    def _blockdiag_cholesky_from_ensembles(ensembles_smd, bias: bool = False):
+    def _blockdiag_cholesky_from_ensembles(ensembles_smd, bias: bool):
         S, _n, _d = ensembles_smd.shape
 
         # Center the ensembles
@@ -491,7 +493,9 @@ class BlockDiagOdeTs1Projected(ssm_impl_api.AbstractOdeProjected):
         construct = BlockDiagLatentCondProjected.from_linop_and_noise_and_stochtrace
         key, jac = state
         key, subkey = random.split(key, num=2)
-        cond = construct(linop, noise, key=subkey, num_probes=self.num_probes)
+        cond = construct(
+            linop, noise, key=subkey, num_probes=self.num_probes, bias=self.bias
+        )
 
         return cond, (key, jac)
 
@@ -951,12 +955,14 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
         return BlockDiagOdeTs1(ode=ode)
 
     def constraint_ode_ts1_projected(
-        self, ode: problems.JetOde, /, *, key, num_probes
+        self, ode: problems.JetOde, /, *, key, num_probes, bias=False
     ) -> BlockDiagOdeTs1Projected:
         if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
 
-        return BlockDiagOdeTs1Projected(ode=ode, key=key, num_probes=num_probes)
+        return BlockDiagOdeTs1Projected(
+            ode=ode, key=key, num_probes=num_probes, bias=bias
+        )
 
     def constraint_residual(
         self,

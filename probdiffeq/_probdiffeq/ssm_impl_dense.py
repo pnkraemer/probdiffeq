@@ -344,13 +344,17 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
         keys = random.split(subkey, num=self.num_probes)
         ensembles = func.vmap(cond.sample_flat)(keys)
         ensembles_nd = ensembles.reshape((self.num_probes, n, d))
-        cholesky = self._remove_offdiag_from_ensembles(ensembles_nd)
+        cholesky = self._remove_offdiag_from_ensembles(ensembles_nd, bias=self.bias)
         noise = DenseNormal(cond.mean_flat, cholesky, cond.tree_flatten)
 
         key, subkey = random.split(self.key, num=2)
         construct = DenseLatentCondProjected.from_linop_and_noise_and_stochtrace
         cond_new = construct(
-            cond_new.A, noise=noise, key=subkey, num_probes=self.num_probes
+            cond_new.A,
+            noise=noise,
+            key=subkey,
+            num_probes=self.num_probes,
+            bias=self.bias,
         )
 
         # Reduce observed
@@ -359,7 +363,7 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
         keys = random.split(key, num=self.num_probes)
         ensembles = func.vmap(observed.sample_flat)(keys)
         ensembles_md = ensembles.reshape((self.num_probes, m, d))
-        cholesky = self._remove_offdiag_from_ensembles(ensembles_md)
+        cholesky = self._remove_offdiag_from_ensembles(ensembles_md, bias=self.bias)
         observed = DenseNormal(observed.mean_flat, cholesky, noise.tree_flatten)
 
         # Return values
@@ -369,7 +373,7 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
         raise RuntimeError
 
     @staticmethod
-    def _remove_offdiag_from_ensembles(ensembles_snd, bias: bool = False):
+    def _remove_offdiag_from_ensembles(ensembles_snd, bias: bool):
         # 'snd' encodes the shape (S, n, d), as opposed to (S, n*d).
 
         def ensemble_to_sample_cholesky(s):
@@ -560,7 +564,9 @@ class DenseOdeTs1Projected(ssm_impl_api.AbstractOdeProjected):
 
         key, subkey = random.split(key, num=2)
         construct = DenseLatentCondProjected.from_linop_and_noise_and_stochtrace
-        cond = construct(linop, noise, key=subkey, num_probes=self.num_probes)
+        cond = construct(
+            linop, noise, key=subkey, num_probes=self.num_probes, bias=self.bias
+        )
 
         return cond, (key, jacstate)
 
@@ -1024,11 +1030,11 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         return DenseOdeTs1(ode=ode)
 
     def constraint_ode_ts1_projected(
-        self, ode: problems.JetOde, /, key, num_probes
+        self, ode: problems.JetOde, /, key, num_probes, bias=False
     ) -> DenseOdeTs1Projected:
         if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
-        return DenseOdeTs1Projected(ode=ode, key=key, num_probes=num_probes)
+        return DenseOdeTs1Projected(ode=ode, key=key, num_probes=num_probes, bias=bias)
 
     def constraint_residual(
         self,

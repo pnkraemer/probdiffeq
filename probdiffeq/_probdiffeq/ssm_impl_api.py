@@ -151,10 +151,13 @@ class AbstractLatentCondAPI:
 
 
 class AbstractLatentCondProjected(AbstractLatentCondAPI):
-    def __init__(self, A, *, noise, to_latent, to_observed, num_probes, key):
+    def __init__(
+        self, A, *, noise, to_latent, to_observed, num_probes, key, bias: bool
+    ):
         super().__init__(A, noise, to_latent, to_observed)
         self.num_probes = num_probes
         self.key = key
+        self.bias = bias
 
     def __repr__(self) -> str:
         msg = f"{self.__class__.__name__}(A={self.A}, noise={self.noise}"
@@ -163,11 +166,16 @@ class AbstractLatentCondProjected(AbstractLatentCondAPI):
         return msg
 
     @classmethod
-    def from_linop_and_noise_and_stochtrace(cls, A, noise, *, key, num_probes):
+    def from_linop_and_noise_and_stochtrace(
+        cls, A, noise, *, key, num_probes, bias: bool
+    ):
         """Construct a latent conditional with unit en- and decoders."""
         if len(noise.batch_shape) > 0:
             construct = func.partial(
-                cls.from_linop_and_noise_and_stochtrace, key=key, num_probes=num_probes
+                cls.from_linop_and_noise_and_stochtrace,
+                key=key,
+                num_probes=num_probes,
+                bias=bias,
             )
             return func.vmap(construct)(A, noise)
 
@@ -179,6 +187,7 @@ class AbstractLatentCondProjected(AbstractLatentCondAPI):
             to_observed=to_observed,
             key=key,
             num_probes=num_probes,
+            bias=bias,
         )
 
     @classmethod
@@ -187,12 +196,12 @@ class AbstractLatentCondProjected(AbstractLatentCondAPI):
 
         def flatten(cond):
             children = cond.A, cond.noise, cond.to_latent, cond.to_observed, cond.key
-            aux = (cond.num_probes,)
+            aux = (cond.num_probes, cond.bias)
             return children, aux
 
         def unflatten(aux, children):
             A, noise, to_latent, to_observed, key = children
-            (num_probes,) = aux
+            (num_probes, bias) = aux
             return cls(
                 A,
                 noise=noise,
@@ -200,6 +209,7 @@ class AbstractLatentCondProjected(AbstractLatentCondAPI):
                 to_observed=to_observed,
                 key=key,
                 num_probes=num_probes,
+                bias=bias,
             )
 
         tree.register_pytree_node(cls, flatten, unflatten)
@@ -289,10 +299,11 @@ class AbstractOde(AbstractLinearization):
 
 
 class AbstractOdeProjected(AbstractLinearization):
-    def __init__(self, *, ode, key, num_probes) -> None:
+    def __init__(self, *, ode, key, num_probes, bias: bool) -> None:
         self.ode = ode
         self.key = key
         self.num_probes = num_probes
+        self.bias = bias
         self.residual_order = self.ode.num_tcoeffs_in_args + 1
 
     def __repr__(self) -> str:
