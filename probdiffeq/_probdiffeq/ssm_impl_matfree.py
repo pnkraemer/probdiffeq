@@ -19,8 +19,29 @@ For example, this variable is used to type Taylor coefficients.
 #   also, should we add iterative linearisation to all Ts1's?
 #   also, should we unify current probing with Jacobian handlers?
 
+# Sample count? See p. 6 in https://arxiv.org/abs/2606.08203
 
-class MatfreeLinopODEConstraint(ssm_impl_api.AbstractLinop):
+
+class Linop:
+    def __init__(self, *, n_in, n_out, d_in, d_out):
+        self.n_in = n_in
+        self.n_out = n_out
+        self.d_in = d_in
+        self.d_out = d_out
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        args = f"n_out={self.n_out}, d_out={self.d_out}, n_in={self.n_in}, d_in={self.d_in})"
+        return f"{name}({args})"
+
+    def vecmat_flat(self, w):
+        v = np.ones((self.n_in * self.d_in,))
+        vecmat = func.linear_transpose(self.matvec_flat, v)
+        (vm,) = vecmat(w)
+        return vm
+
+
+class MatfreeLinopODEConstraint(Linop):
     def __init__(self, *, ode, tree_flatten, x, t):
         self.ode = ode
         self.tree_flatten = tree_flatten
@@ -68,10 +89,6 @@ class MatfreeLinopODEConstraint(ssm_impl_api.AbstractLinop):
         vec = vec_flat.reshape((self.n_in, self.d_in))
         return self.matvec_ndmd(vec).reshape((-1,))
 
-    @property
-    def precon_prototype(self):
-        return np.ones((self.d_in,)), np.ones((self.d_out,))
-
     @classmethod
     def _register_as_pytree(cls) -> None:
         """Register this class (or a subclass) as a JAX pytree."""
@@ -92,8 +109,9 @@ class MatfreeLinopODEConstraint(ssm_impl_api.AbstractLinop):
 MatfreeLinopODEConstraint._register_as_pytree()
 
 
-class MatfreeLinopLstSq(ssm_impl_api.AbstractLinop):
+class MatfreeLinopLstSq(Linop):
     def __init__(self, cholesky_x, cholesky_yx, matfree_linop):
+        # Swap in and out because LstSq is an inverse operator
         super().__init__(
             n_in=matfree_linop.n_out,
             n_out=matfree_linop.n_in,
@@ -103,10 +121,6 @@ class MatfreeLinopLstSq(ssm_impl_api.AbstractLinop):
         self.cholesky_x = cholesky_x
         self.cholesky_yx = cholesky_yx
         self.matfree_linop = matfree_linop
-
-    @property
-    def precon_prototype(self):
-        return np.ones((self.d_in,)), np.ones((self.d_out,))
 
     def matvec_dndm(self, vec_dn):
         vec_flat = vec_dn.T.reshape((self.n_in * self.d_in,))
@@ -119,13 +133,6 @@ class MatfreeLinopLstSq(ssm_impl_api.AbstractLinop):
         return Avec_flat.reshape((self.n_out, self.d_out))
 
     def matvec_flat(self, vec):
-        # LSMR struggles with zero RHS's right now,
-        # so we shortcut.
-        out_like = np.zeros((self.n_out * self.d_out,))
-        cond = linalg.vector_norm(vec) == 0
-        return np.where(cond, out_like, self._matvec_flat_nonzero(vec))
-
-    def _matvec_flat_nonzero(self, vec):
 
         def vecmat(s):
             # vector-Jacobian product
@@ -157,9 +164,21 @@ class MatfreeLinopLstSq(ssm_impl_api.AbstractLinop):
         return Mv.T.reshape((-1,))
 
 
-class MatfreeLatentCond(ssm_impl_api.AbstractLatentCondProjected):
+class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
+    def __init__(self, A, noise, key, num_probes, bias):
+
+        # *batch, d, n = noise.mean_flat.shape
+        # if len(batch) > 0:
+
+        #     partial = func.partial(MatfreeLatentCond.__init__, num_probes=num_probes, bias=bias)
+        #     return func.vmap(partial)(self, A, noise, key)
+
+        super().__init__(A, noise=noise, to_latent=None, to_observed=None)
+        self.key = key
+        self.num_probes = num_probes
+        self.bias = bias
+
     def apply_flat(self, x, /):
-        # TODO: use preconditioning (currently assume Precon=1)
         y = self.A.matvec_ndmd(x.T).T
         m = y + self.noise.mean_flat
         c = self.noise.cholesky_flat
@@ -170,20 +189,17 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCondProjected):
         # Observed mean
         obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
 
-        # TODO: we currently ignore the precon
         # TODO: we currently ignore the noise
         (d, n), dtype = rv.mean_flat.shape, rv.mean_flat.dtype
-        probes = random.normal(self.key, shape=(self.num_probes, n, d), dtype=dtype)
-        chols = func.vmap(self.A.matvec_ndmd)(probes)
-        chols /= np.sqrt(self.num_probes)
-        obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=-1)(chols)
+        ensembles = random.normal(self.key, shape=(self.num_probes, n, d), dtype=dtype)
+        matvec_ensembles = func.vmap(self.A.matvec_ndmd)(ensembles)
+        obs_chol = utilities.blockdiag_cholesky_from_ensembles(
+            matvec_ensembles, bias=self.bias
+        )
         return blockdiag.BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
 
     def revert(self, rv, /, *, solve_triu: Callable):
-        # Sample count? See p. 6 in https://arxiv.org/abs/2606.08203
         del solve_triu  # unused
-        # TODO: use preconditioning (currently assume Precon=1)
-        # TODO: move the MatfreeDense stuff to a separate module? Or delete it? Also, undo all changes in the blockdiag module and remove linop requirement from impl_api because the matfree is in a separate module?
 
         # Observed mean
         obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
@@ -198,8 +214,8 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCondProjected):
 
         # Posterior covariance via probing/ensembles
         keys = random.split(self.key, num=self.num_probes)
-        ensembles = func.vmap(rv.sample_flat)(keys)
-        ensembles = np.transpose(ensembles, axes=(0, 2, 1))
+        ensembles = func.vmap(rv.sample_flat)(keys)  # d, n
+        ensembles = np.transpose(ensembles, axes=(0, 2, 1))  # n, d
 
         def matvec_ndmd(p_nd):
             Ap_nd = self.A.matvec_ndmd(p_nd)
@@ -212,14 +228,12 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCondProjected):
             matvec_ensembles, bias=self.bias
         )
         noise = blockdiag.BlockDiagNormal(cond_mean, C, rv.tree_flatten)
-
-        # Backward linear operator
-        _key, subkey = random.split(self.key, num=2)
-        construct = MatfreeLatentCond.from_linop_and_noise_and_stochtrace
-        cond = construct(
+        key, subkey = random.split(self.key, num=2)
+        cond = MatfreeLatentCond(
             K, noise, key=subkey, num_probes=self.num_probes, bias=self.bias
         )
 
+        # Backward linear operator
         # Marginals (redo samples for whichever reason)
         matvec_ensembles = func.vmap(self.A.matvec_ndmd)(ensembles)
         C = utilities.blockdiag_cholesky_from_ensembles(
@@ -236,12 +250,34 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCondProjected):
     def preconditioner_apply(self, /):
         raise NotImplementedError
 
+    @classmethod
+    def _register_as_pytree(cls) -> None:
+        """Register this class (or a subclass) as a JAX pytree."""
+
+        def flatten(linop):
+            children = (linop.A, linop.noise, linop.key)
+            aux = linop.num_probes, linop.bias
+            return children, aux
+
+        def unflatten(aux, children):
+            (A, noise, key) = children
+            num_probes, bias = aux
+            return cls(A, noise, key=key, num_probes=num_probes, bias=bias)
+
+        tree.register_pytree_node(cls, flatten, unflatten)
+
 
 MatfreeLatentCond._register_as_pytree()
 
 
-class MatfreeOdeTs1(ssm_impl_api.AbstractOdeProjected):
+class MatfreeOdeTs1(ssm_impl_api.AbstractOde):
     """Dense ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
+
+    def __init__(self, ode, key, num_probes, bias):
+        super().__init__(ode=ode)
+        self.key = key
+        self.num_probes = num_probes
+        self.bias = bias
 
     def init_linearization(self):
         # todo: we should move the trace estimation outside
@@ -288,10 +324,9 @@ class MatfreeOdeTs1(ssm_impl_api.AbstractOdeProjected):
             ode=self.ode, tree_flatten=rv.tree_flatten, t=t, x=m0
         )
 
-        construct = MatfreeLatentCond.from_linop_and_noise_and_stochtrace
         key, jac = state
         key, subkey = random.split(key, num=2)
-        cond = construct(
+        cond = MatfreeLatentCond(
             linop, noise, key=subkey, num_probes=self.num_probes, bias=self.bias
         )
 

@@ -31,67 +31,49 @@ C = TypeVar("C", bound=Sequence)
 For example, this variable is used to type Taylor coefficients.
 """
 
-# TODO: Consider how we can reuse trace estimators between Jacobians and this one here.
-# TODO (cont'd): (do Jacobians implement linear operators? Merge the two classes?)
 
+class AbstractLatentCond:
+    """Conditional distributions in latent space.
 
-class AbstractLinop(abc.ABC):
-    def __init__(self, *, n_in, n_out, d_in, d_out):
-        self.n_in = n_in
-        self.n_out = n_out
-        self.d_in = d_in
-        self.d_out = d_out
+    Subclasses implement the SSM-specific operations (marginalise, revert, etc.).
+    """
 
-    def __repr__(self) -> str:
-        msg = f"{self.__class__.__name__}(n_out={self.n_out}, d_out={self.d_out}"
-        msg += f", n_in={self.n_in}, d_in={self.d_in})"
-        return msg
-
-    def matmat_dndm(self, M, /):
-        matvec = self.matvec_dndm
-        matmat = func.vmap(matvec, in_axes=-1, out_axes=-1)
-        return matmat(M)
-
-    def matmat_flat(self, M, /):
-        matvec = self.matvec_flat
-        matmat = func.vmap(matvec, in_axes=-1, out_axes=-1)
-        return matmat(M)
-
-    def vecmat_flat(self, y, /):
-        x = np.zeros((self.d_in * self.n_in,))
-        vjp = func.linear_transpose(self.matvec_flat, x)
-        (vjpx,) = vjp(y)
-        return vjpx
-
-    @abc.abstractmethod
-    def matvec_ndmd(self, x, /):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def matvec_dndm(self, x, /):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def matvec_flat(self, x, /):
-        raise NotImplementedError
-
-    @property
-    @abc.abstractmethod
-    def precon_prototype(self):  # TODO: rename?
-        # return ones...
-        raise NotImplementedError
-
-
-class AbstractLatentCondAPI:
     def __init__(self, A, noise, to_latent, to_observed) -> None:
-        if not isinstance(A, AbstractLinop):
-            msg = f"Linear operator expected, but {A} received."
-            raise TypeError(msg)
-
         self.A = A
         self.noise = noise
         self.to_latent = to_latent
         self.to_observed = to_observed
+
+    def __repr__(self) -> str:
+        msg = f"{self.__class__.__name__}(A={self.A}, noise={self.noise}"
+        msg += f", to_latent={self.to_latent}, to_observed={self.to_observed})"
+        return msg
+
+    @classmethod
+    def _register_as_pytree(cls) -> None:
+        """Register this class (or a subclass) as a JAX pytree."""
+
+        def flatten(cond):
+            children = cond.A, cond.noise, cond.to_latent, cond.to_observed
+            return children, ()
+
+        def unflatten(_aux, children):
+            A, noise, to_latent, to_observed = children
+            return cls(A, noise, to_latent, to_observed)
+
+        tree.register_pytree_node(cls, flatten, unflatten)
+
+    @classmethod
+    def from_linop_and_noise(cls, A, noise):
+        """Construct a latent conditional with unit en- and decoders."""
+        # Hack for blockdiagonal models (and possibly dense evaluations)
+        if A.ndim > 2:
+            return func.vmap(cls.from_linop_and_noise)(A, noise)
+
+        d_out, d_in = A.shape
+        to_latent, to_observed = np.ones((d_in,)), np.ones((d_out,))
+
+        return cls(A, noise=noise, to_latent=to_latent, to_observed=to_observed)
 
     def rescale_noise(self, factor, /):
         """Rescale the noise in a conditional."""
@@ -150,108 +132,7 @@ class AbstractLatentCondAPI:
         return mahalanobis, updated
 
 
-class AbstractLatentCondProjected(AbstractLatentCondAPI):
-    def __init__(
-        self, A, *, noise, to_latent, to_observed, num_probes, key, bias: bool
-    ):
-        super().__init__(A, noise, to_latent, to_observed)
-        self.num_probes = num_probes
-        self.key = key
-        self.bias = bias
-
-    def __repr__(self) -> str:
-        msg = f"{self.__class__.__name__}(A={self.A}, noise={self.noise}"
-        msg += f", to_latent={self.to_latent}, to_observed={self.to_observed}"
-        msg += f", num_probes={self.num_probes}, key={self.key})"
-        return msg
-
-    @classmethod
-    def from_linop_and_noise_and_stochtrace(
-        cls, A, noise, *, key, num_probes, bias: bool
-    ):
-        """Construct a latent conditional with unit en- and decoders."""
-        if len(noise.batch_shape) > 0:
-            construct = func.partial(
-                cls.from_linop_and_noise_and_stochtrace,
-                key=key,
-                num_probes=num_probes,
-                bias=bias,
-            )
-            return func.vmap(construct)(A, noise)
-
-        to_latent, to_observed = A.precon_prototype
-        return cls(
-            A,
-            noise=noise,
-            to_latent=to_latent,
-            to_observed=to_observed,
-            key=key,
-            num_probes=num_probes,
-            bias=bias,
-        )
-
-    @classmethod
-    def _register_as_pytree(cls) -> None:
-        """Register this class (or a subclass) as a JAX pytree."""
-
-        def flatten(cond):
-            children = cond.A, cond.noise, cond.to_latent, cond.to_observed, cond.key
-            aux = (cond.num_probes, cond.bias)
-            return children, aux
-
-        def unflatten(aux, children):
-            A, noise, to_latent, to_observed, key = children
-            (num_probes, bias) = aux
-            return cls(
-                A,
-                noise=noise,
-                to_latent=to_latent,
-                to_observed=to_observed,
-                key=key,
-                num_probes=num_probes,
-                bias=bias,
-            )
-
-        tree.register_pytree_node(cls, flatten, unflatten)
-
-
-class AbstractLatentCond(AbstractLatentCondAPI):
-    """Conditional distributions in latent space.
-
-    Subclasses implement the SSM-specific operations (marginalise, revert, etc.).
-    """
-
-    def __repr__(self) -> str:
-        msg = f"{self.__class__.__name__}(A={self.A}, noise={self.noise}"
-        msg += f", to_latent={self.to_latent}, to_observed={self.to_observed})"
-        return msg
-
-    @classmethod
-    def _register_as_pytree(cls) -> None:
-        """Register this class (or a subclass) as a JAX pytree."""
-
-        def flatten(cond):
-            children = cond.A, cond.noise, cond.to_latent, cond.to_observed
-            return children, ()
-
-        def unflatten(_aux, children):
-            A, noise, to_latent, to_observed = children
-            return cls(A, noise, to_latent, to_observed)
-
-        tree.register_pytree_node(cls, flatten, unflatten)
-
-    @classmethod
-    def from_linop_and_noise(cls, A: AbstractLinop, noise):
-        """Construct a latent conditional with unit en- and decoders."""
-        if len(noise.batch_shape) > 0:
-            return func.vmap(cls.from_linop_and_noise)(A, noise)
-
-        if not isinstance(A, AbstractLinop):
-            msg = f"Linear operator expected, but {A} received."
-            raise TypeError(msg)
-
-        to_latent, to_observed = A.precon_prototype
-        return cls(A, noise=noise, to_latent=to_latent, to_observed=to_observed)
+AbstractLatentCond._register_as_pytree()
 
 
 class AbstractLinearization(abc.ABC):
@@ -298,18 +179,6 @@ class AbstractOde(AbstractLinearization):
         return f"{self.__class__.__name__}(ode={self.ode})"
 
 
-class AbstractOdeProjected(AbstractLinearization):
-    def __init__(self, *, ode, key, num_probes, bias: bool) -> None:
-        self.ode = ode
-        self.key = key
-        self.num_probes = num_probes
-        self.bias = bias
-        self.residual_order = self.ode.num_tcoeffs_in_args + 1
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(ode={self.ode}, key={self.key},num_probes={self.num_probes})"
-
-
 class AbstractTreeFlatten(abc.ABC):
     """Abstract base class for flattening information of tree-structured random variables."""
 
@@ -342,12 +211,6 @@ class AbstractTreeNormal(abc.ABC, Generic[S]):
     def __repr__(self) -> str:
         name = self.__class__.__name__
         return f"{name}({self.mean_flat}, {self.cholesky_flat}, {self.tree_flatten})"
-
-    @property
-    @abc.abstractmethod
-    def batch_shape(self):
-        """Evaluate the batch-shape."""
-        raise NotImplementedError
 
     @property
     @abc.abstractmethod
