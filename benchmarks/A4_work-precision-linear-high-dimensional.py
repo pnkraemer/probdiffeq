@@ -1,4 +1,4 @@
-"""Walltime | Linear ODE with 550 components."""
+"""Walltime | Linear ODE with 250 components."""
 
 from collections.abc import Callable
 
@@ -86,7 +86,7 @@ def solve_ivp_once():
         """Lotka--Volterra dynamics."""
         return 1.01 * y
 
-    u0 = np.ones((550,))
+    u0 = np.ones((250,))
     time_span = np.asarray([0.0, 1.0])
     tol = 1e-12
     solution = scipy.integrate.solve_ivp(
@@ -106,15 +106,16 @@ def solver_probdiffeq(
         del t
         return 1.01 * y
 
-    u0 = jnp.ones((550,), dtype=float)
+    u0 = jnp.ones((250,), dtype=float)
     t0, t1 = (0.0, 1.0)
 
     @jax.jit
     def param_to_solution(tol):
-        jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives)
+        jetexpand = probdiffeq.jetexpand_ode_unroll(num=num_derivatives)
         tcoeffs, _ = jetexpand(vf_probdiffeq, (u0,), t=t0)
 
         ssm = state_space_model(implementation)
+
         iwp = ssm.prior_wiener_integrated(tcoeffs)
         strategy = probdiffeq.strategy_filter()
         if constraint_order == 0:
@@ -123,8 +124,9 @@ def solver_probdiffeq(
             ts = ssm.constraint_ode_ts1(vf_probdiffeq)
         else:
             raise ValueError
+
         solver = probdiffeq.solver_mle(strategy=strategy, constraint=ts)
-        error = probdiffeq.error_residual_std(constraint=ts)
+        error = probdiffeq.error_state_std(constraint=ts)
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
@@ -167,7 +169,7 @@ def solver_diffrax(*, solver) -> Callable:
         """Lotka--Volterra dynamics."""
         return 1.01 * y
 
-    u0 = jnp.ones((550,))
+    u0 = jnp.ones((250,))
     t0, t1 = (0.0, 1.0)
 
     @jax.jit
@@ -197,7 +199,7 @@ def solver_scipy(*, method: str) -> Callable:
         """Lotka--Volterra dynamics."""
         return 1.01 * y
 
-    u0 = np.ones((550,))
+    u0 = np.ones((250,))
     time_span = np.asarray([0.0, 1.0])
 
     def param_to_solution(tol):
