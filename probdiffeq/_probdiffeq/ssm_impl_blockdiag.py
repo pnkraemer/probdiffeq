@@ -1,10 +1,4 @@
-from probdiffeq._probdiffeq import (
-    probing,
-    problems,
-    ssm_impl_api,
-    taylor_points,
-    utilities,
-)
+from probdiffeq._probdiffeq import problems, ssm_impl_api, taylor_points, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
@@ -321,7 +315,9 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
 
         # Posteriors
         matvec_ensembles = func.vmap(matvec_ndmd)(ensembles)
-        C = probing.blockdiag_cholesky_from_ensembles(matvec_ensembles, bias=self.bias)
+        C = utilities.blockdiag_cholesky_from_ensembles(
+            matvec_ensembles, bias=self.bias
+        )
         noise = BlockDiagNormal(cond_mean, C, rv.tree_flatten)
 
         # Backward linear operator
@@ -333,7 +329,9 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
 
         # Marginals (redo samples for whichever reason)
         matvec_ensembles = func.vmap(self.A.matvec_ndmd)(ensembles)
-        C = probing.blockdiag_cholesky_from_ensembles(matvec_ensembles, bias=self.bias)
+        C = utilities.blockdiag_cholesky_from_ensembles(
+            matvec_ensembles, bias=self.bias
+        )
         observed = BlockDiagNormal(obs_mean, C, self.noise.tree_flatten)
 
         # Group and return

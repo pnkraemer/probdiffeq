@@ -145,7 +145,9 @@ def solver(*, num_derivatives: int, constraint: str, fact: str) -> Callable:
         iwp = ssm.prior_wiener_integrated(tcoeffs)
 
         if constraint == "ts1_projected":
-            ts1 = ssm.constraint_ode_ts1_projected(vf)
+            key = jax.random.PRNGKey(1)
+            probes = (num_derivatives + 1) ** 2
+            ts1 = ssm.constraint_ode_ts1_projected(vf, key=key, num_probes=probes)
         elif constraint == "ts1":
             ts1 = ssm.constraint_ode_ts1(vf)
         else:

@@ -1,10 +1,4 @@
-from probdiffeq._probdiffeq import (
-    probing,
-    problems,
-    ssm_impl_api,
-    taylor_points,
-    utilities,
-)
+from probdiffeq._probdiffeq import problems, ssm_impl_api, taylor_points, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree, warnings
 from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
@@ -322,12 +316,18 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
             to_observed=self.to_observed,
         )
         observed = dense_cond.marginalise(rv)
-        m = len(observed.mean)
-        d = observed.mean_flat.size // n
-        cholesky = self._remove_offdiag(observed.cholesky_flat, n=m, d=d)
-        return DenseNormal(observed.mean_flat, cholesky, noise.tree_flatten)
 
-    def merge(self, other: "DenseLatentCondProjected", /) -> "DenseLatentCondProjected":
+        # Remove off-block-diagonal entries
+        key, subkey = random.split(self.key, num=2)
+        m = len(observed.mean)
+        d = observed.mean_flat.size // m
+        keys = random.split(subkey, num=self.num_probes)
+        ensembles = func.vmap(observed.sample_flat)(keys)
+        ensembles_md = ensembles.reshape((self.num_probes, m, d))
+        cholesky = self.remove_offdiags_via_ensembles(ensembles_md, bias=self.bias)
+        return DenseNormal(observed.mean_flat, cholesky, observed.tree_flatten)
+
+    def merge(self, other, /):
         raise RuntimeError
 
     def revert(self, rv: DenseNormal, /, *, solve_triu: Callable):
@@ -343,7 +343,7 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
         # Remove off-block-diagonal entries
         key, subkey = random.split(self.key, num=2)
 
-        # Posterior
+        # Remove off-block-diagonal entries: Posterior
         cond = cond_new.noise
         n = len(cond.mean)
         d = cond.mean_flat.size // n
@@ -353,6 +353,7 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
         cholesky = self.remove_offdiags_via_ensembles(ensembles_nd, bias=self.bias)
         noise = DenseNormal(cond.mean_flat, cholesky, cond.tree_flatten)
 
+        # Update the latent conditional
         key, subkey = random.split(self.key, num=2)
         construct = DenseLatentCondProjected.from_linop_and_noise_and_stochtrace
         cond_new = construct(
@@ -363,7 +364,7 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
             bias=self.bias,
         )
 
-        # Reduce observed
+        # Remove off-block-diagonal entries: observed
         m = len(observed.mean)
         d = observed.mean_flat.size // m
         keys = random.split(key, num=self.num_probes)
@@ -380,7 +381,7 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
 
     @staticmethod
     def remove_offdiags_via_ensembles(ensembles_snd, bias: bool):
-        cholesky = probing.blockdiag_cholesky_from_ensembles(ensembles_snd, bias=bias)
+        cholesky = utilities.blockdiag_cholesky_from_ensembles(ensembles_snd, bias=bias)
 
         # Reintroduce the diagonal: (d, n, n) -> (n, d, n, d)
         _s, n, d = ensembles_snd.shape

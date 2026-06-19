@@ -61,6 +61,7 @@ def test_both_projected_constraints_are_identical(seed, num_probes):
     ode_ts1_projected = ssm.constraint_ode_ts1_projected(
         vf, key=key, num_probes=num_probes
     )
+
     solver = probdiffeq.solver(strategy=strategy, constraint=ode_ts1_projected)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
     solution_projected = solve(prior, grid=grid)
