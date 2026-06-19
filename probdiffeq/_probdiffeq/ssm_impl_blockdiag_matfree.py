@@ -1,0 +1,372 @@
+"""Matrix-free extensions for blockdiagonal models."""
+
+from probdiffeq._probdiffeq import problems, ssm_impl_api, taylor_points, utilities
+from probdiffeq._probdiffeq import ssm_impl_blockdiag as blockdiag
+from probdiffeq.backend import func, linalg, np, random, structs, tree
+from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
+
+__all__ = ["state_space_model_blockdiag_matfree"]
+
+
+C = TypeVar("C", bound=Sequence)
+"""A type-variable for Sequence types.
+
+For example, this variable is used to type Taylor coefficients.
+"""
+
+
+class MatfreeLinOpODEConstraint(ssm_impl_api.AbstractLinOp):
+    def __init__(self, *, ode, tree_flatten, x, t):
+        self.ode = ode
+        self.tree_flatten = tree_flatten
+        self.t = t
+        self.x = x
+
+        *_batch, n_in, d_in = x.shape
+        x_like = structs.ShapeDtypeStruct(shape=(n_in, d_in), dtype=x.dtype)
+        n_out, d_out = func.eval_shape(self._information_operator, x_like).shape
+        super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
+
+    def matvec_ndmd(self, vec):
+        # TODO: this line implies we do sooo many unnecessary function evals...
+        _, jvp = func.linearize(self._information_operator, self.x)
+
+        x1 = vec[np.asarray([self.ode.num_tcoeffs_in_args])]
+        fx0 = jvp(vec)
+        return x1 - fx0
+
+    def _information_operator(self, s: Array) -> Array:
+        # Move to latent space (arg is (n, d) but latent space is (d, n))
+        s = s.T
+
+        # Extract all tcoeffs
+        jet_coords = self.tree_flatten.unflatten_array(s)
+
+        # Extract relevant tcoeffs ("jet-coordinates")
+        jet_coords = jet_coords[: self.ode.num_tcoeffs_in_args]
+
+        # Evaluate the actual vector field
+        fs0 = self.ode.vector_field(jet_coords=jet_coords, t=self.t)
+
+        # Bring back into (m, d) form.
+        return tree.ravel_pytree(fs0)[0][None, :]
+
+    def matvec_dndm(self, vec_dn):
+        vec_nd = vec_dn.T
+        return self.matvec_ndmd(vec_nd).T
+
+    def matvec_flat(self, vec_flat):
+        vec = vec_flat.reshape((self.n_in, self.d_in))
+        return self.matvec_ndmd(vec).reshape((-1,))
+
+    @property
+    def precon_prototype(self):
+        return np.ones((self.d_in,)), np.ones((self.d_out,))
+
+    @classmethod
+    def _register_as_pytree(cls) -> None:
+        """Register this class (or a subclass) as a JAX pytree."""
+
+        def flatten(linop):
+            children = linop.t, linop.x
+            aux = (linop.ode, linop.tree_flatten)
+            return children, aux
+
+        def unflatten(aux, children):
+            (t, x) = children
+            ode, tree_flatten = aux
+            return cls(ode=ode, tree_flatten=tree_flatten, t=t, x=x)
+
+        tree.register_pytree_node(cls, flatten, unflatten)
+
+
+MatfreeLinOpODEConstraint._register_as_pytree()
+
+
+class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
+    def __init__(self, cholesky_x, cholesky_yx, matfree_linop):
+        super().__init__(
+            n_in=matfree_linop.n_out,
+            n_out=matfree_linop.n_in,
+            d_in=matfree_linop.d_out,
+            d_out=matfree_linop.d_in,
+        )
+        self.cholesky_x = cholesky_x
+        self.cholesky_yx = cholesky_yx
+        self.matfree_linop = matfree_linop
+
+    @property
+    def precon_prototype(self):
+        return np.ones((self.d_in,)), np.ones((self.d_out,))
+
+    def matvec_dndm(self, vec_dn):
+        vec_flat = vec_dn.T.reshape((self.n_in * self.d_in,))
+        Avec_flat = self.matvec_flat(vec_flat)
+        return Avec_flat.reshape((self.n_out, self.d_out)).T
+
+    def matvec_ndmd(self, vec):
+        vec_flat = vec.reshape((self.n_in * self.d_in,))
+        Avec_flat = self.matvec_flat(vec_flat)
+        return Avec_flat.reshape((self.n_out, self.d_out))
+
+    def matvec_flat(self, vec):
+        # LSMR struggles with zero RHS's right now,
+        # so we shortcut.
+        out_like = np.zeros((self.n_out * self.d_out,))
+        cond = linalg.vector_norm(vec) == 0
+        return np.where(cond, out_like, self._matvec_flat_nonzero(vec))
+
+    def _matvec_flat_nonzero(self, vec):
+
+        def vecmat(s):
+            # vector-Jacobian product
+            Ats = self.matfree_linop.vecmat_flat(s)
+
+            # Cholesky-vector products
+            BtAts = self.matvec_bd_transpose(self.cholesky_x, Ats)
+            Dts = self.matvec_bd_transpose(self.cholesky_yx, s)
+            return np.concatenate([BtAts, Dts], axis=0)
+
+        # TODO: turn "D" into a damping factor
+        tol = np.finfo_eps(vec.dtype)
+        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec, atol=tol, btol=tol, ctol=tol)
+        return self.matvec_bd(self.cholesky_x, lstsq_sol[: (self.n_out * self.d_out)])
+
+    @staticmethod
+    def matvec_bd_transpose(M, v):
+        d, n, _m = M.shape
+        v_dn = v.reshape((n, d)).T
+        # transpose matvec, not matvec:
+        Mv = linalg.einsum("...mn,...m->...n", M, v_dn)
+        return Mv.T.reshape((-1,))
+
+    @staticmethod
+    def matvec_bd(M, v):
+        d, n, _m = M.shape
+        v_dn = v.reshape((n, d)).T
+        Mv = linalg.einsum("...nm,...m->...n", M, v_dn)
+        return Mv.T.reshape((-1,))
+
+
+class MatfreeLatentCond(ssm_impl_api.AbstractLatentCondProjected):
+    def apply_flat(self, x, /):
+        y = self.A.matvec_ndmd(x.T).T
+        m = y + self.noise.mean_flat
+        c = self.noise.cholesky_flat
+        tree_flatten = self.noise.tree_flatten
+        return blockdiag.BlockDiagNormal(m, c, tree_flatten)
+
+    def marginalise(self, rv, /):
+        # Observed mean
+        obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
+
+        # TODO: we currently ignore the precon
+        # TODO: we currently ignore the noise
+        (d, n), dtype = rv.mean_flat.shape, rv.mean_flat.dtype
+        probes = random.normal(self.key, shape=(self.num_probes, n, d), dtype=dtype)
+        chols = func.vmap(self.A.matvec_ndmd)(probes)
+        chols /= np.sqrt(self.num_probes)
+        obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=-1)(chols)
+        return blockdiag.BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
+
+    def revert(self, rv, /, *, solve_triu: Callable):
+        del solve_triu  # unused
+        # TODO: use preconditioning (currently assume P=1)
+
+        # Sample count. See p. 6 in
+        # https://arxiv.org/abs/2606.08203
+        num = len(rv.mean) * 2
+
+        # Observed mean
+        obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
+
+        # Gain & conditioning
+        K = MatfreeLinOpLstSq(rv.cholesky_flat, self.noise.cholesky_flat, self.A)
+
+        # Posterior mean:
+        cond_mean = rv.mean_flat - K.matvec_dndm(
+            self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
+        )
+
+        # Posterior covariance via probing/ensembles
+        keys = random.split(self.key, num=self.num_probes)
+        ensembles = func.vmap(rv.sample_flat)(keys)
+        ensembles = np.transpose(ensembles, axes=(0, 2, 1))
+
+        def matvec_ndmd(p_nd):
+            Ap_nd = self.A.matvec_ndmd(p_nd)
+            KAp_nd = K.matvec_ndmd(Ap_nd)
+            return p_nd - KAp_nd
+
+        # Posteriors
+        matvec_ensembles = func.vmap(matvec_ndmd)(ensembles)
+        C = utilities.blockdiag_cholesky_from_ensembles(
+            matvec_ensembles, bias=self.bias
+        )
+        noise = blockdiag.BlockDiagNormal(cond_mean, C, rv.tree_flatten)
+
+        # Backward linear operator
+        _key, subkey = random.split(self.key, num=2)
+        construct = MatfreeLatentCond.from_linop_and_noise_and_stochtrace
+        cond = construct(
+            K, noise, key=subkey, num_probes=self.num_probes, bias=self.bias
+        )
+
+        # Marginals (redo samples for whichever reason)
+        matvec_ensembles = func.vmap(self.A.matvec_ndmd)(ensembles)
+        C = utilities.blockdiag_cholesky_from_ensembles(
+            matvec_ensembles, bias=self.bias
+        )
+        observed = blockdiag.BlockDiagNormal(obs_mean, C, self.noise.tree_flatten)
+
+        # Group and return
+        return observed, cond
+
+    def merge(self, other, /):
+        raise NotImplementedError
+
+    def preconditioner_apply(self, /):
+        raise NotImplementedError
+
+
+MatfreeLatentCond._register_as_pytree()
+
+
+class MatfreeOdeTs1(ssm_impl_api.AbstractOdeProjected):
+    """Dense ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
+
+    def init_linearization(self):
+        # todo: we should move the trace estimation outside
+        # the jacobian object. Then, this bit here becomes simpler?
+        # For example, we could even move the information operator
+        # to a method in the ODE, then call func.linearize() / vjp()
+        # in the constraints here, and then call the trace/diagonal estimators
+        # on this linearisation with a uniform API.
+        jac = self.ode.jacobian.init_jacobian_handler()
+        return self.key, jac
+
+    def linearize(self, rv, state, *, damp: float, t: float):
+        # Read n and d so that we can turn latent arrays into
+        # (n, d) arrays, which Jacobians require
+        m_tree = rv.mean
+        n = len(m_tree)
+        d = rv.mean_flat.size // n
+
+        # Materialize the Jacobian
+        m0 = rv.mean_flat.T
+        fun = func.partial(self.information_operator, tree_flatten=rv.tree_flatten, t=t)
+        fx, JVP = func.linearize(fun, m0)
+
+        # Flatten fx and J correctly (from [m, d, n, d] to [md,nd])
+        m, d = fx.shape
+        fx = fx.reshape((m * d,))
+
+        # Complete the expressions for bias and linop
+
+        fx = JVP(rv.mean_flat.T) - fx
+        # E1 = projection_e1(rv.mean_flat.T)
+
+        # Flatten fx into the correct pytree structure
+        f0 = blockdiag.BlockDiagNormal.from_dirac(
+            [m_tree[self.ode.num_tcoeffs_in_args]], damp=damp
+        )
+        fx = f0.tree_flatten.unflatten_array(fx.T)
+
+        # Collect all quantities and return
+        noise = blockdiag.BlockDiagNormal.from_dirac(fx, damp=damp)
+
+        # n_out, d_out, n_in, d_in = E1.shape
+        linop = MatfreeLinOpODEConstraint(
+            ode=self.ode, tree_flatten=rv.tree_flatten, t=t, x=m0
+        )
+
+        construct = MatfreeLatentCond.from_linop_and_noise_and_stochtrace
+        key, jac = state
+        key, subkey = random.split(key, num=2)
+        cond = construct(
+            linop, noise, key=subkey, num_probes=self.num_probes, bias=self.bias
+        )
+
+        return cond, (key, jac)
+
+    # Rewrite the vector field as one that maps
+    # Arrays to arrays.
+    # Maps (n, d) to (1, d) to conform the Jacobian API
+    def information_operator(self, s: Array, *, tree_flatten, t) -> Array:
+        # Move to latent space (arg is (n, d) but latent space is (d, n))
+        s = s.T
+
+        # Extract all tcoeffs
+        jet_coords = tree_flatten.unflatten_array(s)
+
+        # Extract relevant tcoeffs ("jet-coordinates")
+        jet_coords = jet_coords[: self.ode.num_tcoeffs_in_args]
+
+        # Evaluate the actual vector field
+        fs0 = self.ode.vector_field(jet_coords=jet_coords, t=t)
+
+        # Bring back into (m, d) form.
+        return tree.ravel_pytree(fs0)[0][None, :]
+
+
+class state_space_model_blockdiag_matfree(ssm_impl_api.StateSpaceModel):
+    """Implementation of matrix-free extensions for block-diagonal SSMs."""
+
+    def __init__(self, *, key, num_probes, bias=False):
+        self.key = key
+        self.num_probes = num_probes
+        self.bias = bias
+
+    def prior_wiener_integrated(self, *args, **kwargs):
+        bd = blockdiag.state_space_model_blockdiag()
+        return bd.prior_wiener_integrated(*args, **kwargs)
+
+    def prior_wiener_integrated_diffuse(self, *args, **kwargs):
+        bd = blockdiag.state_space_model_blockdiag()
+        return bd.prior_wiener_integrated_diffuse(*args, **kwargs)
+
+    def prior_exponential(
+        self,
+        ode,
+        tcoeffs_mean: C,
+        /,
+        *,
+        is_exact: C | bool = True,
+        inexact_eps: float = 1e-6,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
+    ):
+        raise NotImplementedError
+
+    def prior_exponential_diffuse(
+        self,
+        ode,
+        tcoeffs_mean: C,
+        tcoeffs_std: C,
+        /,
+        *,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
+    ):
+        raise NotImplementedError
+
+    def constraint_ode_ts0(self, ode: problems.JetOde, /):
+        raise NotImplementedError
+
+    def constraint_ode_ts1(self, ode: problems.JetOde, /):
+        if not isinstance(ode, problems.JetOde):
+            raise TypeError(ode)
+
+        return MatfreeOdeTs1(
+            ode=ode, key=self.key, num_probes=self.num_probes, bias=self.bias
+        )
+
+    def constraint_residual(
+        self,
+        residual: problems.JetResidual,
+        *,
+        taylor_point: taylor_points.TaylorPoint | None = None,
+    ):
+        raise NotImplementedError

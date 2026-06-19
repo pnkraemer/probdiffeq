@@ -10,6 +10,7 @@ from probdiffeq._probdiffeq.problems import *
 from probdiffeq._probdiffeq.solvers import *
 from probdiffeq._probdiffeq.ssm_impl_api import *
 from probdiffeq._probdiffeq.ssm_impl_blockdiag import *
+from probdiffeq._probdiffeq.ssm_impl_blockdiag_matfree import *
 from probdiffeq._probdiffeq.ssm_impl_dense import *
 from probdiffeq._probdiffeq.ssm_impl_isotropic import *
 from probdiffeq._probdiffeq.taylor_points import *
