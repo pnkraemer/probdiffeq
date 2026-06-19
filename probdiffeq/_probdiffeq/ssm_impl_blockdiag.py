@@ -303,31 +303,58 @@ class BlockDiagLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
             self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
         )
 
-        # Samples
-        n = len(rv.mean)
-        d = rv.mean_flat.size // n
-        probes = random.normal(
-            self.key, shape=(self.num_probes, n, d), dtype=obs_mean.dtype
-        )
-        probes = linalg.einsum("dnm,smd->snd", rv.cholesky_flat, probes)
+        # Posterior covariance via probing/ensembles
+        keys = random.split(self.key, num=self.num_probes)
+        ensembles = func.vmap(rv.sample_flat)(keys)
+        ensembles = np.transpose(ensembles, axes=(0, 2, 1))
+
+        def matvec_ndmd(p_nd):
+            Ap_nd = self.A.matvec_ndmd(p_nd)
+            KAp_nd = K.matvec_ndmd(Ap_nd)
+            return p_nd - KAp_nd
 
         # Posteriors
-        chols = func.vmap(lambda s: s - K.matvec_ndmd(self.A.matvec_ndmd(s)))(probes)
-        chols /= np.sqrt(self.num_probes)
-        cond_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=-1)(chols)
-        noise = BlockDiagNormal(cond_mean, cond_chol, rv.tree_flatten)
+        C = self._blockdiag_cholesky_from_ensembles(matvec_ndmd, ensembles)
+        noise = BlockDiagNormal(cond_mean, C, rv.tree_flatten)
 
+        # Backward linear operator
+        _key, subkey = random.split(self.key, num=2)
         construct = BlockDiagLatentCondProjected.from_linop_and_noise_and_stochtrace
-        cond = construct(K, noise, key=self.key, num_probes=self.num_probes)
+        cond = construct(K, noise, key=subkey, num_probes=self.num_probes)
 
         # Marginals (redo samples for whichever reason)
-        chols = func.vmap(self.A.matvec_ndmd)(probes)
-        chols /= np.sqrt(self.num_probes)
-        obs_chol = func.vmap(lambda s: linalg.qr_r(s).T, in_axes=-1)(chols)
-        observed = BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
+        C = self._blockdiag_cholesky_from_ensembles(self.A.matvec_ndmd, ensembles)
+        observed = BlockDiagNormal(obs_mean, C, self.noise.tree_flatten)
 
         # Group and return
         return observed, cond
+
+    @staticmethod
+    def _blockdiag_cholesky_from_ensembles(matvec_ndmd, ensembles_smd):
+        S, _n, _d = ensembles_smd.shape
+        # Center, apply matvec, and normalise
+        ensembles_smd -= ensembles_smd.mean(axis=0, keepdims=True)
+        cholesky = func.vmap(matvec_ndmd)(ensembles_smd)
+
+        _S, m, _d = cholesky.shape
+
+        def ensemble_to_sample_cholesky(s):
+            """Compute a sample Cholesky factor fro ensembles."""
+            num, _n = s.shape
+            s /= np.sqrt(num)
+            return linalg.qr_r(s).T
+
+        # The QR decomposition is why we assume S >= n,
+        # so let's check it briefly:
+        if m > S:
+            msg = "The function requires at least as many ensembles as Taylor coefficients."
+            msg += f" Received: S={S} < m={m}, which violates this assumption."
+            raise ValueError(msg)
+
+        # Assume ensembles are shape (S, n, d), so we batch along d
+        # but since we also want the output to be (d, n, n), the out_axes is 0.
+        transform = func.vmap(ensemble_to_sample_cholesky, in_axes=-1, out_axes=0)
+        return transform(cholesky)
 
     def merge(self, other, /):
         raise NotImplementedError
