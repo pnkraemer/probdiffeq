@@ -164,7 +164,7 @@ class DenseNormal(ssm_impl_api.AbstractTreeNormal[DenseTreeFlatten]):
 DenseNormal.register_pytree_node()
 
 
-class DenseMatrix(ssm_impl_api.AbstractLinOp):
+class DenseMatrix(ssm_impl_api.AbstractLinop):
     def __init__(self, *, matrix_ndmd):
         *_batch, n_out, d_out, n_in, d_in = matrix_ndmd.shape
         super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)

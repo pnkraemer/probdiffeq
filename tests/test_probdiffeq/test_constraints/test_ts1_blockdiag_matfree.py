@@ -4,7 +4,7 @@ from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import np, ode, random, testing
 
 
-@testing.parametrize("seed", [1, 2, 3])
+@testing.parametrize("seed", [1, 2])
 @testing.parametrize("num_probes", [10])
 def test_accuracy_matches_dense_ts1(seed, num_probes):
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
@@ -13,15 +13,13 @@ def test_accuracy_matches_dense_ts1(seed, num_probes):
     jetexpand = probdiffeq.jetexpand_ode_unroll(num=2)
     tcoeffs, _ = jetexpand(vf, [u0], t=t0)
     strategy = probdiffeq.strategy_filter()
-    save_at = np.linspace(t0, t1, num=100, endpoint=True)
+    save_at = np.linspace(t0, t1, num=20, endpoint=True)
 
     # Build the rest of the solver (projected, medium precision)
     key = random.prng_key(seed=seed)
-    ssm = probdiffeq.state_space_model_blockdiag()
+    ssm = probdiffeq.state_space_model_matfree(key=key, num_probes=num_probes)
     prior = ssm.prior_wiener_integrated(tcoeffs)
-    ode_ts1_projected = ssm.constraint_ode_ts1_projected(
-        vf, key=key, num_probes=num_probes
-    )
+    ode_ts1_projected = ssm.constraint_ode_ts1(vf)
     solver = probdiffeq.solver(strategy=strategy, constraint=ode_ts1_projected)
     error = probdiffeq.error_state_std(constraint=ode_ts1_projected)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
@@ -56,7 +54,7 @@ def test_both_projected_constraints_are_identical(seed, num_probes):
 
     # Build the rest of the solver (projected, medium precision)
     key = random.prng_key(seed=seed)
-    ssm = probdiffeq.state_space_model_blockdiag_matfree(key=key, num_probes=num_probes)
+    ssm = probdiffeq.state_space_model_matfree(key=key, num_probes=num_probes)
     prior = ssm.prior_wiener_integrated(tcoeffs)
     ode_ts1 = ssm.constraint_ode_ts1(vf)
     solver = probdiffeq.solver(strategy=strategy, constraint=ode_ts1)

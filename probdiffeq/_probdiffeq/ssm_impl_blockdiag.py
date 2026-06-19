@@ -13,7 +13,7 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 
-class BlockDiagMatrix(ssm_impl_api.AbstractLinOp):
+class BlockDiagMatrix(ssm_impl_api.AbstractLinop):
     def __init__(self, *, matrix_dnm):
         d, n_out, n_in = matrix_dnm.shape
         super().__init__(n_in=n_in, n_out=n_out, d_in=d, d_out=d)

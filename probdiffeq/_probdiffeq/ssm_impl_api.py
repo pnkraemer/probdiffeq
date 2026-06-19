@@ -35,7 +35,7 @@ For example, this variable is used to type Taylor coefficients.
 # TODO (cont'd): (do Jacobians implement linear operators? Merge the two classes?)
 
 
-class AbstractLinOp(abc.ABC):
+class AbstractLinop(abc.ABC):
     def __init__(self, *, n_in, n_out, d_in, d_out):
         self.n_in = n_in
         self.n_out = n_out
@@ -84,7 +84,7 @@ class AbstractLinOp(abc.ABC):
 
 class AbstractLatentCondAPI:
     def __init__(self, A, noise, to_latent, to_observed) -> None:
-        if not isinstance(A, AbstractLinOp):
+        if not isinstance(A, AbstractLinop):
             msg = f"Linear operator expected, but {A} received."
             raise TypeError(msg)
 
@@ -241,12 +241,12 @@ class AbstractLatentCond(AbstractLatentCondAPI):
         tree.register_pytree_node(cls, flatten, unflatten)
 
     @classmethod
-    def from_linop_and_noise(cls, A: AbstractLinOp, noise):
+    def from_linop_and_noise(cls, A: AbstractLinop, noise):
         """Construct a latent conditional with unit en- and decoders."""
         if len(noise.batch_shape) > 0:
             return func.vmap(cls.from_linop_and_noise)(A, noise)
 
-        if not isinstance(A, AbstractLinOp):
+        if not isinstance(A, AbstractLinop):
             msg = f"Linear operator expected, but {A} received."
             raise TypeError(msg)
 

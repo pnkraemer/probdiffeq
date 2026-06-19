@@ -5,7 +5,7 @@ from probdiffeq._probdiffeq import ssm_impl_blockdiag as blockdiag
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 
-__all__ = ["state_space_model_blockdiag_matfree"]
+__all__ = ["state_space_model_matfree"]
 
 
 C = TypeVar("C", bound=Sequence)
@@ -14,8 +14,13 @@ C = TypeVar("C", bound=Sequence)
 For example, this variable is used to type Taylor coefficients.
 """
 
+# TODO: figure out the excessive funevals (repeated linearisation),
+#   then we might be at the stage where we can update remaining tests?
+#   also, should we add iterative linearisation to all Ts1's?
+#   also, should we unify current probing with Jacobian handlers?
 
-class MatfreeLinOpODEConstraint(ssm_impl_api.AbstractLinOp):
+
+class MatfreeLinopODEConstraint(ssm_impl_api.AbstractLinop):
     def __init__(self, *, ode, tree_flatten, x, t):
         self.ode = ode
         self.tree_flatten = tree_flatten
@@ -28,9 +33,13 @@ class MatfreeLinOpODEConstraint(ssm_impl_api.AbstractLinOp):
         super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
 
     def matvec_ndmd(self, vec):
-        # TODO: this line implies we do sooo many unnecessary function evals...
+        # TODO (!!!): this line implies sooo many unnecessary function evals...
+        # but if we linearize outside, then MatfreeLinopODEConstraint
+        # isn't a valid pytree anymore... this is the critical puzzle to solve!
+        # should we add external parametrisation to all matvecs, as in
+        # matvec_ndmd(vec, p=(...))?
         _, jvp = func.linearize(self._information_operator, self.x)
-
+        assert False
         x1 = vec[np.asarray([self.ode.num_tcoeffs_in_args])]
         fx0 = jvp(vec)
         return x1 - fx0
@@ -80,10 +89,10 @@ class MatfreeLinOpODEConstraint(ssm_impl_api.AbstractLinOp):
         tree.register_pytree_node(cls, flatten, unflatten)
 
 
-MatfreeLinOpODEConstraint._register_as_pytree()
+MatfreeLinopODEConstraint._register_as_pytree()
 
 
-class MatfreeLinOpLstSq(ssm_impl_api.AbstractLinOp):
+class MatfreeLinopLstSq(ssm_impl_api.AbstractLinop):
     def __init__(self, cholesky_x, cholesky_yx, matfree_linop):
         super().__init__(
             n_in=matfree_linop.n_out,
@@ -181,7 +190,7 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCondProjected):
         obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
 
         # Gain & conditioning
-        K = MatfreeLinOpLstSq(rv.cholesky_flat, self.noise.cholesky_flat, self.A)
+        K = MatfreeLinopLstSq(rv.cholesky_flat, self.noise.cholesky_flat, self.A)
 
         # Posterior mean:
         cond_mean = rv.mean_flat - K.matvec_dndm(
@@ -276,7 +285,7 @@ class MatfreeOdeTs1(ssm_impl_api.AbstractOdeProjected):
         noise = blockdiag.BlockDiagNormal.from_dirac(fx, damp=damp)
 
         # n_out, d_out, n_in, d_in = E1.shape
-        linop = MatfreeLinOpODEConstraint(
+        linop = MatfreeLinopODEConstraint(
             ode=self.ode, tree_flatten=rv.tree_flatten, t=t, x=m0
         )
 
@@ -309,7 +318,7 @@ class MatfreeOdeTs1(ssm_impl_api.AbstractOdeProjected):
         return tree.ravel_pytree(fs0)[0][None, :]
 
 
-class state_space_model_blockdiag_matfree(ssm_impl_api.StateSpaceModel):
+class state_space_model_matfree(ssm_impl_api.StateSpaceModel):
     """Implementation of matrix-free extensions for block-diagonal SSMs."""
 
     def __init__(self, *, key, num_probes, bias=False):
