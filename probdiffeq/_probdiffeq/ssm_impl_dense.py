@@ -1,4 +1,10 @@
-from probdiffeq._probdiffeq import problems, ssm_impl_api, taylor_points, utilities
+from probdiffeq._probdiffeq import (
+    probing,
+    problems,
+    ssm_impl_api,
+    taylor_points,
+    utilities,
+)
 from probdiffeq.backend import func, linalg, np, random, structs, tree, warnings
 from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 from probdiffeq.util import cholesky_util, gram_util
@@ -344,7 +350,7 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
         keys = random.split(subkey, num=self.num_probes)
         ensembles = func.vmap(cond.sample_flat)(keys)
         ensembles_nd = ensembles.reshape((self.num_probes, n, d))
-        cholesky = self._remove_offdiag_from_ensembles(ensembles_nd, bias=self.bias)
+        cholesky = self.remove_offdiags_via_ensembles(ensembles_nd, bias=self.bias)
         noise = DenseNormal(cond.mean_flat, cholesky, cond.tree_flatten)
 
         key, subkey = random.split(self.key, num=2)
@@ -363,7 +369,7 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
         keys = random.split(key, num=self.num_probes)
         ensembles = func.vmap(observed.sample_flat)(keys)
         ensembles_md = ensembles.reshape((self.num_probes, m, d))
-        cholesky = self._remove_offdiag_from_ensembles(ensembles_md, bias=self.bias)
+        cholesky = self.remove_offdiags_via_ensembles(ensembles_md, bias=self.bias)
         observed = DenseNormal(observed.mean_flat, cholesky, noise.tree_flatten)
 
         # Return values
@@ -373,36 +379,15 @@ class DenseLatentCondProjected(ssm_impl_api.AbstractLatentCondProjected):
         raise RuntimeError
 
     @staticmethod
-    def _remove_offdiag_from_ensembles(ensembles_snd, bias: bool):
-        # 'snd' encodes the shape (S, n, d), as opposed to (S, n*d).
-
-        def ensemble_to_sample_cholesky(s):
-            """Compute a sample Cholesky factor from ensembles."""
-            num, _n = s.shape
-            s = s / np.sqrt(num) if bias else s / np.sqrt(num - 1)
-            return linalg.qr_r(s).T
-
-        # The QR decomposition is why we assume S >= n,
-        # so let's check it briefly:
-        S, m, d = ensembles_snd.shape
-        if m > S:
-            msg = "The function requires at least as many ensembles as Taylor coefficients."
-            msg += f" Received: S={S} < m={m}, which violates this assumption."
-            raise ValueError(msg)
-
-        # Center the ensembles
-        ensembles_snd -= ensembles_snd.mean(axis=0, keepdims=True)
-
-        # Assume ensembles are shape (S, n, d), so we batch along d,
-        # but since we also want the output to be (d, n, n), the out_axes is 0.
-        transform = func.vmap(ensemble_to_sample_cholesky, in_axes=-1, out_axes=0)
-        cholesky = transform(ensembles_snd)
+    def remove_offdiags_via_ensembles(ensembles_snd, bias: bool):
+        cholesky = probing.blockdiag_cholesky_from_ensembles(ensembles_snd, bias=bias)
 
         # Reintroduce the diagonal: (d, n, n) -> (n, d, n, d)
+        _s, n, d = ensembles_snd.shape
         cholesky = linalg.einsum("dnm,dt->ndmt", cholesky, np.eye(d))
 
         # Flatten to conform with DenseNormal's hidden shape
-        return cholesky.reshape((m * d, m * d))
+        return cholesky.reshape((n * d, n * d))
 
 
 DenseLatentCondProjected._register_as_pytree()
