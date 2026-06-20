@@ -151,7 +151,7 @@ def solver(*, num_derivatives: int, constraint: str, fact: str) -> Callable:
         elif constraint == "ts1":
             ts1 = ssm.constraint_ode_ts1(vf)
         else:
-            ValueError
+            raise ValueError
         strategy = probdiffeq.strategy_filter()
         solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=ts1)
         error = probdiffeq.error_state_std(constraint=ts1)

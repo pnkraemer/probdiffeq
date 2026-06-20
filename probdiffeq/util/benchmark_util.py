@@ -28,6 +28,7 @@ def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
         for arg in list_of_args:
             precision = precision_fun(fun(arg).block_until_ready())
             times = timeit_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
+            print(precision)
 
             precisions.append(precision)
             works_mean.append(np.mean(np.asarray(times)))

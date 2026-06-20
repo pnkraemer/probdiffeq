@@ -1,4 +1,4 @@
-"""Walltime | Linear ODE with 13 components."""
+"""Walltime | Linear ODE with many components."""
 
 from collections.abc import Callable
 
@@ -17,7 +17,7 @@ from probdiffeq.util import benchmark_util
 jax.config.update("jax_debug_nans", True)
 
 
-def main(start=3.0, stop=12.0, step=1.0, repeats=2) -> None:
+def main(start=3.0, stop=4.0, step=1.0, repeats=2) -> None:
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
@@ -43,12 +43,12 @@ def main(start=3.0, stop=12.0, step=1.0, repeats=2) -> None:
     ts1_bd = solver_probdiffeq(5, constraint_order=1, implementation="blockdiag")
     ts1_mf = solver_probdiffeq(5, constraint_order=1, implementation="matfree")
     algorithms = {
-        r"ProbDiffEq: TS1($5$, matfree)": ts1_mf,
-        r"ProbDiffEq: TS0($5$, isotropic)": ts0_iso,
-        r"ProbDiffEq: TS0($5$, blockdiag)": ts0_bd,
-        r"ProbDiffEq: TS1($5$, blockdiag)": ts1_bd,
-        "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
-        "SciPy: 'RK45'": solver_scipy(method="RK45"),
+        r"ProbDiffEq: TS1($5$, matfree)": ts1_mf
+        # r"ProbDiffEq: TS0($5$, isotropic)": ts0_iso,
+        # r"ProbDiffEq: TS0($5$, blockdiag)": ts0_bd,
+        # r"ProbDiffEq: TS1($5$, blockdiag)": ts1_bd,
+        # "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
+        # "SciPy: 'RK45'": solver_scipy(method="RK45"),
     }
 
     # Compute a reference solution
@@ -86,7 +86,7 @@ def solve_ivp_once():
         """Lotka--Volterra dynamics."""
         return 1.01 * y
 
-    u0 = np.ones((25,))
+    u0 = np.ones((11,))
     time_span = np.asarray([0.0, 1.0])
     tol = 1e-12
     solution = scipy.integrate.solve_ivp(
@@ -99,6 +99,9 @@ def solver_probdiffeq(
     num_derivatives: int, implementation, constraint_order: int
 ) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
+    # raise RuntimeError(
+    #     "Understand why in the two branches, one solver works well and the other doesnt. Then make the less invasive branch work."
+    # )
 
     @probdiffeq.ode
     def vf_probdiffeq(y, /, *, t):
@@ -106,7 +109,7 @@ def solver_probdiffeq(
         del t
         return 1.01 * y
 
-    u0 = jnp.ones((25,), dtype=float)
+    u0 = jnp.ones((11,), dtype=float)
     t0, t1 = (0.0, 1.0)
 
     @jax.jit
@@ -137,7 +140,7 @@ def solver_probdiffeq(
         # Build a solver
         solution = solve(iwp, t0=t0, t1=t1, dt0=dt0, atol=1e-2 * tol, rtol=tol)
 
-        # Return the terminal value)
+        # Return the terminal value
         return jax.block_until_ready(solution.u.mean[0])
 
     def state_space_model(implementation):
@@ -150,7 +153,7 @@ def solver_probdiffeq(
                 return probdiffeq.state_space_model_isotropic()
             case "matfree":
                 key = jax.random.PRNGKey(1)
-                num_probes = (num_derivatives + 1) * 100
+                num_probes = (num_derivatives + 1) * 2
                 return probdiffeq.state_space_model_matfree(
                     key=key, num_probes=num_probes
                 )
@@ -169,7 +172,7 @@ def solver_diffrax(*, solver) -> Callable:
         """Lotka--Volterra dynamics."""
         return 1.01 * y
 
-    u0 = jnp.ones((25,))
+    u0 = jnp.ones((11,))
     t0, t1 = (0.0, 1.0)
 
     @jax.jit
@@ -199,7 +202,7 @@ def solver_scipy(*, method: str) -> Callable:
         """Lotka--Volterra dynamics."""
         return 1.01 * y
 
-    u0 = np.ones((25,))
+    u0 = np.ones((11,))
     time_span = np.asarray([0.0, 1.0])
 
     def param_to_solution(tol):
