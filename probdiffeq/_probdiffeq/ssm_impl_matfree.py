@@ -144,8 +144,7 @@ class MatfreeLinopLstSq(Linop):
             return np.concatenate([BtAts, Dts], axis=0)
 
         # TODO: turn "D" into a damping factor
-        tol = np.finfo_eps(vec.dtype)
-        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec, atol=tol, btol=tol, ctol=tol)
+        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec)
         return self.matvec_bd(self.cholesky_x, lstsq_sol[: (self.n_out * self.d_out)])
 
     @staticmethod
@@ -165,18 +164,25 @@ class MatfreeLinopLstSq(Linop):
 
 
 class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
-    def __init__(self, A, noise, key, num_probes, bias):
-
-        # *batch, d, n = noise.mean_flat.shape
-        # if len(batch) > 0:
-
-        #     partial = func.partial(MatfreeLatentCond.__init__, num_probes=num_probes, bias=bias)
-        #     return func.vmap(partial)(self, A, noise, key)
-
+    def __init__(self, A, noise, key, num_probes, bias, password=False):
         super().__init__(A, noise=noise, to_latent=None, to_observed=None)
         self.key = key
         self.num_probes = num_probes
         self.bias = bias
+
+    @classmethod
+    def from_linop_and_noise_and_stochtrace(cls, A, noise, key, num_probes, bias):
+        *batch, d, n = noise.mean_flat.shape
+        if len(batch) > 0:
+            raise ValueError
+            partial = func.partial(
+                MatfreeLatentCond.from_linop_and_noise_and_stochtrace,
+                num_probes=num_probes,
+                bias=bias,
+            )
+            return func.vmap(partial)(A, noise, key)
+
+        return cls(A, noise, key, num_probes, bias, password=True)
 
     def apply_flat(self, x, /):
         y = self.A.matvec_ndmd(x.T).T
@@ -190,13 +196,12 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
 
         # TODO: we currently ignore the noise
-        (d, n), dtype = rv.mean_flat.shape, rv.mean_flat.dtype
-        ensembles = random.normal(self.key, shape=(self.num_probes, n, d), dtype=dtype)
-        matvec_ensembles = func.vmap(self.A.matvec_ndmd)(ensembles)
-        obs_chol = utilities.blockdiag_cholesky_from_ensembles(
-            matvec_ensembles, bias=self.bias
-        )
-        return blockdiag.BlockDiagNormal(obs_mean, obs_chol, self.noise.tree_flatten)
+        keys = random.split(self.key, num=self.num_probes)
+        ensembles = func.vmap(rv.sample_flat)(keys)  # d, n
+        ensembles = np.transpose(ensembles, axes=(0, 2, 1))  # n, d
+        ensembles_mv = func.vmap(self.A.matvec_ndmd)(ensembles)
+        C = utilities.blockdiag_cholesky_from_ensembles(ensembles_mv, bias=self.bias)
+        return blockdiag.BlockDiagNormal(obs_mean, C, self.noise.tree_flatten)
 
     def revert(self, rv, /, *, solve_triu: Callable):
         del solve_triu  # unused
@@ -208,9 +213,8 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         K = MatfreeLinopLstSq(rv.cholesky_flat, self.noise.cholesky_flat, self.A)
 
         # Posterior mean:
-        cond_mean = rv.mean_flat - K.matvec_dndm(
-            self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
-        )
+        z = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
+        cond_mean = rv.mean_flat - K.matvec_dndm(z)
 
         # Posterior covariance via probing/ensembles
         keys = random.split(self.key, num=self.num_probes)
@@ -223,22 +227,19 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
             return p_nd - KAp_nd
 
         # Posteriors
-        matvec_ensembles = func.vmap(matvec_ndmd)(ensembles)
-        C = utilities.blockdiag_cholesky_from_ensembles(
-            matvec_ensembles, bias=self.bias
-        )
+        ensembles_mv = func.vmap(matvec_ndmd)(ensembles)
+        C = utilities.blockdiag_cholesky_from_ensembles(ensembles_mv, bias=self.bias)
         noise = blockdiag.BlockDiagNormal(cond_mean, C, rv.tree_flatten)
+
         key, subkey = random.split(self.key, num=2)
-        cond = MatfreeLatentCond(
+        cond = MatfreeLatentCond.from_linop_and_noise_and_stochtrace(
             K, noise, key=subkey, num_probes=self.num_probes, bias=self.bias
         )
 
         # Backward linear operator
         # Marginals (redo samples for whichever reason)
-        matvec_ensembles = func.vmap(self.A.matvec_ndmd)(ensembles)
-        C = utilities.blockdiag_cholesky_from_ensembles(
-            matvec_ensembles, bias=self.bias
-        )
+        ensembles_mv = func.vmap(self.A.matvec_ndmd)(ensembles)
+        C = utilities.blockdiag_cholesky_from_ensembles(ensembles_mv, bias=self.bias)
         observed = blockdiag.BlockDiagNormal(obs_mean, C, self.noise.tree_flatten)
 
         # Group and return
@@ -290,6 +291,7 @@ class MatfreeOdeTs1(ssm_impl_api.AbstractOde):
         return self.key, jac
 
     def linearize(self, rv, state, *, damp: float, t: float):
+
         # Read n and d so that we can turn latent arrays into
         # (n, d) arrays, which Jacobians require
         m_tree = rv.mean
@@ -326,7 +328,7 @@ class MatfreeOdeTs1(ssm_impl_api.AbstractOde):
 
         key, jac = state
         key, subkey = random.split(key, num=2)
-        cond = MatfreeLatentCond(
+        cond = MatfreeLatentCond.from_linop_and_noise_and_stochtrace(
             linop, noise, key=subkey, num_probes=self.num_probes, bias=self.bias
         )
 
