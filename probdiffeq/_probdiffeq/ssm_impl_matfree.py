@@ -14,13 +14,6 @@ C = TypeVar("C", bound=Sequence)
 For example, this variable is used to type Taylor coefficients.
 """
 
-# TODO: figure out the excessive funevals (repeated linearisation),
-#   then we might be at the stage where we can update remaining tests?
-#   also, should we add iterative linearisation to all Ts1's?
-#   also, should we unify current probing with Jacobian handlers?
-
-# Sample count? See p. 6 in https://arxiv.org/abs/2606.08203
-
 
 class Linop:
     def __init__(self, *, n_in, n_out, d_in, d_out):
@@ -164,10 +157,10 @@ class MatfreeLinopLstSq(Linop):
 
 
 class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
-    def __init__(self, A, noise, key, num_probes, bias):
+    def __init__(self, A, noise, key, num_ensembles, bias):
         super().__init__(A, noise=noise, to_latent=None, to_observed=None)
         self.key = key
-        self.num_probes = num_probes
+        self.num_ensembles = num_ensembles
         self.bias = bias
 
     def apply_flat(self, x, /):
@@ -182,7 +175,7 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
 
         # TODO: we currently ignore the noise
-        keys = random.split(self.key, num=self.num_probes)
+        keys = random.split(self.key, num=self.num_ensembles)
         ensembles = func.vmap(rv.sample_flat)(keys)  # d, n
         ensembles = np.transpose(ensembles, axes=(0, 2, 1))  # n, d
         ensembles_mv = func.vmap(self.A.matvec_ndmd)(ensembles)
@@ -203,7 +196,7 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         cond_mean = rv.mean_flat - K.matvec_dndm(z)
 
         # Posterior covariance via probing/ensembles
-        keys = random.split(self.key, num=self.num_probes)
+        keys = random.split(self.key, num=self.num_ensembles)
         ensembles = func.vmap(rv.sample_flat)(keys)  # d, n
         ensembles = np.transpose(ensembles, axes=(0, 2, 1))  # n, d
 
@@ -219,7 +212,7 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
 
         _key, subkey = random.split(self.key, num=2)
         cond = MatfreeLatentCond(
-            K, noise, key=subkey, num_probes=self.num_probes, bias=self.bias
+            K, noise, key=subkey, num_ensembles=self.num_ensembles, bias=self.bias
         )
 
         # Backward linear operator
@@ -243,13 +236,13 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
 
         def flatten(linop):
             children = (linop.A, linop.noise, linop.key)
-            aux = linop.num_probes, linop.bias
+            aux = linop.num_ensembles, linop.bias
             return children, aux
 
         def unflatten(aux, children):
             (A, noise, key) = children
-            num_probes, bias = aux
-            return cls(A, noise, key=key, num_probes=num_probes, bias=bias)
+            num_ensembles, bias = aux
+            return cls(A, noise, key=key, num_ensembles=num_ensembles, bias=bias)
 
         tree.register_pytree_node(cls, flatten, unflatten)
 
@@ -260,10 +253,12 @@ MatfreeLatentCond._register_as_pytree()
 class MatfreeOdeTs1(ssm_impl_api.AbstractOde):
     """Dense ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
 
-    def __init__(self, ode, key, num_probes, bias):
+    # Sample count? See p. 6 in https://arxiv.org/abs/2606.08203
+
+    def __init__(self, ode, key, num_ensembles, bias):
         super().__init__(ode=ode)
         self.key = key
-        self.num_probes = num_probes
+        self.num_ensembles = num_ensembles
         self.bias = bias
 
     def init_linearization(self):
@@ -315,7 +310,7 @@ class MatfreeOdeTs1(ssm_impl_api.AbstractOde):
         key, jac = state
         key, subkey = random.split(key, num=2)
         cond = MatfreeLatentCond(
-            linop, noise, key=subkey, num_probes=self.num_probes, bias=self.bias
+            linop, noise, key=subkey, num_ensembles=self.num_ensembles, bias=self.bias
         )
 
         return cond, (key, jac)
@@ -343,9 +338,9 @@ class MatfreeOdeTs1(ssm_impl_api.AbstractOde):
 class state_space_model_matfree(ssm_impl_api.StateSpaceModel):
     """Implementation of matrix-free extensions for block-diagonal SSMs."""
 
-    def __init__(self, *, key, num_probes, bias=False):
+    def __init__(self, *, key, num_ensembles, bias=False):
         self.key = key
-        self.num_probes = num_probes
+        self.num_ensembles = num_ensembles
         self.bias = bias
 
     def prior_wiener_integrated(self, *args, **kwargs):
@@ -391,7 +386,7 @@ class state_space_model_matfree(ssm_impl_api.StateSpaceModel):
             raise TypeError(ode)
 
         return MatfreeOdeTs1(
-            ode=ode, key=self.key, num_probes=self.num_probes, bias=self.bias
+            ode=ode, key=self.key, num_ensembles=self.num_ensembles, bias=self.bias
         )
 
     def constraint_residual(

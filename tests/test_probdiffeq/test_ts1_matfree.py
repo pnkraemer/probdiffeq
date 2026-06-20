@@ -5,8 +5,8 @@ from probdiffeq.backend import np, ode, random, testing
 
 
 @testing.parametrize("seed", [1, 2])
-@testing.parametrize("num_probes", [10])
-def test_accuracy_matches_dense_ts1(seed, num_probes):
+@testing.parametrize("num_ensembles", [10])
+def test_accuracy_matches_dense_ts1(seed, num_ensembles):
     """Test that the matfree Ts1 extension yields accurate solutions."""
     vf, (u0,), (t0, t1) = ode.ivp_lotka_volterra()
 
@@ -18,7 +18,7 @@ def test_accuracy_matches_dense_ts1(seed, num_probes):
 
     # Build the rest of the solver (projected, medium precision)
     key = random.prng_key(seed=seed)
-    ssm = probdiffeq.state_space_model_matfree(key=key, num_probes=num_probes)
+    ssm = probdiffeq.state_space_model_matfree(key=key, num_ensembles=num_ensembles)
     prior = ssm.prior_wiener_integrated(tcoeffs)
     ode_ts1_projected = ssm.constraint_ode_ts1(vf)
     solver = probdiffeq.solver(strategy=strategy, constraint=ode_ts1_projected)

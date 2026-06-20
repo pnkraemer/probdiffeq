@@ -154,9 +154,9 @@ def solver_probdiffeq(
                 return probdiffeq.state_space_model_isotropic()
             case "matfree":
                 key = jax.random.PRNGKey(1)
-                num_probes = (num_derivatives + 1) * 2
+                num_ensembles = (num_derivatives + 1) * 2
                 return probdiffeq.state_space_model_matfree(
-                    key=key, num_probes=num_probes
+                    key=key, num_ensembles=num_ensembles
                 )
             case _:
                 raise ValueError
