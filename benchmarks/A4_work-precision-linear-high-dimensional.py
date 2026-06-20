@@ -16,11 +16,10 @@ from probdiffeq.util import benchmark_util
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
 
-DIMENSION = 40
+DIMENSION = 250
 """The dimension of the ODE problem.
 
-Small enough to include O(d^3) methods in the plot, but large
-enough to penalise them.
+Large enough to exclude all O(d^3) methods.
 """
 
 SCALE = 1.5
@@ -41,9 +40,7 @@ def main(start=3.0, stop=10.0, step=0.5, repeats=2) -> None:
     ts0_bd = solver_probdiffeq(4, constraint_order=0, implementation="blockdiag")
     ts1_bd = solver_probdiffeq(4, constraint_order=1, implementation="blockdiag")
     ts1_mf = solver_probdiffeq(4, constraint_order=1, implementation="matfree")
-    ts1_de = solver_probdiffeq(4, constraint_order=1, implementation="dense")
     algorithms = {
-        r"TS1, dense": ts1_de,
         r"TS1, matfree": ts1_mf,
         r"TS1, blockdiag": ts1_bd,
         r"TS0, blockdiag": ts0_bd,

@@ -1,6 +1,6 @@
 """Matrix-free extensions for blockdiagonal models."""
 
-from probdiffeq._probdiffeq import problems, ssm_impl_api, taylor_points, utilities
+from probdiffeq._probdiffeq import problems, ssm_impl_api, taylor_points
 from probdiffeq._probdiffeq import ssm_impl_blockdiag as blockdiag
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
@@ -179,7 +179,7 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         ensembles = func.vmap(rv.sample_flat)(keys)  # d, n
         ensembles = np.transpose(ensembles, axes=(0, 2, 1))  # n, d
         ensembles_mv = func.vmap(self.A.matvec_ndmd)(ensembles)
-        C = utilities.blockdiag_cholesky_from_ensembles(ensembles_mv, bias=self.bias)
+        C = blockdiag_cholesky_from_ensembles(ensembles_mv, bias=self.bias)
         return blockdiag.BlockDiagNormal(obs_mean, C, self.noise.tree_flatten)
 
     def revert(self, rv, /, *, solve_triu: Callable):
@@ -207,7 +207,7 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
 
         # Posteriors
         ensembles_mv = func.vmap(matvec_ndmd)(ensembles)
-        C = utilities.blockdiag_cholesky_from_ensembles(ensembles_mv, bias=self.bias)
+        C = blockdiag_cholesky_from_ensembles(ensembles_mv, bias=self.bias)
         noise = blockdiag.BlockDiagNormal(cond_mean, C, rv.tree_flatten)
 
         _key, subkey = random.split(self.key, num=2)
@@ -218,7 +218,7 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         # Backward linear operator
         # Marginals (redo samples for whichever reason)
         ensembles_mv = func.vmap(self.A.matvec_ndmd)(ensembles)
-        C = utilities.blockdiag_cholesky_from_ensembles(ensembles_mv, bias=self.bias)
+        C = blockdiag_cholesky_from_ensembles(ensembles_mv, bias=self.bias)
         observed = blockdiag.BlockDiagNormal(obs_mean, C, self.noise.tree_flatten)
 
         # Group and return
@@ -396,3 +396,29 @@ class state_space_model_matfree(ssm_impl_api.StateSpaceModel):
         taylor_point: taylor_points.TaylorPoint | None = None,
     ):
         raise NotImplementedError
+
+
+def blockdiag_cholesky_from_ensembles(ensembles_smd, bias: bool):
+    S, _n, _d = ensembles_smd.shape
+
+    # Center the ensembles
+    ensembles_smd -= ensembles_smd.mean(axis=0, keepdims=True)
+
+    def ensemble_to_sample_cholesky(s):
+        """Compute a sample Cholesky factor from ensembles."""
+        num, _n = s.shape
+        s = s / np.sqrt(num) if bias else s / np.sqrt(num - 1)
+        return linalg.qr_r(s).T
+
+    # The QR decomposition is why we assume S >= n,
+    # so let's check it briefly:
+    _S, m, _d = ensembles_smd.shape
+    if m > S:
+        msg = "The function requires at least as many ensembles as Taylor coefficients."
+        msg += f" Received: S={S} < m={m}, which violates this assumption."
+        raise ValueError(msg)
+
+    # Assume ensembles are shape (S, n, d), so we batch along d
+    # but since we also want the output to be (d, n, n), the out_axes is 0.
+    transform = func.vmap(ensemble_to_sample_cholesky, in_axes=-1, out_axes=0)
+    return transform(ensembles_smd)
