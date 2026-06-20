@@ -16,39 +16,40 @@ from probdiffeq.util import benchmark_util
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
 
+DIMENSION = 40
+"""The dimension of the ODE problem.
 
-def main(start=3.0, stop=4.0, step=1.0, repeats=2) -> None:
+Small enough to include O(d^3) methods in the plot, but large
+enough to penalise them.
+"""
+
+SCALE = 1.5
+"""The 'scale' in u' = scale *  u."""
+
+
+def main(start=3.0, stop=10.0, step=0.5, repeats=2) -> None:
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
-
-    # Simulate once to plot the state
-    ts, ys = solve_ivp_once()
-
-    _fig, ax = plt.subplots(figsize=(5, 3))
-    ax.plot(ts, ys)
-    ax.set_title("Lotka-Volterra problem")
-    ax.set_xlabel("Time")
-    ax.set_ylabel("State")
-    plt.tight_layout()
-    plt.show()
 
     # Read configuration from command line
     tolerances = benchmark_util.setup_tolerances(start=start, stop=stop, step=step)
     timeit_fun = benchmark_util.setup_timeit(repeats=repeats)
 
     # Assemble algorithms
-    ts0_iso = solver_probdiffeq(5, constraint_order=0, implementation="isotropic")
-    ts0_bd = solver_probdiffeq(5, constraint_order=0, implementation="blockdiag")
-    ts1_bd = solver_probdiffeq(5, constraint_order=1, implementation="blockdiag")
-    ts1_mf = solver_probdiffeq(5, constraint_order=1, implementation="matfree")
+    ts0_iso = solver_probdiffeq(4, constraint_order=0, implementation="isotropic")
+    ts0_bd = solver_probdiffeq(4, constraint_order=0, implementation="blockdiag")
+    ts1_bd = solver_probdiffeq(4, constraint_order=1, implementation="blockdiag")
+    ts1_mf = solver_probdiffeq(4, constraint_order=1, implementation="matfree")
+    ts1_de = solver_probdiffeq(4, constraint_order=1, implementation="dense")
     algorithms = {
-        r"ProbDiffEq: TS1($5$, matfree)": ts1_mf
-        # r"ProbDiffEq: TS0($5$, isotropic)": ts0_iso,
-        # r"ProbDiffEq: TS0($5$, blockdiag)": ts0_bd,
-        # r"ProbDiffEq: TS1($5$, blockdiag)": ts1_bd,
-        # "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
-        # "SciPy: 'RK45'": solver_scipy(method="RK45"),
+        r"TS1, dense": ts1_de,
+        r"TS1, matfree": ts1_mf,
+        r"TS1, blockdiag": ts1_bd,
+        r"TS0, blockdiag": ts0_bd,
+        r"TS0, isotropic": ts0_iso,
+        "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
+        "SciPy: 'RK45'": solver_scipy(method="RK45"),
     }
 
     # Compute a reference solution
@@ -67,7 +68,10 @@ def main(start=3.0, stop=4.0, step=1.0, repeats=2) -> None:
 
     _fig, ax = plt.subplots(figsize=(7, 3))
     for label, wp in results.items():
-        ax.loglog(wp["precision"], wp["work_mean"], label=label)
+        linestyle = (
+            "dashed" if "iffrax" in label.lower() or "ipy" in label.lower() else "solid"
+        )
+        ax.loglog(wp["precision"], wp["work_mean"], label=label, linestyle=linestyle)
 
     ax.set_title("Work-precision diagram")
     ax.set_xlabel("Precision (relative RMSE)")
@@ -84,9 +88,9 @@ def solve_ivp_once():
 
     def vf_scipy(_t, y):
         """Lotka--Volterra dynamics."""
-        return 1.01 * y
+        return SCALE * y
 
-    u0 = np.ones((11,))
+    u0 = np.ones((DIMENSION,))
     time_span = np.asarray([0.0, 1.0])
     tol = 1e-12
     solution = scipy.integrate.solve_ivp(
@@ -99,17 +103,14 @@ def solver_probdiffeq(
     num_derivatives: int, implementation, constraint_order: int
 ) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
-    # raise RuntimeError(
-    #     "Understand why in the two branches, one solver works well and the other doesnt. Then make the less invasive branch work."
-    # )
 
     @probdiffeq.ode
     def vf_probdiffeq(y, /, *, t):
         """Lotka--Volterra dynamics."""
         del t
-        return 1.01 * y
+        return SCALE * y
 
-    u0 = jnp.ones((11,), dtype=float)
+    u0 = jnp.ones((DIMENSION,), dtype=float)
     t0, t1 = (0.0, 1.0)
 
     @jax.jit
@@ -129,7 +130,7 @@ def solver_probdiffeq(
             raise ValueError
 
         solver = probdiffeq.solver(strategy=strategy, constraint=ts)
-        error = probdiffeq.error_residual_std(constraint=ts)
+        error = probdiffeq.error_state_std(constraint=ts)
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
@@ -170,9 +171,9 @@ def solver_diffrax(*, solver) -> Callable:
     @jax.jit
     def vf_diffrax(_t, y, _args):
         """Lotka--Volterra dynamics."""
-        return 1.01 * y
+        return SCALE * y
 
-    u0 = jnp.ones((11,))
+    u0 = jnp.ones((DIMENSION,))
     t0, t1 = (0.0, 1.0)
 
     @jax.jit
@@ -200,9 +201,9 @@ def solver_scipy(*, method: str) -> Callable:
 
     def vf_scipy(_t, y):
         """Lotka--Volterra dynamics."""
-        return 1.01 * y
+        return SCALE * y
 
-    u0 = np.ones((11,))
+    u0 = np.ones((DIMENSION,))
     time_span = np.asarray([0.0, 1.0])
 
     def param_to_solution(tol):

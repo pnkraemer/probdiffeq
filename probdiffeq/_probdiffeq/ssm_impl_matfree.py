@@ -34,12 +34,6 @@ class Linop:
         args = f"n_out={self.n_out}, d_out={self.d_out}, n_in={self.n_in}, d_in={self.d_in})"
         return f"{name}({args})"
 
-    def vecmat_flat(self, w):
-        v = np.ones((self.n_in * self.d_in,))
-        vecmat = func.linear_transpose(self.matvec_flat, v)
-        (vm,) = vecmat(w)
-        return vm
-
 
 class MatfreeLinopODEConstraint(Linop):
     def __init__(self, *, ode, tree_flatten, x, t):
@@ -84,6 +78,12 @@ class MatfreeLinopODEConstraint(Linop):
     def matvec_dndm(self, vec_dn):
         vec_nd = vec_dn.T
         return self.matvec_ndmd(vec_nd).T
+
+    def vecmat_flat(self, w):
+        v = np.ones((self.n_in * self.d_in,))
+        vecmat = func.linear_transpose(self.matvec_flat, v)
+        (vm,) = vecmat(w)
+        return vm
 
     def matvec_flat(self, vec_flat):
         vec = vec_flat.reshape((self.n_in, self.d_in))
@@ -164,25 +164,11 @@ class MatfreeLinopLstSq(Linop):
 
 
 class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
-    def __init__(self, A, noise, key, num_probes, bias, password=False):
+    def __init__(self, A, noise, key, num_probes, bias):
         super().__init__(A, noise=noise, to_latent=None, to_observed=None)
         self.key = key
         self.num_probes = num_probes
         self.bias = bias
-
-    @classmethod
-    def from_linop_and_noise_and_stochtrace(cls, A, noise, key, num_probes, bias):
-        *batch, d, n = noise.mean_flat.shape
-        if len(batch) > 0:
-            raise ValueError
-            partial = func.partial(
-                MatfreeLatentCond.from_linop_and_noise_and_stochtrace,
-                num_probes=num_probes,
-                bias=bias,
-            )
-            return func.vmap(partial)(A, noise, key)
-
-        return cls(A, noise, key, num_probes, bias, password=True)
 
     def apply_flat(self, x, /):
         y = self.A.matvec_ndmd(x.T).T
@@ -231,8 +217,8 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         C = utilities.blockdiag_cholesky_from_ensembles(ensembles_mv, bias=self.bias)
         noise = blockdiag.BlockDiagNormal(cond_mean, C, rv.tree_flatten)
 
-        key, subkey = random.split(self.key, num=2)
-        cond = MatfreeLatentCond.from_linop_and_noise_and_stochtrace(
+        _key, subkey = random.split(self.key, num=2)
+        cond = MatfreeLatentCond(
             K, noise, key=subkey, num_probes=self.num_probes, bias=self.bias
         )
 
@@ -328,7 +314,7 @@ class MatfreeOdeTs1(ssm_impl_api.AbstractOde):
 
         key, jac = state
         key, subkey = random.split(key, num=2)
-        cond = MatfreeLatentCond.from_linop_and_noise_and_stochtrace(
+        cond = MatfreeLatentCond(
             linop, noise, key=subkey, num_probes=self.num_probes, bias=self.bias
         )
 
