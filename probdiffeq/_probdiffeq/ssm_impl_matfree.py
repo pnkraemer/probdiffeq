@@ -14,9 +14,10 @@ C = TypeVar("C", bound=Sequence)
 For example, this variable is used to type Taylor coefficients.
 """
 
+# TODO: Implement a block LSMR and use it?
+# TODO: try Hutchinson instead of ensembles
 # TODO: remove info_operator duplication between Ts1 and Linop
 # TODO: Implement iterated linearisation
-# TODO: try Hutchinson instead of ensembles
 # TODO: Implement residual-based solvers
 # TODO: Implement a benchmark for high-dimensional, stiff problems.
 
@@ -146,28 +147,13 @@ class MatfreeLinopLstSq(Linop):
             Ats, _vjp = self.linop_ode_constraint.vecmat_flat(s, jvp_cached=jvp_cached)
 
             # Cholesky-vector products
-            return MatfreeLinopLstSq.materialized_vecmat_dn(self.cholesky_x, Ats)
+            return materialized_vecmat_dn(self.cholesky_x, Ats)
 
         # TODO: turn "D" into a damping factor?
         damp = self.linop_ode_constraint.damp
         lstsq_sol = linalg.lstsq_lsmr(vecmat, vec, x0=x0_flat, damp=damp)
-        Av = MatfreeLinopLstSq.materialized_matvec_dn(self.cholesky_x, lstsq_sol)
+        Av = materialized_matvec_dn(self.cholesky_x, lstsq_sol)
         return Av, jvp_cached
-
-    @staticmethod
-    def materialized_vecmat_dn(M, v):
-        d, n, _m = M.shape
-        v_dn = v.reshape((n, d)).T
-        # transpose matvec, not matvec:
-        Mv = linalg.einsum("...mn,...m->...n", M, v_dn)
-        return Mv.T.reshape((-1,))
-
-    @staticmethod
-    def materialized_matvec_dn(M, v):
-        d, n, _m = M.shape
-        v_dn = v.reshape((n, d)).T
-        Mv = linalg.einsum("...nm,...m->...n", M, v_dn)
-        return Mv.T.reshape((-1,))
 
 
 class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
@@ -193,6 +179,10 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         obs_mean = Am + self.noise.mean_flat
 
         # TODO: we currently ignore the damping factor & the noise...
+
+        # Ensemble Cholesky: P P^\top = (A C Xi) (A C Xi)^\top
+        # but alternatively, Hutchinson:
+        # P P^\top =
         keys = random.split(self.key, num=self.num_ensembles)
         ensembles = func.vmap(rv.sample_flat)(keys)  # d, n
         ensembles = np.transpose(ensembles, axes=(0, 2, 1))  # n, d
@@ -449,3 +439,18 @@ def blockdiag_cholesky_from_ensembles(ensembles_smd, bias: bool):
     # but since we also want the output to be (d, n, n), the out_axes is 0.
     transform = func.vmap(ensemble_to_sample_cholesky, in_axes=-1, out_axes=0)
     return transform(ensembles_smd)
+
+
+def materialized_vecmat_dn(M, v):
+    d, n, _m = M.shape
+    v_dn = v.reshape((n, d)).T
+    # transpose matvec, not matvec:
+    Mv = linalg.einsum("...mn,...m->...n", M, v_dn)
+    return Mv.T.reshape((-1,))
+
+
+def materialized_matvec_dn(M, v):
+    d, n, _m = M.shape
+    v_dn = v.reshape((n, d)).T
+    Mv = linalg.einsum("...nm,...m->...n", M, v_dn)
+    return Mv.T.reshape((-1,))

@@ -16,7 +16,7 @@ from probdiffeq.util import benchmark_util
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
 
-DIMENSION = 250
+DIMENSION = 100
 """The dimension of the ODE problem.
 
 Large enough to exclude all O(d^3) methods.
