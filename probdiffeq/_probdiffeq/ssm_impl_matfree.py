@@ -47,28 +47,30 @@ class MatfreeLinopODEConstraint(Linop):
         *batch, n, d = x.shape
         super().__init__(batch=batch, n_in=n, n_out=1, d_in=d, d_out=d)
 
-    def init_jvp(self):
-        _, jvp = func.linearize(self._information_operator, self.x)
-        return jvp
-
-    def matvec_dn(self, vec_dn, *, jvp):
+    def matvec_dn(self, vec_dn, *, jvp_cached):
         vec_nd = vec_dn.T
-        return self.matvec_nd(vec_nd, jvp=jvp).T
+        Avec_nd, jvp = self.matvec_nd(vec_nd, jvp_cached=jvp_cached)
+        return Avec_nd.T, jvp
 
-    def vecmat_flat(self, w, *, jvp):
+    def vecmat_flat(self, w, *, jvp_cached):
         v = np.ones((self.n_in * self.d_in,))
-        vecmat = func.linear_transpose(lambda s: self.matvec_flat(s, jvp=jvp), v)
+        vecmat = func.linear_transpose(
+            lambda s: self.matvec_flat(s, jvp_cached=jvp_cached)[0], v
+        )
         (vm,) = vecmat(w)
-        return vm
+        return vm, vecmat
 
-    def matvec_flat(self, vec_flat, *, jvp):
+    def matvec_flat(self, vec_flat, *, jvp_cached):
         vec = vec_flat.reshape((self.n_in, self.d_in))
-        return self.matvec_nd(vec, jvp=jvp).reshape((-1,))
+        Avec, jvp = self.matvec_nd(vec, jvp_cached=jvp_cached)
+        return Avec.reshape((-1,)), jvp
 
-    def matvec_nd(self, vec, *, jvp):
-        x1 = vec[np.asarray([self.ode.num_tcoeffs_in_args])]
-        fx0 = jvp(vec)
-        return x1 - fx0
+    def matvec_nd(self, vec, *, jvp_cached):
+        if jvp_cached is None:
+            _, jvp = func.linearize(self._information_operator, self.x)
+        else:
+            jvp = jvp_cached
+        return jvp(vec), jvp
 
     def _information_operator(self, s: Array) -> Array:
         # Move to latent space (arg is (n, d) but latent space is (d, n))
@@ -84,7 +86,9 @@ class MatfreeLinopODEConstraint(Linop):
         fs0 = self.ode.vector_field(jet_coords=jet_coords, t=self.t)
 
         # Bring back into (m, d) form.
-        return tree.ravel_pytree(fs0)[0][None, :]
+        fx0 = tree.ravel_pytree(fs0)[0]
+        s0 = s[..., self.ode.num_tcoeffs_in_args]
+        return (s0 - fx0)[None, :]
 
     @classmethod
     def _register_as_pytree(cls) -> None:
@@ -119,35 +123,40 @@ class MatfreeLinopLstSq(Linop):
         self.cholesky_x = cholesky_x
         self.linop_ode_constraint = linop_ode_constraint
 
-    def init_jvp(self):
-        return self.linop_ode_constraint.init_jvp()
-
-    def matvec_dn(self, vec_dn, *, params):
+    def matvec_dn(self, vec_dn, *, x0_dn, jvp_cached):
         vec_flat = vec_dn.T.reshape((self.n_in * self.d_in,))
-        Avec_flat = self.matvec_flat(vec_flat, params=params)
-        return Avec_flat.reshape((self.n_out, self.d_out)).T
+        x0_flat = (
+            x0_dn.T.reshape((self.n_out * self.d_out,)) if x0_dn is not None else None
+        )
+        Avec_flat, jvp = self.matvec_flat(
+            vec_flat, x0_flat=x0_flat, jvp_cached=jvp_cached
+        )
+        return Avec_flat.reshape((self.n_out, self.d_out)).T, jvp
 
-    def matvec_nd(self, vec, *, params):
+    def matvec_nd(self, vec, *, x0_nd, jvp_cached):
         vec_flat = vec.reshape((self.n_in * self.d_in,))
-        Avec_flat = self.matvec_flat(vec_flat, params=params)
-        return Avec_flat.reshape((self.n_out, self.d_out))
+        x0_flat = (
+            x0_nd.reshape((self.n_out * self.d_out,)) if x0_nd is not None else None
+        )
+        Avec_flat, jvp = self.matvec_flat(
+            vec_flat, x0_flat=x0_flat, jvp_cached=jvp_cached
+        )
+        return Avec_flat.reshape((self.n_out, self.d_out)), jvp
 
-    def matvec_flat(self, vec, *, params):
-        mean_x, jvp = params
+    def matvec_flat(self, vec, *, x0_flat, jvp_cached):
 
         def vecmat(s):
 
             # vector-Jacobian product
-            Ats = self.linop_ode_constraint.vecmat_flat(s, jvp=jvp)
+            Ats, _vjp = self.linop_ode_constraint.vecmat_flat(s, jvp_cached=jvp_cached)
 
             # Cholesky-vector products
             return MatfreeLinopLstSq.materialized_vecmat_dn(self.cholesky_x, Ats)
 
         # TODO: turn "D" into a damping factor?
-        x0 = mean_x.T.reshape((-1,)) if mean_x is not None else None
-        tol = 1e-16
-        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec, x0=x0, atol=tol, btol=tol, ctol=tol)
-        return MatfreeLinopLstSq.materialized_matvec_dn(self.cholesky_x, lstsq_sol)
+        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec, x0=x0_flat)
+        Av = MatfreeLinopLstSq.materialized_matvec_dn(self.cholesky_x, lstsq_sol)
+        return Av, jvp_cached
 
     @staticmethod
     def materialized_vecmat_dn(M, v):
@@ -173,8 +182,8 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         self.bias = bias
 
     def apply_flat(self, x, /):
-        jvp = self.A.init_jvp()
-        y = self.A.matvec_nd(x.T, params=(None, jvp)).T
+        yt, _jvp = self.A.matvec_nd(x.T, x0_nd=None, jvp_cached=None)
+        y = yt.T
         m = y + self.noise.mean_flat
         c = self.noise.cholesky_flat
         tree_flatten = self.noise.tree_flatten
@@ -196,15 +205,15 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         del solve_triu  # unused
 
         # Observed mean
-        jvp = self.A.init_jvp()
-        obs_mean = self.A.matvec_dn(rv.mean_flat, jvp=jvp) + self.noise.mean_flat
+        Am, jvp = self.A.matvec_dn(rv.mean_flat, jvp_cached=None)
+        obs_mean = Am + self.noise.mean_flat
 
         # Gain & conditioning
         K = MatfreeLinopLstSq(cholesky_x=rv.cholesky_flat, linop_ode_constraint=self.A)
 
         # Posterior mean:
-        z = self.A.matvec_dn(rv.mean_flat, jvp=jvp) + self.noise.mean_flat
-        cond_mean = rv.mean_flat - K.matvec_dn(z, params=(None, jvp))
+        Km, _jvp = K.matvec_dn(obs_mean, x0_dn=None, jvp_cached=jvp)
+        cond_mean = rv.mean_flat - Km
 
         # Posterior covariance via probing/ensembles
         keys = random.split(self.key, num=self.num_ensembles)
@@ -212,8 +221,8 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         ensembles = np.transpose(ensembles, axes=(0, 2, 1))  # n, d
 
         def matvec_nd(p_nd):
-            Ap_nd = self.A.matvec_nd(p_nd, jvp=jvp)
-            KAp_nd = K.matvec_nd(Ap_nd, params=(cond_mean, jvp))
+            Ap_nd, _jvp = self.A.matvec_nd(p_nd, jvp_cached=jvp)
+            KAp_nd, _jvp = K.matvec_nd(Ap_nd, x0_nd=cond_mean, jvp_cached=jvp)
             return p_nd - KAp_nd, Ap_nd
 
         # Posteriors
