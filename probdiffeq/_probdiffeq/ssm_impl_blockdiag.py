@@ -140,46 +140,33 @@ class BlockDiagOdeTs0(ssm_impl_api.AbstractOde):
         return cond, None
 
 
-class BlockDiagOdeTs1(ssm_impl_api.AbstractOde):
-    """Block-diagonal ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
+class BlockDiagResidual(ssm_impl_api.AbstractResidual):
+    """Block-diagonal residual linearization via TS1."""
 
     def init_linearization(self):
-        return self.ode.jacobian.init_jacobian_handler()
+        return self.residual.jacobian.init_jacobian_handler()
 
     def linearize(self, rv, state, *, damp: float, t):
-
-        # Understand flattening and unflattening for
-        # single Taylor coefficients
         rv0 = BlockDiagNormal.from_dirac([rv.mean[0]], damp=0.0)
 
-        def a1(s):
-            return s[[self.ode.num_tcoeffs_in_args], ...]
-
-        linop = func.vmap(func.jacrev(a1))(rv.mean_flat)
-
-        def vf_flat(u):
+        def residual_flat(u):
             u_tree = rv.tree_flatten.unflatten_array(u.T)
-            u_tree = u_tree[: self.ode.num_tcoeffs_in_args]
-            fu_tree = self.ode.vector_field(jet_coords=u_tree, t=t)
-            return rv0.tree_flatten.flatten_tree([fu_tree]).T
+            u_tree = u_tree[: self.residual.num_tcoeffs_in_args]
+            r_tree = self.residual.residual_function(jet_coords=u_tree, t=t)
+            return rv0.tree_flatten.flatten_tree([r_tree]).T
 
-        # Evaluate the linearisation
-        # Not 100% the most efficient because we compute the diagonal of
-        # the function of all tcoeffs instead of just the relevant ones.
-        # But if we use reverse-Jacobians, things should be fine.
-        fx, J_diag, state = self.ode.jacobian.calculate_diagonal_along_d(
-            vf_flat, rv.mean_flat.T, state
+        fx, J_diag, state = self.residual.jacobian.calculate_diagonal_along_d(
+            residual_flat, rv.mean_flat.T, state
         )
 
         # Jacobian objects work with (n, d) arrays but block-diagonal models with (d, n) arrays
         fx = fx.T
 
-        # J_diag.shape = (d, 1, n)
-        # linop.shape: (d, 1, n)
-        linop = linop - J_diag
-        fx = rv.mean_flat[:, self.ode.num_tcoeffs_in_args][:, None] - fx
-        diff = func.vmap(lambda a, b: a @ b)(linop, rv.mean_flat)
+        # J_diag.shape = (d, 1, n), fx.shape = (d, 1)
+        linop = J_diag
+        diff = np.einsum("din,dn->di", linop, rv.mean_flat)
         fx = fx - diff
+
         fx = rv0.tree_flatten.unflatten_array(fx)
         bias = BlockDiagNormal.from_dirac([fx], damp=damp)
         cond = BlockDiagLatentCond.from_linop_and_noise(linop, bias)
@@ -578,18 +565,22 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
             raise TypeError(ode)
         return BlockDiagOdeTs0(ode=ode)
 
-    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> BlockDiagOdeTs1:
+    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> BlockDiagResidual:
         if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
-        return BlockDiagOdeTs1(ode=ode)
+        return self.constraint_residual(problems.residual_from_ode(ode))
 
     def constraint_residual(
         self,
         residual: problems.JetResidual,
         *,
         taylor_point: taylor_points.TaylorPoint | None = None,
-    ):
-        raise NotImplementedError
+    ) -> BlockDiagResidual:
+        if not isinstance(residual, problems.JetResidual):
+            raise TypeError(residual)
+        if taylor_point is not None:
+            raise NotImplementedError
+        return BlockDiagResidual(residual)
 
     def _tcoeffs_standard_deviation(self, tcoeffs_mean, /, *, is_exact, inexact_eps):
 

@@ -458,7 +458,7 @@ class StateSpaceModel(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> AbstractOde:
+    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> AbstractResidual:
         r"""Create an ODE constraint and linearise with a first-order Taylor approximation.
 
         This constraint handles ODEs of the form

@@ -54,6 +54,8 @@ JetResidual(num_tcoeffs_in_args=2, jacobian=jacobian_monte_carlo_rev(seed=1, num
 
 """
 
+import operator
+
 from probdiffeq._probdiffeq import jacobians, utilities
 from probdiffeq.backend import func, tree
 from probdiffeq.backend.typing import Any, Array, Generic, Protocol, Sequence, TypeVar
@@ -77,6 +79,7 @@ __all__ = [
     "ode_order_arbitrary",
     "ode_order_two",
     "residual_acceleration",
+    "residual_from_ode",
     "residual_from_stack",
     "residual_jet_lift",
     "residual_position",
@@ -344,6 +347,23 @@ def residual_acceleration(
         jacobian = jacobians.jacobian_monte_carlo_rev()
 
     return JetResidual(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=3)
+
+
+def residual_from_ode(ode: "JetOde") -> JetResidual:
+    """Construct a JetResidual from a JetOde.
+
+    The residual is u^(k) - f(u, u', ..., t) = 0.
+    """
+
+    def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
+        output = jet_coords[ode.num_tcoeffs_in_args]
+        inputs = jet_coords[: ode.num_tcoeffs_in_args]
+        vf_eval = ode.vector_field(jet_coords=inputs, t=t)
+        return tree.tree_map(operator.sub, output, vf_eval)
+
+    return JetResidual(
+        jetfunc, jacobian=ode.jacobian, num_tcoeffs_in_args=ode.num_tcoeffs_in_args + 1
+    )
 
 
 def residual_jet_lift(residual: JetResidual, lift_by: int) -> JetResidual:

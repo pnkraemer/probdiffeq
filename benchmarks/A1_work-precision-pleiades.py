@@ -164,7 +164,7 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=ts)
         error = probdiffeq.error_residual_std(constraint=ts)
 
-        control = ivpsolve.control_proportional_integral()
+        control = ivpsolve.control_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
             solver=solver, error=error, control=control, clip_dt=True
         )

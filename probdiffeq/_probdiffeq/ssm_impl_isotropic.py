@@ -1,4 +1,4 @@
-from probdiffeq._probdiffeq import problems, ssm_impl_api, utilities
+from probdiffeq._probdiffeq import problems, ssm_impl_api, taylor_points, utilities
 from probdiffeq.backend import func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Array, Sequence, TypeVar
 from probdiffeq.util import cholesky_util
@@ -314,47 +314,34 @@ class IsotropicOdeTs0(ssm_impl_api.AbstractOde):
         return cond, None
 
 
-class IsotropicOdeTs1(ssm_impl_api.AbstractOde):
-    """Isotropic ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
+class IsotropicResidual(ssm_impl_api.AbstractResidual):
+    """Isotropic residual linearization via TS1."""
 
     def init_linearization(self):
-        return self.ode.jacobian.init_jacobian_handler()
+        return self.residual.jacobian.init_jacobian_handler()
 
     def linearize(self, rv, state, *, damp: float, t):
 
-        # Evaluate the linearisation
-
-        def vf(s_stack):
+        def residual_flat(s_stack):
             s_tree = rv.tree_flatten.unflatten_array(s_stack)
-            s_tree = s_tree[: self.ode.num_tcoeffs_in_args]
-            fs = self.ode.vector_field(jet_coords=s_tree, t=t)
+            s_tree = s_tree[: self.residual.num_tcoeffs_in_args]
+            fs = self.residual.residual_function(jet_coords=s_tree, t=t)
             return tree.ravel_pytree(fs)[0][None, :]
 
-        n, d = rv.mean_flat.shape
+        _n, d = rv.mean_flat.shape
 
-        # This is not 100% the most efficent because we compute the trace
-        # of the function that depends on all tcoeffs instead of just the
-        # relevant ones.
-        fx, J_trace, state = self.ode.jacobian.calculate_trace_along_d(
-            vf, rv.mean_flat, state
+        fx, J_trace, state = self.residual.jacobian.calculate_trace_along_d(
+            residual_flat, rv.mean_flat, state
         )
-
-        # Best Jacobian approximation: mean of diagonal = trace / len(diagonal)
         J_trace /= d
 
-        # Complete the linearisation
-        idx = np.asarray([self.ode.num_tcoeffs_in_args])
-        E1 = np.eye(n)[idx]
-        linop = E1 - J_trace
-        fx = rv.mean_flat[idx, ...] - fx
+        linop = J_trace
         fx = fx - linop @ rv.mean_flat
 
-        # Turn fx into the correct pytree
         m0_tree = rv.mean[:1]
         rv0 = IsotropicNormal.from_dirac(m0_tree, damp=0.0)
         fx = rv0.tree_flatten.unflatten_array(fx)
 
-        # Turn fx and J_trace into an observation model
         noise = IsotropicNormal.from_dirac(fx, damp=damp)
         cond = IsotropicLatentCond.from_linop_and_noise(linop, noise)
         return cond, state
@@ -576,10 +563,19 @@ class state_space_model_isotropic(ssm_impl_api.StateSpaceModel):
             raise TypeError(ode)
         return IsotropicOdeTs0(ode=ode)
 
-    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> IsotropicOdeTs1:
+    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> IsotropicResidual:
         if not isinstance(ode, problems.JetOde):
             raise TypeError(ode)
-        return IsotropicOdeTs1(ode=ode)
+        return self.constraint_residual(problems.residual_from_ode(ode))
 
-    def constraint_residual(self, residual: problems.JetResidual, *, taylor_point=None):
-        raise NotImplementedError
+    def constraint_residual(
+        self,
+        residual: problems.JetResidual,
+        *,
+        taylor_point: taylor_points.TaylorPoint | None = None,
+    ) -> IsotropicResidual:
+        if not isinstance(residual, problems.JetResidual):
+            raise TypeError(residual)
+        if taylor_point is not None:
+            raise NotImplementedError
+        return IsotropicResidual(residual)
