@@ -38,17 +38,11 @@ def main(start=3.0, stop=10.0, step=1.0, repeats=2) -> None:
 
     # Assemble algorithms
     algorithms = {
-        r"ProbDiffEq: TS1($3$, projected, dense)": solver(
-            num_derivatives=3, constraint="ts1_projected", fact="dense"
-        ),
-        r"ProbDiffEq: TS1($3$, projected, bd)": solver(
-            num_derivatives=3, constraint="ts1_projected", fact="blockdiag"
-        ),
-        r"ProbDiffEq: TS1($3$)": solver(
-            num_derivatives=3, constraint="ts1", fact="dense"
-        ),
-        # r"ProbDiffEq: TS1($5$)": solver(num_derivatives=5, constraint="ts1", fact="dense"),
-        # r"ProbDiffEq: TS1($7$)": solver(num_derivatives=7, constraint="ts1", fact="dense"),
+        r"ProbDiffEq: TS1($3$, matfree)": solver(num_derivatives=3, fact="matfree"),
+        r"ProbDiffEq: TS1($5$, matfree)": solver(num_derivatives=5, fact="matfree"),
+        r"ProbDiffEq: TS1($3$, dense)": solver(num_derivatives=3, fact="dense"),
+        r"ProbDiffEq: TS1($5$, dense)": solver(num_derivatives=5, fact="dense"),
+        r"ProbDiffEq: TS1($7$, dense)": solver(num_derivatives=7, fact="dense"),
         "SciPy: 'LSODA'": solver_scipy(method="LSODA"),
         "SciPy: 'Radau'": solver_scipy(method="Radau"),
     }
@@ -108,7 +102,7 @@ def solve_ivp_once():
     return solution.t, solution.y.T
 
 
-def solver(*, num_derivatives: int, constraint: str, fact: str) -> Callable:
+def solver(*, num_derivatives: int, fact: str) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @probdiffeq.ode
@@ -129,8 +123,10 @@ def solver(*, num_derivatives: int, constraint: str, fact: str) -> Callable:
     u0 = jnp.asarray([1.0, 0.0, 0.0, 0, 0, 0, 0, 0.0057])
     t0, t1 = jnp.asarray([0.0, 321.8122])
 
-    if fact == "blockdiag":
-        ssm = probdiffeq.state_space_model_blockdiag()
+    if fact == "matfree":
+        key = jax.random.PRNGKey(1)
+        num_ensembles = (num_derivatives + 1) * 2
+        ssm = probdiffeq.state_space_model_matfree(key=key, num_ensembles=num_ensembles)
     elif fact == "dense":
         ssm = probdiffeq.state_space_model_dense()
     else:
@@ -143,24 +139,14 @@ def solver(*, num_derivatives: int, constraint: str, fact: str) -> Callable:
         tcoeffs, _ = jetexpand(vf, (u0,), t=t0)
 
         iwp = ssm.prior_wiener_integrated(tcoeffs)
-
-        if constraint == "ts1_projected":
-            key = jax.random.PRNGKey(1)
-            probes = (num_derivatives + 1) ** 2
-            ts1 = ssm.constraint_ode_ts1_projected(vf, key=key, num_probes=probes)
-        elif constraint == "ts1":
-            ts1 = ssm.constraint_ode_ts1(vf)
-        else:
-            raise ValueError
+        ts1 = ssm.constraint_ode_ts1(vf)
         strategy = probdiffeq.strategy_filter()
         solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=ts1)
         error = probdiffeq.error_state_std(constraint=ts1)
-
         solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
 
         # Solve
         dt0 = ivpsolve.dt0(vf, (u0,), t=t0)
-
         solution = solve(iwp, t0=t0, t1=t1, dt0=dt0, atol=1e-3 * tol, rtol=tol)
 
         # Return the terminal value

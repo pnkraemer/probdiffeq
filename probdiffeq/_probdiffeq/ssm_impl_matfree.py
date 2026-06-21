@@ -15,7 +15,6 @@ For example, this variable is used to type Taylor coefficients.
 """
 
 # TODO: remove info_operator duplication between Ts1 and Linop
-# TODO: include matfree TS1 in hires example
 # TODO: Implement iterated linearisation
 # TODO: try Hutchinson instead of ensembles
 # TODO: Implement residual-based solvers
@@ -179,6 +178,7 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         self.bias = bias
 
     def apply_flat(self, x, /):
+        # TODO: we currently ignore the damping factor...
         yt, _jvp = self.A.matvec_nd(x.T, x0_nd=None, jvp_cached=None)
         y = yt.T
         m = y + self.noise.mean_flat
@@ -187,19 +187,28 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         return blockdiag.BlockDiagNormal(m, c, tree_flatten)
 
     def marginalise(self, rv, /):
+        assert isinstance(self.A, MatfreeLinopODEConstraint)
         # Observed mean
-        obs_mean = self.A.matvec_dn(rv.mean_flat) + self.noise.mean_flat
+        Am, jvp = self.A.matvec_dn(rv.mean_flat, jvp_cached=None)
+        obs_mean = Am + self.noise.mean_flat
 
-        # TODO: we currently ignore the noise
+        # TODO: we currently ignore the damping factor & the noise...
         keys = random.split(self.key, num=self.num_ensembles)
         ensembles = func.vmap(rv.sample_flat)(keys)  # d, n
         ensembles = np.transpose(ensembles, axes=(0, 2, 1))  # n, d
-        ensembles_mv = func.vmap(self.A.matvec_nd)(ensembles)
+
+        def mv(x):
+            Ax, _jvp = self.A.matvec_nd(x, jvp_cached=jvp)
+            return Ax
+
+        ensembles_mv = func.vmap(mv)(ensembles)
         C = blockdiag_cholesky_from_ensembles(ensembles_mv, bias=self.bias)
         return blockdiag.BlockDiagNormal(obs_mean, C, self.noise.tree_flatten)
 
     def revert(self, rv, /, *, solve_triu: Callable):
         del solve_triu  # unused
+        assert isinstance(self.A, MatfreeLinopODEConstraint)
+        # TODO: we currently ignore the noise (it is encoded in the damping factor)
 
         # Observed mean
         Am, jvp = self.A.matvec_dn(rv.mean_flat, jvp_cached=None)

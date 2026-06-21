@@ -17,11 +17,12 @@ def test_accuracy_matches_dense_ts1(seed, num_ensembles):
     save_at = np.linspace(t0, t1, num=20, endpoint=True)
 
     # Build the rest of the solver (projected, medium precision)
+    # Use dynamic solvers because they require more RV arithmetic than plain solvers.
     key = random.prng_key(seed=seed)
     ssm = probdiffeq.state_space_model_matfree(key=key, num_ensembles=num_ensembles)
     prior = ssm.prior_wiener_integrated(tcoeffs)
     ode_ts1_projected = ssm.constraint_ode_ts1(vf)
-    solver = probdiffeq.solver(strategy=strategy, constraint=ode_ts1_projected)
+    solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=ode_ts1_projected)
     error = probdiffeq.error_state_std(constraint=ode_ts1_projected)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
     solution_projected = solve(prior, save_at=save_at, atol=1e-4, rtol=1e-4)
@@ -30,7 +31,7 @@ def test_accuracy_matches_dense_ts1(seed, num_ensembles):
     ssm_dense = probdiffeq.state_space_model_dense()
     prior = ssm_dense.prior_wiener_integrated(tcoeffs)
     ode_ts1_reference = ssm_dense.constraint_ode_ts1(vf)
-    solver = probdiffeq.solver(strategy=strategy, constraint=ode_ts1_reference)
+    solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=ode_ts1_reference)
     error = probdiffeq.error_state_std(constraint=ode_ts1_reference)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
     solution_reference = solve(prior, save_at=save_at, atol=1e-8, rtol=1e-8)
