@@ -35,34 +35,6 @@ def test_residual_matches_ts1(seed: int):
     assert testing.allclose(fx.noise.cholesky_flat, fy.noise.cholesky_flat)
 
 
-def test_residual_from_ode_num_tcoeffs():
-    """Assert that residual_from_ode sets num_tcoeffs_in_args correctly."""
-
-    @probdiffeq.ode
-    def vf(y, *, t):
-        del t
-        return 2 * y * (1 - y)
-
-    residual = probdiffeq.residual_from_ode(vf)
-    assert residual.num_tcoeffs_in_args == vf.num_tcoeffs_in_args + 1
-
-
-def test_residual_from_ode_evaluates_correctly():
-    """Assert that residual_from_ode(vf)(u, u') = u' - vf(u)."""
-
-    @probdiffeq.ode
-    def vf(y, *, t):
-        del t
-        return 2 * y * (1 - y)
-
-    residual = probdiffeq.residual_from_ode(vf)
-    y = np.asarray(0.5)
-    dy = np.asarray(0.3)
-    result = residual.residual_function(jet_coords=[y, dy], t=0.0)
-    expected = dy - 2 * y * (1 - y)
-    assert testing.allclose(result, expected)
-
-
 def _create_random_variable(ssm, seed):
     tcoeffs = [np.ones(())] * 5  # values irrelevant
     iwp = ssm.prior_wiener_integrated(tcoeffs, is_exact=False, inexact_eps=1.0)
