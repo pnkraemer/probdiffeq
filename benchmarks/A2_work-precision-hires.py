@@ -39,9 +39,7 @@ def main(start=3.0, stop=10.0, step=1.0, repeats=2) -> None:
     # Assemble algorithms
     algorithms = {
         r"ProbDiffEq: TS1($3$, matfree)": solver_matfree(num_derivatives=3),
-        r"ProbDiffEq: TS1($4$, matfree)": solver_matfree(num_derivatives=4),
         r"ProbDiffEq: TS1($5$, matfree)": solver_matfree(num_derivatives=5),
-        r"ProbDiffEq: TS1($3$, dense)": solver_dense(num_derivatives=3),
         r"ProbDiffEq: TS1($5$, dense)": solver_dense(num_derivatives=5),
         r"ProbDiffEq: TS1($7$, dense)": solver_dense(num_derivatives=7),
         "SciPy: 'LSODA'": solver_scipy(method="LSODA"),
