@@ -14,7 +14,6 @@ C = TypeVar("C", bound=Sequence)
 For example, this variable is used to type Taylor coefficients.
 """
 
-# TODO: currently, this solver needs double precision. Why?
 # TODO: Implement a block LSMR and use it?
 # TODO: Try Hutchinson instead of ensembles
 # TODO: Remove info_operator duplication between Ts1 and Linop

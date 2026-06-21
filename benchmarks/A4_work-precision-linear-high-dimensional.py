@@ -28,7 +28,7 @@ SCALE = 1.5
 
 def main(start=3.0, stop=10.0, step=0.5, repeats=2) -> None:
     """Run the script."""
-    # Set up all the configs
+    # Double precision for high precision simulations
     jax.config.update("jax_enable_x64", True)
 
     # Read configuration from command line
@@ -128,15 +128,10 @@ def solver_probdiffeq(
 
         solver = probdiffeq.solver(strategy=strategy, constraint=ts)
         error = probdiffeq.error_state_std(constraint=ts)
-
-        control = ivpsolve.control_proportional_integral()
-        solve = ivpsolve.solve_adaptive_terminal_values(
-            error=error, solver=solver, control=control
-        )
-        dt0 = ivpsolve.dt0(vf_probdiffeq, (u0,), t=t0)
+        solve = ivpsolve.solve_adaptive_terminal_values(error=error, solver=solver)
 
         # Build a solver
-        solution = solve(iwp, t0=t0, t1=t1, dt0=dt0, atol=1e-2 * tol, rtol=tol)
+        solution = solve(iwp, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
 
         # Return the terminal value
         return jax.block_until_ready(solution.u.mean[0])
