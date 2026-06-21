@@ -54,8 +54,6 @@ JetResidual(num_tcoeffs_in_args=2, jacobian=jacobian_monte_carlo_rev(seed=1, num
 
 """
 
-import operator
-
 from probdiffeq._probdiffeq import jacobians, utilities
 from probdiffeq.backend import func, tree
 from probdiffeq.backend.typing import Any, Array, Generic, Protocol, Sequence, TypeVar
@@ -359,7 +357,7 @@ def residual_from_ode(ode: "JetOde") -> JetResidual:
         output = jet_coords[ode.num_tcoeffs_in_args]
         inputs = jet_coords[: ode.num_tcoeffs_in_args]
         vf_eval = ode.vector_field(jet_coords=inputs, t=t)
-        return tree.tree_map(operator.sub, output, vf_eval)
+        return tree.tree_map(lambda a, b: a - b, output, vf_eval)
 
     return JetResidual(
         jetfunc, jacobian=ode.jacobian, num_tcoeffs_in_args=ode.num_tcoeffs_in_args + 1
