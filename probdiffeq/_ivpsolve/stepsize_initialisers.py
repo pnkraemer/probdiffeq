@@ -19,7 +19,7 @@ def dt0(vf, initial_values: Sequence, /, scale=0.01, nugget=1e-5, **vf_kwargs):
 
 
 def dt0_adaptive(
-    vf, initial_values: Sequence, /, t, *, error_contraction_rate, rtol, atol
+    vf, initial_values: Sequence, /, t0, *, error_contraction_rate, rtol, atol
 ):
     """Propose an initial time-step as a function of the tolerances."""
     # Algorithm from:
@@ -34,7 +34,7 @@ def dt0_adaptive(
         raise ValueError
     y0 = initial_values[0]
 
-    f0 = vf(*initial_values, t=t)
+    f0 = vf(*initial_values, t=t0)
 
     y0, unravel = tree.ravel_pytree(y0)
     f0, _ = tree.ravel_pytree(f0)
@@ -45,7 +45,7 @@ def dt0_adaptive(
     dt0 = np.where((d0 < 1e-5) | (d1 < 1e-5), 1e-6, 0.01 * d0 / d1)
 
     y1 = y0 + dt0 * f0
-    f1 = vf(unravel(y1), t=t + dt0)
+    f1 = vf(unravel(y1), t=t0 + dt0)
     f1, _ = tree.ravel_pytree(f1)
     d2 = linalg.vector_norm((f1 - f0) / scale) / dt0
 
