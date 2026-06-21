@@ -24,7 +24,8 @@ For example, this variable is used to type Taylor coefficients.
 
 
 class Linop:
-    def __init__(self, *, n_in, n_out, d_in, d_out):
+    def __init__(self, *, batch, n_in, n_out, d_in, d_out):
+        self.batch = batch
         self.n_in = n_in
         self.n_out = n_out
         self.d_in = d_in
@@ -32,7 +33,7 @@ class Linop:
 
     def __repr__(self):
         name = self.__class__.__name__
-        args = f"n_out={self.n_out}, d_out={self.d_out}, n_in={self.n_in}, d_in={self.d_in})"
+        args = f"batch={self.batch}, n_out={self.n_out}, d_out={self.d_out}, n_in={self.n_in}, d_in={self.d_in})"
         return f"{name}({args})"
 
 
@@ -44,12 +45,9 @@ class MatfreeLinopODEConstraint(Linop):
         self.x = x
 
         *batch, n, d = x.shape
-        super().__init__(n_in=n, n_out=1, d_in=d, d_out=d)
+        super().__init__(batch=batch, n_in=n, n_out=1, d_in=d, d_out=d)
 
     def init_jvp(self):
-        import jax
-
-        jax.debug.print("linearisation", ordered=True)
         _, jvp = func.linearize(self._information_operator, self.x)
         return jvp
 
@@ -109,59 +107,47 @@ MatfreeLinopODEConstraint._register_as_pytree()
 
 
 class MatfreeLinopLstSq(Linop):
-    def __init__(
-        self,
-        *,
-        cholesky_x,
-        cholesky_yx,
-        linop_ode_constraint: MatfreeLinopODEConstraint,
-        mean_x,
-    ):
+    def __init__(self, *, cholesky_x, linop_ode_constraint: MatfreeLinopODEConstraint):
         # Swap 'in' and 'out' because LstSq is an inverse operator
         super().__init__(
+            batch=linop_ode_constraint.batch,
             n_in=linop_ode_constraint.n_out,
             n_out=linop_ode_constraint.n_in,
             d_in=linop_ode_constraint.d_out,
             d_out=linop_ode_constraint.d_in,
         )
-        self.mean_x = mean_x
         self.cholesky_x = cholesky_x
-        self.cholesky_yx = cholesky_yx
         self.linop_ode_constraint = linop_ode_constraint
 
     def init_jvp(self):
         return self.linop_ode_constraint.init_jvp()
 
-    def matvec_dn(self, vec_dn, *, jvp):
+    def matvec_dn(self, vec_dn, *, params):
         vec_flat = vec_dn.T.reshape((self.n_in * self.d_in,))
-        Avec_flat = self.matvec_flat(vec_flat, jvp=jvp)
+        Avec_flat = self.matvec_flat(vec_flat, params=params)
         return Avec_flat.reshape((self.n_out, self.d_out)).T
 
-    def matvec_nd(self, vec, *, jvp):
+    def matvec_nd(self, vec, *, params):
         vec_flat = vec.reshape((self.n_in * self.d_in,))
-        Avec_flat = self.matvec_flat(vec_flat, jvp=jvp)
+        Avec_flat = self.matvec_flat(vec_flat, params=params)
         return Avec_flat.reshape((self.n_out, self.d_out))
 
-    def matvec_flat(self, vec, *, jvp):
+    def matvec_flat(self, vec, *, params):
+        mean_x, jvp = params
 
         def vecmat(s):
-            import jax
-
-            jax.debug.print("matvec", ordered=True)
 
             # vector-Jacobian product
             Ats = self.linop_ode_constraint.vecmat_flat(s, jvp=jvp)
 
             # Cholesky-vector products
-            BtAts = MatfreeLinopLstSq.materialized_vecmat_dn(self.cholesky_x, Ats)
-            Dts = MatfreeLinopLstSq.materialized_vecmat_dn(self.cholesky_yx, s)
-            return np.concatenate([BtAts, Dts], axis=0)
+            return MatfreeLinopLstSq.materialized_vecmat_dn(self.cholesky_x, Ats)
 
         # TODO: turn "D" into a damping factor?
-        x0 = self.mean_x.T.reshape((-1,))
-        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec, x0=x0)
-        sol = lstsq_sol[: (self.n_out * self.d_out)]
-        return MatfreeLinopLstSq.materialized_matvec_dn(self.cholesky_x, sol)
+        x0 = mean_x.T.reshape((-1,)) if mean_x is not None else None
+        tol = 1e-16
+        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec, x0=x0, atol=tol, btol=tol, ctol=tol)
+        return MatfreeLinopLstSq.materialized_matvec_dn(self.cholesky_x, lstsq_sol)
 
     @staticmethod
     def materialized_vecmat_dn(M, v):
@@ -187,12 +173,8 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         self.bias = bias
 
     def apply_flat(self, x, /):
-        import jax
-
-        jax.debug.print("\nApplication:", ordered=True)
-
         jvp = self.A.init_jvp()
-        y = self.A.matvec_nd(x.T, jvp=jvp).T
+        y = self.A.matvec_nd(x.T, params=(None, jvp)).T
         m = y + self.noise.mean_flat
         c = self.noise.cholesky_flat
         tree_flatten = self.noise.tree_flatten
@@ -214,24 +196,15 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         del solve_triu  # unused
 
         # Observed mean
-        import jax
-
-        jax.debug.print("\nMean:", ordered=True)
         jvp = self.A.init_jvp()
         obs_mean = self.A.matvec_dn(rv.mean_flat, jvp=jvp) + self.noise.mean_flat
 
         # Gain & conditioning
-        mean_x = 0 * np.concatenate((rv.mean_flat, self.noise.mean_flat), axis=1)
-        K = MatfreeLinopLstSq(
-            cholesky_x=rv.cholesky_flat,
-            cholesky_yx=self.noise.cholesky_flat,
-            linop_ode_constraint=self.A,
-            mean_x=mean_x,
-        )
+        K = MatfreeLinopLstSq(cholesky_x=rv.cholesky_flat, linop_ode_constraint=self.A)
 
         # Posterior mean:
         z = self.A.matvec_dn(rv.mean_flat, jvp=jvp) + self.noise.mean_flat
-        cond_mean = rv.mean_flat - K.matvec_dn(z, jvp=jvp)
+        cond_mean = rv.mean_flat - K.matvec_dn(z, params=(None, jvp))
 
         # Posterior covariance via probing/ensembles
         keys = random.split(self.key, num=self.num_ensembles)
@@ -240,12 +213,9 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
 
         def matvec_nd(p_nd):
             Ap_nd = self.A.matvec_nd(p_nd, jvp=jvp)
-            KAp_nd = K.matvec_nd(Ap_nd, jvp=jvp)
+            KAp_nd = K.matvec_nd(Ap_nd, params=(cond_mean, jvp))
             return p_nd - KAp_nd, Ap_nd
 
-        import jax
-
-        jax.debug.print("\nEnsembles:", ordered=True)
         # Posteriors
         ensembles_p, ensembles_o = func.vmap(matvec_nd)(ensembles)
         cond_chol = blockdiag_cholesky_from_ensembles(ensembles_p, bias=self.bias)
