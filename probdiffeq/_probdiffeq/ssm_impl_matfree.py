@@ -356,11 +356,6 @@ class state_space_model_matfree(ssm_impl_api.StateSpaceModel):
     def constraint_ode_ts0(self, ode: problems.JetOde, /):
         raise NotImplementedError
 
-    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> MatfreeResidual:
-        if not isinstance(ode, problems.JetOde):
-            raise TypeError(ode)
-        return self.constraint_residual(problems.residual_from_ode(ode))
-
     def constraint_residual(
         self,
         residual: problems.JetResidual,

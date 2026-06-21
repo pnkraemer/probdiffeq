@@ -565,11 +565,6 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
             raise TypeError(ode)
         return BlockDiagOdeTs0(ode=ode)
 
-    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> BlockDiagResidual:
-        if not isinstance(ode, problems.JetOde):
-            raise TypeError(ode)
-        return self.constraint_residual(problems.residual_from_ode(ode))
-
     def constraint_residual(
         self,
         residual: problems.JetResidual,
