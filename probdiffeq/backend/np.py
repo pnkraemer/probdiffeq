@@ -164,8 +164,8 @@ def load(path, /):
     return jnp.load(path, allow_pickle=True)
 
 
-def stack(list_of_arrays, /):
-    return jnp.stack(list_of_arrays)
+def stack(list_of_arrays, /, *, axis=0):
+    return jnp.stack(list_of_arrays, axis=axis)
 
 
 def transpose(arr, /, *, axes):
@@ -252,9 +252,9 @@ def cos(x, /):
     return jnp.cos(x)
 
 
-def mean(arr, /, axis=None):
-    return jnp.mean(arr, axis=axis)
+def mean(arr, /, axis=None, keepdims=False):
+    return jnp.mean(arr, axis=axis, keepdims=keepdims)
 
 
-def std(arr, /, *, ddof=0):
-    return jnp.std(arr, ddof=ddof)
+def std(arr, /, *, axis=None, ddof=0):
+    return jnp.std(arr, ddof=ddof, axis=axis)

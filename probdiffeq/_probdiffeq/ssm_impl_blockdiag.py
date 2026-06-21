@@ -315,8 +315,11 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
         return -0.5 * (logdet_term + maha_term + u.size * np.log(np.pi() * 2))
 
     def to_multivariate_normal(self):
-        mean = np.reshape(self.mean_flat.T, (-1,), order="F")
-        cov = np.block_diag(self._cov_dense())
+        mean = np.reshape(self.mean_flat.T, (-1,))
+
+        *_, d, n = self.mean_flat.shape
+        cov_full = linalg.einsum("dnm,dt->ndmt", self._cov_dense(), np.eye(d))
+        cov = cov_full.reshape((n * d, -1))
         return mean, cov
 
     def _cov_dense(self):
@@ -341,7 +344,7 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
 
         d, _n, n = self.cholesky_flat.shape
         base = random.normal(key, shape=(d, n))
-        return self.mean_flat + np.einsum("ijk,ij->ik", self.cholesky_flat, base)
+        return self.mean_flat + np.einsum("...jk,...k->...j", self.cholesky_flat, base)
 
     def identity_conditional(self) -> BlockDiagLatentCond:
         (d, ndim) = self.mean_flat.shape

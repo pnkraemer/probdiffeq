@@ -987,7 +987,6 @@ class error_state_std(ErrorEstimator):
         # Extrapolate from the zero-error state
         mean = previous.u.mean_flat
         rv = transition.apply_flat(mean)
-
         mean = previous.u.mean
         mean_leaves = tree.tree_leaves_depth_one(mean)
         error_contraction_rate = len(mean_leaves)
@@ -1002,11 +1001,8 @@ class error_state_std(ErrorEstimator):
 
         # Extract the local residual std from the linearization
         zeros = tree.tree_map(np.zeros_like, linearized.noise.mean)
-        output_scale, conditional = (
-            linearized.bayes_rule_and_residual_whitened_rms_tree(
-                zeros, rv, solve_triu=linalg.solve_triu
-            )
-        )
+        bayes_rule = linearized.bayes_rule_and_residual_whitened_rms_tree
+        output_scale, conditional = bayes_rule(zeros, rv, solve_triu=linalg.solve_triu)
 
         # Measure error on the n-th state (usually, n=0 because why not)
         n = self.derivative_idx

@@ -12,5 +12,6 @@ from probdiffeq._probdiffeq.ssm_impl_api import *
 from probdiffeq._probdiffeq.ssm_impl_blockdiag import *
 from probdiffeq._probdiffeq.ssm_impl_dense import *
 from probdiffeq._probdiffeq.ssm_impl_isotropic import *
+from probdiffeq._probdiffeq.ssm_impl_matfree import *
 from probdiffeq._probdiffeq.taylor_points import *
 from probdiffeq._probdiffeq.utilities import *
