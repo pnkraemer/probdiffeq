@@ -24,7 +24,7 @@ def test_accuracy_matches_dense_ts1(seed, num_ensembles):
     solver = probdiffeq.solver(strategy=strategy, constraint=ode_ts1_projected)
     error = probdiffeq.error_state_std(constraint=ode_ts1_projected)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
-    solution_projected = solve(prior, save_at=save_at, atol=1e-4, rtol=1e-4)
+    solution_projected = solve(prior, save_at=save_at, atol=1e-2, rtol=1e-2)
 
     # Build the rest of the solver (dense reference, high precision)
     ssm_dense = probdiffeq.state_space_model_dense()

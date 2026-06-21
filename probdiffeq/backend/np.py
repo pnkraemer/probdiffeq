@@ -164,8 +164,8 @@ def load(path, /):
     return jnp.load(path, allow_pickle=True)
 
 
-def stack(list_of_arrays, /):
-    return jnp.stack(list_of_arrays)
+def stack(list_of_arrays, /, *, axis=0):
+    return jnp.stack(list_of_arrays, axis=axis)
 
 
 def transpose(arr, /, *, axes):

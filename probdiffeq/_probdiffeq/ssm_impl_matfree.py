@@ -2,7 +2,7 @@
 
 from probdiffeq._probdiffeq import problems, ssm_impl_api, taylor_points
 from probdiffeq._probdiffeq import ssm_impl_blockdiag as blockdiag
-from probdiffeq.backend import func, linalg, np, random, structs, tree
+from probdiffeq.backend import func, linalg, np, random, tree
 from probdiffeq.backend.typing import Array, Callable, Sequence, TypeVar
 
 __all__ = ["state_space_model_matfree"]
@@ -13,6 +13,14 @@ C = TypeVar("C", bound=Sequence)
 
 For example, this variable is used to type Taylor coefficients.
 """
+
+# TODO: remove unnecessary function evaluations
+# TODO: remove info_operator duplication between Ts1 and Linop
+# TODO: include matfree TS1 in hires example
+# TODO: Implement iterated linearisation
+# TODO: try Hutchinson instead of ensembles
+# TODO: Implement residual-based solvers
+# TODO: Implement a benchmark for high-dimensional, stiff problems.
 
 
 class Linop:
@@ -35,19 +43,31 @@ class MatfreeLinopODEConstraint(Linop):
         self.t = t
         self.x = x
 
-        *_batch, n_in, d_in = x.shape
-        x_like = structs.ShapeDtypeStruct(shape=(n_in, d_in), dtype=x.dtype)
-        n_out, d_out = func.eval_shape(self._information_operator, x_like).shape
-        super().__init__(n_in=n_in, n_out=n_out, d_in=d_in, d_out=d_out)
+        *batch, n, d = x.shape
+        super().__init__(n_in=n, n_out=1, d_in=d, d_out=d)
 
-    def matvec_ndmd(self, vec):
-        # TODO (!!!): this line implies sooo many unnecessary function evals...
-        # but if we linearize outside, then MatfreeLinopODEConstraint
-        # isn't a valid pytree anymore... this is the critical puzzle to solve!
-        # should we add external parametrisation to all matvecs, as in
-        # matvec_ndmd(vec, p=(...))?
+    def init_jvp(self):
+        import jax
+
+        jax.debug.print("linearisation", ordered=True)
         _, jvp = func.linearize(self._information_operator, self.x)
+        return jvp
 
+    def matvec_dn(self, vec_dn, *, jvp):
+        vec_nd = vec_dn.T
+        return self.matvec_nd(vec_nd, jvp=jvp).T
+
+    def vecmat_flat(self, w, *, jvp):
+        v = np.ones((self.n_in * self.d_in,))
+        vecmat = func.linear_transpose(lambda s: self.matvec_flat(s, jvp=jvp), v)
+        (vm,) = vecmat(w)
+        return vm
+
+    def matvec_flat(self, vec_flat, *, jvp):
+        vec = vec_flat.reshape((self.n_in, self.d_in))
+        return self.matvec_nd(vec, jvp=jvp).reshape((-1,))
+
+    def matvec_nd(self, vec, *, jvp):
         x1 = vec[np.asarray([self.ode.num_tcoeffs_in_args])]
         fx0 = jvp(vec)
         return x1 - fx0
@@ -67,20 +87,6 @@ class MatfreeLinopODEConstraint(Linop):
 
         # Bring back into (m, d) form.
         return tree.ravel_pytree(fs0)[0][None, :]
-
-    def matvec_dndm(self, vec_dn):
-        vec_nd = vec_dn.T
-        return self.matvec_ndmd(vec_nd).T
-
-    def vecmat_flat(self, w):
-        v = np.ones((self.n_in * self.d_in,))
-        vecmat = func.linear_transpose(self.matvec_flat, v)
-        (vm,) = vecmat(w)
-        return vm
-
-    def matvec_flat(self, vec_flat):
-        vec = vec_flat.reshape((self.n_in, self.d_in))
-        return self.matvec_ndmd(vec).reshape((-1,))
 
     @classmethod
     def _register_as_pytree(cls) -> None:
@@ -103,45 +109,62 @@ MatfreeLinopODEConstraint._register_as_pytree()
 
 
 class MatfreeLinopLstSq(Linop):
-    def __init__(self, cholesky_x, cholesky_yx, matfree_linop):
-        # Swap in and out because LstSq is an inverse operator
+    def __init__(
+        self,
+        *,
+        cholesky_x,
+        cholesky_yx,
+        linop_ode_constraint: MatfreeLinopODEConstraint,
+        mean_x,
+    ):
+        # Swap 'in' and 'out' because LstSq is an inverse operator
         super().__init__(
-            n_in=matfree_linop.n_out,
-            n_out=matfree_linop.n_in,
-            d_in=matfree_linop.d_out,
-            d_out=matfree_linop.d_in,
+            n_in=linop_ode_constraint.n_out,
+            n_out=linop_ode_constraint.n_in,
+            d_in=linop_ode_constraint.d_out,
+            d_out=linop_ode_constraint.d_in,
         )
+        self.mean_x = mean_x
         self.cholesky_x = cholesky_x
         self.cholesky_yx = cholesky_yx
-        self.matfree_linop = matfree_linop
+        self.linop_ode_constraint = linop_ode_constraint
 
-    def matvec_dndm(self, vec_dn):
+    def init_jvp(self):
+        return self.linop_ode_constraint.init_jvp()
+
+    def matvec_dn(self, vec_dn, *, jvp):
         vec_flat = vec_dn.T.reshape((self.n_in * self.d_in,))
-        Avec_flat = self.matvec_flat(vec_flat)
+        Avec_flat = self.matvec_flat(vec_flat, jvp=jvp)
         return Avec_flat.reshape((self.n_out, self.d_out)).T
 
-    def matvec_ndmd(self, vec):
+    def matvec_nd(self, vec, *, jvp):
         vec_flat = vec.reshape((self.n_in * self.d_in,))
-        Avec_flat = self.matvec_flat(vec_flat)
+        Avec_flat = self.matvec_flat(vec_flat, jvp=jvp)
         return Avec_flat.reshape((self.n_out, self.d_out))
 
-    def matvec_flat(self, vec):
+    def matvec_flat(self, vec, *, jvp):
 
         def vecmat(s):
+            import jax
+
+            jax.debug.print("matvec", ordered=True)
+
             # vector-Jacobian product
-            Ats = self.matfree_linop.vecmat_flat(s)
+            Ats = self.linop_ode_constraint.vecmat_flat(s, jvp=jvp)
 
             # Cholesky-vector products
-            BtAts = self.matvec_bd_transpose(self.cholesky_x, Ats)
-            Dts = self.matvec_bd_transpose(self.cholesky_yx, s)
+            BtAts = MatfreeLinopLstSq.materialized_vecmat_dn(self.cholesky_x, Ats)
+            Dts = MatfreeLinopLstSq.materialized_vecmat_dn(self.cholesky_yx, s)
             return np.concatenate([BtAts, Dts], axis=0)
 
-        # TODO: turn "D" into a damping factor
-        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec)
-        return self.matvec_bd(self.cholesky_x, lstsq_sol[: (self.n_out * self.d_out)])
+        # TODO: turn "D" into a damping factor?
+        x0 = self.mean_x.T.reshape((-1,))
+        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec, x0=x0)
+        sol = lstsq_sol[: (self.n_out * self.d_out)]
+        return MatfreeLinopLstSq.materialized_matvec_dn(self.cholesky_x, sol)
 
     @staticmethod
-    def matvec_bd_transpose(M, v):
+    def materialized_vecmat_dn(M, v):
         d, n, _m = M.shape
         v_dn = v.reshape((n, d)).T
         # transpose matvec, not matvec:
@@ -149,7 +172,7 @@ class MatfreeLinopLstSq(Linop):
         return Mv.T.reshape((-1,))
 
     @staticmethod
-    def matvec_bd(M, v):
+    def materialized_matvec_dn(M, v):
         d, n, _m = M.shape
         v_dn = v.reshape((n, d)).T
         Mv = linalg.einsum("...nm,...m->...n", M, v_dn)
@@ -164,7 +187,12 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         self.bias = bias
 
     def apply_flat(self, x, /):
-        y = self.A.matvec_ndmd(x.T).T
+        import jax
+
+        jax.debug.print("\nApplication:", ordered=True)
+
+        jvp = self.A.init_jvp()
+        y = self.A.matvec_nd(x.T, jvp=jvp).T
         m = y + self.noise.mean_flat
         c = self.noise.cholesky_flat
         tree_flatten = self.noise.tree_flatten
@@ -172,13 +200,13 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
 
     def marginalise(self, rv, /):
         # Observed mean
-        obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
+        obs_mean = self.A.matvec_dn(rv.mean_flat) + self.noise.mean_flat
 
         # TODO: we currently ignore the noise
         keys = random.split(self.key, num=self.num_ensembles)
         ensembles = func.vmap(rv.sample_flat)(keys)  # d, n
         ensembles = np.transpose(ensembles, axes=(0, 2, 1))  # n, d
-        ensembles_mv = func.vmap(self.A.matvec_ndmd)(ensembles)
+        ensembles_mv = func.vmap(self.A.matvec_nd)(ensembles)
         C = blockdiag_cholesky_from_ensembles(ensembles_mv, bias=self.bias)
         return blockdiag.BlockDiagNormal(obs_mean, C, self.noise.tree_flatten)
 
@@ -186,40 +214,54 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         del solve_triu  # unused
 
         # Observed mean
-        obs_mean = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
+        import jax
+
+        jax.debug.print("\nMean:", ordered=True)
+        jvp = self.A.init_jvp()
+        obs_mean = self.A.matvec_dn(rv.mean_flat, jvp=jvp) + self.noise.mean_flat
 
         # Gain & conditioning
-        K = MatfreeLinopLstSq(rv.cholesky_flat, self.noise.cholesky_flat, self.A)
+        mean_x = 0 * np.concatenate((rv.mean_flat, self.noise.mean_flat), axis=1)
+        K = MatfreeLinopLstSq(
+            cholesky_x=rv.cholesky_flat,
+            cholesky_yx=self.noise.cholesky_flat,
+            linop_ode_constraint=self.A,
+            mean_x=mean_x,
+        )
 
         # Posterior mean:
-        z = self.A.matvec_dndm(rv.mean_flat) + self.noise.mean_flat
-        cond_mean = rv.mean_flat - K.matvec_dndm(z)
+        z = self.A.matvec_dn(rv.mean_flat, jvp=jvp) + self.noise.mean_flat
+        cond_mean = rv.mean_flat - K.matvec_dn(z, jvp=jvp)
 
         # Posterior covariance via probing/ensembles
         keys = random.split(self.key, num=self.num_ensembles)
         ensembles = func.vmap(rv.sample_flat)(keys)  # d, n
         ensembles = np.transpose(ensembles, axes=(0, 2, 1))  # n, d
 
-        def matvec_ndmd(p_nd):
-            Ap_nd = self.A.matvec_ndmd(p_nd)
-            KAp_nd = K.matvec_ndmd(Ap_nd)
-            return p_nd - KAp_nd
+        def matvec_nd(p_nd):
+            Ap_nd = self.A.matvec_nd(p_nd, jvp=jvp)
+            KAp_nd = K.matvec_nd(Ap_nd, jvp=jvp)
+            return p_nd - KAp_nd, Ap_nd
 
+        import jax
+
+        jax.debug.print("\nEnsembles:", ordered=True)
         # Posteriors
-        ensembles_mv = func.vmap(matvec_ndmd)(ensembles)
-        C = blockdiag_cholesky_from_ensembles(ensembles_mv, bias=self.bias)
-        noise = blockdiag.BlockDiagNormal(cond_mean, C, rv.tree_flatten)
+        ensembles_p, ensembles_o = func.vmap(matvec_nd)(ensembles)
+        cond_chol = blockdiag_cholesky_from_ensembles(ensembles_p, bias=self.bias)
+        noise = blockdiag.BlockDiagNormal(cond_mean, cond_chol, rv.tree_flatten)
 
+        # Backward linear operator
         _key, subkey = random.split(self.key, num=2)
         cond = MatfreeLatentCond(
             K, noise, key=subkey, num_ensembles=self.num_ensembles, bias=self.bias
         )
 
-        # Backward linear operator
-        # Marginals (redo samples for whichever reason)
-        ensembles_mv = func.vmap(self.A.matvec_ndmd)(ensembles)
-        C = blockdiag_cholesky_from_ensembles(ensembles_mv, bias=self.bias)
-        observed = blockdiag.BlockDiagNormal(obs_mean, C, self.noise.tree_flatten)
+        # Marginals
+        obs_chol = blockdiag_cholesky_from_ensembles(ensembles_o, bias=self.bias)
+        observed = blockdiag.BlockDiagNormal(
+            obs_mean, obs_chol, self.noise.tree_flatten
+        )
 
         # Group and return
         return observed, cond
