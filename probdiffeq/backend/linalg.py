@@ -61,9 +61,9 @@ def lstsq_svd(matrix, rhs, /):
     return jnp.linalg.lstsq(matrix, rhs)[0]
 
 
-def lstsq_lsmr(vecmat_fun, rhs, /, *, x0, **lsmr_kwargs):
+def lstsq_lsmr(vecmat_fun, rhs, /, *, x0, damp, **lsmr_kwargs):
     lsmr = lstsq.lsmr(**lsmr_kwargs)
-    sol, _info = lsmr(vecmat_fun, rhs, x0=x0)
+    sol, _info = lsmr(vecmat_fun, rhs, x0=x0, damp=damp)
     return sol
 
 

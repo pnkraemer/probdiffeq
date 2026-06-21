@@ -14,7 +14,6 @@ C = TypeVar("C", bound=Sequence)
 For example, this variable is used to type Taylor coefficients.
 """
 
-# TODO: remove unnecessary function evaluations
 # TODO: remove info_operator duplication between Ts1 and Linop
 # TODO: include matfree TS1 in hires example
 # TODO: Implement iterated linearisation
@@ -38,11 +37,12 @@ class Linop:
 
 
 class MatfreeLinopODEConstraint(Linop):
-    def __init__(self, *, ode, tree_flatten, x, t):
+    def __init__(self, *, ode, tree_flatten, x, t, damp):
         self.ode = ode
         self.tree_flatten = tree_flatten
         self.t = t
         self.x = x
+        self.damp = damp
 
         *batch, n, d = x.shape
         super().__init__(batch=batch, n_in=n, n_out=1, d_in=d, d_out=d)
@@ -95,14 +95,14 @@ class MatfreeLinopODEConstraint(Linop):
         """Register this class (or a subclass) as a JAX pytree."""
 
         def flatten(linop):
-            children = linop.t, linop.x
+            children = linop.t, linop.x, linop.damp
             aux = (linop.ode, linop.tree_flatten)
             return children, aux
 
         def unflatten(aux, children):
-            (t, x) = children
+            (t, x, damp) = children
             ode, tree_flatten = aux
-            return cls(ode=ode, tree_flatten=tree_flatten, t=t, x=x)
+            return cls(ode=ode, tree_flatten=tree_flatten, t=t, x=x, damp=damp)
 
         tree.register_pytree_node(cls, flatten, unflatten)
 
@@ -124,20 +124,16 @@ class MatfreeLinopLstSq(Linop):
         self.linop_ode_constraint = linop_ode_constraint
 
     def matvec_dn(self, vec_dn, *, x0_dn, jvp_cached):
-        vec_flat = vec_dn.T.reshape((self.n_in * self.d_in,))
-        x0_flat = (
-            x0_dn.T.reshape((self.n_out * self.d_out,)) if x0_dn is not None else None
-        )
+        vec_flat = vec_dn.T.reshape((-1,))
+        x0_flat = x0_dn.T.reshape((-1,)) if x0_dn is not None else None
         Avec_flat, jvp = self.matvec_flat(
             vec_flat, x0_flat=x0_flat, jvp_cached=jvp_cached
         )
         return Avec_flat.reshape((self.n_out, self.d_out)).T, jvp
 
     def matvec_nd(self, vec, *, x0_nd, jvp_cached):
-        vec_flat = vec.reshape((self.n_in * self.d_in,))
-        x0_flat = (
-            x0_nd.reshape((self.n_out * self.d_out,)) if x0_nd is not None else None
-        )
+        vec_flat = vec.reshape((-1,))
+        x0_flat = x0_nd.reshape((-1,)) if x0_nd is not None else None
         Avec_flat, jvp = self.matvec_flat(
             vec_flat, x0_flat=x0_flat, jvp_cached=jvp_cached
         )
@@ -154,7 +150,8 @@ class MatfreeLinopLstSq(Linop):
             return MatfreeLinopLstSq.materialized_vecmat_dn(self.cholesky_x, Ats)
 
         # TODO: turn "D" into a damping factor?
-        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec, x0=x0_flat)
+        damp = self.linop_ode_constraint.damp
+        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec, x0=x0_flat, damp=damp)
         Av = MatfreeLinopLstSq.materialized_matvec_dn(self.cholesky_x, lstsq_sol)
         return Av, jvp_cached
 
@@ -325,7 +322,7 @@ class MatfreeOdeTs1(ssm_impl_api.AbstractOde):
 
         # n_out, d_out, n_in, d_in = E1.shape
         linop = MatfreeLinopODEConstraint(
-            ode=self.ode, tree_flatten=rv.tree_flatten, t=t, x=m0
+            ode=self.ode, tree_flatten=rv.tree_flatten, t=t, x=m0, damp=damp
         )
 
         key, jac = state
