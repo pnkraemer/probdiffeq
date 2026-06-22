@@ -945,6 +945,12 @@ class error_state_std(ErrorEstimator):
 
     """
 
+    # Reasons to use this estimator (show this in experiments):
+    #   - Works for all constraints (including DAEs etc.)
+    #   - Makes the error match the tolerance better.
+    #     (Hypothesis: residuals tend to be a bit larger than the state, so the error overestimates.)
+    #   - Makes the matfree solvers more reliable, especially at extreme tols.
+
     # TODO: make the experimental-warning into a decorator
     def __init__(
         self,

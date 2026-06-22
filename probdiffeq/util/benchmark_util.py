@@ -26,12 +26,17 @@ def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
         works_std = []
         precisions = []
         for arg in list_of_args:
+            # TODO: if we do timing and precision jointly (which means hardcoding timing), then
+            # we can cut runtimes of costlier benchmarks where we only afford repeat=1 in half.
             precision = precision_fun(fun(arg).block_until_ready())
-            times = timeit_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
-
             precisions.append(precision)
-            works_mean.append(np.mean(np.asarray(times)))
-            works_std.append(np.std(np.asarray(times), ddof=1))
+
+            times = timeit_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
+            mean = np.mean(np.asarray(times))
+            works_mean.append(mean)
+            if len(times) > 1:
+                std = np.std(np.asarray(times), ddof=1)
+                works_std.append(std)
         return {
             "work_mean": np.asarray(works_mean),
             "work_std": np.asarray(works_std),

@@ -138,9 +138,10 @@ class MatfreeLinopLstSq(Linop):
             # Cholesky-vector products
             return materialized_vecmat_dn(self.cholesky_x, Ats)
 
-        # TODO: turn "D" into a damping factor?
+        # TODO: let users control the tol?
+        tol = 10 * np.finfo_eps(vec.dtype)
         damp = self.linop_constraint.damp
-        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec, x0=x0_flat, damp=damp)
+        lstsq_sol = linalg.lstsq_lsmr(vecmat, vec, x0=x0_flat, damp=damp, tol=tol)
         Av = materialized_matvec_dn(self.cholesky_x, lstsq_sol)
         return Av, jvp_cached
 
@@ -170,11 +171,9 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         # TODO: we currently ignore the damping factor & the noise...
 
         # Ensemble Cholesky: P P^\top = (A C Xi) (A C Xi)^\top
-        # but alternatively, Hutchinson:
-        # P P^\top =
         keys = random.split(self.key, num=self.num_ensembles)
-        ensembles = func.vmap(rv.sample_flat)(keys)  # d, n
-        ensembles = np.transpose(ensembles, axes=(0, 2, 1))  # n, d
+        ensembles = func.vmap(rv.sample_flat)(keys)  # s, d, n
+        ensembles = np.transpose(ensembles, axes=(0, 2, 1))  # s, n, d
 
         def mv(x):
             Ax, _jvp = self.A.matvec_nd(x, jvp_cached=jvp)
@@ -185,9 +184,10 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         return blockdiag.BlockDiagNormal(obs_mean, C, self.noise.tree_flatten)
 
     def revert(self, rv, /, *, solve_triu: Callable):
-        del solve_triu  # unused
+        del solve_triu  # unused # TODO: should this be LSMR?
         assert isinstance(self.A, MatfreeLinopResidualConstraint)
-        # TODO: we currently ignore the noise (it is encoded in the damping factor)
+        # TODO: we currently ignore the noise
+        #       (instead, we use what is encoded in the damping factor)
 
         # Observed mean
         Am, jvp = self.A.matvec_dn(rv.mean_flat, jvp_cached=None)
@@ -202,8 +202,8 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
 
         # Posterior covariance via probing/ensembles
         keys = random.split(self.key, num=self.num_ensembles)
-        ensembles = func.vmap(rv.sample_flat)(keys)  # d, n
-        ensembles = np.transpose(ensembles, axes=(0, 2, 1))  # n, d
+        ensembles = func.vmap(rv.sample_flat)(keys)  # s, d, n
+        ensembles = np.transpose(ensembles, axes=(0, 2, 1))  # s, n, d
 
         def matvec_nd(p_nd):
             Ap_nd, _jvp = self.A.matvec_nd(p_nd, jvp_cached=jvp)
@@ -372,7 +372,7 @@ class state_space_model_matfree(ssm_impl_api.StateSpaceModel):
 
 
 def blockdiag_cholesky_from_ensembles(ensembles_smd, bias: bool):
-    S, _n, _d = ensembles_smd.shape
+    S, n, _d = ensembles_smd.shape
 
     # Center the ensembles
     ensembles_smd -= ensembles_smd.mean(axis=0, keepdims=True)
@@ -385,10 +385,9 @@ def blockdiag_cholesky_from_ensembles(ensembles_smd, bias: bool):
 
     # The QR decomposition is why we assume S >= n,
     # so let's check it briefly:
-    _S, m, _d = ensembles_smd.shape
-    if m > S:
+    if n > S:
         msg = "The function requires at least as many ensembles as Taylor coefficients."
-        msg += f" Received: S={S} < m={m}, which violates this assumption."
+        msg += f" Received: S={S} < n={n}, which violates this assumption."
         raise ValueError(msg)
 
     # Assume ensembles are shape (S, n, d), so we batch along d
