@@ -1,7 +1,7 @@
 ---
 ### Source:
 ### https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/#
-name: Publish Python distribution to PyPI
+name: Build and publish to PyPI
 on: push
 jobs:
   build:
@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: 3.x
       - name: Install pypa/build
-        run: python3 -m pip install build --user
+        run: python3 -m pip install build
       - name: Build a binary wheel and a source tarball
         run: python3 -m build
       - name: Store the distribution packages
