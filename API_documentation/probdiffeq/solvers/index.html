@@ -1,0 +1,3996 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The documentation for the probdiffeq library.">
+      
+      
+        <meta name="author" content="Nicholas Krämer">
+      
+      
+      
+        <link rel="prev" href="../problems/">
+      
+      
+        <link rel="next" href="../ssms%3A%20api/">
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.23">
+    
+    
+      
+        <title>Solvers - probdiffeq documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.84d31ad4.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Fira+Sans:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Fira Sans";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../_stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#solvers" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="probdiffeq documentation" class="md-header__button md-logo" aria-label="probdiffeq documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            probdiffeq documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Solvers
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0 8a5 5 0 0 1-5-5 5 5 0 0 1 5-5 5 5 0 0 1 5 5 5 5 0 0 1-5 5m0-12.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 9a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3m0-4.5c5 0 9.27 3.11 11 7.5-1.73 4.39-6 7.5-11 7.5S2.73 16.39 1 12c1.73-4.39 6-7.5 11-7.5M3.18 12a9.821 9.821 0 0 0 17.64 0 9.821 9.821 0 0 0-17.64 0"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/pnkraemer/probdiffeq" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pnkraemer/probdiffeq
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="probdiffeq documentation" class="md-nav__button md-logo" aria-label="probdiffeq documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    probdiffeq documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/pnkraemer/probdiffeq" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pnkraemer/probdiffeq
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Probabilistic solvers in JAX
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../1_installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../2_coming_from_other_ode_solver_libraries%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Coming from other ODE solver libraries?
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../3_choose_the_right_solver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Choose the right solver
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../4_troubleshoot_common_issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Troubleshoot common issues
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../5_use_the_ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Use the CI
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../6_create_new_examples_or_benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Create new examples or benchmarks
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../7_citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Citation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    API documentation
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            API documentation
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_9_1" id="__nav_9_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    probdiffeq.ivpsolve
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9_1">
+            <span class="md-nav__icon md-icon"></span>
+            probdiffeq.ivpsolve
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ivpsolve/controllers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Controllers
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ivpsolve/solver%20protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Solver protocols
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ivpsolve/solvers%3A%20adaptive%20steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Solvers: adaptive steps
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ivpsolve/solvers%3A%20fixed%20steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Solvers: fixed steps
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ivpsolve/stepsize%20initialisers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Stepsize initialisers
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9_2" id="__nav_9_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    probdiffeq.probdiffeq
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9_2">
+            <span class="md-nav__icon md-icon"></span>
+            probdiffeq.probdiffeq
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../estimators%20%26%20losses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Estimators &amp; losses
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jacobians/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Jacobians
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jet%20expansion%20algorithms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Jet expansion algorithms
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../problems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Problems
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Solvers
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Solvers
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.ErrorEstimator" class="md-nav__link">
+    <span class="md-ellipsis">
+      ErrorEstimator
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.N" class="md-nav__link">
+    <span class="md-ellipsis">
+      N
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      ProbabilisticSolution
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver" class="md-nav__link">
+    <span class="md-ellipsis">
+      ProbabilisticSolver
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.T" class="md-nav__link">
+    <span class="md-ellipsis">
+      T
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.__all__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __all__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.error_norm_rms_then_scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      error_norm_rms_then_scale
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.error_norm_scale_then_rms" class="md-nav__link">
+    <span class="md-ellipsis">
+      error_norm_scale_then_rms
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.error_residual_std" class="md-nav__link">
+    <span class="md-ellipsis">
+      error_residual_std
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.error_state_std" class="md-nav__link">
+    <span class="md-ellipsis">
+      error_state_std
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.solver" class="md-nav__link">
+    <span class="md-ellipsis">
+      solver
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.solver_dynamic" class="md-nav__link">
+    <span class="md-ellipsis">
+      solver_dynamic
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.solver_mle" class="md-nav__link">
+    <span class="md-ellipsis">
+      solver_mle
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ssms%3A%20api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    SSMs: API
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ssms%3A%20blockdiag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    SSMs: blockdiag
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ssms%3A%20dense/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    SSMs: dense
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ssms%3A%20isotropic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    SSMs: isotropic
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ssms%3A%20matfree/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    SSMs: matfree
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../taylor%20points/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Taylor points
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Examples
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            Examples
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/A0_get_started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    A0. Get started
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/A1_taylor_coefficients_as_central_data_structures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    A1. Taylor coefficients as central data structures
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/B0_understand_the_ode_posterior/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    B0. Understand the ODE posterior
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/B1_visualise_solution_uncertainty/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    B1. Visualise solution uncertainty
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/B2_simulate_pd_es/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    B2. Simulate PDEs
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/B3_simulate_da_es/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    B3. Simulate DAEs
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/C0_choose_between_prior_distributions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    C0. Choose between prior distributions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/C1_leverage_dynamic_calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    C1. Leverage dynamic calibration
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/C2_solve_second_order_iv_ps_without_transformation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    C2. Solve second order IVPs without transformation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/C3_customise_the_constraints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    C3. Customise the constraints
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/C4_some_solvers_are_more_stable_than_others/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    C4. Some solvers are more stable than others
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/D0_enable_reverse_mode_derivatives/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    D0. Enable reverse-mode derivatives
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/E0_learn_neural_od_es_with_diffusion_tempering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    E0. Learn neural ODEs with diffusion tempering
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/E1_estimate_parameters_via_black_jax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    E1. Estimate parameters (via BlackJAX)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/E2_estimate_parameters_via_optax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    E2. Estimate parameters (via Optax)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Examples/E3_fit_the_robertson_dae_to_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    E3. Fit the Robertson DAE to data
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Extended Benchmarks
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            Extended Benchmarks
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Extended_Benchmarks/A0_walltime_%7C_lotka_volterra/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    A0. Walltime | Lotka-Volterra
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Extended_Benchmarks/A1_walltime_%7C_pleiades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    A1. Walltime | Pleiades
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Extended_Benchmarks/A2_walltime_%7C_hires/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    A2. Walltime | Hires
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Extended_Benchmarks/A3_walltime_%7C_stiff_van_der_pol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    A3. Walltime | stiff van-der-Pol
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Extended_Benchmarks/A4_walltime_%7C_linear_ode_with_many_components/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    A4. Walltime | Linear ODE with many components
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Extended_Benchmarks/A5_walltime_%7C_burgers_pde/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    A5. Walltime | Burgers PDE
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Extended_Benchmarks/B0_walltime_%7C_robertson_dae/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    B0. Walltime | Robertson DAE
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Extended_Benchmarks/C0_taylor_recursions_%7C_fitz_hugh_nagumo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    C0. Taylor recursions | FitzHugh-Nagumo
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Extended_Benchmarks/C1_taylor_recursions_%7C_neural_ode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    C1. Taylor recursions | Neural ODE
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Extended_Benchmarks/C2_taylor_recursions_%7C_pleiades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    C2. Taylor recursions | Pleiades
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Extended_Benchmarks/D0_convergence_rates_%7C_lotka_volterra/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    D0. Convergence rates | Lotka-Volterra
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.ErrorEstimator" class="md-nav__link">
+    <span class="md-ellipsis">
+      ErrorEstimator
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.N" class="md-nav__link">
+    <span class="md-ellipsis">
+      N
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      ProbabilisticSolution
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver" class="md-nav__link">
+    <span class="md-ellipsis">
+      ProbabilisticSolver
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.T" class="md-nav__link">
+    <span class="md-ellipsis">
+      T
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.__all__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __all__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.error_norm_rms_then_scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      error_norm_rms_then_scale
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.error_norm_scale_then_rms" class="md-nav__link">
+    <span class="md-ellipsis">
+      error_norm_scale_then_rms
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.error_residual_std" class="md-nav__link">
+    <span class="md-ellipsis">
+      error_residual_std
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.error_state_std" class="md-nav__link">
+    <span class="md-ellipsis">
+      error_state_std
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.solver" class="md-nav__link">
+    <span class="md-ellipsis">
+      solver
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.solver_dynamic" class="md-nav__link">
+    <span class="md-ellipsis">
+      solver_dynamic
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probdiffeq._probdiffeq.solvers.solver_mle" class="md-nav__link">
+    <span class="md-ellipsis">
+      solver_mle
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="solvers">Solvers<a class="headerlink" href="#solvers" title="Permanent link">¤</a></h1>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+
+    <div class="doc doc-contents first">
+
+        <p>Solvers.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="probdiffeq._probdiffeq.solvers.ErrorEstimator" class="doc doc-heading">
+            <code>ErrorEstimator</code>
+
+
+<a href="#probdiffeq._probdiffeq.solvers.ErrorEstimator" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>An interface for error estimators in probabilistic solvers.</p>
+<p>Related:
+<a href="#probdiffeq._probdiffeq.solvers.ErrorEstimator--probdiffeq.probdiffeq.error_residual_std"><code>error_residual_std</code></a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ErrorEstimator.estimate_error_norm" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">estimate_error_norm</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">previous</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">,</span> <span class="n">proposed</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">dt</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">atol</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">rtol</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">damp</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.ErrorEstimator.estimate_error_norm" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Estimate the error norm.</p>
+<p>The error norm is a single scalar that already includes:</p>
+<ul>
+<li>Absolute and relative tolerances</li>
+<li>Error contraction rates</li>
+</ul>
+<p>In the acceptance/rejection step, this error norm is compared
+to one to determine whether a step has been successful.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ErrorEstimator.init_error" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">init_error</span><span class="p">()</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.ErrorEstimator.init_error" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize the error-estimation state.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="probdiffeq._probdiffeq.solvers.N" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">N</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s1">&#39;N&#39;</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="p">(</span><span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractTreeNormal</span><span class="p">))</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.N" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>A type-variable to describe normal distributions.</p>
+<p>Used to type marginals, for example.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolution" class="doc doc-heading">
+            <code>ProbabilisticSolution</code>
+
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolution" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>A datastructure for probabilistic solutions of differential equations.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolution.auxiliary" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">auxiliary</span><span class="p">:</span> <span class="n">Any</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolution.auxiliary" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Auxiliary states.</p>
+<p>For instance, random keys for Hutchinson-based
+diagonal linearisation in the correction,
+or running means of the MLE calibration.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolution.fun_evals" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fun_evals</span><span class="p">:</span> <span class="n">Any</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolution.fun_evals" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Function evaluations.</p>
+<p>Used to cache observation models between solver steps
+and error estimates.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolution.num_steps" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">num_steps</span><span class="p">:</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolution.num_steps" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The number of steps taken until the current point.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolution.output_scale" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">output_scale</span><span class="p">:</span> <span class="n">Any</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolution.output_scale" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The current output scale.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolution.prior" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">prior</span><span class="p">:</span> <span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractPrior</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolution.prior" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolution.solution_full" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">solution_full</span><span class="p">:</span> <span class="n">T</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolution.solution_full" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The current posterior estimate.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolution.t" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">t</span><span class="p">:</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolution.t" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The current time-step.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolution.u" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">u</span><span class="p">:</span> <span class="n">N</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolution.u" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The current ODE solution estimate.</p>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolver" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">ProbabilisticSolver</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">strategy</span><span class="p">:</span> <span class="n">estimators_and_losses</span><span class="o">.</span><span class="n">MarkovStrategy</span><span class="p">,</span> <span class="n">constraint</span><span class="p">:</span> <span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractLinearization</span><span class="p">,</span> <span class="n">constraint_init</span><span class="p">:</span> <span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractLinearization</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>An interface for probabilistic differential equation solvers.</p>
+<p>Related:
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver--probdiffeq.probdiffeq.solver"><code>solver</code></a>,
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver--probdiffeq.probdiffeq.solver_mle"><code>solver_mle</code></a>,
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver--probdiffeq.probdiffeq.solver_dynamic"><code>solver_dynamic</code></a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolver.constraint" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">constraint</span> <span class="o">=</span> <span class="n">constraint</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver.constraint" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolver.constraint_init" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">constraint_init</span> <span class="o">=</span> <span class="n">constraint_init</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver.constraint_init" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolver.init" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">init</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">damp</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProbabilisticSolution</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver.init" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize the probabilistic solution.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolver.interpolate" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">interpolate</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">interp_from</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">,</span> <span class="n">interp_to</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">)</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver.interpolate" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Interpolate between two solution objects.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolver.interpolate_at_t1" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">interpolate_at_t1</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">interp_from</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">,</span> <span class="n">interp_to</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">)</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver.interpolate_at_t1" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Interpolate the solution near a checkpoint.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolver.is_suitable_for_offgrid_marginals" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">is_suitable_for_offgrid_marginals</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver.is_suitable_for_offgrid_marginals" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Whether the solver admits offgrid-marginal calculation.</p>
+<p>Excludes fixed-point smoothers, for example.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolver.is_suitable_for_save_at" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">is_suitable_for_save_at</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver.is_suitable_for_save_at" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Whether the solver admits adaptive time-stepping with checkpoints.</p>
+<p>Excludes fixed-interval smoothers, for example.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolver.is_suitable_for_save_every_step" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">is_suitable_for_save_every_step</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver.is_suitable_for_save_every_step" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Whether the solver admits adaptive time-stepping without checkpoints.</p>
+<p>Excludes fixed-point smoothers, for example.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolver.offgrid_marginals" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">offgrid_marginals</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">solution</span><span class="p">)</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver.offgrid_marginals" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute off-grid marginals via jax.numpy.searchsorted.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The time-point 't' may not be an element in the solution grid.
+Otherwise, anything can happen and the solution will be incorrect.
+At the moment, we do not check this.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The time-point 't' must also be strictly in (t0, t1).
+It must not lie outside the interval, and it must not coincide
+with the interval boundaries.
+At the moment, we do not check this.</p>
+</div>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolver.step" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">step</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">dt</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">damp</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver.step" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Perform a step.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolver.strategy" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">strategy</span> <span class="o">=</span> <span class="n">strategy</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver.strategy" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.ProbabilisticSolver.userfriendly_output" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">userfriendly_output</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">solution0</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">,</span> <span class="n">solution</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProbabilisticSolution</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.ProbabilisticSolver.userfriendly_output" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Make the solutions 'user-friendly'.</p>
+<p>This may include calibration, calculation of marginals, and other things.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="probdiffeq._probdiffeq.solvers.T" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s1">&#39;T&#39;</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="p">(</span><span class="n">estimators_and_losses</span><span class="o">.</span><span class="n">MarkovSequence</span> <span class="o">|</span> <span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractTreeNormal</span><span class="p">))</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.T" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>A type-variable to describe posterior distributions.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="probdiffeq._probdiffeq.solvers.__all__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;ErrorEstimator&#39;</span><span class="p">,</span> <span class="s1">&#39;ProbabilisticSolution&#39;</span><span class="p">,</span> <span class="s1">&#39;ProbabilisticSolver&#39;</span><span class="p">,</span> <span class="s1">&#39;error_norm_rms_then_scale&#39;</span><span class="p">,</span> <span class="s1">&#39;error_norm_scale_then_rms&#39;</span><span class="p">,</span> <span class="s1">&#39;error_residual_std&#39;</span><span class="p">,</span> <span class="s1">&#39;error_state_std&#39;</span><span class="p">,</span> <span class="s1">&#39;solver&#39;</span><span class="p">,</span> <span class="s1">&#39;solver_dynamic&#39;</span><span class="p">,</span> <span class="s1">&#39;solver_mle&#39;</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.__all__" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="probdiffeq._probdiffeq.solvers.error_norm_rms_then_scale" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">error_norm_rms_then_scale</span><span class="p">(</span><span class="n">norm_order</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_norm_rms_then_scale" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Normalize an error by computing the root-mean-square norm followed by scaling.</p>
+<p>Use this for residual-based error estimators in combination
+with custom root linearization.</p>
+<p>See the custom information operator tutorial for details.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="probdiffeq._probdiffeq.solvers.error_norm_scale_then_rms" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">error_norm_scale_then_rms</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">norm_order</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_norm_scale_then_rms" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Normalize an error by scaling followed by computing the root-mean-square norm.</p>
+<p>This is the recommended approach, and there is no reason to choose
+<a href="#probdiffeq._probdiffeq.solvers.error_norm_scale_then_rms--probdiffeq.probdiffeq.error_norm_rms_then_scale"><code>error_norm_rms_then_scale</code></a>,
+in situations where the present function applies.
+However, there are situations where it doesn't apply, for example,
+in residual-based error estimators for root constraints whose pytree
+structure differs from that of the target Taylor coefficients.</p>
+<p>See the custom information operator tutorial for details.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="probdiffeq._probdiffeq.solvers.error_residual_std" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">error_residual_std</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">constraint</span><span class="p">:</span> <span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractLinearization</span><span class="p">,</span> <span class="n">error_norm</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">re_linearize_before_error</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">error_per_unit_step</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_residual_std" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Construct an error estimator based on a local residual's standard deviation.</p>
+<p>This is the common error estimate, proposed by Schober et al. (2019),
+extended by Bosch et al. (2021) to different linearization and calibration modes,
+and then generalised to state-space model factorisations by
+Krämer, Bosch, and Schmidt et al. (2022).
+Please consider citing these papers in your work if you use any of
+these error estimates.</p>
+<details class="note">
+<summary>BibTex for Schober et al. (2019)</summary>
+<div class="highlight"><pre><span></span><code><span class="nc">@article</span><span class="p">{</span><span class="nl">schober2019probabilistic</span><span class="p">,</span>
+<span class="w">    </span><span class="na">title</span><span class="p">=</span><span class="s">{A probabilistic model for the numerical</span>
+<span class="s">    solution of initial value problems}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">author</span><span class="p">=</span><span class="s">{Schober, Michael and S{\&quot;a}rkk{\&quot;a}, Simo and Hennig, Philipp}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">journal</span><span class="p">=</span><span class="s">{Statistics and Computing}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">volume</span><span class="p">=</span><span class="s">{29}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">number</span><span class="p">=</span><span class="s">{1}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">pages</span><span class="p">=</span><span class="s">{99--122}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">year</span><span class="p">=</span><span class="s">{2019}</span><span class="p">,</span>
+<span class="w">    </span><span class="na">publisher</span><span class="p">=</span><span class="s">{Springer}</span>
+<span class="p">}</span>
+</code></pre></div>
+</details>
+<details class="note">
+<summary>BibTex for Bosch et al. (2021)</summary>
+<div class="highlight"><pre><span></span><code><span class="w">    </span><span class="nc">@inproceedings</span><span class="p">{</span><span class="nl">bosch2021calibrated</span><span class="p">,</span>
+<span class="w">        </span><span class="na">title</span><span class="p">=</span><span class="s">{Calibrated adaptive probabilistic ODE solvers}</span><span class="p">,</span>
+<span class="w">        </span><span class="na">author</span><span class="p">=</span><span class="s">{Bosch, Nathanael and Hennig, Philipp and Tronarp, Filip}</span><span class="p">,</span>
+<span class="w">        </span><span class="na">booktitle</span><span class="p">=</span><span class="s">{International Conference on</span>
+<span class="s">        Artificial Intelligence and Statistics}</span><span class="p">,</span>
+<span class="w">        </span><span class="na">pages</span><span class="p">=</span><span class="s">{3466--3474}</span><span class="p">,</span>
+<span class="w">        </span><span class="na">year</span><span class="p">=</span><span class="s">{2021}</span><span class="p">,</span>
+<span class="w">        </span><span class="na">organization</span><span class="p">=</span><span class="s">{PMLR}</span>
+<span class="w">    </span><span class="p">}</span>
+</code></pre></div>
+</details>
+<details class="note">
+<summary>BibTex for Krämer, Bosch, and Schmidt et al. (2022)</summary>
+<div class="highlight"><pre><span></span><code><span class="w">    </span><span class="nc">@inproceedings</span><span class="p">{</span><span class="nl">kramer2022probabilistic</span><span class="p">,</span>
+<span class="w">        </span><span class="na">title</span><span class="p">=</span><span class="s">{Probabilistic ODE solutions in millions of dimensions}</span><span class="p">,</span>
+<span class="w">        </span><span class="na">author</span><span class="p">=</span><span class="s">{Kr{\&quot;a}mer, Nicholas and Bosch, Nathanael and</span>
+<span class="s">        Schmidt, Jonathan and Hennig, Philipp}</span><span class="p">,</span>
+<span class="w">        </span><span class="na">booktitle</span><span class="p">=</span><span class="s">{International Conference on Machine Learning}</span><span class="p">,</span>
+<span class="w">        </span><span class="na">pages</span><span class="p">=</span><span class="s">{11634--11649}</span><span class="p">,</span>
+<span class="w">        </span><span class="na">year</span><span class="p">=</span><span class="s">{2022}</span><span class="p">,</span>
+<span class="w">        </span><span class="na">organization</span><span class="p">=</span><span class="s">{PMLR}</span>
+<span class="w">    </span><span class="p">}</span>
+</code></pre></div>
+</details>
+<p>Related:
+<a href="#probdiffeq._probdiffeq.solvers.error_residual_std--probdiffeq.probdiffeq.ErrorEstimator"><code>ErrorEstimator</code></a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.error_residual_std.constraint" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">constraint</span> <span class="o">=</span> <span class="n">constraint</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_residual_std.constraint" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.error_residual_std.error_norm" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">error_norm</span> <span class="o">=</span> <span class="n">error_norm</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_residual_std.error_norm" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.error_residual_std.error_per_unit_step" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">error_per_unit_step</span> <span class="o">=</span> <span class="n">error_per_unit_step</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_residual_std.error_per_unit_step" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.error_residual_std.estimate_error_norm" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">estimate_error_norm</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">previous</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">,</span> <span class="n">proposed</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">dt</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">atol</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">rtol</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">damp</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">]</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_residual_std.estimate_error_norm" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.error_residual_std.init_error" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">init_error</span><span class="p">()</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_residual_std.init_error" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.error_residual_std.re_linearize_before_error" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">re_linearize_before_error</span> <span class="o">=</span> <span class="n">re_linearize_before_error</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_residual_std.re_linearize_before_error" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="probdiffeq._probdiffeq.solvers.error_state_std" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">error_state_std</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">constraint</span><span class="p">:</span> <span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractLinearization</span><span class="p">,</span> <span class="n">error_norm</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">re_linearize_before_error</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">derivative_idx</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">error_per_unit_step</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_state_std" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Construct an error estimator based on a state's standard deviation.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning: highly EXPERIMENTAL feature!</p>
+<p>This function is highly experimental and not safe to use.
+There is no guarantee that it works correctly (or at all).
+It might be deleted tomorrow and without any deprecation policy.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.error_state_std.constraint" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">constraint</span> <span class="o">=</span> <span class="n">constraint</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_state_std.constraint" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.error_state_std.derivative_idx" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">derivative_idx</span> <span class="o">=</span> <span class="n">derivative_idx</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_state_std.derivative_idx" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.error_state_std.error_norm" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">error_norm</span> <span class="o">=</span> <span class="n">error_norm</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_state_std.error_norm" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.error_state_std.error_per_unit_step" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">error_per_unit_step</span> <span class="o">=</span> <span class="n">error_per_unit_step</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_state_std.error_per_unit_step" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.error_state_std.estimate_error_norm" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">estimate_error_norm</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">previous</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">,</span> <span class="n">proposed</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">dt</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">atol</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">rtol</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">damp</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">]</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_state_std.estimate_error_norm" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.error_state_std.init_error" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">init_error</span><span class="p">()</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_state_std.init_error" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.error_state_std.re_linearize_before_error" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">re_linearize_before_error</span> <span class="o">=</span> <span class="n">re_linearize_before_error</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.error_state_std.re_linearize_before_error" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="probdiffeq._probdiffeq.solvers.solver" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">solver</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">constraint</span><span class="p">:</span> <span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractLinearization</span><span class="p">,</span> <span class="n">strategy</span><span class="p">:</span> <span class="n">estimators_and_losses</span><span class="o">.</span><span class="n">MarkovStrategy</span><span class="p">,</span> <span class="n">constraint_init</span><span class="p">:</span> <span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractLinearization</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.solver" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Create a solver that does not calibrate the output scale automatically.</p>
+<p>This is the text-book implementation of probabilistic solvers.
+It is typically used in parameter estimation:</p>
+<ul>
+<li>In combination with gradient-based optimisation of the output scale.</li>
+<li>In combination with diffusion tempering.</li>
+</ul>
+<p>See the tutorials for example applications.</p>
+<p>Related:
+<a href="#probdiffeq._probdiffeq.solvers.solver--probdiffeq.probdiffeq.ProbabilisticSolver"><code>ProbabilisticSolver</code></a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.solver.init" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">init</span><span class="p">(</span><span class="n">t</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">u</span><span class="p">:</span> <span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractPrior</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">damp</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProbabilisticSolution</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.solver.init" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.solver.step" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">step</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">damp</span><span class="p">)</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.solver.step" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.solver.userfriendly_output" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">userfriendly_output</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">solution0</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">,</span> <span class="n">solution</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProbabilisticSolution</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.solver.userfriendly_output" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="probdiffeq._probdiffeq.solvers.solver_dynamic" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">solver_dynamic</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">strategy</span><span class="p">:</span> <span class="n">estimators_and_losses</span><span class="o">.</span><span class="n">MarkovStrategy</span><span class="p">,</span> <span class="n">constraint</span><span class="p">:</span> <span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractLinearization</span><span class="p">,</span> <span class="n">constraint_init</span><span class="p">:</span> <span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractLinearization</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">re_linearize_after_calibration</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">stop_gradient_through_calibration</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.solver_dynamic" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Create a solver that calibrates the output scale dynamically.</p>
+<p>Related:
+<a href="#probdiffeq._probdiffeq.solvers.solver_dynamic--probdiffeq.probdiffeq.ProbabilisticSolver"><code>ProbabilisticSolver</code></a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.solver_dynamic.init" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">init</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">u</span><span class="p">:</span> <span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractPrior</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">damp</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProbabilisticSolution</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.solver_dynamic.init" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.solver_dynamic.re_linearize_after_calibration" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">re_linearize_after_calibration</span> <span class="o">=</span> <span class="n">re_linearize_after_calibration</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.solver_dynamic.re_linearize_after_calibration" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.solver_dynamic.step" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">step</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">dt</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">damp</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.solver_dynamic.step" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.solver_dynamic.stop_gradient_through_calibration" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">stop_gradient_through_calibration</span> <span class="o">=</span> <span class="n">stop_gradient_through_calibration</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.solver_dynamic.stop_gradient_through_calibration" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.solver_dynamic.userfriendly_output" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">userfriendly_output</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">solution</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">,</span> <span class="n">solution0</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">)</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.solver_dynamic.userfriendly_output" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="probdiffeq._probdiffeq.solvers.solver_mle" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">solver_mle</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">constraint</span><span class="p">:</span> <span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractLinearization</span><span class="p">,</span> <span class="n">strategy</span><span class="p">:</span> <span class="n">estimators_and_losses</span><span class="o">.</span><span class="n">MarkovStrategy</span><span class="p">,</span> <span class="n">constraint_init</span><span class="p">:</span> <span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractLinearization</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">correct_asymptotic_underconfidence</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.solver_mle" class="headerlink" title="Permanent link">¤</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Create a solver that uses maximum-likelihood calibration for the output scale.</p>
+<p>Related:
+<a href="#probdiffeq._probdiffeq.solvers.solver_mle--probdiffeq.probdiffeq.ProbabilisticSolver"><code>ProbabilisticSolver</code></a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.solver_mle.correct_asymptotic_underconfidence" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">correct_asymptotic_underconfidence</span> <span class="o">=</span> <span class="n">correct_asymptotic_underconfidence</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#probdiffeq._probdiffeq.solvers.solver_mle.correct_asymptotic_underconfidence" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.solver_mle.init" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">init</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">u</span><span class="p">:</span> <span class="n">ssm_impl_api</span><span class="o">.</span><span class="n">AbstractPrior</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">damp</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProbabilisticSolution</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.solver_mle.init" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.solver_mle.step" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">step</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">dt</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">damp</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.solver_mle.step" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="probdiffeq._probdiffeq.solvers.solver_mle.userfriendly_output" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">userfriendly_output</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">solution0</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">,</span> <span class="n">solution</span><span class="p">:</span> <span class="n">ProbabilisticSolution</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProbabilisticSolution</span></code>
+
+<a href="#probdiffeq._probdiffeq.solvers.solver_mle.userfriendly_output" class="headerlink" title="Permanent link">¤</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://twitter.com/@pnkraemer" target="_blank" rel="noopener" title="pnkraemer" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M459.4 151.7c.3 4.5.3 9.1.3 13.6 0 138.7-105.6 298.6-298.6 298.6-59.5 0-114.7-17.2-161.1-47.1 8.4 1 16.6 1.3 25.3 1.3 49.1 0 94.2-16.6 130.3-44.8-46.1-1-84.8-31.2-98.1-72.8 6.5 1 13 1.6 19.8 1.6 9.4 0 18.8-1.3 27.6-3.6-48.1-9.7-84.1-52-84.1-103v-1.3c14 7.8 30.2 12.7 47.4 13.3-28.3-18.8-46.8-51-46.8-87.4 0-19.5 5.2-37.4 14.3-53C87.4 130.8 165 172.4 252.1 176.9c-1.6-7.8-2.6-15.9-2.6-24C249.5 95.1 296.3 48 354.4 48c30.2 0 57.5 12.7 76.7 33.1 23.7-4.5 46.5-13.3 66.6-25.3-7.8 24.4-24.4 44.8-46.1 57.8 21.1-2.3 41.6-8.1 60.4-16.2-14.3 20.8-32.2 39.3-52.6 54.3"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.sections", "navigation.path", "navigation.indexes", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.f55a23d4.min.js"></script>
+      
+        <script src="../../../_javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
