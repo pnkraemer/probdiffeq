@@ -457,8 +457,7 @@ class StateSpaceModel(abc.ABC):
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> AbstractOde:
+    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> AbstractResidual:
         r"""Create an ODE constraint and linearise with a first-order Taylor approximation.
 
         This constraint handles ODEs of the form
@@ -471,7 +470,11 @@ class StateSpaceModel(abc.ABC):
 
         Related: :class:`probdiffeq._probdiffeq.ssm_impl_api.AbstractLinearization`.
         """
-        raise NotImplementedError
+        if not isinstance(ode, problems.JetOde):
+            raise TypeError(ode)
+
+        residual = problems.residual_from_ode(ode)
+        return self.constraint_residual(residual)
 
     @abc.abstractmethod
     def constraint_residual(

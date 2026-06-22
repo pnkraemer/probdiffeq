@@ -36,9 +36,9 @@ class Linop:
         return f"{name}({args})"
 
 
-class MatfreeLinopODEConstraint(Linop):
-    def __init__(self, *, ode, tree_flatten, x, t, damp):
-        self.ode = ode
+class MatfreeLinopResidualConstraint(Linop):
+    def __init__(self, *, residual, tree_flatten, x, t, damp):
+        self.residual = residual
         self.tree_flatten = tree_flatten
         self.t = t
         self.x = x
@@ -73,55 +73,44 @@ class MatfreeLinopODEConstraint(Linop):
         return jvp(vec), jvp
 
     def _information_operator(self, s: Array) -> Array:
-        # Move to latent space (arg is (n, d) but latent space is (d, n))
         s = s.T
-
-        # Extract all tcoeffs
         jet_coords = self.tree_flatten.unflatten_array(s)
-
-        # Extract relevant tcoeffs ("jet-coordinates")
-        jet_coords = jet_coords[: self.ode.num_tcoeffs_in_args]
-
-        # Evaluate the actual vector field
-        fs0 = self.ode.vector_field(jet_coords=jet_coords, t=self.t)
-
-        # Bring back into (m, d) form.
-        fx0 = tree.ravel_pytree(fs0)[0]
-        s0 = s[..., self.ode.num_tcoeffs_in_args]
-        return (s0 - fx0)[None, :]
+        jet_coords = jet_coords[: self.residual.num_tcoeffs_in_args]
+        r = self.residual.residual_function(jet_coords=jet_coords, t=self.t)
+        return tree.ravel_pytree(r)[0][None, :]
 
     @classmethod
     def _register_as_pytree(cls) -> None:
-        """Register this class (or a subclass) as a JAX pytree."""
-
         def flatten(linop):
             children = linop.t, linop.x, linop.damp
-            aux = (linop.ode, linop.tree_flatten)
+            aux = (linop.residual, linop.tree_flatten)
             return children, aux
 
         def unflatten(aux, children):
             (t, x, damp) = children
-            ode, tree_flatten = aux
-            return cls(ode=ode, tree_flatten=tree_flatten, t=t, x=x, damp=damp)
+            residual, tree_flatten = aux
+            return cls(
+                residual=residual, tree_flatten=tree_flatten, t=t, x=x, damp=damp
+            )
 
         tree.register_pytree_node(cls, flatten, unflatten)
 
 
-MatfreeLinopODEConstraint._register_as_pytree()
+MatfreeLinopResidualConstraint._register_as_pytree()
 
 
 class MatfreeLinopLstSq(Linop):
-    def __init__(self, *, cholesky_x, linop_ode_constraint: MatfreeLinopODEConstraint):
+    def __init__(self, *, cholesky_x, linop_constraint: MatfreeLinopResidualConstraint):
         # Swap 'in' and 'out' because LstSq is an inverse operator
         super().__init__(
-            batch=linop_ode_constraint.batch,
-            n_in=linop_ode_constraint.n_out,
-            n_out=linop_ode_constraint.n_in,
-            d_in=linop_ode_constraint.d_out,
-            d_out=linop_ode_constraint.d_in,
+            batch=linop_constraint.batch,
+            n_in=linop_constraint.n_out,
+            n_out=linop_constraint.n_in,
+            d_in=linop_constraint.d_out,
+            d_out=linop_constraint.d_in,
         )
         self.cholesky_x = cholesky_x
-        self.linop_ode_constraint = linop_ode_constraint
+        self.linop_constraint = linop_constraint
 
     def matvec_dn(self, vec_dn, *, x0_dn, jvp_cached):
         vec_flat = vec_dn.T.reshape((-1,))
@@ -144,13 +133,13 @@ class MatfreeLinopLstSq(Linop):
         def vecmat(s):
 
             # vector-Jacobian product
-            Ats, _vjp = self.linop_ode_constraint.vecmat_flat(s, jvp_cached=jvp_cached)
+            Ats, _vjp = self.linop_constraint.vecmat_flat(s, jvp_cached=jvp_cached)
 
             # Cholesky-vector products
             return materialized_vecmat_dn(self.cholesky_x, Ats)
 
         # TODO: turn "D" into a damping factor?
-        damp = self.linop_ode_constraint.damp
+        damp = self.linop_constraint.damp
         lstsq_sol = linalg.lstsq_lsmr(vecmat, vec, x0=x0_flat, damp=damp)
         Av = materialized_matvec_dn(self.cholesky_x, lstsq_sol)
         return Av, jvp_cached
@@ -173,7 +162,7 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         return blockdiag.BlockDiagNormal(m, c, tree_flatten)
 
     def marginalise(self, rv, /):
-        assert isinstance(self.A, MatfreeLinopODEConstraint)
+        assert isinstance(self.A, MatfreeLinopResidualConstraint)
         # Observed mean
         Am, jvp = self.A.matvec_dn(rv.mean_flat, jvp_cached=None)
         obs_mean = Am + self.noise.mean_flat
@@ -197,7 +186,7 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
 
     def revert(self, rv, /, *, solve_triu: Callable):
         del solve_triu  # unused
-        assert isinstance(self.A, MatfreeLinopODEConstraint)
+        assert isinstance(self.A, MatfreeLinopResidualConstraint)
         # TODO: we currently ignore the noise (it is encoded in the damping factor)
 
         # Observed mean
@@ -205,7 +194,7 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
         obs_mean = Am + self.noise.mean_flat
 
         # Gain & conditioning
-        K = MatfreeLinopLstSq(cholesky_x=rv.cholesky_flat, linop_ode_constraint=self.A)
+        K = MatfreeLinopLstSq(cholesky_x=rv.cholesky_flat, linop_constraint=self.A)
 
         # Posterior mean:
         Km, _jvp = K.matvec_dn(obs_mean, x0_dn=None, jvp_cached=jvp)
@@ -267,61 +256,42 @@ class MatfreeLatentCond(ssm_impl_api.AbstractLatentCond):
 MatfreeLatentCond._register_as_pytree()
 
 
-class MatfreeOdeTs1(ssm_impl_api.AbstractOde):
-    """Dense ODE linearization via TS1 (first-degree Taylor series: evaluate the residual and its Jacobian at the linearization point)."""
+class MatfreeResidual(ssm_impl_api.AbstractResidual):
+    """Matfree residual linearization via TS1."""
 
-    # Sample count? See p. 6 in https://arxiv.org/abs/2606.08203
-
-    def __init__(self, ode, key, num_ensembles, bias):
-        super().__init__(ode=ode)
+    def __init__(self, residual, key, num_ensembles, bias):
+        super().__init__(residual)
         self.key = key
         self.num_ensembles = num_ensembles
         self.bias = bias
 
     def init_linearization(self):
-        # todo: we should move the trace estimation outside
-        # the jacobian object. Then, this bit here becomes simpler?
-        # For example, we could even move the information operator
-        # to a method in the ODE, then call func.linearize() / vjp()
-        # in the constraints here, and then call the trace/diagonal estimators
-        # on this linearisation with a uniform API.
-        jac = self.ode.jacobian.init_jacobian_handler()
+        jac = self.residual.jacobian.init_jacobian_handler()
         return self.key, jac
 
     def linearize(self, rv, state, *, damp: float, t: float):
-
-        # Read n and d so that we can turn latent arrays into
-        # (n, d) arrays, which Jacobians require
         m_tree = rv.mean
         n = len(m_tree)
         d = rv.mean_flat.size // n
 
-        # Materialize the Jacobian
         m0 = rv.mean_flat.T
         fun = func.partial(self.information_operator, tree_flatten=rv.tree_flatten, t=t)
         fx, JVP = func.linearize(fun, m0)
 
-        # Flatten fx and J correctly (from [m, d, n, d] to [md,nd])
         m, d = fx.shape
         fx = fx.reshape((m * d,))
 
-        # Complete the expressions for bias and linop
+        fx = fx - JVP(rv.mean_flat.T)
 
-        fx = JVP(rv.mean_flat.T) - fx
-        # E1 = projection_e1(rv.mean_flat.T)
-
-        # Flatten fx into the correct pytree structure
         f0 = blockdiag.BlockDiagNormal.from_dirac(
-            [m_tree[self.ode.num_tcoeffs_in_args]], damp=damp
+            [m_tree[self.residual.num_tcoeffs_in_args - 1]], damp=damp
         )
         fx = f0.tree_flatten.unflatten_array(fx.T)
 
-        # Collect all quantities and return
         noise = blockdiag.BlockDiagNormal.from_dirac(fx, damp=damp)
 
-        # n_out, d_out, n_in, d_in = E1.shape
-        linop = MatfreeLinopODEConstraint(
-            ode=self.ode, tree_flatten=rv.tree_flatten, t=t, x=m0, damp=damp
+        linop = MatfreeLinopResidualConstraint(
+            residual=self.residual, tree_flatten=rv.tree_flatten, t=t, x=m0, damp=damp
         )
 
         key, jac = state
@@ -332,24 +302,12 @@ class MatfreeOdeTs1(ssm_impl_api.AbstractOde):
 
         return cond, (key, jac)
 
-    # Rewrite the vector field as one that maps
-    # Arrays to arrays.
-    # Maps (n, d) to (1, d) to conform the Jacobian API
     def information_operator(self, s: Array, *, tree_flatten, t) -> Array:
-        # Move to latent space (arg is (n, d) but latent space is (d, n))
         s = s.T
-
-        # Extract all tcoeffs
         jet_coords = tree_flatten.unflatten_array(s)
-
-        # Extract relevant tcoeffs ("jet-coordinates")
-        jet_coords = jet_coords[: self.ode.num_tcoeffs_in_args]
-
-        # Evaluate the actual vector field
-        fs0 = self.ode.vector_field(jet_coords=jet_coords, t=t)
-
-        # Bring back into (m, d) form.
-        return tree.ravel_pytree(fs0)[0][None, :]
+        jet_coords = jet_coords[: self.residual.num_tcoeffs_in_args]
+        r = self.residual.residual_function(jet_coords=jet_coords, t=t)
+        return tree.ravel_pytree(r)[0][None, :]
 
 
 class state_space_model_matfree(ssm_impl_api.StateSpaceModel):
@@ -398,21 +356,19 @@ class state_space_model_matfree(ssm_impl_api.StateSpaceModel):
     def constraint_ode_ts0(self, ode: problems.JetOde, /):
         raise NotImplementedError
 
-    def constraint_ode_ts1(self, ode: problems.JetOde, /):
-        if not isinstance(ode, problems.JetOde):
-            raise TypeError(ode)
-
-        return MatfreeOdeTs1(
-            ode=ode, key=self.key, num_ensembles=self.num_ensembles, bias=self.bias
-        )
-
     def constraint_residual(
         self,
         residual: problems.JetResidual,
         *,
         taylor_point: taylor_points.TaylorPoint | None = None,
-    ):
-        raise NotImplementedError
+    ) -> MatfreeResidual:
+        if not isinstance(residual, problems.JetResidual):
+            raise TypeError(residual)
+        if taylor_point is not None:
+            raise NotImplementedError
+        return MatfreeResidual(
+            residual, key=self.key, num_ensembles=self.num_ensembles, bias=self.bias
+        )
 
 
 def blockdiag_cholesky_from_ensembles(ensembles_smd, bias: bool):
