@@ -11,10 +11,10 @@ authors = [
     {name="Nicholas Krämer", email="pekra@dtu.dk"}
 ]
 description = "Probabilistic numerical solvers for differential equations"
+license = "MIT"
 readme = "README.md"
 requires-python=">=3.11"  # Match JAX's requirements
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.11",
