@@ -79,7 +79,7 @@ def solve_adaptive_save_at(
         ```
     """
     if not solver.is_suitable_for_save_at and warn:
-        msg = f"Strategy {solver} should not be used in solve_adaptive_save_at. "
+        msg = f"Solver {solver} should not be used in solve_adaptive_save_at. "
         warnings.warn(msg, stacklevel=1)
 
     if control is None:

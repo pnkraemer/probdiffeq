@@ -21,7 +21,7 @@ def solve_adaptive_save_every_step(solver, error, control=None, clip_dt=False):
     test-utilities module.
     """
     if not solver.is_suitable_for_save_every_step:
-        msg = f"Strategy {solver} should not be used in solve_adaptive_save_every_step."
+        msg = f"Solver {solver} should not be used in solve_adaptive_save_every_step."
         warnings.warn(msg, stacklevel=1)
 
     if control is None:
