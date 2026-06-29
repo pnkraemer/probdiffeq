@@ -21,9 +21,10 @@ def odeint_and_save_at(vf, y0: tuple, /, save_at, *, atol, rtol):
         vfx = vf(y, t=sign * t)
         return jax.tree_util.tree_map(lambda s: sign * s, vfx)
 
-    return jax.experimental.ode.odeint(
+    sol = jax.experimental.ode.odeint(
         vf_wrapped, *y0, save_at[:: int(sign)], atol=atol, rtol=rtol
     )
+    return jax.tree_util.tree_map(lambda s: s[:: int(sign)], sol)
 
 
 def ivp_lotka_volterra():
