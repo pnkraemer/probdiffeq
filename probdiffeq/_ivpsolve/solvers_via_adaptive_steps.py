@@ -79,7 +79,9 @@ def solve_adaptive_save_at(
         ```
     """
     if not solver.is_suitable_for_save_at and warn:
-        msg = f"Solver {solver} should not be used in solve_adaptive_save_at. "
+        msg = f"Solver {solver} should not be used in solve_adaptive_save_at."
+        msg += " This is typically caused by the wrong strategy selection."
+        msg += " Try using filters or fixed-point smoothers."
         warnings.warn(msg, stacklevel=1)
 
     if control is None:
