@@ -18,7 +18,7 @@ class DenseLatentCond(ssm_impl_api.AbstractLatentCond):
     def apply_flat(self, x, /):
         x = self.to_latent * x
         mean = self.to_observed * (self.A @ x + self.noise.mean_flat)
-        cholesky = self.to_observed[:, None] * self.noise.cholesky_flat
+        cholesky = np.abs(self.to_observed[:, None]) * self.noise.cholesky_flat
         return DenseNormal(mean, cholesky, self.noise.tree_flatten)
 
     def marginalise(self, rv, /):
@@ -29,7 +29,7 @@ class DenseLatentCond(ssm_impl_api.AbstractLatentCond):
         cholesky_new = cholesky_util.sum_of_sqrtm_factors(R_stack=R_stack).T
 
         mean_new = self.to_observed * (self.A @ mean + self.noise.mean_flat)
-        cholesky_new = self.to_observed[:, None] * cholesky_new
+        cholesky_new = np.abs(self.to_observed[:, None]) * cholesky_new
         return DenseNormal(mean_new, cholesky_new, self.noise.tree_flatten)
 
     def merge(self, other: "DenseLatentCond", /) -> "DenseLatentCond":
@@ -39,7 +39,7 @@ class DenseLatentCond(ssm_impl_api.AbstractLatentCond):
         g = self.A @ (T[:, None] * other.A)
         xi = self.A @ (T * other.noise.mean_flat) + self.noise.mean_flat
 
-        R1 = (self.A @ (T[:, None] * other.noise.cholesky_flat)).T
+        R1 = (self.A @ (np.abs(T[:, None]) * other.noise.cholesky_flat)).T
         R2 = self.noise.cholesky_flat.T
         Xi = cholesky_util.sum_of_sqrtm_factors(R_stack=(R1, R2))
 
@@ -50,7 +50,7 @@ class DenseLatentCond(ssm_impl_api.AbstractLatentCond):
 
     def revert(self, rv: "DenseNormal", /, *, solve_triu: Callable):
         mean = self.to_latent * rv.mean_flat
-        cholesky = self.to_latent[:, None] * rv.cholesky_flat
+        cholesky = np.abs(self.to_latent[:, None]) * rv.cholesky_flat
 
         R_X_F = (self.A @ cholesky).T
         R_X = cholesky.T
@@ -72,14 +72,14 @@ class DenseLatentCond(ssm_impl_api.AbstractLatentCond):
         )
 
         mean = self.to_observed * mean_observed
-        cholesky = self.to_observed[:, None] * r_obs.T
+        cholesky = np.abs(self.to_observed[:, None]) * r_obs.T
         observed = DenseNormal(mean, cholesky, self.noise.tree_flatten)
         return observed, cond_new
 
     def preconditioner_apply(self, /):
         A = self.to_observed[:, None] * self.A * self.to_latent[None, :]
         mean = self.to_observed * self.noise.mean_flat
-        cholesky = self.to_observed[:, None] * self.noise.cholesky_flat
+        cholesky = np.abs(self.to_observed[:, None]) * self.noise.cholesky_flat
         noise = DenseNormal(mean, cholesky, self.noise.tree_flatten)
         return DenseLatentCond.from_linop_and_noise(A, noise)
 
@@ -356,7 +356,9 @@ class DenseWienerIntegrated(ssm_impl_api.AbstractPrior):
         p_inv = np.repeat(p_inv, self.d)
 
         # Q contains the base-output scale, so we only multiply with output_scale
-        noise = DenseNormal(self.q0, output_scale * self.Q, self.tree_flatten)
+        noise = DenseNormal(
+            self.q0, np.sqrt(np.abs(dt)) * output_scale * self.Q, self.tree_flatten
+        )
         return DenseLatentCond(self.A, noise, to_latent=p_inv, to_observed=p)
 
     @staticmethod
@@ -412,12 +414,12 @@ class DenseExponential(ssm_impl_api.AbstractPrior):
         p_inv = np.repeat(p_inv, self.d)
 
         A_p = dt * p_inv[:, None] * self.A * p[None, :]
-        B_p = np.sqrt(dt) * p_inv[:, None] * self.B
+        B_p = np.abs(p_inv[:, None]) * self.B
         eA, L = self.exp_gram(A_p, B_p)
 
         # L already contains the output scale information (via B),
         # so we only multiply with the incoming output scale
-        noise = DenseNormal(self.q0, output_scale * L, self.tree_flatten)
+        noise = DenseNormal(self.q0, np.sqrt(dt) * output_scale * L, self.tree_flatten)
 
         return DenseLatentCond(eA, noise, to_latent=p_inv, to_observed=p)
 

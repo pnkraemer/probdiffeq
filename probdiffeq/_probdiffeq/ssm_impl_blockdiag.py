@@ -20,7 +20,7 @@ class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
         def apply_unbatch(s, c):
             s = c.to_latent * s
             m_new = c.to_observed * (c.A @ s + c.noise.mean_flat)
-            c_new = c.to_observed[:, None] * c.noise.cholesky_flat
+            c_new = np.abs(c.to_observed[:, None]) * c.noise.cholesky_flat
             return BlockDiagNormal(m_new, c_new, self.noise.tree_flatten)
 
         return func.vmap(apply_unbatch)(x, self)
@@ -29,7 +29,7 @@ class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
         matrix, noise = self.A, self.noise
         assert matrix.ndim == 3
         mean = self.to_latent * rv.mean_flat
-        cholesky = self.to_latent[:, :, None] * rv.cholesky_flat
+        cholesky = np.abs(self.to_latent[:, :, None]) * rv.cholesky_flat
 
         mean_marg = np.einsum("ijk,ik->ij", matrix, mean) + noise.mean_flat
 
@@ -39,7 +39,7 @@ class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
         cholesky = func.vmap(cholesky_util.sum_of_sqrtm_factors)(R_stack)
 
         mean_new = self.to_observed * mean_marg
-        cholesky_new = self.to_observed[:, :, None] * _transpose(cholesky)
+        cholesky_new = np.abs(self.to_observed[:, :, None]) * _transpose(cholesky)
         return BlockDiagNormal(mean_new, cholesky_new, self.noise.tree_flatten)
 
     def merge(self, other: "BlockDiagLatentCond", /) -> "BlockDiagLatentCond":
@@ -52,7 +52,10 @@ class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
         m1, m2 = T * other.noise.mean_flat, self.noise.mean_flat
         xi = func.vmap(lambda a, b, c: a @ b + c)(A1, m1, m2)
 
-        C1, C2 = self.noise.cholesky_flat, T[:, :, None] * other.noise.cholesky_flat
+        C1, C2 = (
+            self.noise.cholesky_flat,
+            np.abs(T[:, :, None]) * other.noise.cholesky_flat,
+        )
         R1 = _transpose(func.vmap(lambda a, b: a @ b)(A1, C2))
         R2 = _transpose(C1)
         Xi = func.vmap(cholesky_util.sum_of_sqrtm_factors)((R1, R2))
@@ -65,7 +68,7 @@ class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
 
     def revert(self, rv, /, *, solve_triu):
         mean = self.to_latent * rv.mean_flat
-        cholesky = self.to_latent[:, :, None] * rv.cholesky_flat
+        cholesky = np.abs(self.to_latent[:, :, None]) * rv.cholesky_flat
 
         rv_chol_upper = _transpose(cholesky)
         noise_chol_upper = _transpose(self.noise.cholesky_flat)
@@ -92,7 +95,7 @@ class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
         )
 
         mean_observed = self.to_observed * mean_observed
-        cholesky_observed = self.to_observed[:, :, None] * cholesky_obs
+        cholesky_observed = np.abs(self.to_observed[:, :, None]) * cholesky_obs
         observed = BlockDiagNormal(
             mean_observed, cholesky_observed, self.noise.tree_flatten
         )
@@ -101,7 +104,7 @@ class BlockDiagLatentCond(ssm_impl_api.AbstractLatentCond):
     def preconditioner_apply(self, /):
         A = self.to_observed[:, :, None] * self.A * self.to_latent[:, None, :]
         mean = self.to_observed * self.noise.mean_flat
-        cholesky = self.to_observed[:, :, None] * self.noise.cholesky_flat
+        cholesky = np.abs(self.to_observed[:, :, None]) * self.noise.cholesky_flat
         noise = BlockDiagNormal(mean, cholesky, self.noise.tree_flatten)
         to_observed = np.ones_like(self.to_observed)
         to_latent = np.ones_like(self.to_latent)
@@ -402,7 +405,9 @@ class BlockDiagWienerIntegrated(ssm_impl_api.AbstractPrior):
         (d,) = output_scale.shape
 
         mean = np.ones((d, 1)) * self.q0[None, :]
-        cholesky = output_scale[:, None, None] * self.q_sqrtm[None, :, :]
+        cholesky = (
+            np.sqrt(np.abs(dt)) * output_scale[:, None, None] * self.q_sqrtm[None, :, :]
+        )
         noise = BlockDiagNormal(mean, cholesky, self.tree_flatten)
 
         A_batch = np.ones((d, 1, 1)) * self.a[None, :, :]
