@@ -90,6 +90,14 @@ class ProbabilisticSolver:
         self.constraint = constraint
         self.constraint_init = constraint_init
 
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}("
+            f"strategy={self.strategy!r}, "
+            f"constraint={self.constraint!r}, "
+            f"constraint_init={self.constraint_init!r})"
+        )
+
     @property
     def is_suitable_for_offgrid_marginals(self):
         """Whether the solver admits offgrid-marginal calculation.
@@ -319,6 +327,15 @@ class solver_mle(ProbabilisticSolver):
         )
         self.correct_asymptotic_underconfidence = correct_asymptotic_underconfidence
 
+    def __repr__(self) -> str:
+        return (
+            f"solver_mle("
+            f"strategy={self.strategy!r}, "
+            f"constraint={self.constraint!r}, "
+            f"constraint_init={self.constraint_init!r}, "
+            f"correct_asymptotic_underconfidence={self.correct_asymptotic_underconfidence!r})"
+        )
+
     def init(self, t, u: ssm_impl_api.AbstractPrior, *, damp) -> ProbabilisticSolution:
         prior = u
         u_pred, prediction = self.strategy.init_posterior(u=u.init)
@@ -470,6 +487,16 @@ class solver_dynamic(ProbabilisticSolver):
         )
         self.re_linearize_after_calibration = re_linearize_after_calibration
         self.stop_gradient_through_calibration = stop_gradient_through_calibration
+
+    def __repr__(self) -> str:
+        return (
+            f"solver_dynamic("
+            f"strategy={self.strategy!r}, "
+            f"constraint={self.constraint!r}, "
+            f"constraint_init={self.constraint_init!r}, "
+            f"re_linearize_after_calibration={self.re_linearize_after_calibration!r}, "
+            f"stop_gradient_through_calibration={self.stop_gradient_through_calibration!r})"
+        )
 
     def init(self, t, u: ssm_impl_api.AbstractPrior, *, damp) -> ProbabilisticSolution:
         prior = u
