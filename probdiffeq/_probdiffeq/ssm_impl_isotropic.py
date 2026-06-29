@@ -364,7 +364,7 @@ class IsotropicWienerIntegrated(ssm_impl_api.AbstractPrior):
             msg += f" Received: {output_scale.shape}."
             raise ValueError(msg)
 
-        scale = self.output_scale * output_scale
+        scale = np.sqrt(np.abs(dt)) * self.output_scale * output_scale
         noise = IsotropicNormal(self.q0, scale * self.q_sqrtm, self.tree_flatten)
         p, p_inv = self.precon_fun(dt)
         return IsotropicLatentCond(self.A, noise, to_latent=p_inv, to_observed=p)

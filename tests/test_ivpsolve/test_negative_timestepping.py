@@ -13,6 +13,7 @@ def test_time_reversal_matches_modified_problem():
     tcoeffs, _ = jetexpand(vf, [u0], t=t0)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
     save_at = np.linspace(t0, t1, num=20, endpoint=True)
+    save_at = save_at[::-1]
 
     # Build the rest of the solver (dense reference, high precision)
     ssm_dense = probdiffeq.state_space_model_dense()
@@ -24,7 +25,6 @@ def test_time_reversal_matches_modified_problem():
     received = solve(prior, save_at=save_at, atol=1e-8, rtol=1e-8)
 
     # Compute a reference solution
-    save_at = save_at[::-1]
     expected = ode.odeint_and_save_at(vf, (u0,), save_at=save_at, atol=1e-7, rtol=1e-7)
 
     print(received.u.mean[0]["U"].prey)

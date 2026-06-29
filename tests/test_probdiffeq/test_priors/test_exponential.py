@@ -82,7 +82,8 @@ def test_exponential_raises_error_if_vf_linear_is_bad(ssm_factory):
 
 @testing.parametrize("ode_shape", [(), (3,), (3, 3)])
 @testing.parametrize("ssm_factory", [probdiffeq.state_space_model_dense])
-def test_exponential_transition_as_expected(ode_shape, ssm_factory):
+@testing.parametrize("sign", [1, -1])
+def test_exponential_transition_as_expected(ode_shape, ssm_factory, sign):
     """Follow Proposition 1 in https://arxiv.org/abs/2305.14978."""
     ssm = ssm_factory()
     u = np.ones(ode_shape)
@@ -97,7 +98,7 @@ def test_exponential_transition_as_expected(ode_shape, ssm_factory):
 
     exponential = ssm.prior_exponential(vf_linear, tcoeffs)
 
-    dt = 0.123456
+    dt = sign * 0.123456
     output_scale = 1.0
     cond = func.jit(exponential.transition)(dt=dt, output_scale=output_scale)
     cond = cond.preconditioner_apply()
