@@ -392,6 +392,8 @@ class BlockDiagWienerIntegrated(ssm_impl_api.AbstractPrior):
     def transition(self, *, dt: float, output_scale: Array) -> BlockDiagLatentCond:
         p, p_inv = self.precon_fun(dt)
 
+        # TODO: for scalar models, the base-output-scale should be a scalar?!
+        #       In other words, the output scale shape should be identical to the leaf shape?
         output_scale = np.asarray(output_scale)
         if output_scale.shape != self.output_scale.shape:
             msg = "The output-scale has the wrong shape."

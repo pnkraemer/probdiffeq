@@ -419,7 +419,9 @@ class DenseExponential(ssm_impl_api.AbstractPrior):
 
         # L already contains the output scale information (via B),
         # so we only multiply with the incoming output scale
-        noise = DenseNormal(self.q0, np.sqrt(dt) * output_scale * L, self.tree_flatten)
+        noise = DenseNormal(
+            self.q0, np.sqrt(np.abs(dt)) * output_scale * L, self.tree_flatten
+        )
 
         return DenseLatentCond(eA, noise, to_latent=p_inv, to_observed=p)
 
