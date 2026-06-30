@@ -305,6 +305,9 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
         return -0.5 * (logdet_term + maha_term + u.size * np.log(np.pi() * 2))
 
     def to_multivariate_normal(self):
+        if self.mean_flat.ndim > 2:
+            return func.vmap(BlockDiagNormal.to_multivariate_normal)(self)
+
         mean = np.reshape(self.mean_flat.T, (-1,))
 
         *_, d, n = self.mean_flat.shape

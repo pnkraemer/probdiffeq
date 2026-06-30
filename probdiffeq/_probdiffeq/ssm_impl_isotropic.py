@@ -236,6 +236,9 @@ class IsotropicNormal(ssm_impl_api.AbstractTreeNormal[IsotropicTreeFlatten]):
         return -0.5 * (logdet_term + maha_term + u.size * np.log(np.pi() * 2))
 
     def to_multivariate_normal(self):
+        if self.mean_flat.ndim > 2:
+            return func.vmap(IsotropicNormal.to_multivariate_normal)(self)
+
         _n, d = self.mean_flat.shape
         eye_d = np.eye(d)
 
