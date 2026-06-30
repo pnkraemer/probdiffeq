@@ -439,6 +439,78 @@ class StateSpaceModel(abc.ABC):
             output_scale=output_scale,
         )
 
+    def prior_matern(
+        self,
+        length_scale: float,
+        tcoeffs: C,
+        /,
+        *,
+        is_exact: C | bool = True,
+        inexact_eps: float = 1e-6,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
+    ) -> AbstractPrior:
+        """Construct an integrated Ornstein-Uhlenbeck prior."""
+
+        def autonomous(*, jet_coords):
+            D = len(jet_coords)
+            z = np.sqrt(2 * (D - 0.5)) / length_scale
+            scaled = [
+                np.comb(D, i) * z ** (D - i) * d for i, d in enumerate(jet_coords)
+            ]
+            return -sum(scaled)
+
+        ode: problems.JetOdeAutonomous = problems.JetOdeAutonomous(
+            autonomous,
+            jacobian=jacobians.jacobian_monte_carlo_fwd(),
+            num_tcoeffs_in_args=len(tcoeffs),
+        )
+        return self.prior_exponential(
+            ode,
+            tcoeffs,
+            is_exact=is_exact,
+            inexact_eps=inexact_eps,
+            diffuse_derivatives=diffuse_derivatives,
+            diffuse_eps=diffuse_eps,
+            output_scale=output_scale,
+        )
+
+    def prior_matern_diffuse(
+        self,
+        length_scale: float,
+        tcoeffs_mean: C,
+        tcoeffs_std: C,
+        /,
+        *,
+        diffuse_derivatives: int = 0,
+        diffuse_eps: float = 1.0,
+        output_scale: Array | None = None,
+    ) -> AbstractPrior:
+        """Construct a diffuse integrated Ornstein-Uhlenbeck prior."""
+
+        def autonomous(*, jet_coords):
+            D = len(jet_coords)
+            z = np.sqrt(2 * (D - 0.5)) / length_scale
+            scaled = [
+                np.comb(D, i) * z ** (D - i) * d for i, d in enumerate(jet_coords)
+            ]
+            return -sum(scaled)
+
+        ode: problems.JetOdeAutonomous = problems.JetOdeAutonomous(
+            autonomous,
+            jacobian=jacobians.jacobian_monte_carlo_fwd(),
+            num_tcoeffs_in_args=len(tcoeffs_mean),
+        )
+        return self.prior_exponential_diffuse(
+            ode,
+            tcoeffs_mean,
+            tcoeffs_std,
+            diffuse_derivatives=diffuse_derivatives,
+            diffuse_eps=diffuse_eps,
+            output_scale=output_scale,
+        )
+
     # --- Linearization constructors ---
 
     @abc.abstractmethod
