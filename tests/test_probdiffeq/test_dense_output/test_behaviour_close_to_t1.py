@@ -73,7 +73,6 @@ def test_something(ssm, strategy, solver_factory, tol, num) -> None:
     solve = test_util.solve_adaptive_save_every_step(error=error, solver=solver)
     solution_every = solve(iwp, atol=tol, rtol=tol, t0=t0, t1=t1)
 
-    print("Now the test...")
     # Generate a save-at solver
     solver = solver_factory(strategy=strategy.save_at, constraint=ts0)
     solve = func.jit(ivpsolve.solve_adaptive_save_at(error=error, solver=solver))

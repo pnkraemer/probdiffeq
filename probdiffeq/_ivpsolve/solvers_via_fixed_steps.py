@@ -20,8 +20,10 @@ def solve_fixed_grid(
 
         t0 = grid[0]
         state0 = solver.init(t=t0, u=u, damp=damp)
-        _, result = flow.scan(body_fn, init=state0, xs=np.diff(grid))
+        s_new, result = flow.scan(body_fn, init=state0, xs=np.diff(grid))
 
-        return solver.userfriendly_output(solution0=state0, solution=result)
+        return solver.userfriendly_output(
+            solution0=state0, solution=result, solution1=s_new
+        )
 
     return solve

@@ -1,7 +1,7 @@
 """Solvers."""
 
 from probdiffeq._probdiffeq import estimators_and_losses, ssm_impl_api, utilities
-from probdiffeq.backend import func, linalg, np, structs, tree
+from probdiffeq.backend import abc, func, linalg, np, structs, tree
 from probdiffeq.backend.typing import Any, Array, Callable, Generic, TypeVar
 
 __all__ = [
@@ -69,7 +69,7 @@ class ProbabilisticSolution(Generic[N, T]):
     prior: ssm_impl_api.AbstractPrior
 
 
-class ProbabilisticSolver:
+class ProbabilisticSolver(abc.ABC):
     """An interface for probabilistic differential equation solvers.
 
     Related:
@@ -122,14 +122,17 @@ class ProbabilisticSolver:
         """
         return self.strategy.is_suitable_for_save_every_step
 
+    @abc.abstractmethod
     def init(self, t, init, *, damp: float) -> ProbabilisticSolution:
         """Initialize the probabilistic solution."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def step(self, state: ProbabilisticSolution, *, dt: float, damp: float):
         """Perform a step."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def userfriendly_output(
         self,
         *,

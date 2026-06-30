@@ -1,7 +1,7 @@
 """Estimation strategies and loss functions."""
 
 from probdiffeq._probdiffeq import ssm_impl_api, utilities
-from probdiffeq.backend import flow, func, linalg, np, random, structs, tree
+from probdiffeq.backend import abc, flow, func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Callable, Generic, Sequence, TypeVar
 
 __all__ = [
@@ -271,7 +271,7 @@ T = TypeVar("T", bound=MarkovSequence | ssm_impl_api.AbstractTreeNormal)
 """A type-variable to describe posterior distributions."""
 
 
-class MarkovStrategy(Generic[T]):
+class MarkovStrategy(abc.ABC, Generic[T]):
     """An interface for estimation strategies in Markovian state-space models.
 
     Related:
@@ -290,18 +290,22 @@ class MarkovStrategy(Generic[T]):
         self.is_suitable_for_save_every_step = is_suitable_for_save_every_step
         self.is_suitable_for_offgrid_marginals = is_suitable_for_offgrid_marginals
 
+    @abc.abstractmethod
     def init_posterior(self, *, u) -> T:
         """Initialize a posterior distribution."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def predict(self, posterior: T, *, transition) -> tuple:
         """Make a prediction."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def apply_updates(self, prediction: T, *, updates) -> tuple:
         """Apply updates to a prediction."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def interpolate_fwd(
         self, *, posterior_t0: T, posterior_t1: T, transition_t0_t, transition_t_t1
     ) -> tuple[tuple, utilities.InterpResult[T]]:
@@ -314,12 +318,14 @@ class MarkovStrategy(Generic[T]):
         """Interpolate between two points."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def interpolate_fwd_at_t1(
         self, *, posterior_t1: T
     ) -> tuple[tuple, utilities.InterpResult[T]]:
         """Interpolate at a checkpoint."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def finalize(self, *, posterior0: T, posterior: T, output_scale) -> T:
         """Finalize the posterior before returning a solution."""
         raise NotImplementedError
@@ -378,7 +384,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         assert output_scale.shape == expected.shape
         posterior0 = posterior0.rescale_cholesky(output_scale)
         posterior = posterior.rescale_cholesky(output_scale)
-        posterio1 = posterior1.rescale_cholesky(output_scale)
+        posterior1 = posterior1.rescale_cholesky(output_scale)
 
         # Compute the RV at time t=t1 from posterior1 (think: "overstepped state")
         rv_at_t1 = posterior1.conditional.marginalise(posterior1.marginal)
@@ -674,6 +680,9 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         posterior = posterior.rescale_cholesky(output_scale)
         posterior1 = posterior1.rescale_cholesky(output_scale)
 
+        assert False, (
+            "Create a SmoothingSolution type which holds a markov sequence and the filtering solutions?"
+        )
         # Compute the RV at time t=t1 from posterior1 (think: "overstepped state")
         rv_at_t1 = posterior1.conditional.marginalise(posterior1.marginal)
 
@@ -800,51 +809,6 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         # Marginalise from t1 to t to obtain the interpolated solution.
         conditional_t1_to_t = extrapolated_t1.conditional
         rv_at_t = extrapolated_t.marginal
-
-        # Return the right combination of marginals and conditionals.
-        interpolated = MarkovSequence(
-            rv_at_t, extrapolated_t.conditional, reverse=extrapolated_t.reverse
-        )
-        step_from = MarkovSequence(
-            posterior_t1.marginal,
-            conditional=conditional_t1_to_t,
-            reverse=posterior_t1.reverse,
-        )
-        interp_res = utilities.InterpResult(
-            step_from=step_from, interp_from=previous_new
-        )
-
-        marginals = interpolated.marginal
-        return (marginals, interpolated), interp_res
-
-    def interpolate_offgrid_marginals(
-        self,
-        *,
-        posterior_t0: MarkovSequence,
-        posterior_t1: MarkovSequence,
-        transition_t0_t,
-        transition_t_t1,
-    ):
-        # Note to myself: Don't attempt to remove any of them.
-        # They're all important. You will break the code (again) :).
-
-        # Extrapolate from t0 to t, and from t to t1.
-        # This yields all building blocks.
-        _, extrapolated_t = self.predict(
-            posterior=posterior_t0, transition=transition_t0_t
-        )
-        conditional_id = posterior_t0.marginal.identity_conditional()
-        previous_new = MarkovSequence(
-            extrapolated_t.marginal, conditional_id, reverse=extrapolated_t.reverse
-        )
-        _, extrapolated_t1 = self.predict(
-            posterior=previous_new, transition=transition_t_t1
-        )
-
-        # Marginalise from t1 to t to obtain the interpolated solution.
-        marginal_t1 = posterior_t1.marginal
-        conditional_t1_to_t = extrapolated_t1.conditional
-        rv_at_t = conditional_t1_to_t.marginalise(marginal_t1)
 
         # Return the right combination of marginals and conditionals.
         interpolated = MarkovSequence(

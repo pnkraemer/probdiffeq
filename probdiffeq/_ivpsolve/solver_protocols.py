@@ -49,5 +49,5 @@ class Solver(Protocol, Generic[T_contra, S]):
     def is_suitable_for_save_at(self) -> bool:
         """Whether or not the solver can be used with adaptive time-stepping."""
 
-    def userfriendly_output(self, *, solution: S, solution0: S) -> S:
+    def userfriendly_output(self, *, solution1: S, solution: S, solution0: S) -> S:
         """Postprocess the solution before returning."""
