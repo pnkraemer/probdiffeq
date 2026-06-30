@@ -49,7 +49,7 @@ def main():
 
     # Solve the ODE.
 
-    ts = jnp.linspace(t0, t1, endpoint=True, num=250)
+    ts = jnp.linspace(t0, t1, endpoint=True, num=500)
     sol = jax.jit(solve)(iwp, save_at=ts, dt0=0.1, atol=1e-1, rtol=1e-1)
 
     # Plot the solution.
@@ -62,10 +62,13 @@ def main():
         figsize=(len(sol.u.mean) * 3, 5),
     )
     titles = ["Position", "Velocity", "Acceleration"]
-    for u, label in zip(
-        [sol.u, sol.solution_full.marginal],
-        ["Solution (smoothed)", "Fwd pass (filtered)"],
-    ):
+
+    content = {
+        "Solution (smoothed)": sol.u,
+        "Fwd. pass (filtered)": sol.solution_full.filtering,
+    }
+
+    for label, u in content.items():
         for i, (u_i, std_i, ax_i, title_i) in enumerate(
             zip(u.mean, u.std, axes.T, titles)
         ):

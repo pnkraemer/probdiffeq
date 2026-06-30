@@ -35,8 +35,8 @@ def test_filter_marginals_accessible_in_smoother(ssm) -> None:
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
     solution_smoother = func.jit(solve)(iwp, atol=1e-1, rtol=1e-1, save_at=ts)
 
-    (m1, C1) = solution_filter.u.to_multivariate_normal()
-    (m2, C2) = solution_smoother.solution_full.marginal.to_multivariate_normal()
+    (m1, C1) = solution_filter.solution_full.to_multivariate_normal()
+    (m2, C2) = solution_smoother.solution_full.filtering.to_multivariate_normal()
 
     assert testing.allclose(m1, m2)
     assert testing.allclose(C1, C2)
