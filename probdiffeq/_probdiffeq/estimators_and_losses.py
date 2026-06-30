@@ -708,9 +708,10 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         )
 
         # Marginalise from t1 to t to obtain the interpolated solution.
-        marginal_t1 = posterior_t1.marginal
-        conditional_t1_to_t = extrapolated_t1.conditional
-        rv_at_t = conditional_t1_to_t.marginalise(marginal_t1)
+        # marginal_t1 = posterior_t1.marginal
+        # conditional_t1_to_t = extrapolated_t1.conditional
+        # rv_at_t = conditional_t1_to_t.marginalise(marginal_t1)
+        rv_at_t = extrapolated_t.marginal
 
         # Return the right combination of marginals and conditionals.
         interpolated = MarkovSequence(
