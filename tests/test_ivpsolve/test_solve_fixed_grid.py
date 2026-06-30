@@ -52,3 +52,18 @@ def test_fixed_grid_result_matches_adaptive_grid_result_when_reusing_grid(
     _, u_shape = tree.tree_flatten_depth_one(solution_fixed.u.mean)
     _, u_std_shape = tree.tree_flatten_depth_one(solution_fixed.u.std)
     assert u_shape == u_std_shape
+
+
+def test_fixed_grid_raises_warning_for_fixedpoint_smoother() -> None:
+    """Assert that fixed-point smoothers are discouraged by fixed-step solvers."""
+    vf, _u0, _ = ode.ivp_lotka_volterra()
+
+    vf = probdiffeq.ode(vf)
+
+    ssm = probdiffeq.state_space_model_isotropic()
+    ts0 = ssm.constraint_ode_ts0(vf)
+
+    strategy = probdiffeq.strategy_smoother_fixedpoint()
+    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
+    with testing.warns(match="fixedpoint"):
+        _ = ivpsolve.solve_fixed_grid(solver=solver)
