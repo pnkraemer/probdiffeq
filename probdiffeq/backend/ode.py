@@ -8,13 +8,23 @@ import jax.numpy as jnp
 
 
 def odeint_and_save_at(vf, y0: tuple, /, save_at, *, atol, rtol):
-    assert isinstance(y0, tuple | list)
+    assert isinstance(y0, (tuple, list))
     assert len(y0) == 1
 
-    def vf_wrapped(y, t):
-        return vf(y, t=t)
+    save_at = jnp.asarray(save_at)
 
-    return jax.experimental.ode.odeint(vf_wrapped, *y0, save_at, atol=atol, rtol=rtol)
+    sign = jnp.sign(jnp.diff(save_at[:2])[0])  # +1 forward, -1 reversed
+
+    def vf_wrapped(y, t):
+        # forward (sign=+1): s = t,  returns vf(y, t=s)
+        # reversed (sign=-1): s = -t, returns -vf(y, t=-s)
+        vfx = vf(y, t=sign * t)
+        return jax.tree_util.tree_map(lambda s: sign * s, vfx)
+
+    sol = jax.experimental.ode.odeint(
+        vf_wrapped, *y0, save_at[:: int(sign)], atol=atol, rtol=rtol
+    )
+    return jax.tree_util.tree_map(lambda s: s[:: int(sign)], sol)
 
 
 def ivp_lotka_volterra():

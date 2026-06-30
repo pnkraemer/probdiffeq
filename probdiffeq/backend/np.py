@@ -2,6 +2,7 @@
 
 import jax.lax
 import jax.numpy as jnp
+import jax.scipy.special
 
 
 def factorial(n, /):
@@ -258,3 +259,8 @@ def mean(arr, /, axis=None, keepdims=False):
 
 def std(arr, /, *, axis=None, ddof=0):
     return jnp.std(arr, ddof=ddof, axis=axis)
+
+
+def comb(N, k):
+    # N choose k
+    return jax.scipy.special.comb(N, k)

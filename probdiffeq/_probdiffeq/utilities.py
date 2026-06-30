@@ -113,12 +113,10 @@ def preconditioner_taylor(num_derivatives):
     with jax.ensure_compile_time_eval():
         powers = np.arange(num_derivatives, -1.0, step=-1.0)
         scales = np.factorial(powers)
-        powers = powers + 0.5
 
     def precon(dt):
-        dt_abs = np.abs(dt)
-        scaling_vector = np.power(dt_abs, powers) / scales
-        scaling_vector_inv = np.power(dt_abs, -powers) * scales
+        scaling_vector = np.power(dt, powers) / scales
+        scaling_vector_inv = np.power(dt, -powers) * scales
         return scaling_vector, scaling_vector_inv
 
     return precon
