@@ -8,6 +8,7 @@ __all__ = [
     "MarkovSequence",
     "MarkovStrategy",
     "Smoother",
+    "SmoothingSolution",
     "loss_lml_terminal_values",
     "loss_lml_timeseries",
     "strategy_filter",
@@ -54,7 +55,7 @@ def loss_lml_timeseries(
 ):
     """Construct a log-marginal-likelihood loss for a time-series."""
 
-    def loss(u, /, *, posterior, std):
+    def loss(u, /, *, posterior: MarkovSequence, std):
         if not isinstance(posterior, MarkovSequence):
             msg = "The datatype of the posterior is not as expected."
             msg += f" Expected: {MarkovSequence}."
@@ -64,8 +65,11 @@ def loss_lml_timeseries(
             raise TypeError(msg)
 
         u = tree.tree_map(np.asarray, u)
+        N, *_ = np.shape(tree.tree_leaves(u)[0])
         std = tree.tree_map(np.asarray, std)
-        std_expected = posterior.marginal.std[tcoeff_index]
+        std_expected = tree.tree_map(
+            lambda s: np.stack([s] * N), posterior.marginal.std[tcoeff_index]
+        )
 
         msg = "The standard deviation container differs from what was expected."
         msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
