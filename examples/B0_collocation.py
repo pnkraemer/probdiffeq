@@ -55,7 +55,7 @@ def main():
     error = probdiffeq.error_residual_std(constraint=ts1)
     solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
     sol = solve(iwp, save_at=ts, atol=1e-1, rtol=1e-1)
-    mseq_posterior = sol.solution_full
+    mseq_posterior = sol.solution_full.posterior
 
     # Compute samples.
 

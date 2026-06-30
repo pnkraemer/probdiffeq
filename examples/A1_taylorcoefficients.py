@@ -67,7 +67,7 @@ def main():
     # For example, the standard deviation or samples from the solution object:
 
     key = jax.random.PRNGKey(seed=15)
-    posterior = solution.solution_full
+    posterior = solution.solution_full.posterior
     sample_one = posterior.sample(key)
     sample_many = posterior.sample(key, shape=(1, 2, 3))
 
