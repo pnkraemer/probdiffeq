@@ -47,7 +47,7 @@ def test_lml_is_scalar_and_finite(solution) -> None:
     """Assert that the timeseries LML is a finite scalar."""
     sol, loss, data, std = solution
 
-    lml = func.jit(loss)(data, posterior=sol.solution_full, std=std)
+    lml = func.jit(loss)(data, posterior=sol.solution_full.posterior, std=std)
 
     assert lml.shape == ()
     assert not np.isnan(lml)
@@ -63,7 +63,7 @@ def test_that_function_raises_error_for_wrong_number_of_timesteps(solution) -> N
     std = tree.tree_map(lambda s: s[:-1], std)
 
     with testing.raises(ValueError, match="container differs"):
-        _ = loss(data, posterior=sol.solution_full, std=std)
+        _ = loss(data, posterior=sol.solution_full.posterior, std=std)
 
 
 def test_raises_error_if_terminal_values_were_intended(solution) -> None:

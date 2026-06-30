@@ -6,7 +6,7 @@ After applying stats.calibrate(), the posterior is different.
 """
 
 from probdiffeq import ivpsolve, probdiffeq
-from probdiffeq.backend import func, np, ode, testing
+from probdiffeq.backend import func, linalg, np, ode, testing, tree
 
 
 @testing.case()
@@ -59,7 +59,7 @@ def case_simulate_terminal_values(ssm_factory):
     dt0 = ivpsolve.dt0(vf, u0, t=t0)
 
     ssm = ssm_factory()
-    iwp = ssm.prior_wiener_integrated(tcoeffs)
+    iwp = ssm.prior_wiener_integrated(tcoeffs, is_exact=False)
     ts0 = ssm.constraint_ode_ts0(vf)
 
     def solver_to_solution(solver_fun, strategy_fun):
@@ -98,7 +98,11 @@ def test_calibration_changes_the_posterior(uncalibrated_and_mle_solution) -> Non
 
     # Assert the means are identical, but the stds & scales are not.
     assert not testing.allclose(uncalibrated.output_scale, mle.output_scale)
-    assert not testing.allclose(uncalibrated.u.std, mle.u.std)
+
+    # If the std is zero, then scaling with sigma has no effect
+    # This is e.g. the case for fixed-point smoothers in fixed steps.
+    if linalg.vector_norm(tree.ravel_pytree(uncalibrated.u.std)[0]) > 0:
+        assert not testing.allclose(uncalibrated.u.std, mle.u.std)
 
     # For some solvers, the means are not exactly identical but the differences
     # are small (and vanish for double precision). No idea why. But everything else

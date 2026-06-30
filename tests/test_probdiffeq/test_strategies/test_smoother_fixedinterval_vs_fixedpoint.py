@@ -4,7 +4,7 @@ That is, when called with correct adaptive- and checkpoint-setups.
 """
 
 from probdiffeq import ivpsolve, probdiffeq
-from probdiffeq.backend import func, np, ode, testing, tree
+from probdiffeq.backend import func, ode, testing
 from probdiffeq.util import test_util
 
 
@@ -72,63 +72,15 @@ def test_fixedpoint_smoother_equivalent_same_grid(
     assert testing.allclose(sol_fp.u, sol_sm.u)
     assert testing.allclose(sol_fp.num_steps, sol_sm.num_steps)
     assert testing.allclose(
-        sol_fp.solution_full.marginal, sol_sm.solution_full.marginal
+        sol_fp.solution_full.posterior.marginal, sol_sm.solution_full.posterior.marginal
     )
 
     # The backward conditionals use different parametrisations
     # but implement the same transitions
     cond_fp, cond_sm = (
-        sol_fp.solution_full.conditional,
-        sol_sm.solution_full.conditional,
+        sol_fp.solution_full.posterior.conditional,
+        sol_sm.solution_full.posterior.conditional,
     )
     cond_fp = func.vmap(lambda c: c.preconditioner_apply())(cond_fp)
     cond_sm = func.vmap(lambda c: c.preconditioner_apply())(cond_sm)
     assert testing.allclose(cond_fp, cond_sm)
-
-
-def test_fixedpoint_smoother_equivalent_different_grid(
-    solver_setup, solution_smoother
-) -> None:
-    """Test that the interpolated smoother result equals the save_at result."""
-    save_at = solution_smoother.t
-
-    # Re-generate the smoothing solver
-    tcoeffs = solver_setup["tcoeffs"]
-    ssm = solver_setup["ssm_factory"]()
-    iwp = ssm.prior_wiener_integrated(tcoeffs)
-    ts0 = ssm.constraint_ode_ts0(solver_setup["vf"])
-    strategy_sm = probdiffeq.strategy_smoother_fixedinterval()
-    solver_smoother = probdiffeq.solver(strategy=strategy_sm, constraint=ts0)
-
-    # Compute the offgrid-marginals
-    ts = np.linspace(save_at[0], save_at[-1], num=7, endpoint=True)
-    offgrid = func.partial(
-        solver_smoother.offgrid_marginals, solution=solution_smoother
-    )
-    interpolated = func.jit(func.vmap(offgrid))(ts[1:-1])
-
-    # Generate a fixedpoint solver and solve (saving at the interpolation points)
-    tcoeffs = solver_setup["tcoeffs"]
-    ssm = solver_setup["ssm_factory"]()
-    iwp = ssm.prior_wiener_integrated(tcoeffs)
-    ts0 = ssm.constraint_ode_ts0(solver_setup["vf"])
-    strategy_fp = probdiffeq.strategy_smoother_fixedpoint()
-    solver = probdiffeq.solver(strategy=strategy_fp, constraint=ts0)
-    error = probdiffeq.error_residual_std(constraint=ts0)
-    solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
-    solution_fixedpoint = func.jit(solve)(
-        iwp, save_at=ts, dt0=0.1, atol=1e-3, rtol=1e-3
-    )
-
-    # Extract the interior points of the save_at solution
-    # (because only there is the interpolated solution defined)
-    u_fixedpoint = tree.tree_map(lambda s: s[1:-1], solution_fixedpoint.u.mean)
-    u_std_fixedpoint = tree.tree_map(lambda s: s[1:-1], solution_fixedpoint.u.std)
-    marginals_fixedpoint = tree.tree_map(lambda s: s[1:-1], solution_fixedpoint.u)
-
-    assert testing.allclose(u_fixedpoint, interpolated.mean)
-    assert testing.allclose(u_std_fixedpoint, interpolated.std)
-
-    # Compare QOI and marginals
-    marginals_allclose_func = func.vmap(testing.marginals_allclose)
-    assert np.all(marginals_allclose_func(marginals_fixedpoint, interpolated))

@@ -136,12 +136,14 @@ def solve_adaptive_save_at(
         # Advance to one checkpoint after the other
         init = (solution0, state)
         xs = save_at[1:]
-        (_solution, _state), solution = flow.scan(
+        (_solution, state), solution = flow.scan(
             advance, init=init, xs=xs, reverse=False
         )
 
         # Stack the initial value into the solution and return
-        return solver.userfriendly_output(solution0=solution0, solution=solution)
+        return solver.userfriendly_output(
+            solution0=solution0, solution=solution, solution1=state.step_from
+        )
 
     return solve
 
@@ -344,7 +346,7 @@ class RejectionLoop:
     def interp_beyond_t1(self, args):
         """If we stepped cleanly over t1, interpolate."""
         state, t1 = args
-        solution, interp_res = self.solver.interpolate(
+        solution, interp_res = self.solver.interpolate_fwd(
             t=t1, interp_from=state.interp_from, interp_to=state.step_from
         )
 
@@ -360,7 +362,7 @@ class RejectionLoop:
     def interp_at_t1(self, args):
         """If we stepped exactly to t1, still interpolate."""
         state, t1 = args
-        solution, interp_res = self.solver.interpolate_at_t1(
+        solution, interp_res = self.solver.interpolate_fwd_at_t1(
             t=t1, interp_from=state.interp_from, interp_to=state.step_from
         )
         new_state = TimeStepState(

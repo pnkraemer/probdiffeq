@@ -171,7 +171,7 @@ def loss_data_fit(solve, *, inputs, labels):
         loss_lml = probdiffeq.loss_lml_timeseries()
         sol = solve(y0, save_at=inputs, output_scale=output_scale)
 
-        lml = loss_lml(labels, std=std_ts, posterior=sol.solution_full)
+        lml = loss_lml(labels, std=std_ts, posterior=sol.solution_full.posterior)
         return -lml, sol
 
     return loss
