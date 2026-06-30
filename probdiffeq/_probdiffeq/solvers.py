@@ -153,6 +153,9 @@ class ProbabilisticSolver:
             with the interval boundaries.
             At the moment, we do not check this.
         """
+        if not self.is_suitable_for_offgrid_marginals:
+            raise NotImplementedError
+
         assert t.shape == solution.t[0].shape
         # side="left" and side="right" are equivalent
         # because we _assume_ that the point sets are disjoint.
@@ -179,13 +182,10 @@ class ProbabilisticSolver:
         u_t1 = _extract(solution.u)
         _, posterior_t1 = self.strategy.init_posterior(u=u_t1)
 
-        if not self.is_suitable_for_offgrid_marginals:
-            raise NotImplementedError
-
         prior_at_t0 = _extract_previous(solution.prior)
         transition_t0_t = prior_at_t0.transition(dt=t - t0, output_scale=output_scale)
         transition_t_t1 = prior_at_t0.transition(dt=t1 - t, output_scale=output_scale)
-        (estimate, _posterior), _interp_res = self.strategy.interpolate(
+        (estimate, _posterior), _interp_res = self.strategy.interpolate_posthoc(
             posterior_t0=posterior_t0,
             posterior_t1=posterior_t1,
             transition_t0_t=transition_t0_t,
@@ -599,7 +599,9 @@ class solver_dynamic(ProbabilisticSolver):
         )
 
         # TODO: stack the calibrated output scales instead of ones?
-        output_scale = ones
+        output_scale = np.concatenate(
+            [solution0.output_scale[None], solution.output_scale]
+        )
         ts = np.concatenate([solution0.t[None], solution.t])
         return ProbabilisticSolution(
             t=ts,

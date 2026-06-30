@@ -57,27 +57,29 @@ def test_save_at_result_matches_interpolated_adaptive_result(ssm, strategy) -> N
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=2)
     tcoeffs, _ = jetexpand(vf, u0, t=t0)
     iwp = ssm.prior_wiener_integrated(tcoeffs)
-    ts0 = ssm.constraint_ode_ts0(vf)
+    ts0 = ssm.constraint_ode_ts1(vf)
     error = probdiffeq.error_residual_std(constraint=ts0)
+    ts = np.linspace(t0, t1, num=5, endpoint=True)
 
-    # Compute an adaptive solution and interpolate
-    ts = np.linspace(t0, t1, num=15, endpoint=True)
-    solver = probdiffeq.solver(strategy=strategy.save_every_step, constraint=ts0)
+    # Compute an adaptive solution and interpolate.
+    # Use a dynamic solver because it makes the interpolation the most complicated
+    # due to the output-scale bookkeeping.
+    solver = probdiffeq.solver_dynamic(
+        strategy=strategy.save_every_step, constraint=ts0
+    )
     solve = test_util.solve_adaptive_save_every_step(error=error, solver=solver)
-    save_every = solve(iwp, t0=t0, t1=t1, dt0=0.1, atol=1e-2, rtol=1e-2)
+    save_every = solve(iwp, t0=t0, t1=t1, atol=1e-2, rtol=1e-2)
     offgrid = func.vmap(lambda s: solver.offgrid_marginals(s, solution=save_every))
     u_interpolated = func.jit(offgrid)(ts[1:-1])
 
     # Compute a save-at solution and remove the edge-points (because offgrid_marginals can't compute them)
-    solver = probdiffeq.solver(strategy=strategy.save_at, constraint=ts0)
+    solver = probdiffeq.solver_dynamic(strategy=strategy.save_at, constraint=ts0)
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
-    save_at = func.jit(solve)(iwp, atol=1e-2, rtol=1e-2, save_at=ts, dt0=0.1)
+    save_at = func.jit(solve)(iwp, atol=1e-2, rtol=1e-2, save_at=ts)
     u_save_at = tree.tree_map(lambda s: s[1:-1], save_at.u)
 
     # Assert similarity
-    assert testing.allclose(u_interpolated.mean, u_save_at.mean)
-    assert testing.allclose(u_interpolated.std, u_save_at.std)
-
-    mv1 = u_interpolated.to_multivariate_normal()
-    mv2 = u_save_at.to_multivariate_normal()
-    assert testing.allclose(mv1, mv2)
+    m1, C1 = u_interpolated.to_multivariate_normal()
+    m2, C2 = u_save_at.to_multivariate_normal()
+    assert testing.allclose(m1, m2)
+    assert testing.allclose(C1, C2)

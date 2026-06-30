@@ -308,6 +308,12 @@ class MarkovStrategy(Generic[T]):
         """Interpolate between two points."""
         raise NotImplementedError
 
+    def interpolate_posthoc(
+        self, *, posterior_t0: T, posterior_t1: T, transition_t0_t, transition_t_t1
+    ) -> tuple[tuple, utilities.InterpResult[T]]:
+        """Interpolate between two points."""
+        raise NotImplementedError
+
     def interpolate_at_t1(
         self, *, posterior_t1: T
     ) -> tuple[tuple, utilities.InterpResult[T]]:
@@ -409,6 +415,37 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         which happens when computing offgrid-marginals, do not use `interpolate()`.
         """
         # Extrapolate from t0 to t, and from t to t1.
+        _, solution_at_t = self.predict(
+            posterior=posterior_t0, transition=transition_t0_t
+        )
+        _, extrapolated_t1 = self.predict(
+            posterior=solution_at_t, transition=transition_t_t1
+        )
+
+        # The state at t1 gets a new backward model;
+        # (it must remember how to get back to t, not to t0).
+        solution_at_t1 = MarkovSequence(
+            posterior_t1.marginal,
+            extrapolated_t1.conditional,
+            reverse=extrapolated_t1.reverse,
+        )
+
+        # Extract targets
+        interp_res = utilities.InterpResult(
+            step_from=solution_at_t1, interp_from=solution_at_t
+        )
+        marginals = solution_at_t.marginal
+        return (marginals, solution_at_t), interp_res
+
+    def interpolate_posthoc(
+        self,
+        *,
+        posterior_t0: MarkovSequence,
+        posterior_t1: MarkovSequence,
+        transition_t0_t,
+        transition_t_t1,
+    ):
+        # Extrapolate from t0 to t, and from t to t1.
 
         _, extrapolated_t = self.predict(
             posterior=posterior_t0, transition=transition_t0_t
@@ -497,6 +534,16 @@ class strategy_filter(MarkovStrategy):
         return marginals, posterior
 
     def interpolate(
+        self, *, posterior_t0, posterior_t1, transition_t0_t, transition_t_t1
+    ):
+        return self.interpolate_posthoc(
+            posterior_t0=posterior_t0,
+            posterior_t1=posterior_t1,
+            transition_t0_t=transition_t0_t,
+            transition_t_t1=transition_t_t1,
+        )
+
+    def interpolate_posthoc(
         self, *, posterior_t0, posterior_t1, transition_t0_t, transition_t_t1
     ):
         del transition_t_t1
@@ -708,10 +755,53 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         )
 
         # Marginalise from t1 to t to obtain the interpolated solution.
-        # marginal_t1 = posterior_t1.marginal
-        # conditional_t1_to_t = extrapolated_t1.conditional
-        # rv_at_t = conditional_t1_to_t.marginalise(marginal_t1)
+        conditional_t1_to_t = extrapolated_t1.conditional
         rv_at_t = extrapolated_t.marginal
+
+        # Return the right combination of marginals and conditionals.
+        interpolated = MarkovSequence(
+            rv_at_t, extrapolated_t.conditional, reverse=extrapolated_t.reverse
+        )
+        step_from = MarkovSequence(
+            posterior_t1.marginal,
+            conditional=conditional_t1_to_t,
+            reverse=posterior_t1.reverse,
+        )
+        interp_res = utilities.InterpResult(
+            step_from=step_from, interp_from=previous_new
+        )
+
+        marginals = interpolated.marginal
+        return (marginals, interpolated), interp_res
+
+    def interpolate_posthoc(
+        self,
+        *,
+        posterior_t0: MarkovSequence,
+        posterior_t1: MarkovSequence,
+        transition_t0_t,
+        transition_t_t1,
+    ):
+        # Note to myself: Don't attempt to remove any of them.
+        # They're all important. You will break the code (again) :).
+
+        # Extrapolate from t0 to t, and from t to t1.
+        # This yields all building blocks.
+        _, extrapolated_t = self.predict(
+            posterior=posterior_t0, transition=transition_t0_t
+        )
+        conditional_id = posterior_t0.marginal.identity_conditional()
+        previous_new = MarkovSequence(
+            extrapolated_t.marginal, conditional_id, reverse=extrapolated_t.reverse
+        )
+        _, extrapolated_t1 = self.predict(
+            posterior=previous_new, transition=transition_t_t1
+        )
+
+        # Marginalise from t1 to t to obtain the interpolated solution.
+        marginal_t1 = posterior_t1.marginal
+        conditional_t1_to_t = extrapolated_t1.conditional
+        rv_at_t = conditional_t1_to_t.marginalise(marginal_t1)
 
         # Return the right combination of marginals and conditionals.
         interpolated = MarkovSequence(
