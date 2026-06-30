@@ -56,8 +56,8 @@ def case_solver_dynamic():
 @testing.parametrize_with_cases("strategy", cases=".", prefix="case_strategy_")
 @testing.parametrize_with_cases("solver_factory", cases=".", prefix="case_solver_")
 @testing.parametrize("tol, num", [(1e-1, 30)])  # hand-tuned
-def test_something(ssm, strategy, solver_factory, tol, num) -> None:
-    """Test that the save_at result matches the interpolation (using a filter)."""
+def test_behaviour_at_t1_is_correct(ssm, strategy, solver_factory, tol, num) -> None:
+    """Test that filtering/smoothing close to t=t1 is correct."""
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     # Generate a solver
