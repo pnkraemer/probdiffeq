@@ -61,6 +61,7 @@ def loss_lml_timeseries(
             msg += f" Expected: {MarkovSequence}."
             msg += f" Received: {type(posterior)}."
             msg += " Did you perhaps use a filter instead of a smoother"
+            msg += ", forget to extract the posterior from the smoothing-solution"
             msg += ", or mean to use a different loss?"
             raise TypeError(msg)
 
