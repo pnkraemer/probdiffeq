@@ -539,7 +539,7 @@ class state_space_model_isotropic(ssm_impl_api.StateSpaceModel):
                 raise ValueError(msg)
 
             def std_init(s: Array) -> Array:
-                if s.dtype != np.dtype(bool):
+                if np.asarray(s).dtype != np.dtype(bool):
                     msg = "Boolean entries expected in `is_exact`."
                     msg += f" Received: dtype={np.dtype(s)}"
                     raise TypeError(msg)
