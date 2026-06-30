@@ -49,42 +49,46 @@ def main():
 
     # Solve the ODE.
 
-    ts = jnp.linspace(t0, t1, endpoint=True, num=50)
+    ts = jnp.linspace(t0, t1, endpoint=True, num=250)
     sol = jax.jit(solve)(iwp, save_at=ts, dt0=0.1, atol=1e-1, rtol=1e-1)
 
     # Plot the solution.
 
     fig, axes = plt.subplots(
-        nrows=3,
+        nrows=2,
         ncols=len(tcoeffs),
         sharex="col",
         tight_layout=True,
-        figsize=(len(sol.u.mean) * 2, 5),
+        figsize=(len(sol.u.mean) * 3, 5),
     )
     _titles = ["State", "1st deriv.", "2nd deriv.", "3rd deriv."]
-    for i, (u_i, std_i, ax_i) in enumerate(zip(sol.u.mean, sol.u.std, axes.T)):
-        # Set up titles and axis descriptions
-        title = _titles[i] if i < len(_titles) else f"{i}th deriv."
-        ax_i[0].set_title(title, fontsize="medium")
-        if i == 0:
-            ax_i[0].set_ylabel("Prey", fontsize="medium")
-            ax_i[1].set_ylabel("Predators", fontsize="medium")
-            ax_i[2].set_ylabel("Std.-dev.", fontsize="medium")
+    for u, label in zip(
+        [sol.u, sol.solution_full.marginal],
+        ["Solution (smoothed)", "Fwd pass (filtered)"],
+    ):
+        for i, (u_i, std_i, ax_i) in enumerate(zip(u.mean, u.std, axes.T)):
+            # Set up titles and axis descriptions
+            title = _titles[i] if i < len(_titles) else f"{i}th deriv."
+            ax_i[0].set_title(title, fontsize="medium")
+            if i == 0:
+                ax_i[0].set_ylabel("Prey", fontsize="medium")
+                ax_i[1].set_ylabel("Predators", fontsize="medium")
+                # ax_i[2].set_ylabel("Std.-dev.", fontsize="medium")
 
-        ax_i[-1].set_xlabel("Time", fontsize="medium")
+            ax_i[-1].set_xlabel("Time", fontsize="medium")
 
-        for m, std, ax in zip(u_i.T, std_i.T, ax_i):
-            # Plot the mean
-            ax.plot(sol.t, m)
+            for m, std, ax in zip(u_i.T, std_i.T, ax_i):
+                # Plot the mean
+                ax.plot(sol.t, m, label=label)
 
-            # Plot the standard deviation
-            lower, upper = m - 3 * std, m + 3 * std
-            ax.fill_between(sol.t, lower, upper, alpha=0.3)
-            ax.set_xlim((jnp.amin(ts), jnp.amax(ts)))
+                # Plot the standard deviation
+                lower, upper = m - 3 * std, m + 3 * std
+                ax.fill_between(sol.t, lower, upper, alpha=0.3)
+                ax.set_xlim((jnp.amin(ts), jnp.amax(ts)))
 
-        ax_i[2].semilogy(sol.t, std_i[:, 0], label="Prey")
-        ax_i[2].semilogy(sol.t, std_i[:, 1], label="Predators")
-        ax_i[2].legend(fontsize="x-small")
+    for ax in axes.flatten():
+        ax.legend(fontsize="x-small")
+        ax.grid(linestyle="dotted")
 
     fig.align_ylabels()
     plt.show()
