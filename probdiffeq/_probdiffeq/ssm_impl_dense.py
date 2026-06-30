@@ -414,14 +414,12 @@ class DenseExponential(ssm_impl_api.AbstractPrior):
         p_inv = np.repeat(p_inv, self.d)
 
         A_p = dt * p_inv[:, None] * self.A * p[None, :]
-        B_p = np.abs(p_inv[:, None]) * self.B
+        B_p = np.sqrt(np.abs(dt)) * np.abs(p_inv[:, None]) * self.B
         eA, L = self.exp_gram(A_p, B_p)
 
         # L already contains the output scale information (via B),
         # so we only multiply with the incoming output scale
-        noise = DenseNormal(
-            self.q0, np.sqrt(np.abs(dt)) * output_scale * L, self.tree_flatten
-        )
+        noise = DenseNormal(self.q0, output_scale * L, self.tree_flatten)
 
         return DenseLatentCond(eA, noise, to_latent=p_inv, to_observed=p)
 
