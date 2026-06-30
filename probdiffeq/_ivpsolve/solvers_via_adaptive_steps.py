@@ -136,12 +136,14 @@ def solve_adaptive_save_at(
         # Advance to one checkpoint after the other
         init = (solution0, state)
         xs = save_at[1:]
-        (_solution, _state), solution = flow.scan(
+        (_solution, state), solution = flow.scan(
             advance, init=init, xs=xs, reverse=False
         )
 
         # Stack the initial value into the solution and return
-        return solver.userfriendly_output(solution0=solution0, solution=solution)
+        return solver.userfriendly_output(
+            solution0=solution0, solution=solution, solution1=state.step_from
+        )
 
     return solve
 

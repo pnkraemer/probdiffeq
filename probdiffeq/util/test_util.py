@@ -60,7 +60,7 @@ def solve_adaptive_save_every_step(solver, error, control=None, clip_dt=False):
 
         solutions = tree.tree_array_stack(solutions)
         return func.jit(solver.userfriendly_output)(
-            solution0=solution0, solution=solutions
+            solution0=solution0, solution=solutions, solution1=state.step_from
         )
 
     return solve

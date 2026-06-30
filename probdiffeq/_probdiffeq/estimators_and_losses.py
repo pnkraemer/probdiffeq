@@ -366,20 +366,42 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         return marginals, posterior
 
     def finalize(
-        self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
+        self,
+        *,
+        posterior0: MarkovSequence,
+        posterior: MarkovSequence,
+        posterior1: MarkovSequence,
+        output_scale,
     ):
-        prototype = posterior0.marginal.prototype_output_scale_calibrated()
-        assert output_scale.shape == prototype.shape
+        expected = posterior0.marginal.prototype_output_scale_calibrated()
+
+        assert output_scale.shape == expected.shape
         posterior0 = posterior0.rescale_cholesky(output_scale)
         posterior = posterior.rescale_cholesky(output_scale)
+        posterio1 = posterior1.rescale_cholesky(output_scale)
+
+        # Compute the RV at time t=t1 from posterior1 (think: "overstepped state")
+        rv_at_t1 = posterior1.conditional.marginalise(posterior1.marginal)
+
+        # Combine this RV with all conditionals on the in-between points and marginalise.
+        # This gives the state at t1 conditioned on *all* function evaluations.
+        # If the last step was to t1 precisely, posterior1.conditional = I anyway.
+        full = MarkovSequence(
+            rv_at_t1, posterior.conditional, reverse=posterior.reverse
+        )
 
         # Marginalise
-        marginals = posterior.evaluate_marginals()
+        marginals = full.evaluate_marginals()
 
-        # Prepend the initial condition to the filtering distributions
+        # Combine all three: posterior0, posterior, posterior1. We take all variables
+        # but drop the conditional corresponding to posterior0 because it is meaningless
         init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
+        init = tree.tree_array_append(init, posterior1.marginal)
+        conditional = tree.tree_array_append(
+            posterior.conditional, posterior1.conditional
+        )
         posterior = MarkovSequence(
-            marginal=init, conditional=posterior.conditional, reverse=posterior.reverse
+            marginal=init, conditional=conditional, reverse=posterior.reverse
         )
 
         # Extract targets
@@ -517,20 +539,18 @@ class strategy_filter(MarkovStrategy):
         marginals = updates
         return marginals, marginals
 
-    def finalize(self, *, posterior0, posterior, output_scale):
+    def finalize(self, *, posterior0, posterior, posterior1, output_scale):
         expected = posterior0.prototype_output_scale_calibrated()
         assert output_scale.shape == expected.shape
 
-        # No rescaling because no calibration at the initial step
-        posterior0 = posterior0.rescale_cholesky(output_scale)
-
         # Calibrate
+        posterior0 = posterior0.rescale_cholesky(output_scale)
         posterior = posterior.rescale_cholesky(output_scale)
+        posterior1 = posterior1.rescale_cholesky(output_scale)
 
         # Stack
-        posterior = tree.tree_array_prepend(posterior0, posterior)
-
-        marginals = posterior
+        marginals = tree.tree_array_prepend(posterior0, posterior)
+        posterior = tree.tree_array_append(marginals, posterior1)
         return marginals, posterior
 
     def interpolate_fwd(
@@ -639,20 +659,43 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         return marginals, posterior
 
     def finalize(
-        self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
+        self,
+        *,
+        posterior0: MarkovSequence,
+        posterior: MarkovSequence,
+        posterior1: MarkovSequence,
+        output_scale,
     ):
         expected = posterior0.marginal.prototype_output_scale_calibrated()
         assert output_scale.shape == expected.shape
+
+        # Calibrate all objects
         posterior0 = posterior0.rescale_cholesky(output_scale)
         posterior = posterior.rescale_cholesky(output_scale)
+        posterior1 = posterior1.rescale_cholesky(output_scale)
+
+        # Compute the RV at time t=t1 from posterior1 (think: "overstepped state")
+        rv_at_t1 = posterior1.conditional.marginalise(posterior1.marginal)
+
+        # Combine this RV with all conditionals on the in-between points and marginalise.
+        # This gives the state at t1 conditioned on *all* function evaluations.
+        # If the last step was to t1 precisely, posterior1.conditional = I anyway.
+        full = MarkovSequence(
+            rv_at_t1, posterior.conditional, reverse=posterior.reverse
+        )
 
         # Marginalise
-        marginals = posterior.evaluate_marginals()
+        marginals = full.evaluate_marginals()
 
-        # Prepend the initial condition to the filtering distributions
+        # Combine all three: posterior0, posterior, posterior1. We take all variables
+        # but drop the conditional corresponding to posterior0 because it is meaningless
         init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
+        init = tree.tree_array_append(init, posterior1.marginal)
+        conditional = tree.tree_array_append(
+            posterior.conditional, posterior1.conditional
+        )
         posterior = MarkovSequence(
-            marginal=init, conditional=posterior.conditional, reverse=posterior.reverse
+            marginal=init, conditional=conditional, reverse=posterior.reverse
         )
 
         # Extract targets

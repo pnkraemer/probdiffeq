@@ -131,7 +131,11 @@ class ProbabilisticSolver:
         raise NotImplementedError
 
     def userfriendly_output(
-        self, *, solution0: ProbabilisticSolution, solution: ProbabilisticSolution
+        self,
+        *,
+        solution0: ProbabilisticSolution,
+        solution: ProbabilisticSolution,
+        solution1: ProbabilisticSolution,
     ) -> ProbabilisticSolution:
         """Make the solutions 'user-friendly'.
 
@@ -430,14 +434,16 @@ class solver_mle(ProbabilisticSolver):
         )
 
     def userfriendly_output(
-        self, *, solution0: ProbabilisticSolution, solution: ProbabilisticSolution
+        self,
+        *,
+        solution0: ProbabilisticSolution,
+        solution: ProbabilisticSolution,
+        solution1: ProbabilisticSolution,
     ) -> ProbabilisticSolution:
         assert solution.t.ndim > 0
 
         # This is the MLE solver, so we take the calibrated scale
-        _, output_scale, _ = solution.auxiliary
-        ones = np.ones_like(output_scale)
-        output_scale = output_scale[-1]
+        _, output_scale, _ = solution1.auxiliary
 
         # Improve the calibration like in other Gaussian process models.
         #   ODE priors are generally not as smooth as the ODE solutions,
@@ -448,22 +454,25 @@ class solver_mle(ProbabilisticSolver):
             output_scale = output_scale / np.sqrt(solution.num_steps[-1])
 
         # Finalize the solution with the calibrated output scale
-        init = solution0.solution_full
-        posterior = solution.solution_full
         estimate, posterior = self.strategy.finalize(
-            posterior0=init, posterior=posterior, output_scale=output_scale
+            posterior0=solution0.solution_full,
+            posterior=solution.solution_full,
+            posterior1=solution1.solution_full,
+            output_scale=output_scale,
         )
 
-        output_scale = ones * output_scale[None, ...]
+        # Promote the calibrated output scale
+        _, scale, _ = solution.auxiliary
+        output_scale = np.ones_like(scale) * output_scale[None, ...]
         ts = np.concatenate([solution0.t[None], solution.t])
         return ProbabilisticSolution(
             t=ts,
             u=estimate,
             solution_full=posterior,
             output_scale=output_scale,
-            num_steps=solution.num_steps,
-            auxiliary=solution.auxiliary,
-            fun_evals=solution.fun_evals,
+            num_steps=solution.num_steps,  # todo: add the last step?
+            auxiliary=solution.auxiliary,  # todo: add the last step?
+            fun_evals=solution.fun_evals,  # todo: add the last step?
             prior=solution.prior,
         )
 
@@ -587,20 +596,24 @@ class solver_dynamic(ProbabilisticSolver):
         )
 
     def userfriendly_output(
-        self, *, solution: ProbabilisticSolution, solution0: ProbabilisticSolution
+        self,
+        *,
+        solution: ProbabilisticSolution,
+        solution0: ProbabilisticSolution,
+        solution1: ProbabilisticSolution,
     ):
         # This is the dynamic solver,
         # and all covariances have been calibrated already
         ones = np.ones_like(solution.output_scale)
         output_scale = ones[-1, ...]
 
-        init = solution0.solution_full
-        posterior = solution.solution_full
         estimate, posterior = self.strategy.finalize(
-            posterior0=init, posterior=posterior, output_scale=output_scale
+            posterior0=solution0.solution_full,
+            posterior=solution.solution_full,
+            posterior1=solution1.solution_full,
+            output_scale=output_scale,
         )
 
-        # TODO: stack the calibrated output scales instead of ones?
         output_scale = np.concatenate(
             [solution0.output_scale[None], solution.output_scale]
         )
@@ -717,7 +730,11 @@ class solver(ProbabilisticSolver):
         )
 
     def userfriendly_output(
-        self, *, solution0: ProbabilisticSolution, solution: ProbabilisticSolution
+        self,
+        *,
+        solution0: ProbabilisticSolution,
+        solution: ProbabilisticSolution,
+        solution1: ProbabilisticSolution,
     ) -> ProbabilisticSolution:
         assert solution.t.ndim > 0
 
@@ -725,10 +742,11 @@ class solver(ProbabilisticSolver):
         ones = np.ones_like(solution.output_scale)
         output_scale = np.ones_like(solution.output_scale[-1])
 
-        init = solution0.solution_full
-        posterior = solution.solution_full
         u, posterior = self.strategy.finalize(
-            posterior0=init, posterior=posterior, output_scale=output_scale
+            posterior0=solution0.solution_full,
+            posterior=solution.solution_full,
+            posterior1=solution1.solution_full,
+            output_scale=output_scale,
         )
 
         output_scale = ones * output_scale[None, ...]
