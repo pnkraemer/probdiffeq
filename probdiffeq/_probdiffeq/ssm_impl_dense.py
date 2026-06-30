@@ -525,20 +525,6 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
         output_scale: Array | None = None,
     ):
         """Construct an exponential integrator prior."""
-        if ode.num_tcoeffs_in_args != len(tcoeffs_mean):
-            msg = f"""The exponential prior does not match the Taylor coefficients in the SSM.
-
-        Concretely:
-
-        - For two Taylor coefficients, we expect an ODE of order 2.
-        - For three Taylor coefficients, we expect an ODE of order 3.
-        - For four Taylor coefficients, we expect an ODE of order 4.
-
-        and so on. The passed ODE has order **{ode.num_tcoeffs_in_args}**,
-        whereas the state-space model includes **{len(tcoeffs_mean)}**
-        Taylor coefficients.
-        """
-            raise TypeError(msg)
         tcoeffs_std = self._tcoeffs_standard_deviation(
             tcoeffs_mean, is_exact=is_exact, inexact_eps=inexact_eps
         )
@@ -569,6 +555,21 @@ class state_space_model_dense(ssm_impl_api.StateSpaceModel):
                 diffuse_derivatives=diffuse_derivatives,
                 diffuse_eps=diffuse_eps,
             )
+
+        if ode.num_tcoeffs_in_args != len(tcoeffs_mean):
+            msg = f"""The exponential prior does not match the Taylor coefficients in the SSM.
+
+        Concretely:
+
+        - For two Taylor coefficients, we expect an ODE of order 2.
+        - For three Taylor coefficients, we expect an ODE of order 3.
+        - For four Taylor coefficients, we expect an ODE of order 4.
+
+        and so on. The passed ODE has order **{ode.num_tcoeffs_in_args}**,
+        whereas the state-space model includes **{len(tcoeffs_mean)}**
+        Taylor coefficients.
+        """
+            raise TypeError(msg)
 
         # Construct the initial variable from the mean and std
         init = DenseNormal.from_mean_and_std(tcoeffs_mean, tcoeffs_std)

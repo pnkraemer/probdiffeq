@@ -84,3 +84,22 @@ def test_exponential_transition_contains_expm(ode_shape, ssm_factory, dt):
     cond = cond.preconditioner_apply()
     phi_iwp_smaller = cond.A
     assert testing.allclose(A_received[:-d, :-d], phi_iwp_smaller)
+
+
+def test_exponential_raises_error_correctly_for_diffuse_derivatives():
+    """See issue #894."""
+    tcoeffs = [np.ones((3,))]  # one coefficient - rest via diffuse derivatives
+
+    @func.partial(probdiffeq.ode_autonomous_order_arbitrary, num_tcoeffs_in_args=3)
+    def vf_linear(u, du, ddu, /):
+        del u
+        del du
+        return ddu
+
+    ssm = probdiffeq.state_space_model_dense()
+
+    msg = "does not match the Taylor"
+    with testing.raises(TypeError, match=msg):  # should this be a value error?
+        _ = ssm.prior_exponential(vf_linear, tcoeffs)  # fails
+
+    _ = ssm.prior_exponential(vf_linear, tcoeffs, diffuse_derivatives=2)  # passes
