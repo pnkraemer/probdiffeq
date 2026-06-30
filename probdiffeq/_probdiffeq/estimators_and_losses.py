@@ -1,12 +1,14 @@
 """Estimation strategies and loss functions."""
 
 from probdiffeq._probdiffeq import ssm_impl_api, utilities
-from probdiffeq.backend import flow, func, linalg, np, random, structs, tree
+from probdiffeq.backend import abc, flow, func, linalg, np, random, structs, tree
 from probdiffeq.backend.typing import Any, Callable, Generic, Sequence, TypeVar
 
 __all__ = [
     "MarkovSequence",
     "MarkovStrategy",
+    "Smoother",
+    "SmoothingSolution",
     "loss_lml_terminal_values",
     "loss_lml_timeseries",
     "strategy_filter",
@@ -53,18 +55,22 @@ def loss_lml_timeseries(
 ):
     """Construct a log-marginal-likelihood loss for a time-series."""
 
-    def loss(u, /, *, posterior, std):
+    def loss(u, /, *, posterior: MarkovSequence, std):
         if not isinstance(posterior, MarkovSequence):
             msg = "The datatype of the posterior is not as expected."
             msg += f" Expected: {MarkovSequence}."
             msg += f" Received: {type(posterior)}."
             msg += " Did you perhaps use a filter instead of a smoother"
+            msg += ", forget to extract the posterior from the smoothing-solution"
             msg += ", or mean to use a different loss?"
             raise TypeError(msg)
 
         u = tree.tree_map(np.asarray, u)
+        N, *_ = np.shape(tree.tree_leaves(u)[0])
         std = tree.tree_map(np.asarray, std)
-        std_expected = posterior.marginal.std[tcoeff_index]
+        std_expected = tree.tree_map(
+            lambda s: np.stack([s] * N), posterior.marginal.std[tcoeff_index]
+        )
 
         msg = "The standard deviation container differs from what was expected."
         msg += f" Expected: shape={tree.tree_map(np.shape, std_expected)}."
@@ -267,11 +273,18 @@ class MarkovSequence(Generic[N]):
         return tree.tree_array_prepend(sample0_tree, samples)
 
 
+@tree.register_dataclass
+@structs.dataclass
+class SmoothingSolution(Generic[N]):
+    posterior: MarkovSequence[N]
+    filtering: N
+
+
 T = TypeVar("T", bound=MarkovSequence | ssm_impl_api.AbstractTreeNormal)
 """A type-variable to describe posterior distributions."""
 
 
-class MarkovStrategy(Generic[T]):
+class MarkovStrategy(abc.ABC, Generic[T]):
     """An interface for estimation strategies in Markovian state-space models.
 
     Related:
@@ -290,161 +303,45 @@ class MarkovStrategy(Generic[T]):
         self.is_suitable_for_save_every_step = is_suitable_for_save_every_step
         self.is_suitable_for_offgrid_marginals = is_suitable_for_offgrid_marginals
 
+    @abc.abstractmethod
     def init_posterior(self, *, u) -> T:
         """Initialize a posterior distribution."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def predict(self, posterior: T, *, transition) -> tuple:
         """Make a prediction."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def apply_updates(self, prediction: T, *, updates) -> tuple:
         """Apply updates to a prediction."""
         raise NotImplementedError
 
-    def interpolate(
+    @abc.abstractmethod
+    def interpolate_fwd(
         self, *, posterior_t0: T, posterior_t1: T, transition_t0_t, transition_t_t1
     ) -> tuple[tuple, utilities.InterpResult[T]]:
         """Interpolate between two points."""
         raise NotImplementedError
 
-    def interpolate_at_t1(
+    def interpolate_offgrid_marginals(
+        self, *, posterior_t0: Any, posterior_t1: T, transition_t0_t, transition_t_t1
+    ) -> tuple[tuple, utilities.InterpResult[T]]:
+        """Interpolate between two points."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def interpolate_fwd_at_t1(
         self, *, posterior_t1: T
     ) -> tuple[tuple, utilities.InterpResult[T]]:
         """Interpolate at a checkpoint."""
         raise NotImplementedError
 
-    def finalize(self, *, posterior0: T, posterior: T, output_scale) -> T:
+    @abc.abstractmethod
+    def finalize(self, *, posterior0: T, posterior: T, output_scale):
         """Finalize the posterior before returning a solution."""
         raise NotImplementedError
-
-
-class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
-    """Construct a fixed-interval smoother.
-
-    Use this strategy for fixed steps.
-    For adaptive steps, consider using a fixed-point smoother instead.
-
-
-    Related:
-    [`MarkovStrategy`](#probdiffeq.probdiffeq.MarkovStrategy).
-    """
-
-    def __init__(self) -> None:
-        super().__init__(
-            is_suitable_for_save_at=False,
-            is_suitable_for_save_every_step=True,
-            is_suitable_for_offgrid_marginals=True,
-        )
-
-    def init_posterior(self, *, u):
-        cond = u.identity_conditional()
-        posterior = MarkovSequence(marginal=u, conditional=cond, reverse=True)
-        return u, posterior
-
-    def predict(self, posterior: MarkovSequence, *, transition) -> tuple:
-        marginals, cond = transition.revert(
-            posterior.marginal, solve_triu=linalg.solve_triu
-        )
-        posterior = MarkovSequence(
-            marginal=marginals, conditional=cond, reverse=posterior.reverse
-        )
-
-        return marginals, posterior
-
-    def apply_updates(self, prediction, *, updates):
-        posterior = MarkovSequence(
-            updates, prediction.conditional, reverse=prediction.reverse
-        )
-        marginals = updates
-        return marginals, posterior
-
-    def finalize(
-        self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
-    ):
-        prototype = posterior0.marginal.prototype_output_scale_calibrated()
-        assert output_scale.shape == prototype.shape
-        posterior0 = posterior0.rescale_cholesky(output_scale)
-        posterior = posterior.rescale_cholesky(output_scale)
-
-        # Marginalise
-        marginals = posterior.evaluate_marginals()
-
-        # Prepend the initial condition to the filtering distributions
-        init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
-        posterior = MarkovSequence(
-            marginal=init, conditional=posterior.conditional, reverse=posterior.reverse
-        )
-
-        # Extract targets
-        return marginals, posterior
-
-    def interpolate(
-        self,
-        *,
-        posterior_t0: MarkovSequence,
-        posterior_t1: MarkovSequence,
-        transition_t0_t,
-        transition_t_t1,
-    ):
-        """Interpolate between two Markov sequences.
-
-        Here is how a smoother interpolates:
-
-        - Extrapolate from t0 to t, which gives the filtering distribution
-          and the backward transition from t to t0.
-        - Extrapolate from t to t1, which gives another filtering distribution
-          and the backward transition from t1 to t.
-        - Apply the new t1-to-t backward transition to the posterior
-          to compute the interpolation.
-
-        This intermediate result is informed about its "right-hand side" datum.
-        Note how in probdiffeq, all solver subintervals include their right-hand
-        side time-point: in other words, they are (t0, t1].
-
-        Specifically, interpolation is not equal to computing offgrid marginals.
-        Interpolation always assumes that the current subinterval is the right-most
-        subinterval, which is the case during the forward pass.
-        After the simulation, if there are observations > t1,
-        which happens when computing offgrid-marginals, do not use `interpolate()`.
-        """
-        # Extrapolate from t0 to t, and from t to t1.
-
-        _, extrapolated_t = self.predict(
-            posterior=posterior_t0, transition=transition_t0_t
-        )
-        _, extrapolated_t1 = self.predict(
-            posterior=extrapolated_t, transition=transition_t_t1
-        )
-
-        # Marginalise backwards from t1 to t to obtain the interpolated solution.
-        marginal_t1 = posterior_t1.marginal
-        conditional_t1_to_t = extrapolated_t1.conditional
-        rv_at_t = conditional_t1_to_t.marginalise(marginal_t1)
-        solution_at_t = MarkovSequence(
-            rv_at_t, extrapolated_t.conditional, reverse=extrapolated_t.reverse
-        )
-
-        # The state at t1 gets a new backward model;
-        # (it must remember how to get back to t, not to t0).
-        solution_at_t1 = MarkovSequence(
-            marginal_t1, conditional_t1_to_t, reverse=extrapolated_t.reverse
-        )
-        interp_res = utilities.InterpResult(
-            step_from=solution_at_t1, interp_from=solution_at_t
-        )
-
-        # Extract targets
-        marginals = solution_at_t.marginal
-        return (marginals, solution_at_t), interp_res
-
-    def interpolate_at_t1(self, posterior_t1):
-        marginals = posterior_t1.marginal
-
-        interp_res = utilities.InterpResult(
-            step_from=posterior_t1, interp_from=posterior_t1
-        )
-        return (marginals, posterior_t1), interp_res
 
 
 class strategy_filter(MarkovStrategy):
@@ -480,23 +377,30 @@ class strategy_filter(MarkovStrategy):
         marginals = updates
         return marginals, marginals
 
-    def finalize(self, *, posterior0, posterior, output_scale):
+    def finalize(self, *, posterior0, posterior, posterior1, output_scale):
+        del posterior1
         expected = posterior0.prototype_output_scale_calibrated()
         assert output_scale.shape == expected.shape
 
-        # No rescaling because no calibration at the initial step
-        posterior0 = posterior0.rescale_cholesky(output_scale)
-
         # Calibrate
+        posterior0 = posterior0.rescale_cholesky(output_scale)
         posterior = posterior.rescale_cholesky(output_scale)
 
-        # Stack
-        posterior = tree.tree_array_prepend(posterior0, posterior)
+        # Stack. Ignore posterior1 because we don't store anything beyond t1
+        marginals = tree.tree_array_prepend(posterior0, posterior)
+        return marginals, marginals
 
-        marginals = posterior
-        return marginals, posterior
+    def interpolate_fwd(
+        self, *, posterior_t0, posterior_t1, transition_t0_t, transition_t_t1
+    ):
+        return self.interpolate_offgrid_marginals(
+            posterior_t0=posterior_t0,
+            posterior_t1=posterior_t1,
+            transition_t0_t=transition_t0_t,
+            transition_t_t1=transition_t_t1,
+        )
 
-    def interpolate(
+    def interpolate_offgrid_marginals(
         self, *, posterior_t0, posterior_t1, transition_t0_t, transition_t_t1
     ):
         del transition_t_t1
@@ -509,7 +413,7 @@ class strategy_filter(MarkovStrategy):
         )
         return (marginals, interpolated), interp_res
 
-    def interpolate_at_t1(self, *, posterior_t1):
+    def interpolate_fwd_at_t1(self, *, posterior_t1):
         marginals = posterior_t1
         interp_res = utilities.InterpResult(
             step_from=posterior_t1, interp_from=posterior_t1
@@ -517,7 +421,56 @@ class strategy_filter(MarkovStrategy):
         return (marginals, posterior_t1), interp_res
 
 
-class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
+class Smoother(MarkovStrategy[MarkovSequence]):
+    def init_posterior(self, *, u):
+        cond = u.identity_conditional()
+        posterior = MarkovSequence(u, cond, reverse=True)
+        return u, posterior
+
+    def apply_updates(self, prediction, *, updates):
+        posterior = MarkovSequence(
+            updates, prediction.conditional, reverse=prediction.reverse
+        )
+        marginals = updates
+        return marginals, posterior
+
+    def finalize(
+        self,
+        *,
+        posterior0: MarkovSequence,
+        posterior: MarkovSequence,
+        posterior1: MarkovSequence,
+        output_scale,
+    ):
+        expected = posterior0.marginal.prototype_output_scale_calibrated()
+        assert output_scale.shape == expected.shape
+
+        # Calibrate all objects
+        posterior0 = posterior0.rescale_cholesky(output_scale)
+        posterior = posterior.rescale_cholesky(output_scale)
+        posterior1 = posterior1.rescale_cholesky(output_scale)
+
+        # Compute the RV at time t=t1 from posterior1 (think: "overstepped state")
+        rv_at_t1 = posterior1.conditional.marginalise(posterior1.marginal)
+
+        # Combine this RV with all conditionals on the in-between points and marginalise.
+        # This gives the state at t1 conditioned on *all* function evaluations.
+        # If the last step was to t1 precisely, posterior1.conditional = I anyway.
+        full_posterior = MarkovSequence(
+            rv_at_t1, posterior.conditional, reverse=posterior.reverse
+        )
+        marginals = full_posterior.evaluate_marginals()
+
+        # Stack all filtering distributions
+        # (ignore solution1 because we store nothing beyond t1)
+        filtering = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
+        solution = SmoothingSolution(posterior=full_posterior, filtering=filtering)
+
+        # Extract targets
+        return marginals, solution
+
+
+class strategy_smoother_fixedpoint(Smoother):
     r"""Construct a fixedpoint-smoother.
 
     Fixed-point smoothers are the method of choice for adaptive
@@ -570,48 +523,15 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
             is_suitable_for_offgrid_marginals=False,
         )
 
-    def init_posterior(self, *, u):
-        cond = u.identity_conditional()
-        posterior = MarkovSequence(u, cond, reverse=True)
-        return u, posterior
-
     def predict(self, posterior: MarkovSequence, *, transition) -> tuple:
         rv = posterior.marginal
         bw0 = posterior.conditional
         marginals, cond = transition.revert(rv, solve_triu=linalg.solve_triu)
         cond = bw0.merge(cond)
         predicted = MarkovSequence(marginals, cond, reverse=posterior.reverse)
-
         return marginals, predicted
 
-    def apply_updates(self, prediction: MarkovSequence, *, updates):
-        posterior = MarkovSequence(
-            updates, prediction.conditional, reverse=prediction.reverse
-        )
-        marginals = updates
-        return marginals, posterior
-
-    def finalize(
-        self, *, posterior0: MarkovSequence, posterior: MarkovSequence, output_scale
-    ):
-        expected = posterior0.marginal.prototype_output_scale_calibrated()
-        assert output_scale.shape == expected.shape
-        posterior0 = posterior0.rescale_cholesky(output_scale)
-        posterior = posterior.rescale_cholesky(output_scale)
-
-        # Marginalise
-        marginals = posterior.evaluate_marginals()
-
-        # Prepend the initial condition to the filtering distributions
-        init = tree.tree_array_prepend(posterior0.marginal, posterior.marginal)
-        posterior = MarkovSequence(
-            marginal=init, conditional=posterior.conditional, reverse=posterior.reverse
-        )
-
-        # Extract targets
-        return marginals, posterior
-
-    def interpolate_at_t1(self, *, posterior_t1: MarkovSequence):
+    def interpolate_fwd_at_t1(self, *, posterior_t1: MarkovSequence):
         cond_identity = posterior_t1.marginal.identity_conditional()
         resume_from = MarkovSequence(
             posterior_t1.marginal,
@@ -626,7 +546,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         marginals = interpolated.marginal
         return (marginals, interpolated), interp_res
 
-    def interpolate(
+    def interpolate_fwd(
         self,
         *,
         posterior_t0: MarkovSequence,
@@ -634,64 +554,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         transition_t0_t,
         transition_t_t1,
     ):
-        """Interpolate between two Markov sequences.
-
-        Assuming `state_t0` has seen $n$ collocation points,
-        and `state_t1` has seen $n+1$ collocation points,
-        then interpolation at time $t$ is computed as follows:
-
-        1. Extrapolate from $t_0$ to $t$. This yields:
-            - the marginal at $t$ given $n$ observations.
-            - the backward transition from $t$ to $t_0$ given $n$ observations.
-
-        2. Extrapolate from $t$ to $t_1$. This yields:
-            - the marginal at $t_1$ given $n$ observations
-              (in contrast,`state_t1` has seen $n+1$ observations)
-            - the backward transition from $t_1$ to $t$ given $n$ observations.
-
-        3. Apply the backward transition from $t_1$ to $t$
-        to the marginal inside `state_t1`
-        to obtain the marginal at $t$ given $n+1$ observations. Similarly,
-        the interpolated solution inherits all auxiliary info from the $t_1$ state.
-
-        ---------------------------------------------------------------------
-
-        All comments from fixed-interval smoother interpolation apply.
-
-        ---------------------------------------------------------------------
-
-        Difference to standard smoother interpolation:
-
-        In the fixed-point smoother, backward transitions are modified
-        to ensure that future operations remain correct.
-        Denote the location of the fixed-point with $t_f$. Then,
-        the backward transition at $t$ is merged with that at $t_0$.
-        This preserves knowledge of how to move from $t$ to $t_f$.
-
-        Then, `t` becomes the new fixed-point location. To ensure
-        that future operations "find their way back to $t$":
-
-        - Subsequent interpolations do not continue from the raw
-        interpolated value. Instead, they continue from a nearly
-        identical state where the backward transition is replaced
-        by the identity.
-
-        - Subsequent solver steps do not continue from the initial $t_1$
-        state. Instead, they continue from a version whose backward
-        model is replaced with the `t-to-t1` transition.
-
-
-        ---------------------------------------------------------------------
-
-        As a result, each interpolation must return three distinct states:
-
-        1. the interpolated solution,
-        2. the state to continue interpolating from,
-        3. the state to continue solver stepping from.
-
-        These are intentionally different in the fixed-point smoother.
-        """
-        # Note to myself: Don't attempt to remove any of them.
+        # Note to myself: Don't attempt to remove any of the state variabless.
         # They're all important. You will break the code (again) :).
 
         # Extrapolate from t0 to t, and from t to t1.
@@ -708,9 +571,8 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         )
 
         # Marginalise from t1 to t to obtain the interpolated solution.
-        marginal_t1 = posterior_t1.marginal
         conditional_t1_to_t = extrapolated_t1.conditional
-        rv_at_t = conditional_t1_to_t.marginalise(marginal_t1)
+        rv_at_t = extrapolated_t.marginal
 
         # Return the right combination of marginals and conditionals.
         interpolated = MarkovSequence(
@@ -727,3 +589,129 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
 
         marginals = interpolated.marginal
         return (marginals, interpolated), interp_res
+
+
+class strategy_smoother_fixedinterval(Smoother):
+    """Construct a fixed-interval smoother.
+
+    Use this strategy for fixed steps.
+    For adaptive steps, consider using a fixed-point smoother instead.
+
+
+    Related:
+    [`MarkovStrategy`](#probdiffeq.probdiffeq.MarkovStrategy).
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            is_suitable_for_save_at=False,
+            is_suitable_for_save_every_step=True,
+            is_suitable_for_offgrid_marginals=True,
+        )
+
+    def predict(self, posterior: MarkovSequence, *, transition) -> tuple:
+        marginals, cond = transition.revert(
+            posterior.marginal, solve_triu=linalg.solve_triu
+        )
+        posterior = MarkovSequence(
+            marginal=marginals, conditional=cond, reverse=posterior.reverse
+        )
+
+        return marginals, posterior
+
+    def interpolate_fwd(
+        self,
+        *,
+        posterior_t0: MarkovSequence,
+        posterior_t1: MarkovSequence,
+        transition_t0_t,
+        transition_t_t1,
+    ):
+        """Interpolate between two Markov sequences.
+
+        Here is how a smoother interpolates:
+
+        - Extrapolate from t0 to t, which gives the filtering distribution
+          and the backward transition from t to t0.
+        - Extrapolate from t to t1, which gives another filtering distribution
+          and the backward transition from t1 to t.
+        - Apply the new t1-to-t backward transition to the posterior
+          to compute the interpolation.
+
+        This intermediate result is informed about its "right-hand side" datum.
+        Note how in probdiffeq, all solver subintervals include their right-hand
+        side time-point: in other words, they are (t0, t1].
+
+        Specifically, interpolation is not equal to computing offgrid marginals.
+        Interpolation always assumes that the current subinterval is the right-most
+        subinterval, which is the case during the forward pass.
+        After the simulation, if there are observations > t1,
+        which happens when computing offgrid-marginals, do not use `interpolate_fwd()`.
+        """
+        # Extrapolate from t0 to t, and from t to t1.
+        _, solution_at_t = self.predict(
+            posterior=posterior_t0, transition=transition_t0_t
+        )
+        _, extrapolated_t1 = self.predict(
+            posterior=solution_at_t, transition=transition_t_t1
+        )
+
+        # The state at t1 gets a new backward model;
+        # (it must remember how to get back to t, not to t0).
+        solution_at_t1 = MarkovSequence(
+            posterior_t1.marginal,
+            extrapolated_t1.conditional,
+            reverse=extrapolated_t1.reverse,
+        )
+
+        # Extract targets
+        interp_res = utilities.InterpResult(
+            step_from=solution_at_t1, interp_from=solution_at_t
+        )
+        marginals = solution_at_t.marginal
+        return (marginals, solution_at_t), interp_res
+
+    def interpolate_offgrid_marginals(
+        self,
+        *,
+        posterior_t0: SmoothingSolution,
+        posterior_t1: MarkovSequence,
+        transition_t0_t,
+        transition_t_t1,
+    ):
+        # Extrapolate from t0 to t, and from t to t1.
+
+        _, post = self.init_posterior(u=posterior_t0.filtering)
+        _, extrapolated_t = self.predict(posterior=post, transition=transition_t0_t)
+        _, extrapolated_t1 = self.predict(
+            posterior=extrapolated_t, transition=transition_t_t1
+        )
+
+        # Marginalise backwards from t1 to t to obtain the interpolated solution.
+        marginal_t1 = posterior_t1.marginal
+        conditional_t1_to_t = extrapolated_t1.conditional
+        rv_at_t = conditional_t1_to_t.marginalise(marginal_t1)
+        solution_at_t = MarkovSequence(
+            rv_at_t, extrapolated_t.conditional, reverse=extrapolated_t.reverse
+        )
+
+        # The state at t1 gets a new backward model;
+        # (it must remember how to get back to t, not to t0).
+        solution_at_t1 = MarkovSequence(
+            marginal_t1, conditional_t1_to_t, reverse=extrapolated_t.reverse
+        )
+        interp_res = utilities.InterpResult(
+            step_from=solution_at_t1, interp_from=solution_at_t
+        )
+
+        # Extract targets
+        marginals = solution_at_t.marginal
+        return (marginals, solution_at_t), interp_res
+
+    def interpolate_fwd_at_t1(self, posterior_t1):
+        marginals = posterior_t1.marginal
+
+        interp_res = utilities.InterpResult(
+            step_from=posterior_t1, interp_from=posterior_t1
+        )
+        return (marginals, posterior_t1), interp_res

@@ -124,7 +124,7 @@ def loss_marginal_likelihood(*, data, solve, std=1e-1):
         """Evaluate the data fit as a function of the parameters."""
         sol = solve(params)
         std_array = jnp.ones_like(sol.t) * std
-        lml = loss_lml(data, std=std_array, posterior=sol.solution_full)
+        lml = loss_lml(data, std=std_array, posterior=sol.solution_full.posterior)
         return -lml
 
     return loss

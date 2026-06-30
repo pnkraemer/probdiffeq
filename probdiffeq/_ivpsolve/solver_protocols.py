@@ -39,10 +39,10 @@ class Solver(Protocol, Generic[T_contra, S]):
     def step(self, state: S, *, dt: float, damp: float) -> S:
         """Perform a step."""
 
-    def interpolate(self, *, t, interp_from: S, interp_to: S) -> Any:
+    def interpolate_fwd(self, *, t, interp_from: S, interp_to: S) -> Any:
         """Interpolate between two solver states."""
 
-    def interpolate_at_t1(self, *, t, interp_from: S, interp_to: S) -> Any:
+    def interpolate_fwd_at_t1(self, *, t, interp_from: S, interp_to: S) -> Any:
         """Interpolate close to a checkpoint."""
 
     @property
@@ -53,5 +53,5 @@ class Solver(Protocol, Generic[T_contra, S]):
     def is_suitable_for_save_every_step(self) -> bool:
         """Whether or not the solver can be used with a certain style of adaptive time-stepping."""
 
-    def userfriendly_output(self, *, solution: S, solution0: S) -> S:
+    def userfriendly_output(self, *, solution1: S, solution: S, solution0: S) -> S:
         """Postprocess the solution before returning."""

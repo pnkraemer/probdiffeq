@@ -305,6 +305,9 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
         return -0.5 * (logdet_term + maha_term + u.size * np.log(np.pi() * 2))
 
     def to_multivariate_normal(self):
+        if self.mean_flat.ndim > 2:
+            return func.vmap(BlockDiagNormal.to_multivariate_normal)(self)
+
         mean = np.reshape(self.mean_flat.T, (-1,))
 
         *_, d, n = self.mean_flat.shape
@@ -600,23 +603,29 @@ class state_space_model_blockdiag(ssm_impl_api.StateSpaceModel):
                 tcoeffs_std = tree.tree_map(eps_like, tcoeffs_mean)
         else:
 
+            def shape_compatible(A, B):
+                return tree.tree_map(
+                    lambda a, b: np.shape(a) in [(), np.shape(b)], A, B
+                )
+
+            if not tree.tree_all(shape_compatible(is_exact, tcoeffs_mean)):
+                msg = "Input 'is_exact' has the wrong PyTree structure."
+                msg += f" Expected: {tree.tree_map(np.shape, tcoeffs_mean)}."
+                msg += f" Received: {tree.tree_map(np.shape, is_exact)}."
+                raise ValueError(msg)
+
+            is_exact_promoted = tree.tree_map(
+                lambda a, b: a * np.ones(b.shape, dtype=bool), is_exact, tcoeffs_mean
+            )
+
             def std_init(s: Array) -> Array:
-                if s.dtype != np.dtype(bool):
+                if np.asarray(s).dtype != np.dtype(bool):
                     msg = "Boolean entries expected in `is_exact`."
                     msg += f" Received: dtype={np.dtype(s)}"
                     raise TypeError(msg)
                 return np.where(s, 0.0, inexact_eps)
 
-            tcoeffs_std = tree.tree_map(std_init, is_exact)
-
-        def shape_equal(A, B):
-            return tree.tree_map(lambda a, b: np.shape(a) == np.shape(b), A, B)
-
-        if not tree.tree_all(shape_equal(tcoeffs_mean, tcoeffs_std)):
-            msg = "Input 'is_exact' has the wrong PyTree structure."
-            msg += f" Expected: {tree.tree_map(np.shape, tcoeffs_mean)}."
-            msg += f" Received: {tree.tree_map(np.shape, is_exact)}."
-            raise ValueError(msg)
+            tcoeffs_std = tree.tree_map(std_init, is_exact_promoted)
 
         return tcoeffs_std
 

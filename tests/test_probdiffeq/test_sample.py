@@ -37,7 +37,7 @@ def fixture_solution(ssm_factory):
 def test_sample_shape(solution, shape) -> None:
     """Assert that sampled trajectories have shape equal to the requested sample shape prepended to the state shape."""
     key = random.prng_key(seed=15)
-    samples = solution.solution_full.sample(key, shape=shape)
+    samples = solution.solution_full.posterior.sample(key, shape=shape)
 
     for s, u in zip(samples, solution.u.mean):
         s_shape = tree.tree_map(lambda x: x.shape, s)

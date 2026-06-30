@@ -49,8 +49,8 @@ def argmin(arr, /):
     return jnp.argmin(arr)
 
 
-def diff(arr, /):
-    return jnp.diff(arr)
+def diff(arr, /, axis=-1):
+    return jnp.diff(arr, axis=axis)
 
 
 def reshape(arr, /, new_shape, order="C"):
