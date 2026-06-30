@@ -39,10 +39,10 @@ class Solver(Protocol, Generic[T_contra, S]):
     def step(self, state: S, *, dt: float, damp: float) -> S:
         """Perform a step."""
 
-    def interpolate(self, *, t, interp_from: S, interp_to: S) -> Any:
+    def interpolate_fwd(self, *, t, interp_from: S, interp_to: S) -> Any:
         """Interpolate between two solver states."""
 
-    def interpolate_at_t1(self, *, t, interp_from: S, interp_to: S) -> Any:
+    def interpolate_fwd_at_t1(self, *, t, interp_from: S, interp_to: S) -> Any:
         """Interpolate close to a checkpoint."""
 
     @property

@@ -185,15 +185,17 @@ class ProbabilisticSolver:
         prior_at_t0 = _extract_previous(solution.prior)
         transition_t0_t = prior_at_t0.transition(dt=t - t0, output_scale=output_scale)
         transition_t_t1 = prior_at_t0.transition(dt=t1 - t, output_scale=output_scale)
-        (estimate, _posterior), _interp_res = self.strategy.interpolate_posthoc(
-            posterior_t0=posterior_t0,
-            posterior_t1=posterior_t1,
-            transition_t0_t=transition_t0_t,
-            transition_t_t1=transition_t_t1,
+        (estimate, _posterior), _interp_res = (
+            self.strategy.interpolate_offgrid_marginals(
+                posterior_t0=posterior_t0,
+                posterior_t1=posterior_t1,
+                transition_t0_t=transition_t0_t,
+                transition_t_t1=transition_t_t1,
+            )
         )
         return estimate
 
-    def interpolate(
+    def interpolate_fwd(
         self, *, t, interp_from: ProbabilisticSolution, interp_to: ProbabilisticSolution
     ):
         """Interpolate between two solution objects."""
@@ -207,7 +209,7 @@ class ProbabilisticSolver:
         )
 
         # Interpolate
-        tmp = self.strategy.interpolate(
+        tmp = self.strategy.interpolate_fwd(
             posterior_t0=interp_from.solution_full,
             posterior_t1=interp_to.solution_full,
             transition_t0_t=transition_t0_t,
@@ -259,12 +261,12 @@ class ProbabilisticSolver:
         )
         return interpolated, interp_res
 
-    def interpolate_at_t1(
+    def interpolate_fwd_at_t1(
         self, *, t, interp_from: ProbabilisticSolution, interp_to: ProbabilisticSolution
     ):
         """Interpolate the solution near a checkpoint."""
         del t
-        tmp = self.strategy.interpolate_at_t1(posterior_t1=interp_to.solution_full)
+        tmp = self.strategy.interpolate_fwd_at_t1(posterior_t1=interp_to.solution_full)
         (estimate, interpolated), step_and_interpolate_from = tmp
 
         prev = ProbabilisticSolution(

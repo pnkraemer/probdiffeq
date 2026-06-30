@@ -25,13 +25,13 @@ def test_filter_marginals_accessible_in_smoother(ssm) -> None:
     ts = np.linspace(t0, t1, num=15, endpoint=True)
 
     # Compute a filter solution
-    strategy = probdiffeq.strategy_filter()
-    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
+    filter_ = probdiffeq.strategy_filter()
+    solver = probdiffeq.solver(strategy=filter_, constraint=ts0)
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
     solution_filter = func.jit(solve)(iwp, atol=1e-1, rtol=1e-1, save_at=ts)
 
-    strategy = probdiffeq.strategy_smoother_fixedpoint()
-    solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
+    smoother = probdiffeq.strategy_smoother_fixedpoint()
+    solver = probdiffeq.solver(strategy=smoother, constraint=ts0)
     solve = ivpsolve.solve_adaptive_save_at(error=error, solver=solver)
     solution_smoother = func.jit(solve)(iwp, atol=1e-1, rtol=1e-1, save_at=ts)
 

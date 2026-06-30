@@ -302,19 +302,19 @@ class MarkovStrategy(Generic[T]):
         """Apply updates to a prediction."""
         raise NotImplementedError
 
-    def interpolate(
+    def interpolate_fwd(
         self, *, posterior_t0: T, posterior_t1: T, transition_t0_t, transition_t_t1
     ) -> tuple[tuple, utilities.InterpResult[T]]:
         """Interpolate between two points."""
         raise NotImplementedError
 
-    def interpolate_posthoc(
+    def interpolate_offgrid_marginals(
         self, *, posterior_t0: T, posterior_t1: T, transition_t0_t, transition_t_t1
     ) -> tuple[tuple, utilities.InterpResult[T]]:
         """Interpolate between two points."""
         raise NotImplementedError
 
-    def interpolate_at_t1(
+    def interpolate_fwd_at_t1(
         self, *, posterior_t1: T
     ) -> tuple[tuple, utilities.InterpResult[T]]:
         """Interpolate at a checkpoint."""
@@ -385,7 +385,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         # Extract targets
         return marginals, posterior
 
-    def interpolate(
+    def interpolate_fwd(
         self,
         *,
         posterior_t0: MarkovSequence,
@@ -412,7 +412,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         Interpolation always assumes that the current subinterval is the right-most
         subinterval, which is the case during the forward pass.
         After the simulation, if there are observations > t1,
-        which happens when computing offgrid-marginals, do not use `interpolate()`.
+        which happens when computing offgrid-marginals, do not use `interpolate_fwd()`.
         """
         # Extrapolate from t0 to t, and from t to t1.
         _, solution_at_t = self.predict(
@@ -437,7 +437,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         marginals = solution_at_t.marginal
         return (marginals, solution_at_t), interp_res
 
-    def interpolate_posthoc(
+    def interpolate_offgrid_marginals(
         self,
         *,
         posterior_t0: MarkovSequence,
@@ -475,7 +475,7 @@ class strategy_smoother_fixedinterval(MarkovStrategy[MarkovSequence]):
         marginals = solution_at_t.marginal
         return (marginals, solution_at_t), interp_res
 
-    def interpolate_at_t1(self, posterior_t1):
+    def interpolate_fwd_at_t1(self, posterior_t1):
         marginals = posterior_t1.marginal
 
         interp_res = utilities.InterpResult(
@@ -533,17 +533,17 @@ class strategy_filter(MarkovStrategy):
         marginals = posterior
         return marginals, posterior
 
-    def interpolate(
+    def interpolate_fwd(
         self, *, posterior_t0, posterior_t1, transition_t0_t, transition_t_t1
     ):
-        return self.interpolate_posthoc(
+        return self.interpolate_offgrid_marginals(
             posterior_t0=posterior_t0,
             posterior_t1=posterior_t1,
             transition_t0_t=transition_t0_t,
             transition_t_t1=transition_t_t1,
         )
 
-    def interpolate_posthoc(
+    def interpolate_offgrid_marginals(
         self, *, posterior_t0, posterior_t1, transition_t0_t, transition_t_t1
     ):
         del transition_t_t1
@@ -556,7 +556,7 @@ class strategy_filter(MarkovStrategy):
         )
         return (marginals, interpolated), interp_res
 
-    def interpolate_at_t1(self, *, posterior_t1):
+    def interpolate_fwd_at_t1(self, *, posterior_t1):
         marginals = posterior_t1
         interp_res = utilities.InterpResult(
             step_from=posterior_t1, interp_from=posterior_t1
@@ -658,7 +658,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         # Extract targets
         return marginals, posterior
 
-    def interpolate_at_t1(self, *, posterior_t1: MarkovSequence):
+    def interpolate_fwd_at_t1(self, *, posterior_t1: MarkovSequence):
         cond_identity = posterior_t1.marginal.identity_conditional()
         resume_from = MarkovSequence(
             posterior_t1.marginal,
@@ -673,7 +673,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         marginals = interpolated.marginal
         return (marginals, interpolated), interp_res
 
-    def interpolate(
+    def interpolate_fwd(
         self,
         *,
         posterior_t0: MarkovSequence,
@@ -774,7 +774,7 @@ class strategy_smoother_fixedpoint(MarkovStrategy[MarkovSequence]):
         marginals = interpolated.marginal
         return (marginals, interpolated), interp_res
 
-    def interpolate_posthoc(
+    def interpolate_offgrid_marginals(
         self,
         *,
         posterior_t0: MarkovSequence,
