@@ -56,20 +56,21 @@ def main():
 
     fig, axes = plt.subplots(
         nrows=2,
-        ncols=len(tcoeffs),
+        ncols=len(iwp.init.mean),
         sharex="col",
         tight_layout=True,
         figsize=(len(sol.u.mean) * 3, 5),
     )
-    _titles = ["State", "1st deriv.", "2nd deriv.", "3rd deriv."]
+    titles = ["Position", "Velocity", "Acceleration"]
     for u, label in zip(
         [sol.u, sol.solution_full.marginal],
         ["Solution (smoothed)", "Fwd pass (filtered)"],
     ):
-        for i, (u_i, std_i, ax_i) in enumerate(zip(u.mean, u.std, axes.T)):
+        for i, (u_i, std_i, ax_i, title_i) in enumerate(
+            zip(u.mean, u.std, axes.T, titles)
+        ):
             # Set up titles and axis descriptions
-            title = _titles[i] if i < len(_titles) else f"{i}th deriv."
-            ax_i[0].set_title(title, fontsize="medium")
+            ax_i[0].set_title(title_i, fontsize="medium")
             if i == 0:
                 ax_i[0].set_ylabel("Prey", fontsize="medium")
                 ax_i[1].set_ylabel("Predators", fontsize="medium")
