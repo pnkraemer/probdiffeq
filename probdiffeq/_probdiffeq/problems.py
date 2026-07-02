@@ -124,6 +124,10 @@ class JetOde(JetAbstract, Generic[T]):
         num_tcoeffs_in_args: int,
         tcoeff_indices_output: list[int],
     ):
+        # TODO: turn the num_tcoeffs_in_args argument into tcoeff_indices_input.
+        #       However, this requires manipulating the jet_lift logic to handle
+        #       inputs like (2, 4, 5). There is a well-defined solution,
+        #       but, for now, spelling out this solution is too complicated for me.
         super().__init__(jacobian=jacobian, num_tcoeffs_in_args=num_tcoeffs_in_args)
         self.vector_field = vector_field
         self.tcoeff_indices_output = tcoeff_indices_output
@@ -163,9 +167,6 @@ def ode(func: ProtocolODEFirstOrder, /, *, jacobian: jacobians.Jacobian | None =
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_rev()
 
-    # TODO: turn the num_tcoeffs_in_args argument into tcoeff_indices_input.
-    #       However, this requires manipulating the jet_lift logic to handle
-    #       inputs like (2, 4, 5). For now, this is too complicated for me.
     return JetOde(
         jetfunc, jacobian=jacobian, num_tcoeffs_in_args=1, tcoeff_indices_output=[1]
     )
