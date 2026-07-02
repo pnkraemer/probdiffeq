@@ -198,7 +198,7 @@ class _JetOdeCommon(JetAbstract, Generic[T]):
 
 
 class JetOde(_JetOdeCommon, Generic[T]):
-    def jet_lift(self, *, lift_by: int) -> "JetResidual":
+    def jet_lift(self, *, lift_by: int) -> "JetOde":
         """Lift a function on k-jet coordinates to one on (k+m)-jet coordinates."""
         if not isinstance(lift_by, int):
             raise TypeError
@@ -249,7 +249,7 @@ class JetOdeAutonomous(_JetOdeCommon, Generic[T]):
 def ode(func: ProtocolODEFirstOrder, /, *, jacobian: jacobians.Jacobian | None = None):
     """Construct a description of an ODE u' = f(u, t)."""
 
-    def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
+    def jetfunc(*, jet_coords: Sequence[T], t: float) -> list[T]:
         (y,) = jet_coords
         return [func(y, t=t)]
 
@@ -266,7 +266,7 @@ def ode_order_two(
 ):
     """Construct a description of an ODE u'' = f(u, u', t)."""
 
-    def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
+    def jetfunc(*, jet_coords: Sequence[T], t: float) -> list[T]:
         (y, dy) = jet_coords
         return [func(y, dy, t=t)]
 
@@ -286,13 +286,18 @@ def ode_order_arbitrary(
 ):
     """Construct a description of an ODE of arbitrary order."""
 
-    def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
-        return func(*jet_coords[:num_tcoeffs_in_args], t=t)
+    def jetfunc(*, jet_coords: Sequence[T], t: float) -> list[T]:
+        return [func(*jet_coords[:num_tcoeffs_in_args], t=t)]
 
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_rev()
 
-    return JetOde(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=num_tcoeffs_in_args)
+    return JetOde(
+        jetfunc,
+        jacobian=jacobian,
+        num_tcoeffs_in_args=num_tcoeffs_in_args,
+        tcoeff_indices_output=[num_tcoeffs_in_args],
+    )
 
 
 class ProtocolODEAutonomous(Protocol[T]):
@@ -399,7 +404,7 @@ def residual_position(
     # No implementation difference between ode and implicit, but
     # we don't want to force the user to think in terms of jet functions
     # so we offer these wrappers.
-    def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
+    def jetfunc(*, jet_coords: Sequence[T], t: float) -> list[T]:
         (y,) = jet_coords
         return [func(y, t=t)]
 
@@ -436,7 +441,7 @@ def residual_velocity(
     # No implementation difference between ode and implicit, but
     # we don't want to force the user to think in terms of jet functions
     # so we offer these wrappers.
-    def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
+    def jetfunc(*, jet_coords: Sequence[T], t: float) -> list[T]:
         (y, dy) = jet_coords
         return [func(y, dy, t=t)]
 
@@ -460,7 +465,7 @@ def residual_acceleration(
     # No implementation difference between ode and implicit, but
     # we don't want to force the user to think in terms of jet functions
     # so we offer these wrappers.
-    def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
+    def jetfunc(*, jet_coords: Sequence[T], t: float) -> list[T]:
         (y, dy, ddy) = jet_coords
         return [func(y, dy, ddy, t=t)]
 

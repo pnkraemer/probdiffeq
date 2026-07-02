@@ -391,14 +391,14 @@ class StateSpaceModel(abc.ABC):
     ) -> AbstractPrior:
         """Construct an integrated Ornstein-Uhlenbeck prior."""
 
-        def autonomous(*, jet_coords):
-            return linop(jet_coords[-1])
+        def autonomous(*, jet_coords: list) -> list:
+            return [linop(jet_coords[-1])]
 
         ode: problems.JetOdeAutonomous = problems.JetOdeAutonomous(
             autonomous,
             jacobian=jacobians.jacobian_monte_carlo_fwd(),
             num_tcoeffs_in_args=len(tcoeffs) + diffuse_derivatives,
-            tcoeff_indices_output=len(tcoeffs) + diffuse_derivatives + 1,
+            tcoeff_indices_output=[len(tcoeffs) + diffuse_derivatives + 1],
         )
         return self.prior_exponential(
             ode,
@@ -423,14 +423,14 @@ class StateSpaceModel(abc.ABC):
     ) -> AbstractPrior:
         """Construct a diffuse integrated Ornstein-Uhlenbeck prior."""
 
-        def autonomous(*, jet_coords):
-            return linop(jet_coords[-1])
+        def autonomous(*, jet_coords: list) -> list:
+            return [linop(jet_coords[-1])]
 
         ode: problems.JetOdeAutonomous = problems.JetOdeAutonomous(
             autonomous,
             jacobian=jacobians.jacobian_monte_carlo_fwd(),
             num_tcoeffs_in_args=len(tcoeffs_mean) + diffuse_derivatives,
-            tcoeff_indices_output=len(tcoeffs_mean) + diffuse_derivatives + 1,
+            tcoeff_indices_output=[len(tcoeffs_mean) + diffuse_derivatives + 1],
         )
         return self.prior_exponential_diffuse(
             ode,
@@ -455,19 +455,19 @@ class StateSpaceModel(abc.ABC):
     ) -> AbstractPrior:
         """Construct an integrated Ornstein-Uhlenbeck prior."""
 
-        def autonomous(*, jet_coords):
+        def autonomous(*, jet_coords: list) -> list:
             D = len(jet_coords)
             z = np.sqrt(2 * (D - 0.5)) / length_scale
             scaled = [
                 np.comb(D, i) * z ** (D - i) * d for i, d in enumerate(jet_coords)
             ]
-            return -sum(scaled)
+            return [-sum(scaled)]
 
         ode: problems.JetOdeAutonomous = problems.JetOdeAutonomous(
             autonomous,
             jacobian=jacobians.jacobian_monte_carlo_fwd(),
             num_tcoeffs_in_args=len(tcoeffs) + diffuse_derivatives,
-            tcoeff_indices_output=len(tcoeffs) + diffuse_derivatives + 1,
+            tcoeff_indices_output=[len(tcoeffs) + diffuse_derivatives + 1],
         )
         return self.prior_exponential(
             ode,
@@ -492,19 +492,19 @@ class StateSpaceModel(abc.ABC):
     ) -> AbstractPrior:
         """Construct a diffuse integrated Ornstein-Uhlenbeck prior."""
 
-        def autonomous(*, jet_coords):
+        def autonomous(*, jet_coords: list) -> list:
             D = len(jet_coords)
             z = np.sqrt(2 * (D - 0.5)) / length_scale
             scaled = [
                 np.comb(D, i) * z ** (D - i) * d for i, d in enumerate(jet_coords)
             ]
-            return -sum(scaled)
+            return [-sum(scaled)]
 
         ode: problems.JetOdeAutonomous = problems.JetOdeAutonomous(
             autonomous,
             jacobian=jacobians.jacobian_monte_carlo_fwd(),
             num_tcoeffs_in_args=len(tcoeffs_mean) + diffuse_derivatives,
-            tcoeff_indices_output=len(tcoeffs_mean) + diffuse_derivatives + 1,
+            tcoeff_indices_output=[len(tcoeffs_mean) + diffuse_derivatives + 1],
         )
         return self.prior_exponential_diffuse(
             ode,

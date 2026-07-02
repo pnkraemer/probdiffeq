@@ -6,8 +6,6 @@ This example estimates the unknown initial conditions from synthetic observation
 by minimising the negative log-marginal-likelihood via gradient descent.
 """
 
-import functools
-
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -50,7 +48,6 @@ def main(
 ) -> None:
     """Run the script."""
 
-    @functools.partial(probdiffeq.residual_jet_lift, lift_by=2)
     @probdiffeq.residual_velocity
     def differential(u, du, /, *, t):
         del t
@@ -62,12 +59,13 @@ def main(
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
         return jnp.stack([f0, f1])
 
-    @functools.partial(probdiffeq.residual_jet_lift, lift_by=3)
     @probdiffeq.residual_position
     def algebraic(u, *, t):
         del t
         return u[0] + u[1] + u[2] - 1
 
+    differential = differential.jet_lift(lift_by=2)
+    algebraic = algebraic.jet_lift(lift_by=3)
     residual = probdiffeq.residual_from_stack(differential, algebraic)
 
     def while_loop(cond, body, init):
