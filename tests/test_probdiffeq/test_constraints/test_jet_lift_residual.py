@@ -97,16 +97,17 @@ def fixture_expected(residual, derivatives):
     return coeffs
 
 
+@testing.case()
 def case_residual_jet_lift_dae(residual):
     """Use the DAE residual with separate differential and algebraic parts."""
     taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
 
     def constraint_residual(ssm, lift_by: int):
         differential = probdiffeq.residual_velocity(residual.residual_differential)
-        differential = probdiffeq.residual_jet_lift(differential, lift_by=lift_by)
+        differential = differential.jet_lift(lift_by=lift_by)
 
         algebraic = probdiffeq.residual_position(residual.residual_algebraic)
-        algebraic = probdiffeq.residual_jet_lift(algebraic, lift_by=lift_by + 1)
+        algebraic = algebraic.jet_lift(lift_by=lift_by + 1)
         residual_stack = probdiffeq.residual_from_stack(differential, algebraic)
 
         return ssm.constraint_residual(residual_stack, taylor_point=taylor_point)
@@ -114,13 +115,14 @@ def case_residual_jet_lift_dae(residual):
     return constraint_residual
 
 
+@testing.case()
 def case_residual_jet_lift_residual(residual):
     """Use the implicit residual formulation."""
     taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
 
     def constraint_residual(ssm, lift_by: int):
         implicit = probdiffeq.residual_velocity(residual.residual)
-        implicit = probdiffeq.residual_jet_lift(implicit, lift_by=lift_by)
+        implicit = implicit.jet_lift(lift_by=lift_by)
         return ssm.constraint_residual(implicit, taylor_point=taylor_point)
 
     return constraint_residual
