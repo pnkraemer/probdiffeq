@@ -11,7 +11,8 @@ def test_residual_matches_ts1(seed: int):
     @probdiffeq.residual_velocity
     def f(u, du, /, *, t):
         """Evaluate the residual corresponding to the ODE."""
-        return du - vf(u, t=t)
+        [vfx] = vf(u, t=t)
+        return du - vfx
 
     @probdiffeq.ode
     def vf(y, *, t):
