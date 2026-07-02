@@ -18,7 +18,7 @@ Examples
 ...     return y
 >>>
 >>> print(f)
-JetOde(num_tcoeffs_in_args=1, jacobian=jacobian_monte_carlo_rev(seed=1, num_probes=10))
+JetOde(num_tcoeffs_in_args=1, jacobian=jacobian_monte_carlo_rev(seed=1, num_probes=10), tcoeff_indices_output=[1])
 
 
 Higher-order problems:
@@ -28,7 +28,7 @@ Higher-order problems:
 ...     return y + dy
 >>>
 >>> print(f)
-JetOde(num_tcoeffs_in_args=2, jacobian=jacobian_monte_carlo_rev(seed=1, num_probes=10))
+JetOde(num_tcoeffs_in_args=2, jacobian=jacobian_monte_carlo_rev(seed=1, num_probes=10), tcoeff_indices_output=[2])
 
 General constraints:
 
@@ -189,7 +189,7 @@ class _JetOdeCommon(JetAbstract, Generic[T]):
         self.tcoeff_indices_output = tcoeff_indices_output
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(num_tcoeffs_in_args={self.num_tcoeffs_in_args}, jacobian={self.jacobian}, tcoeff_indices_output={self.tcoeff_indices_output}, vector_field={self.vector_field})"
+        return f"{self.__class__.__name__}(num_tcoeffs_in_args={self.num_tcoeffs_in_args}, jacobian={self.jacobian}, tcoeff_indices_output={self.tcoeff_indices_output})"
 
     def __call__(self, *jet_coords: *tuple[T], t: Array) -> T:
         # jet_coords = (u(t), u'(t), u''(t), ..., u^(K)(t))

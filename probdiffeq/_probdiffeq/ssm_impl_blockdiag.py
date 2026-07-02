@@ -156,6 +156,7 @@ class BlockDiagResidual(ssm_impl_api.AbstractResidual):
         output_like = func.eval_shape(
             self.residual.residual_function, jet_coords=jet_coords, t=t
         )
+        output_like = tree.tree_map(np.zeros_like, output_like)
         rv_output = BlockDiagNormal.from_dirac(output_like, damp=0.0)
 
         def residual_flat(u):
