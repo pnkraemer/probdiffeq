@@ -259,30 +259,6 @@ class DenseOdeTs0(ssm_impl_api.AbstractOde):
         return cond, None
 
 
-# class DenseOdeTs0Old(ssm_impl_api.AbstractOde):
-#     """Dense ODE linearization via TS0 (zeroth-degree Taylor series: evaluate at the prior mean, no Jacobian)."""
-
-#     def init_linearization(self) -> None:
-#         return None
-
-#     def linearize(self, rv: DenseNormal, state: None, *, damp: float, t):
-#         del state
-
-#         def derivative_selector(m: Array) -> Array:
-#             """Select the n-th derivative from the Taylor coefficient stack."""
-#             m0 = rv.tree_flatten.unflatten_array(m)[self.ode.num_tcoeffs_in_args]
-#             return tree.ravel_pytree(m0)[0]
-
-#         Ms = rv.mean
-#         assert False
-#         fm = self.ode.vector_field(jet_coords=Ms[: self.ode.num_tcoeffs_in_args], t=t)
-#         fx = tree.tree_map(lambda s: -s, [fm])
-#         linop = func.jacrev(derivative_selector)(rv.mean_flat)
-#         noise = DenseNormal.from_dirac(fx, damp=damp)
-#         cond = DenseLatentCond.from_linop_and_noise(linop, noise)
-#         return cond, None
-
-
 class DenseResidual(ssm_impl_api.AbstractResidual):
     """Construct a dense implementation of residual-TS1 linearization."""
 

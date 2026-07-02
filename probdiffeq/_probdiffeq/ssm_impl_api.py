@@ -398,6 +398,7 @@ class StateSpaceModel(abc.ABC):
             autonomous,
             jacobian=jacobians.jacobian_monte_carlo_fwd(),
             num_tcoeffs_in_args=len(tcoeffs) + diffuse_derivatives,
+            tcoeff_indices_output=len(tcoeffs) + diffuse_derivatives + 1,
         )
         return self.prior_exponential(
             ode,
@@ -429,6 +430,7 @@ class StateSpaceModel(abc.ABC):
             autonomous,
             jacobian=jacobians.jacobian_monte_carlo_fwd(),
             num_tcoeffs_in_args=len(tcoeffs_mean) + diffuse_derivatives,
+            tcoeff_indices_output=len(tcoeffs_mean) + diffuse_derivatives + 1,
         )
         return self.prior_exponential_diffuse(
             ode,
@@ -465,6 +467,7 @@ class StateSpaceModel(abc.ABC):
             autonomous,
             jacobian=jacobians.jacobian_monte_carlo_fwd(),
             num_tcoeffs_in_args=len(tcoeffs) + diffuse_derivatives,
+            tcoeff_indices_output=len(tcoeffs) + diffuse_derivatives + 1,
         )
         return self.prior_exponential(
             ode,
@@ -501,6 +504,7 @@ class StateSpaceModel(abc.ABC):
             autonomous,
             jacobian=jacobians.jacobian_monte_carlo_fwd(),
             num_tcoeffs_in_args=len(tcoeffs_mean) + diffuse_derivatives,
+            tcoeff_indices_output=len(tcoeffs_mean) + diffuse_derivatives + 1,
         )
         return self.prior_exponential_diffuse(
             ode,

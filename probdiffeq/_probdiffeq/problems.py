@@ -118,6 +118,7 @@ class JetAbstract:
                 msg += f" Expected: 0 <= lift_by <= {lift_by_upper}."
                 msg += f" Received: lift_by == {lift_by}."
                 raise ValueError(msg)
+
             order = self.num_tcoeffs_in_args + lift_by
             tcoeffs = jet_coords[:order]
 
@@ -171,7 +172,7 @@ class ProtocolODEOrderTwo(Protocol[T]):
     def __call__(self, u: T, du: T, /, *, t: float) -> T: ...
 
 
-class JetOde(JetAbstract, Generic[T]):
+class _JetOdeCommon(JetAbstract, Generic[T]):
     def __init__(
         self,
         vector_field,
@@ -195,6 +196,8 @@ class JetOde(JetAbstract, Generic[T]):
     def tcoeff_indices_input(self) -> list[int]:
         return list(range(self.num_tcoeffs_in_args))
 
+
+class JetOde(_JetOdeCommon, Generic[T]):
     def jet_lift(self, *, lift_by: int) -> "JetResidual":
         """Lift a function on k-jet coordinates to one on (k+m)-jet coordinates."""
         if not isinstance(lift_by, int):
@@ -207,8 +210,6 @@ class JetOde(JetAbstract, Generic[T]):
         vf_lifted = self.lift(self.vector_field, lift_by=lift_by)
         order = self.num_tcoeffs_in_args + lift_by
 
-        # TODO: If we call this on the *Autonomous subclass,
-        #       we lose the fact that the lifted function is autonomous.
         [idx] = self.tcoeff_indices_output
         tcoeff_indices_output = [idx + ell for ell in range(lift_by + 1)]
         return JetOde(
@@ -219,23 +220,30 @@ class JetOde(JetAbstract, Generic[T]):
         )
 
 
-class JetOdeAutonomous(JetOde[T]):
+class JetOdeAutonomous(_JetOdeCommon, Generic[T]):
     """An autonomous ODE u^(k) = f(u, u', ...) where f does not depend on t."""
 
     def __init__(
-        self, autonomous, jacobian: jacobians.Jacobian, num_tcoeffs_in_args: int
+        self,
+        autonomous,
+        jacobian: jacobians.Jacobian,
+        num_tcoeffs_in_args: int,
+        tcoeff_indices_output: list[int],
     ):
         def vector_field(*, jet_coords, t):
             del t
             return autonomous(jet_coords=jet_coords)
 
         super().__init__(
-            vector_field, jacobian=jacobian, num_tcoeffs_in_args=num_tcoeffs_in_args
-        )
-        assert False, (
-            "Fix: jet-lifting for ODEs and autonomous ODEs differs, so rethink the subclass construction"
+            vector_field,
+            jacobian=jacobian,
+            num_tcoeffs_in_args=num_tcoeffs_in_args,
+            tcoeff_indices_output=tcoeff_indices_output,
         )
         self.autonomous = autonomous
+
+    def jet_lift(self, *, lift_by: int) -> "JetResidual":
+        raise NotImplementedError
 
 
 def ode(func: ProtocolODEFirstOrder, /, *, jacobian: jacobians.Jacobian | None = None):
@@ -243,7 +251,7 @@ def ode(func: ProtocolODEFirstOrder, /, *, jacobian: jacobians.Jacobian | None =
 
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
         (y,) = jet_coords
-        return func(y, t=t)
+        return [func(y, t=t)]
 
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_rev()
@@ -301,7 +309,9 @@ def ode_autonomous(
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_rev()
 
-    return JetOdeAutonomous(autonomous, jacobian=jacobian, num_tcoeffs_in_args=1)
+    return JetOdeAutonomous(
+        autonomous, jacobian=jacobian, num_tcoeffs_in_args=1, tcoeff_indices_output=[1]
+    )
 
 
 class ProtocolODEAutonomousOrderTwo(Protocol[T]):
@@ -384,7 +394,7 @@ def residual_position(
     # so we offer these wrappers.
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
         (y,) = jet_coords
-        return func(y, t=t)
+        return [func(y, t=t)]
 
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_rev()
@@ -421,7 +431,7 @@ def residual_velocity(
     # so we offer these wrappers.
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
         (y, dy) = jet_coords
-        return func(y, dy, t=t)
+        return [func(y, dy, t=t)]
 
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_rev()
@@ -445,7 +455,7 @@ def residual_acceleration(
     # so we offer these wrappers.
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
         (y, dy, ddy) = jet_coords
-        return func(y, dy, ddy, t=t)
+        return [func(y, dy, ddy, t=t)]
 
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_rev()
@@ -460,7 +470,7 @@ def residual_from_ode(ode: "JetOde") -> JetResidual:
     """
 
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
-        output = jet_coords[ode.num_tcoeffs_in_args]
+        output = [jet_coords[i] for i in ode.tcoeff_indices_output]
         inputs = jet_coords[: ode.num_tcoeffs_in_args]
         vf_eval = ode.vector_field(jet_coords=inputs, t=t)
         return tree.tree_map(lambda a, b: a - b, output, vf_eval)

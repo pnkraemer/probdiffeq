@@ -70,7 +70,7 @@ def jetexpand_ode_padded_scan(*, num: int) -> JetExpansionAlg[problems.JetOde]:
         num_arguments = len(inits)
 
         # Initial Taylor series (u_0, u_1, ..., u_k)
-        primals = vf.vector_field(jet_coords=inits, t=t)
+        [primals] = vf.vector_field(jet_coords=inits, t=t)
         taylor_coeffs = [*inits, primals]
 
         # Early exit for num=1.
@@ -153,7 +153,8 @@ def jetexpand_ode_coefficient_increment(*, num_arguments):
         vf: problems.JetOde, taylor_coeffs: Sequence[T], *, t: float
     ) -> list[T]:
         def vf_with_kwargs(*u: *tuple[T, ...]) -> T:
-            return vf.vector_field(jet_coords=u, t=t)
+            [output] = vf.vector_field(jet_coords=u, t=t)
+            return output
 
         primals, series = utilities.jet_coords_to_primals_and_series(
             taylor_coeffs, num_arguments
