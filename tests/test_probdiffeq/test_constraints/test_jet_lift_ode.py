@@ -20,6 +20,12 @@ def case_ssm_blockdiag():
 
 
 @testing.case
+def case_ssm_isotropic():
+    """Construct an isotropic SSM."""
+    return probdiffeq.state_space_model_isotropic()
+
+
+@testing.case
 def case_constraint_ts0():
     """Construct a TS0 constraint."""
     return lambda ssm, ode: ssm.constraint_ode_ts0(ode)
