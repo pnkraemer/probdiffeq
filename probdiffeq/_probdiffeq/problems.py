@@ -106,11 +106,12 @@ class JetAbstract:
     def __repr__(self):
         return f"{self.__class__.__name__}(num_tcoeffs_in_args={self.num_tcoeffs_in_args}, jacobian={self.jacobian})"
 
-    def _lift(self, fun, /, *, lift_by: int):
+    def lift(self, fun, /, *, lift_by: int):
+        """Lift a function on k-jet coordinates to one on (k+m)-jet coordinates."""
 
-        def residual_lifted(*, jet_coords: Sequence[T], t) -> Sequence[T]:
+        def fun_lifted(*, jet_coords: Sequence[T], t) -> Sequence[T]:
 
-            # Check that the lift_by argument is feasible
+            # Check that the lift_by argument is feasible:
             lift_by_upper = len(jet_coords) - self.num_tcoeffs_in_args
             if lift_by < 0 or lift_by > lift_by_upper:
                 msg = "The provided jet-order is incompatible with the residual order."
@@ -159,7 +160,7 @@ class JetAbstract:
             coeffs_out = [primals, *series]
             return [unravel_outputs(c) for c in coeffs_out]
 
-        return residual_lifted
+        return fun_lifted
 
 
 class ProtocolODEFirstOrder(Protocol[T]):
@@ -198,12 +199,24 @@ class JetOde(JetAbstract, Generic[T]):
         """Lift a function on k-jet coordinates to one on (k+m)-jet coordinates."""
         if not isinstance(lift_by, int):
             raise TypeError
-        vf_lifted = self._lift(self.vector_field, lift_by=lift_by)
+
+        if len(self.tcoeff_indices_output) != 1:
+            msg = "Jet-lifting is only implemented for ODEs with a single output Taylor coefficient."
+            raise NotImplementedError(msg)
+
+        vf_lifted = self.lift(self.vector_field, lift_by=lift_by)
         order = self.num_tcoeffs_in_args + lift_by
 
         # TODO: If we call this on the *Autonomous subclass,
         #       we lose the fact that the lifted function is autonomous.
-        return JetOde(vf_lifted, num_tcoeffs_in_args=order, jacobian=self.jacobian)
+        [idx] = self.tcoeff_indices_output
+        tcoeff_indices_output = [idx + ell for ell in range(lift_by + 1)]
+        return JetOde(
+            vf_lifted,
+            num_tcoeffs_in_args=order,
+            jacobian=self.jacobian,
+            tcoeff_indices_output=tcoeff_indices_output,
+        )
 
 
 class JetOdeAutonomous(JetOde[T]):
@@ -218,6 +231,9 @@ class JetOdeAutonomous(JetOde[T]):
 
         super().__init__(
             vector_field, jacobian=jacobian, num_tcoeffs_in_args=num_tcoeffs_in_args
+        )
+        assert False, (
+            "Fix: jet-lifting for ODEs and autonomous ODEs differs, so rethink the subclass construction"
         )
         self.autonomous = autonomous
 
@@ -347,7 +363,7 @@ class JetResidual(JetAbstract):
         """Lift a function on k-jet coordinates to one on (k+m)-jet coordinates."""
         if not isinstance(lift_by, int):
             raise TypeError
-        residual_lifted = self._lift(self.residual_function, lift_by=lift_by)
+        residual_lifted = self.lift(self.residual_function, lift_by=lift_by)
         order = self.num_tcoeffs_in_args + lift_by
         return JetResidual(
             residual_lifted, num_tcoeffs_in_args=order, jacobian=self.jacobian
