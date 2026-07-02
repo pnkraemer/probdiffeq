@@ -55,7 +55,7 @@ JetResidual(num_tcoeffs_in_args=2, jacobian=jacobian_monte_carlo_rev(seed=1, num
 """
 
 from probdiffeq._probdiffeq import jacobians, utilities
-from probdiffeq.backend import func, tree
+from probdiffeq.backend import func, np, tree
 from probdiffeq.backend.typing import Any, Array, Generic, Protocol, Sequence, TypeVar
 
 __all__ = [
@@ -106,6 +106,61 @@ class JetAbstract:
     def __repr__(self):
         return f"{self.__class__.__name__}(num_tcoeffs_in_args={self.num_tcoeffs_in_args}, jacobian={self.jacobian})"
 
+    def _lift(self, fun, /, *, lift_by: int):
+
+        def residual_lifted(*, jet_coords: Sequence[T], t) -> Sequence[T]:
+
+            # Check that the lift_by argument is feasible
+            lift_by_upper = len(jet_coords) - self.num_tcoeffs_in_args
+            if lift_by < 0 or lift_by > lift_by_upper:
+                msg = "The provided jet-order is incompatible with the residual order."
+                msg += f" Expected: 0 <= lift_by <= {lift_by_upper}."
+                msg += f" Received: lift_by == {lift_by}."
+                raise ValueError(msg)
+            order = self.num_tcoeffs_in_args + lift_by
+            tcoeffs = jet_coords[:order]
+
+            # Learn how to unflatten the outputs. We need this for
+            # the output types to be consistent with the original
+            # pytree structure (needed especially for ODE jet-lifting)
+            out_like = func.eval_shape(
+                fun, jet_coords=jet_coords[: self.num_tcoeffs_in_args], t=t
+            )
+            out_like = tree.tree_map(np.zeros_like, out_like)
+            _, unravel_outputs = tree.ravel_pytree(out_like)
+
+            # Flatten the residual because jax.experimental.jet is a bit high maintenance :)
+            _, unravel_inputs = tree.ravel_pytree(jet_coords[0])
+            flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
+
+            def jet_call(*y):
+                y_tree = [unravel_inputs(s) for s in y]
+                fx = fun(jet_coords=y_tree, t=t)
+                return tree.ravel_pytree(fx)[0]
+
+            # Process the Taylor-coefficient list into the primals/series combination
+            # needed for jax.experimental.jet
+            ps, ss = utilities.jet_coords_to_primals_and_series(
+                flat, self.num_tcoeffs_in_args
+            )
+
+            # If there are no series, then we can just call the function directly and return the result.
+            if len(tree.tree_leaves(ss)) == 0:
+                fx = jet_call(*ps)
+
+                # Return a sequence to be compatible with Taylor-coeff logic,
+                # but don't bother unflattening the content
+                # because the result will be compared to zero anyway
+                return [unravel_outputs(fx)]
+
+            # Call the jet, combine the primals and series,
+            # and return the result as a sequence of Taylor coefficients
+            primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
+            coeffs_out = [primals, *series]
+            return [unravel_outputs(c) for c in coeffs_out]
+
+        return residual_lifted
+
 
 class ProtocolODEFirstOrder(Protocol[T]):
     def __call__(self, u: T, /, *, t: float) -> T: ...
@@ -138,6 +193,17 @@ class JetOde(JetAbstract, Generic[T]):
     @property
     def tcoeff_indices_input(self) -> list[int]:
         return list(range(self.num_tcoeffs_in_args))
+
+    def jet_lift(self, *, lift_by: int) -> "JetResidual":
+        """Lift a function on k-jet coordinates to one on (k+m)-jet coordinates."""
+        if not isinstance(lift_by, int):
+            raise TypeError
+        vf_lifted = self._lift(self.vector_field, lift_by=lift_by)
+        order = self.num_tcoeffs_in_args + lift_by
+
+        # TODO: If we call this on the *Autonomous subclass,
+        #       we lose the fact that the lifted function is autonomous.
+        return JetOde(vf_lifted, num_tcoeffs_in_args=order, jacobian=self.jacobian)
 
 
 class JetOdeAutonomous(JetOde[T]):
@@ -281,43 +347,7 @@ class JetResidual(JetAbstract):
         """Lift a function on k-jet coordinates to one on (k+m)-jet coordinates."""
         if not isinstance(lift_by, int):
             raise TypeError
-
-        def residual_lifted(*, jet_coords: Sequence[T], t) -> Sequence[T]:
-            tcoeffs_all = jet_coords
-            _, unravel_one = tree.ravel_pytree(tcoeffs_all[0])
-
-            lift_by_upper = len(tcoeffs_all) - self.num_tcoeffs_in_args
-            if lift_by < 0 or lift_by > lift_by_upper:
-                msg = "The provided jet-order is incompatible with the residual order."
-                msg += f" Expected: 0 <= lift_by <= {lift_by_upper}."
-                msg += f" Received: lift_by == {lift_by}."
-                raise ValueError(msg)
-            order = self.num_tcoeffs_in_args + lift_by
-            tcoeffs = tcoeffs_all[:order]
-
-            # Flatten the residual because jax.jet is a bit high maintenance :)
-            def jet_call(*y):
-                y_tree = [unravel_one(s) for s in y]
-                fx = self.residual_function(jet_coords=y_tree, t=t)
-                return tree.ravel_pytree(fx)[0]
-
-            flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
-
-            ps, ss = utilities.jet_coords_to_primals_and_series(
-                flat, self.num_tcoeffs_in_args
-            )
-
-            if len(tree.tree_leaves(ss)) == 0:
-                fx = jet_call(*ps)
-
-                # Return a sequence to be compatible with Taylor-coeff logic,
-                # but don't bother unflattening the content
-                # because the result will be compared to zero anyway
-                return [fx]
-
-            primals, series = func.jet(jet_call, ps, ss, is_tcoeff=False)
-            return [primals, *series]
-
+        residual_lifted = self._lift(self.residual_function, lift_by=lift_by)
         order = self.num_tcoeffs_in_args + lift_by
         return JetResidual(
             residual_lifted, num_tcoeffs_in_args=order, jacobian=self.jacobian

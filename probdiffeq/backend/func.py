@@ -52,8 +52,8 @@ def grad(func):
     return jax.grad(func)
 
 
-def eval_shape(func, *args):
-    return jax.eval_shape(func, *args)
+def eval_shape(func, *args, **kwargs):
+    return jax.eval_shape(func, *args, **kwargs)
 
 
 def stop_gradient(x, /):
