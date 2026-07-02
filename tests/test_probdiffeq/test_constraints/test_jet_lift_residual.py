@@ -128,9 +128,6 @@ def case_residual_jet_lift_residual(residual):
     return constraint_residual
 
 
-# TODO: move jet_lift to the Residual class?!
-
-
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_residual_")
 @testing.parametrize("lift_by", [0, "max"])
 @testing.parametrize("ssm_factory", [probdiffeq.state_space_model_dense])
