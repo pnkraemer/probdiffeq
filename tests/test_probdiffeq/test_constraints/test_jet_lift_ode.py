@@ -1,6 +1,9 @@
 from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, testing
 
+# TODO: make all existing tests pass, then add cases here to cover the remainders.
+# (Eg higher order ODEs?)
+
 
 @testing.case
 def case_ssm_dense():
@@ -13,12 +16,18 @@ def case_constraint_ts0():
     return lambda ssm, ode: ssm.constraint_ode_ts0(ode)
 
 
-@testing.parametrize_with_cases("ssm", cases=".", prefix="case_ssm_")
-@testing.parametrize_with_cases("constraint", cases=".", prefix="case_constraint_")
+@testing.case
+def case_ode_lotka_volterra():
+    return ode.ivp_lotka_volterra()
+
+
 @testing.parametrize("lift_by", [0, 1, 2])  # max: num_derivatives - 1
 @testing.parametrize("num_derivatives", [3])
-def test_jet_lift_ode_works(ssm, constraint, lift_by, num_derivatives) -> None:
-    vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
+@testing.parametrize_with_cases("ssm", cases=".", prefix="case_ssm_")
+@testing.parametrize_with_cases("constraint", cases=".", prefix="case_constraint_")
+@testing.parametrize_with_cases("ode", cases=".", prefix="case_ode_")
+def test_jet_lift_ode_works(ssm, constraint, ode, lift_by, num_derivatives) -> None:
+    vf, u0, (t0, t1) = ode
 
     # Generate a solver
     ts = np.linspace(t0, t1, num=50, endpoint=True)
