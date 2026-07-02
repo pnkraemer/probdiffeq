@@ -1,3 +1,5 @@
+"""Tests for jet-lifting functionality for ODEs."""
+
 from probdiffeq import ivpsolve, probdiffeq
 from probdiffeq.backend import func, np, ode, testing
 
@@ -13,11 +15,13 @@ def case_ssm_dense():
 
 @testing.case
 def case_constraint_ts0():
+    """Construct a TS0 constraint."""
     return lambda ssm, ode: ssm.constraint_ode_ts0(ode)
 
 
 @testing.case
 def case_ode_lotka_volterra():
+    """Construct a Lotka-Volterra ODE."""
     return ode.ivp_lotka_volterra()
 
 
@@ -26,7 +30,10 @@ def case_ode_lotka_volterra():
 @testing.parametrize_with_cases("ssm", cases=".", prefix="case_ssm_")
 @testing.parametrize_with_cases("constraint", cases=".", prefix="case_constraint_")
 @testing.parametrize_with_cases("ode", cases=".", prefix="case_ode_")
-def test_jet_lift_ode_works(ssm, constraint, ode, lift_by, num_derivatives) -> None:
+def test_jet_lift_ode_does_not_reduce_accuracy(
+    ssm, constraint, ode, lift_by, num_derivatives
+):
+    """Test that jet-lifting an ODE does not reduce accuracy."""
     vf, u0, (t0, t1) = ode
 
     # Generate a solver
