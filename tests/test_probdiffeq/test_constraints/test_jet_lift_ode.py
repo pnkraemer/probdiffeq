@@ -73,14 +73,16 @@ def test_jet_lift_ode_does_not_reduce_accuracy(
     # Compute a reference solution
     ts0 = constraint(ssm, vf)
     solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
-    solve = ivpsolve.solve_fixed_grid(solver=solver)
-    solution_ts0 = func.jit(solve)(iwp, grid=ts)
+    error = probdiffeq.error_state_std(constraint=ts0)
+    solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
+    solution_ts0 = func.jit(solve)(iwp, save_at=ts, atol=1e-5, rtol=1e-5)
 
     # Compute a jet-lifted solution
     ts0 = constraint(ssm, vf_lifted)
     solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
-    solve = ivpsolve.solve_fixed_grid(solver=solver)
-    solution_jet_lift = func.jit(solve)(iwp, grid=ts)
+    error = probdiffeq.error_state_std(constraint=ts0)
+    solve = ivpsolve.solve_adaptive_save_at(solver=solver, error=error)
+    solution_jet_lift = func.jit(solve)(iwp, save_at=ts, atol=1e-5, rtol=1e-5)
 
     assert testing.allclose(
         solution_ts0.u.mean[0], solution_jet_lift.u.mean[0], atol=1e-3, rtol=1e-3

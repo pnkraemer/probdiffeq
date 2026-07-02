@@ -979,6 +979,15 @@ class error_residual_std(ErrorEstimator):
         if self.error_per_unit_step:
             n += 1
 
+        if reference.shape != error.shape:
+            msg = f"The error-estimate and reference have different shapes ({error.shape} vs {reference.shape})."
+            msg += (
+                " This is typically caused by using the residual-based error estimator"
+            )
+            msg += " for non-standard constraints, e.g., DAEs or jet-extended ODEs."
+            msg += " Try using state-based error estimators or exchange the error-norm computation."
+            raise ValueError(msg)
+
         error_abs = error * dt**n / np.factorial(n)
         error_norm = self.error_norm(error_abs, reference, atol=atol, rtol=rtol)
 

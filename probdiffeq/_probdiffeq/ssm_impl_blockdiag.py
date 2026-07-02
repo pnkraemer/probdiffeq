@@ -283,9 +283,13 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
         return self.residual_whitened_rms_flat(u_latent)
 
     def residual_whitened_rms_flat(self, u_latent, /):
-        mean = np.reshape(self.mean_flat - u_latent, (-1,))
-        cholesky = np.reshape(self.cholesky_flat, (-1,))
-        return mean / cholesky / np.sqrt(mean.size)
+
+        def rms_scalar(u, m, c):
+            dx = u - m
+            w = linalg.solve_tril(c, dx)
+            return linalg.vector_norm(w) / np.sqrt(m.size)
+
+        return func.vmap(rms_scalar)(u_latent, self.mean_flat, self.cholesky_flat)
 
     def rescale_cholesky(self, factor, /):
         cholesky = factor[..., None, None] * self.cholesky_flat

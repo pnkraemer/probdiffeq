@@ -194,17 +194,19 @@ class IsotropicNormal(ssm_impl_api.AbstractTreeNormal[IsotropicTreeFlatten]):
         return self.tree_flatten.unflatten_array_scalar(std_flat)
 
     def residual_whitened_rms_tree(self, u):
-        if self.cholesky_flat.size > 1:
-            raise ValueError
         u_latent = self.tree_flatten.flatten_tree(u)
         return self.residual_whitened_rms_flat(u_latent)
 
     def residual_whitened_rms_flat(self, u_latent, /):
-        residual_white = (self.mean_flat - u_latent) / self.cholesky_flat
-        residual_white_matrix = linalg.qr_r(residual_white.T)
-        return np.reshape(
-            np.abs(residual_white_matrix) / np.sqrt(self.mean_flat.size), ()
-        )
+
+        residual_white = self.mean_flat - u_latent
+        residual_white = linalg.solve_tril(self.cholesky_flat, residual_white)
+
+        residual_white = np.reshape(residual_white, (-1, 1))
+        residual_white_matrix = linalg.qr_r(residual_white)
+        residual_white_matrix = np.reshape(residual_white_matrix, ())
+
+        return np.abs(residual_white_matrix) / np.sqrt(self.mean_flat.size)
 
     def rescale_cholesky(self, factor, /):
         cholesky = factor[..., None, None] * self.cholesky_flat
