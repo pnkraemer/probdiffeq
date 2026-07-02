@@ -268,12 +268,14 @@ def ode_order_two(
 
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> T:
         (y, dy) = jet_coords
-        return func(y, dy, t=t)
+        return [func(y, dy, t=t)]
 
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_rev()
 
-    return JetOde(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=2)
+    return JetOde(
+        jetfunc, jacobian=jacobian, num_tcoeffs_in_args=2, tcoeff_indices_output=[2]
+    )
 
 
 # No typing because arbitrary order is difficult to type (unlike ode and ode_order_two)
@@ -333,7 +335,9 @@ def ode_autonomous_order_two(
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_rev()
 
-    return JetOdeAutonomous(autonomous, jacobian=jacobian, num_tcoeffs_in_args=2)
+    return JetOdeAutonomous(
+        autonomous, jacobian=jacobian, num_tcoeffs_in_args=2, tcoeff_indices_output=[2]
+    )
 
 
 # No typing because arbitrary order is difficult to type (unlike ode and ode_order_two)
@@ -351,7 +355,10 @@ def ode_autonomous_order_arbitrary(
         jacobian = jacobians.jacobian_monte_carlo_rev()
 
     return JetOdeAutonomous(
-        autonomous, jacobian=jacobian, num_tcoeffs_in_args=num_tcoeffs_in_args
+        autonomous,
+        jacobian=jacobian,
+        num_tcoeffs_in_args=num_tcoeffs_in_args,
+        tcoeff_indices_output=[num_tcoeffs_in_args],
     )
 
 
