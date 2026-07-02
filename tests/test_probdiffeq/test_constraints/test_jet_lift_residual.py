@@ -126,17 +126,20 @@ def case_residual_jet_lift_residual(residual):
     return constraint_residual
 
 
-@testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
+# TODO: move jet_lift to the Residual class?!
+
+
+@testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_residual_")
 @testing.parametrize("lift_by", [0, "max"])
 @testing.parametrize("ssm_factory", [probdiffeq.state_space_model_dense])
-def test_posterior_linearisation_matches_closed_form_recursion(
+def test_jet_lift_plus_posterior_linearisation_matches_jet_expansion(
     residual: Root,
     jet_factory: Callable,
     expected: list,
     lift_by: int | Literal["max"],
     ssm_factory,
 ):
-    """Assert that jet-lifted posterior linearization matches the ODE recursion."""
+    """Assert that posterior linearisation + jet-lifted residuals recover jet expansions."""
     derivatives = len(expected) - 1
     ssm = ssm_factory()
     iwp = ssm.prior_wiener_integrated([residual.u0], diffuse_derivatives=derivatives)
@@ -157,7 +160,7 @@ def test_posterior_linearisation_matches_closed_form_recursion(
         assert testing.allclose(received[: 2 + lift_by], expected[: 2 + lift_by])
 
 
-@testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
+@testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_residual_")
 @testing.parametrize("wrong_lift_by", [-1, 4, 100])
 @testing.parametrize("ssm_factory", [probdiffeq.state_space_model_dense])
 def test_wrong_lift_by_raises_error(
