@@ -125,7 +125,7 @@ class JetAbstract:
             # Learn how to unflatten the outputs. We need this for
             # the output types to be consistent with the original
             # pytree structure (needed especially for ODE jet-lifting)
-            out_like = func.eval_shape(
+            [out_like] = func.eval_shape(
                 fun, jet_coords=jet_coords[: self.num_tcoeffs_in_args], t=t
             )
             out_like = tree.tree_map(np.zeros_like, out_like)
@@ -187,6 +187,9 @@ class _JetOdeCommon(JetAbstract, Generic[T]):
         super().__init__(jacobian=jacobian, num_tcoeffs_in_args=num_tcoeffs_in_args)
         self.vector_field = vector_field
         self.tcoeff_indices_output = tcoeff_indices_output
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(num_tcoeffs_in_args={self.num_tcoeffs_in_args}, jacobian={self.jacobian}, tcoeff_indices_output={self.tcoeff_indices_output}, vector_field={self.vector_field})"
 
     def __call__(self, *jet_coords: *tuple[T], t: Array) -> T:
         # jet_coords = (u(t), u'(t), u''(t), ..., u^(K)(t))
@@ -475,7 +478,7 @@ def residual_acceleration(
     return JetResidual(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=3)
 
 
-def residual_from_ode(ode: "JetOde") -> JetResidual:
+def residual_from_ode(ode: JetOde) -> JetResidual:
     """Construct a JetResidual from a JetOde.
 
     The residual is u^(k) - f(u, u', ..., t) = 0.

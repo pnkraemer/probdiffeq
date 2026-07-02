@@ -14,9 +14,21 @@ def case_ssm_dense():
 
 
 @testing.case
+def case_ssm_blockdiag():
+    """Construct a block-diagonal SSM."""
+    return probdiffeq.state_space_model_blockdiag()
+
+
+@testing.case
 def case_constraint_ts0():
     """Construct a TS0 constraint."""
     return lambda ssm, ode: ssm.constraint_ode_ts0(ode)
+
+
+@testing.case
+def case_constraint_ts1():
+    """Construct a TS0 constraint."""
+    return lambda ssm, ode: ssm.constraint_ode_ts1(ode)
 
 
 @testing.case
@@ -42,7 +54,10 @@ def test_jet_lift_ode_does_not_reduce_accuracy(
 
     # Build an ODE and a jet-lifted ODE
     # TODO: assert that jet_lift has a good error message if lift_by is too large
-    vf = probdiffeq.ode(vf)
+
+    # Materialize the Jacobian to ensure that trace-estimation errors
+    # are not the culprits for failing tests
+    vf = probdiffeq.ode(vf, jacobian=probdiffeq.jacobian_materialize())
     vf_lifted = vf.jet_lift(lift_by=lift_by)
 
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives)
