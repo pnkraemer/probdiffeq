@@ -118,14 +118,23 @@ class ProtocolODEOrderTwo(Protocol[T]):
 
 class JetOde(JetAbstract, Generic[T]):
     def __init__(
-        self, vector_field, jacobian: jacobians.Jacobian, num_tcoeffs_in_args: int
+        self,
+        vector_field,
+        jacobian: jacobians.Jacobian,
+        num_tcoeffs_in_args: int,
+        tcoeff_indices_output: list[int],
     ):
         super().__init__(jacobian=jacobian, num_tcoeffs_in_args=num_tcoeffs_in_args)
         self.vector_field = vector_field
+        self.tcoeff_indices_output = tcoeff_indices_output
 
     def __call__(self, *jet_coords: *tuple[T], t: Array) -> T:
         # jet_coords = (u(t), u'(t), u''(t), ..., u^(K)(t))
         return self.vector_field(jet_coords=jet_coords, t=t)
+
+    @property
+    def tcoeff_indices_input(self) -> list[int]:
+        return list(range(self.num_tcoeffs_in_args))
 
 
 class JetOdeAutonomous(JetOde[T]):
@@ -154,7 +163,12 @@ def ode(func: ProtocolODEFirstOrder, /, *, jacobian: jacobians.Jacobian | None =
     if jacobian is None:
         jacobian = jacobians.jacobian_monte_carlo_rev()
 
-    return JetOde(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=1)
+    # TODO: turn the num_tcoeffs_in_args argument into tcoeff_indices_input.
+    #       However, this requires manipulating the jet_lift logic to handle
+    #       inputs like (2, 4, 5). For now, this is too complicated for me.
+    return JetOde(
+        jetfunc, jacobian=jacobian, num_tcoeffs_in_args=1, tcoeff_indices_output=[1]
+    )
 
 
 def ode_order_two(
