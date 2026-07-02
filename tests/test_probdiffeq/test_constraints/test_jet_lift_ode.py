@@ -8,10 +8,16 @@ def case_ssm_dense():
     return probdiffeq.state_space_model_dense()
 
 
+@testing.case
+def case_constraint_ts0():
+    return lambda ssm, ode: ssm.constraint_ode_ts0(ode)
+
+
 @testing.parametrize_with_cases("ssm", cases=".", prefix="case_ssm_")
+@testing.parametrize_with_cases("constraint", cases=".", prefix="case_constraint_")
 @testing.parametrize("lift_by", [0, 1, 2])  # max: num_derivatives - 1
 @testing.parametrize("num_derivatives", [3])
-def test_jet_lift_ode_works(ssm, lift_by, num_derivatives) -> None:
+def test_jet_lift_ode_works(ssm, constraint, lift_by, num_derivatives) -> None:
     vf, u0, (t0, t1) = ode.ivp_lotka_volterra()
 
     # Generate a solver
@@ -28,13 +34,13 @@ def test_jet_lift_ode_works(ssm, lift_by, num_derivatives) -> None:
     iwp = ssm.prior_wiener_integrated(tcoeffs)
 
     # Compute a reference solution
-    ts0 = ssm.constraint_ode_ts0(vf)
+    ts0 = constraint(ssm, vf)
     solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
     solution_ts0 = func.jit(solve)(iwp, grid=ts)
 
     # Compute a jet-lifted solution
-    ts0 = ssm.constraint_ode_ts0(vf_lifted)
+    ts0 = constraint(ssm, vf_lifted)
     solver = probdiffeq.solver(strategy=strategy, constraint=ts0)
     solve = ivpsolve.solve_fixed_grid(solver=solver)
     solution_jet_lift = func.jit(solve)(iwp, grid=ts)
