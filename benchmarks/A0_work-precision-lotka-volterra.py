@@ -19,7 +19,7 @@ jax.config.update("jax_debug_nans", True)
 jax.config.update("jax_enable_x64", True)
 
 
-def main(start=3.0, stop=12.0, step=0.5, repeats=1) -> None:
+def main(start=3.0, stop=12.0, step=1.0, repeats=1) -> None:
     """Run the script."""
     # Simulate once to plot the state
     ts, ys = solve_ivp_once()
@@ -45,15 +45,11 @@ def main(start=3.0, stop=12.0, step=0.5, repeats=1) -> None:
     ts0_bd_jet = solver_probdiffeq_jet(
         5, constraint_order=0, implementation="blockdiag"
     )
-    ts1_dense = solver_probdiffeq(8, constraint_order=1, implementation="dense")
-    ts1_dense_jet = solver_probdiffeq_jet(8, constraint_order=1, implementation="dense")
     algorithms = {
         r"TS0(5, isotropic)": ts0_iso,
         r"JetTS0(5, isotropic)": ts0_iso_jet,
         r"TS0(5, blockdiag)": ts0_bd,
         r"JetTS0(5, blockdiag)": ts0_bd_jet,
-        r"TS1(8, dense)": ts1_dense,
-        r"JetTS1(8, dense)": ts1_dense_jet,
         "SciPy: 'RK45'": solver_scipy(method="RK45"),
     }
 
