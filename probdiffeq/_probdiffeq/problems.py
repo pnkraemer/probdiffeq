@@ -63,13 +63,6 @@ __all__ = [
     "JetOde",
     "JetOdeAutonomous",
     "JetResidual",
-    "ProtocolODEAutonomous",
-    "ProtocolODEAutonomousOrderTwo",
-    "ProtocolODEFirstOrder",
-    "ProtocolODEOrderTwo",
-    "ProtocolResidualAcceleration",
-    "ProtocolResidualPosition",
-    "ProtocolResidualVelocity",
     "ode",
     "ode_autonomous",
     "ode_autonomous_order_arbitrary",
@@ -164,11 +157,11 @@ class JetAbstract:
         return fun_lifted
 
 
-class ProtocolODEFirstOrder(Protocol[T]):
+class _ProtocolODEFirstOrder(Protocol[T]):
     def __call__(self, u: T, /, *, t: float) -> T: ...
 
 
-class ProtocolODEOrderTwo(Protocol[T]):
+class _ProtocolODEOrderTwo(Protocol[T]):
     def __call__(self, u: T, du: T, /, *, t: float) -> T: ...
 
 
@@ -191,11 +184,14 @@ class _JetOdeCommon(JetAbstract, Generic[T]):
     def __repr__(self):
         return f"{self.__class__.__name__}(num_tcoeffs_in_args={self.num_tcoeffs_in_args}, jacobian={self.jacobian}, tcoeff_indices_output={self.tcoeff_indices_output})"
 
-    # TODO: call if self.is_jet_extended: raise ValueError in here once uncommenting
-    # def __call__(self, *jet_coords: *tuple[T], t: Array) -> T:
-    #     # jet_coords = (u(t), u'(t), u''(t), ..., u^(K)(t))
-    #     [fx] = self.vector_field(jet_coords=jet_coords, t=t)
-    #     return fx
+    def __call__(self, *jet_coords: *tuple[T], t: Array) -> T:
+        # jet_coords = (u(t), u'(t), u''(t), ..., u^(K)(t))
+
+        if self.is_jet_extended:
+            raise ValueError
+
+        [fx] = self.vector_field(jet_coords=jet_coords, t=t)
+        return fx
 
     @property
     def tcoeff_indices_input(self) -> list[int]:
@@ -261,7 +257,7 @@ class JetOdeAutonomous(_JetOdeCommon, Generic[T]):
         raise NotImplementedError
 
 
-def ode(func: ProtocolODEFirstOrder, /, *, jacobian: jacobians.Jacobian | None = None):
+def ode(func: _ProtocolODEFirstOrder, /, *, jacobian: jacobians.Jacobian | None = None):
     """Construct a description of an ODE u' = f(u, t)."""
 
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> list[T]:
@@ -277,7 +273,7 @@ def ode(func: ProtocolODEFirstOrder, /, *, jacobian: jacobians.Jacobian | None =
 
 
 def ode_order_two(
-    func: ProtocolODEOrderTwo, /, *, jacobian: jacobians.Jacobian | None = None
+    func: _ProtocolODEOrderTwo, /, *, jacobian: jacobians.Jacobian | None = None
 ):
     """Construct a description of an ODE u'' = f(u, u', t)."""
 
@@ -315,12 +311,12 @@ def ode_order_arbitrary(
     )
 
 
-class ProtocolODEAutonomous(Protocol[T]):
+class _ProtocolODEAutonomous(Protocol[T]):
     def __call__(self, u: T, /) -> T: ...
 
 
 def ode_autonomous(
-    func: ProtocolODEAutonomous, /, *, jacobian: jacobians.Jacobian | None = None
+    func: _ProtocolODEAutonomous, /, *, jacobian: jacobians.Jacobian | None = None
 ):
     """Construct a description of an autonomous ODE u' = f(u)."""
 
@@ -336,12 +332,12 @@ def ode_autonomous(
     )
 
 
-class ProtocolODEAutonomousOrderTwo(Protocol[T]):
+class _ProtocolODEAutonomousOrderTwo(Protocol[T]):
     def __call__(self, u: T, du: T, /) -> T: ...
 
 
 def ode_autonomous_order_two(
-    func: ProtocolODEAutonomousOrderTwo,
+    func: _ProtocolODEAutonomousOrderTwo,
     /,
     *,
     jacobian: jacobians.Jacobian | None = None,
@@ -407,12 +403,12 @@ class JetResidual(JetAbstract):
         )
 
 
-class ProtocolResidualPosition(Protocol[T_contra]):
+class _ProtocolResidualPosition(Protocol[T_contra]):
     def __call__(self, u: T_contra, /, *, t: float) -> Any: ...
 
 
 def residual_position(
-    func: ProtocolResidualPosition, /, *, jacobian: jacobians.Jacobian | None = None
+    func: _ProtocolResidualPosition, /, *, jacobian: jacobians.Jacobian | None = None
 ) -> JetResidual:
     """Construct a description of a residual f(u, t) = 0."""
 
@@ -444,12 +440,12 @@ def residual_from_stack(*residual_stack: *tuple[JetResidual, ...]) -> JetResidua
     return JetResidual(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=num_args)
 
 
-class ProtocolResidualVelocity(Protocol[T_contra]):
+class _ProtocolResidualVelocity(Protocol[T_contra]):
     def __call__(self, u: T_contra, du: T_contra, /, *, t: float) -> Any: ...
 
 
 def residual_velocity(
-    func: ProtocolResidualVelocity, /, *, jacobian: jacobians.Jacobian | None = None
+    func: _ProtocolResidualVelocity, /, *, jacobian: jacobians.Jacobian | None = None
 ) -> JetResidual:
     """Construct a description of a residual f(u, du, t) = 0."""
 
@@ -466,14 +462,17 @@ def residual_velocity(
     return JetResidual(jetfunc, jacobian=jacobian, num_tcoeffs_in_args=2)
 
 
-class ProtocolResidualAcceleration(Protocol[T_contra]):
+class _ProtocolResidualAcceleration(Protocol[T_contra]):
     def __call__(
         self, u: T_contra, du: T_contra, ddu: T_contra, /, *, t: float
     ) -> Any: ...
 
 
 def residual_acceleration(
-    func: ProtocolResidualAcceleration, /, *, jacobian: jacobians.Jacobian | None = None
+    func: _ProtocolResidualAcceleration,
+    /,
+    *,
+    jacobian: jacobians.Jacobian | None = None,
 ) -> JetResidual:
     """Construct a description of a residual f(u, du, ddu, t) = 0."""
 
