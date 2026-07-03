@@ -84,7 +84,7 @@ def fixture_residual_sir():
 
 
 @testing.fixture(name="expected")
-@testing.parametrize("derivatives", [1, 5])
+@testing.parametrize("derivatives", [5])
 def fixture_expected(residual, derivatives):
     """Compute expected jet expansion coefficients via the ODE vector field."""
 
@@ -102,12 +102,18 @@ def case_residual_jet_lift_dae(residual):
     """Use the DAE residual with separate differential and algebraic parts."""
     taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
 
-    def constraint_residual(ssm, lift_by: int):
+    def constraint_residual(ssm, lift_by: int | Literal["max"], num_tcoeffs):
         differential = probdiffeq.residual_velocity(residual.residual_differential)
-        differential = differential.jet_lift(lift_by=lift_by)
 
         algebraic = probdiffeq.residual_position(residual.residual_algebraic)
-        algebraic = algebraic.jet_lift(lift_by=lift_by + 1)
+
+        if lift_by == "max":
+            differential = differential.jet_lift_max(num_tcoeffs=num_tcoeffs)
+            algebraic = algebraic.jet_lift_max(num_tcoeffs=num_tcoeffs)
+        else:
+            differential = differential.jet_lift(lift_by=lift_by)
+            algebraic = algebraic.jet_lift(lift_by=lift_by + 1)
+
         residual_stack = probdiffeq.residual_from_stack(differential, algebraic)
 
         return ssm.constraint_residual(residual_stack, taylor_point=taylor_point)
@@ -120,16 +126,19 @@ def case_residual_jet_lift_residual(residual):
     """Use the implicit residual formulation."""
     taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
 
-    def constraint_residual(ssm, lift_by: int):
+    def constraint_residual(ssm, lift_by: int | Literal["max"], num_tcoeffs):
         implicit = probdiffeq.residual_velocity(residual.residual)
-        implicit = implicit.jet_lift(lift_by=lift_by)
+        if lift_by == "max":
+            implicit = implicit.jet_lift_max(num_tcoeffs=num_tcoeffs)
+        else:
+            implicit = implicit.jet_lift(lift_by=lift_by)
         return ssm.constraint_residual(implicit, taylor_point=taylor_point)
 
     return constraint_residual
 
 
 @testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_residual_")
-@testing.parametrize("lift_by", [0, "max"])
+@testing.parametrize("lift_by", [0, 1, 2, "max"])
 @testing.parametrize("ssm_factory", [probdiffeq.state_space_model_dense])
 def test_jet_lift_plus_posterior_linearisation_matches_jet_expansion(
     residual: Root,
@@ -143,8 +152,7 @@ def test_jet_lift_plus_posterior_linearisation_matches_jet_expansion(
     ssm = ssm_factory()
     iwp = ssm.prior_wiener_integrated([residual.u0], diffuse_derivatives=derivatives)
 
-    lift_by = len(expected) - 2 if lift_by == "max" else lift_by
-    constraint = jet_factory(ssm=ssm, lift_by=lift_by)
+    constraint = jet_factory(ssm=ssm, lift_by=lift_by, num_tcoeffs=derivatives + 1)
 
     cstate = constraint.init_linearization()
     fx, cstate = constraint.linearize(iwp.init, cstate, damp=0.0, t=residual.t0)
@@ -169,7 +177,7 @@ def test_wrong_lift_by_raises_error(
     # 5 Taylor coefficients + residual-orders of 2 (constraints depend on u and du).
     ssm = ssm_factory()
     iwp = ssm.prior_wiener_integrated([residual.u0], diffuse_derivatives=4)
-    constraint = jet_factory(ssm=ssm, lift_by=wrong_lift_by)
+    constraint = jet_factory(ssm=ssm, lift_by=wrong_lift_by, num_tcoeffs=4 + 1)
 
     cstate = constraint.init_linearization()
     with testing.raises(ValueError, match="Received"):

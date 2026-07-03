@@ -43,7 +43,7 @@ def case_ode_lotka_volterra():
     return ode.ivp_lotka_volterra()
 
 
-@testing.parametrize("lift_by", [0, 1, 2])  # max: num_derivatives - 1
+@testing.parametrize("lift_by", [0, 1, 2, "max"])  # max: num_derivatives - 1
 @testing.parametrize("num_derivatives", [3])
 @testing.parametrize_with_cases("ssm", cases=".", prefix="case_ssm_")
 @testing.parametrize_with_cases("constraint", cases=".", prefix="case_constraint_")
@@ -64,7 +64,10 @@ def test_jet_lift_ode_does_not_reduce_accuracy(
     # Materialize the Jacobian to ensure that trace-estimation errors
     # are not the culprits for failing tests
     vf = probdiffeq.ode(vf, jacobian=probdiffeq.jacobian_materialize())
-    vf_lifted = vf.jet_lift(lift_by=lift_by)
+    if lift_by == "max":
+        vf_lifted = vf.jet_lift_max(num_tcoeffs=num_derivatives + 1)
+    else:
+        vf_lifted = vf.jet_lift(lift_by=lift_by)
 
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives)
     tcoeffs, _ = jetexpand(vf, u0, t=t0)

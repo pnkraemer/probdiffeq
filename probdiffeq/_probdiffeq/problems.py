@@ -209,6 +209,24 @@ class _JetOdeCommon(JetAbstract, Generic[T]):
 
 
 class JetOde(_JetOdeCommon, Generic[T]):
+    def jet_lift_max(self, *, num_tcoeffs: int) -> "JetOde":
+        if self.is_jet_extended:
+            raise ValueError
+        [output_idx] = self.tcoeff_indices_output
+        assert output_idx >= self.num_tcoeffs_in_args
+
+        # E.g. for second-order ODE with three-coeff priors:
+        #   output_idx = 2
+        #   num_tcoeffs = 3 (state, position, velocity)
+        #   -> lift_by = 0, because all states are observed directly
+        # For second-order ODE with five-coeff priors:
+        #   output_idx = 2
+        #   num_tcoeffs = 5
+        #   -> lift_by = 2, because without jet extension,
+        #   the two highest derivatives remain unobserved
+        lift_by = num_tcoeffs - output_idx - 1
+        return self.jet_lift(lift_by=lift_by)
+
     def jet_lift(self, *, lift_by: int) -> "JetOde":
         """Lift a function on k-jet coordinates to one on (k+m)-jet coordinates."""
         if not isinstance(lift_by, int):
@@ -253,7 +271,10 @@ class JetOdeAutonomous(_JetOdeCommon, Generic[T]):
         )
         self.autonomous = autonomous
 
-    def jet_lift(self, *, lift_by: int) -> "JetResidual":
+    def jet_lift_max(self, *, num_tcoeffs: int):
+        raise NotImplementedError
+
+    def jet_lift(self, *, lift_by: int):
         raise NotImplementedError
 
 
@@ -391,6 +412,9 @@ class JetResidual(JetAbstract):
         """Make the vector field callable like the original user function to hide the "sophisticated" API."""
         # jet_coords = (u(t), u'(t), u''(t), ..., u^(K)(t))
         return self.residual_function(jet_coords=jet_coords, t=t)
+
+    def jet_lift_max(self, *, num_tcoeffs: int) -> "JetResidual":
+        return self.jet_lift(lift_by=num_tcoeffs - self.num_tcoeffs_in_args)
 
     def jet_lift(self, *, lift_by: int) -> "JetResidual":
         """Lift a function on k-jet coordinates to one on (k+m)-jet coordinates."""
