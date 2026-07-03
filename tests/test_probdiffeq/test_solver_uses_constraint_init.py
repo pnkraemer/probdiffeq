@@ -34,7 +34,6 @@ def test_output_matches_reference(
     """Assert that the solver uses the constraint init to set the first-step state accurately."""
     vf, (u0,), (t0, t1) = ivp
 
-    @func.partial(probdiffeq.residual_jet_lift, lift_by=derivatives - 1)
     @probdiffeq.residual_velocity
     def residual(u, du, /, *, t):
         return tree.tree_map(
@@ -50,6 +49,8 @@ def test_output_matches_reference(
     def residual_nonlinear(u, _du, *, t):
         vfu = vf(u, t=t)
         return tree.tree_map(lambda a: -a, vfu)
+
+    residual = residual.jet_lift(lift_by=derivatives - 1)
 
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=derivatives)
     expected, _ = jetexpand(probdiffeq.ode(vf), [u0], t=t0)

@@ -17,7 +17,7 @@ from probdiffeq.util import benchmark_util
 jax.config.update("jax_debug_nans", True)
 
 
-def main(start=4.0, stop=10.0, step=0.25, repeats=2) -> None:
+def main(start=6.0, stop=10.0, step=0.25, repeats=2) -> None:
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
@@ -41,7 +41,9 @@ def main(start=4.0, stop=10.0, step=0.25, repeats=2) -> None:
     # Assemble algorithms
     algorithms = {
         "TS1(4)": solver_probdiffeq(num_derivatives=4),
-        "TS1(8)": solver_probdiffeq(num_derivatives=8),
+        "JetTS1(4)": solver_probdiffeq_jet(num_derivatives=4),
+        "TS1(6)": solver_probdiffeq(num_derivatives=6),
+        "JetTS1(6)": solver_probdiffeq_jet(num_derivatives=6),
         "SciPy('LSODA')": solver_scipy(method="LSODA"),
     }
 
@@ -100,14 +102,9 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @probdiffeq.ode_order_two
-    def vf_probdiffeq(u, du, *, t):  # noqa: ARG001
+    def vf(u, du, *, t):  # noqa: ARG001
         """Van-der-Pol dynamics as a second-order differential equation."""
         return 1e5 * ((1.0 - u**2) * du - u)
-
-    @probdiffeq.residual_acceleration
-    def residual(u, du, ddu, /, *, t):
-        """Evaluate a residual to solve the 2nd-order problem directly."""
-        return ddu - vf_probdiffeq(u, du, t=t)
 
     t0, t1 = 0.0, 3.0
     u0, du0 = (jnp.asarray(2.0), jnp.asarray(0.0))
@@ -117,11 +114,48 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
     def param_to_solution(tol):
         # Build a solver
         jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives - 1)
-        tcoeffs, _ = jetexpand(vf_probdiffeq, (u0, du0), t=t0)
+        tcoeffs, _ = jetexpand(vf, (u0, du0), t=t0)
 
         ssm = probdiffeq.state_space_model_dense()
         iwp = ssm.prior_wiener_integrated(tcoeffs)
-        ts = ssm.constraint_residual(residual)
+        ts = ssm.constraint_ode_ts1(vf)
+        strategy = probdiffeq.strategy_filter()
+
+        solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=ts)
+        error = probdiffeq.error_state_std(constraint=ts)
+
+        control = ivpsolve.control_proportional_integral()
+        solve = ivpsolve.solve_adaptive_terminal_values(
+            solver=solver, error=error, control=control
+        )
+        solution = solve(iwp, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
+        return jax.block_until_ready(solution.u.mean[0])
+
+    return param_to_solution
+
+
+def solver_probdiffeq_jet(*, num_derivatives: int) -> Callable:
+    """Construct a solver that wraps ProbDiffEq's solution routines."""
+
+    @probdiffeq.ode_order_two
+    def vf(u, du, *, t):  # noqa: ARG001
+        """Van-der-Pol dynamics as a second-order differential equation."""
+        return 1e5 * ((1.0 - u**2) * du - u)
+
+    vf = vf.jet_lift(lift_by=num_derivatives - 2)
+    t0, t1 = 0.0, 3.0
+    u0, du0 = (jnp.asarray(2.0), jnp.asarray(0.0))
+    t0, t1 = (0.0, 6.3)
+
+    @jax.jit
+    def param_to_solution(tol):
+        # Build a solver
+
+        ssm = probdiffeq.state_space_model_dense()
+        iwp = ssm.prior_wiener_integrated(
+            (u0, du0), diffuse_derivatives=num_derivatives - 1
+        )
+        ts = ssm.constraint_ode_ts1(vf)
         strategy = probdiffeq.strategy_filter()
 
         solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=ts)

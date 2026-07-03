@@ -129,15 +129,16 @@ class BlockDiagOdeTs0(ssm_impl_api.AbstractOde):
     def linearize(self, rv, state: None, *, damp: float, t):
         del state
 
-        jet_coords = rv.mean[: self.ode.num_tcoeffs_in_args]
-        fx = self.ode.vector_field(jet_coords=jet_coords, t=t)
+        fx = self.ode.vector_field(
+            jet_coords=rv.mean[: self.ode.num_tcoeffs_in_args], t=t
+        )
         fx = tree.tree_map(lambda s: -s, fx)
-        bias = BlockDiagNormal.from_dirac([fx], damp=damp)
+        bias = BlockDiagNormal.from_dirac(fx, damp=damp)
 
-        def a1(s):
-            return s[[self.ode.num_tcoeffs_in_args], ...]
+        def derivative_selector(s):
+            return s[np.asarray(self.ode.tcoeff_indices_output), ...]
 
-        linop = func.vmap(func.jacrev(a1))(rv.mean_flat)
+        linop = func.vmap(func.jacrev(derivative_selector))(rv.mean_flat)
 
         cond = BlockDiagLatentCond.from_linop_and_noise(linop, bias)
         return cond, None
@@ -150,13 +151,19 @@ class BlockDiagResidual(ssm_impl_api.AbstractResidual):
         return self.residual.jacobian.init_jacobian_handler()
 
     def linearize(self, rv, state, *, damp: float, t):
-        rv0 = BlockDiagNormal.from_dirac([rv.mean[0]], damp=0.0)
+        # Understand the output pytree structure
+        jet_coords = rv.mean[: self.residual.num_tcoeffs_in_args]
+        output_like = func.eval_shape(
+            self.residual.residual_function, jet_coords=jet_coords, t=t
+        )
+        output_like = tree.tree_map(np.zeros_like, output_like)
+        rv_output = BlockDiagNormal.from_dirac(output_like, damp=0.0)
 
         def residual_flat(u):
             u_tree = rv.tree_flatten.unflatten_array(u.T)
             u_tree = u_tree[: self.residual.num_tcoeffs_in_args]
             r_tree = self.residual.residual_function(jet_coords=u_tree, t=t)
-            return rv0.tree_flatten.flatten_tree([r_tree]).T
+            return rv_output.tree_flatten.flatten_tree(r_tree).T
 
         fx, J_diag, state = self.residual.jacobian.calculate_diagonal_along_d(
             residual_flat, rv.mean_flat.T, state
@@ -170,8 +177,8 @@ class BlockDiagResidual(ssm_impl_api.AbstractResidual):
         diff = np.einsum("din,dn->di", linop, rv.mean_flat)
         fx = fx - diff
 
-        fx = rv0.tree_flatten.unflatten_array(fx)
-        bias = BlockDiagNormal.from_dirac([fx], damp=damp)
+        fx = rv_output.tree_flatten.unflatten_array(fx)
+        bias = BlockDiagNormal.from_dirac(fx, damp=damp)
         cond = BlockDiagLatentCond.from_linop_and_noise(linop, bias)
         return cond, state
 
@@ -276,9 +283,13 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
         return self.residual_whitened_rms_flat(u_latent)
 
     def residual_whitened_rms_flat(self, u_latent, /):
-        mean = np.reshape(self.mean_flat - u_latent, (-1,))
-        cholesky = np.reshape(self.cholesky_flat, (-1,))
-        return mean / cholesky / np.sqrt(mean.size)
+
+        def rms_scalar(u, m, c):
+            dx = u - m
+            w = linalg.solve_tril(c, dx)
+            return linalg.vector_norm(w) / np.sqrt(m.size)
+
+        return func.vmap(rms_scalar)(u_latent, self.mean_flat, self.cholesky_flat)
 
     def rescale_cholesky(self, factor, /):
         cholesky = factor[..., None, None] * self.cholesky_flat

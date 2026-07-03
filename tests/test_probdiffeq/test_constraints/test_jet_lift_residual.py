@@ -6,7 +6,7 @@ from probdiffeq.backend.typing import Array, Callable, Literal
 
 
 @structs.dataclass
-class Root:
+class ResidualFixture:
     """Different APIs for one and the same residual-finding problem.
 
     Its purpose is to enable different jet-constraints to solve the same
@@ -22,8 +22,8 @@ class Root:
 
 
 @testing.fixture(name="residual")
-def fixture_residual_sir():
-    """Construct the SIR model as a Root struct with ODE and DAE residuals."""
+def fixture_residual_sir() -> ResidualFixture:
+    """Construct the SIR model as a ResidualFixture with ODE and DAE residuals."""
 
     def residual(u, du, /, *, t):
         linear = imex_linear(u, du, t=t)
@@ -73,7 +73,7 @@ def fixture_residual_sir():
 
     u0 = np.asarray([0.99, 0.01, 0.0])
     t0 = 0.0
-    return Root(
+    return ResidualFixture(
         residual=residual,
         residual_differential=dae_differential,
         residual_algebraic=dae_algebraic,
@@ -83,9 +83,9 @@ def fixture_residual_sir():
     )
 
 
-@testing.fixture(name="expected")
-@testing.parametrize("derivatives", [1, 5])
-def fixture_expected(residual, derivatives):
+@testing.fixture(name="true_tcoeffs")
+@testing.parametrize("derivatives", [5])
+def fixture_true_tcoeffs(residual: ResidualFixture, derivatives: int) -> list:
     """Compute expected jet expansion coefficients via the ODE vector field."""
 
     @probdiffeq.ode
@@ -97,16 +97,23 @@ def fixture_expected(residual, derivatives):
     return coeffs
 
 
-def case_residual_jet_lift_dae(residual):
+@testing.case()
+def case_residual_jet_lift_dae(residual: ResidualFixture) -> Callable:
     """Use the DAE residual with separate differential and algebraic parts."""
     taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
 
-    def constraint_residual(ssm, lift_by: int):
+    def constraint_residual(ssm, lift_by: int | Literal["max"], num_tcoeffs):
         differential = probdiffeq.residual_velocity(residual.residual_differential)
-        differential = probdiffeq.residual_jet_lift(differential, lift_by=lift_by)
 
         algebraic = probdiffeq.residual_position(residual.residual_algebraic)
-        algebraic = probdiffeq.residual_jet_lift(algebraic, lift_by=lift_by + 1)
+
+        if lift_by == "max":
+            differential = differential.jet_lift_max(num_tcoeffs=num_tcoeffs)
+            algebraic = algebraic.jet_lift_max(num_tcoeffs=num_tcoeffs)
+        else:
+            differential = differential.jet_lift(lift_by=lift_by)
+            algebraic = algebraic.jet_lift(lift_by=lift_by + 1)
+
         residual_stack = probdiffeq.residual_from_stack(differential, algebraic)
 
         return ssm.constraint_residual(residual_stack, taylor_point=taylor_point)
@@ -114,35 +121,36 @@ def case_residual_jet_lift_dae(residual):
     return constraint_residual
 
 
-def case_residual_jet_lift_residual(residual):
+@testing.case()
+def case_residual_jet_lift_residual(residual: ResidualFixture) -> Callable:
     """Use the implicit residual formulation."""
     taylor_point = probdiffeq.taylor_point_maximum_a_posteriori()
 
-    def constraint_residual(ssm, lift_by: int):
+    def constraint_residual(ssm, lift_by: int | Literal["max"], num_tcoeffs):
         implicit = probdiffeq.residual_velocity(residual.residual)
-        implicit = probdiffeq.residual_jet_lift(implicit, lift_by=lift_by)
+        if lift_by == "max":
+            implicit = implicit.jet_lift_max(num_tcoeffs=num_tcoeffs)
+        else:
+            implicit = implicit.jet_lift(lift_by=lift_by)
         return ssm.constraint_residual(implicit, taylor_point=taylor_point)
 
     return constraint_residual
 
 
-@testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
-@testing.parametrize("lift_by", [0, "max"])
-@testing.parametrize("ssm_factory", [probdiffeq.state_space_model_dense])
-def test_posterior_linearisation_matches_closed_form_recursion(
-    residual: Root,
+@testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_residual_")
+@testing.parametrize("lift_by", [0, 1, 2, "max"])
+def test_jet_lift_with_taylor_map_yields_true_tcoeffs(
+    residual: ResidualFixture,
+    true_tcoeffs: list,
     jet_factory: Callable,
-    expected: list,
     lift_by: int | Literal["max"],
-    ssm_factory,
 ):
-    """Assert that jet-lifted posterior linearization matches the ODE recursion."""
-    derivatives = len(expected) - 1
-    ssm = ssm_factory()
+    """Assert that posterior linearisation + jet-lifted residuals recover jet expansions."""
+    ssm = probdiffeq.state_space_model_dense()
+    derivatives = len(true_tcoeffs) - 1
     iwp = ssm.prior_wiener_integrated([residual.u0], diffuse_derivatives=derivatives)
 
-    lift_by = len(expected) - 2 if lift_by == "max" else lift_by
-    constraint = jet_factory(ssm=ssm, lift_by=lift_by)
+    constraint = jet_factory(ssm=ssm, lift_by=lift_by, num_tcoeffs=derivatives + 1)
 
     cstate = constraint.init_linearization()
     fx, cstate = constraint.linearize(iwp.init, cstate, damp=0.0, t=residual.t0)
@@ -152,22 +160,21 @@ def test_posterior_linearisation_matches_closed_form_recursion(
     updated = reverted.apply_flat(0.0)
     received = updated.mean
     if lift_by == "max":
-        assert testing.allclose(received, expected)
+        assert testing.allclose(received, true_tcoeffs)
     else:
-        assert testing.allclose(received[: 2 + lift_by], expected[: 2 + lift_by])
+        assert testing.allclose(received[: 2 + lift_by], true_tcoeffs[: 2 + lift_by])
 
 
-@testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_jet_")
+@testing.parametrize_with_cases("jet_factory", cases=".", prefix="case_residual_")
 @testing.parametrize("wrong_lift_by", [-1, 4, 100])
-@testing.parametrize("ssm_factory", [probdiffeq.state_space_model_dense])
 def test_wrong_lift_by_raises_error(
-    residual: Root, jet_factory: Callable, wrong_lift_by, ssm_factory
+    residual: ResidualFixture, jet_factory: Callable, wrong_lift_by: int
 ):
     """Assert that an out-of-range lift-by index raises a ValueError."""
     # 5 Taylor coefficients + residual-orders of 2 (constraints depend on u and du).
-    ssm = ssm_factory()
+    ssm = probdiffeq.state_space_model_dense()
     iwp = ssm.prior_wiener_integrated([residual.u0], diffuse_derivatives=4)
-    constraint = jet_factory(ssm=ssm, lift_by=wrong_lift_by)
+    constraint = jet_factory(ssm=ssm, lift_by=wrong_lift_by, num_tcoeffs=4 + 1)
 
     cstate = constraint.init_linearization()
     with testing.raises(ValueError, match="Received"):

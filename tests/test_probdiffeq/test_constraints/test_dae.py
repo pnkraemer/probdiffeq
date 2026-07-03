@@ -47,14 +47,12 @@ def solve_ode(inits, num):
 def solve_dae(inits, num):
     """Solve the SIR model as a DAE."""
 
-    @func.partial(probdiffeq.residual_jet_lift, lift_by=num)
     @probdiffeq.residual_position
     def algebraic(u, /, *, t):
         del t
         N = 1.0  # total population
         return u[0] + u[1] + u[2] - N
 
-    @func.partial(probdiffeq.residual_jet_lift, lift_by=num - 1)
     @probdiffeq.residual_velocity
     def differential(u, du, /, *, t):
         del t
@@ -69,6 +67,8 @@ def solve_dae(inits, num):
 
         return np.stack([F1, F2])
 
+    algebraic = algebraic.jet_lift(lift_by=num)
+    differential = differential.jet_lift(lift_by=num - 1)
     residual = probdiffeq.residual_from_stack(differential, algebraic)
 
     jetexpand = probdiffeq.jetexpand_residual(num=num)

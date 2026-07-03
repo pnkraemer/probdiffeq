@@ -66,11 +66,14 @@ def jetexpand_ode_padded_scan(*, num: int) -> JetExpansionAlg[problems.JetOde]:
         if num == 0:
             return list(inits), {}
 
+        if vf.is_jet_lifted:
+            raise ValueError
+
         # Number of positional arguments in f
         num_arguments = len(inits)
 
         # Initial Taylor series (u_0, u_1, ..., u_k)
-        primals = vf.vector_field(jet_coords=inits, t=t)
+        [primals] = vf.vector_field(jet_coords=inits, t=t)
         taylor_coeffs = [*inits, primals]
 
         # Early exit for num=1.
@@ -130,13 +133,16 @@ def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg[problems.JetOde]:
         if num == 0:
             return list(inits), {}
 
+        if vf.is_jet_lifted:
+            raise ValueError
+
         # Number of positional arguments in f
         num_arguments = len(inits)
 
         increment = jetexpand_ode_coefficient_increment(num_arguments=num_arguments)
 
         # Initial Taylor series (u_0, u_1, ..., u_k)
-        primals = vf.vector_field(jet_coords=inits, t=t)
+        [primals] = vf.vector_field(jet_coords=inits, t=t)
         taylor_coeffs = [*inits, primals]
 
         for _ in range(num - 1):
@@ -152,8 +158,13 @@ def jetexpand_ode_coefficient_increment(*, num_arguments):
     def increment(
         vf: problems.JetOde, taylor_coeffs: Sequence[T], *, t: float
     ) -> list[T]:
+
+        if vf.is_jet_lifted:
+            raise ValueError
+
         def vf_with_kwargs(*u: *tuple[T, ...]) -> T:
-            return vf.vector_field(jet_coords=u, t=t)
+            [output] = vf.vector_field(jet_coords=u, t=t)
+            return output
 
         primals, series = utilities.jet_coords_to_primals_and_series(
             taylor_coeffs, num_arguments
@@ -180,10 +191,16 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg[problems.JetOde]:
         if num == 0:
             return list(inits), {}
 
-        vf_wrapped = func.partial(vf, t=t)
+        if vf.is_jet_lifted:
+            raise ValueError
+
+        def vf_wrapped(*jet_coords):
+            [vfx] = vf.vector_field(jet_coords=jet_coords, t=t)
+            return vfx
+
         g_n, g_0 = vf_wrapped, vf_wrapped
 
-        taylor_coeffs = [*inits, vf(*inits, t=t)]
+        taylor_coeffs = [*inits, vf_wrapped(*inits)]
         for _ in range(num - 1):
             g_n = _fwd_recursion_iterate(fun_n=g_n, fun_0=g_0)
             taylor_coeffs = [*taylor_coeffs, g_n(*inits)]
@@ -227,6 +244,10 @@ def jetexpand_ode_doubling_unroll(
     def expand(
         vf: problems.JetOde, inits: Sequence[T], /, *, t: float
     ) -> tuple[list[T], dict]:
+
+        if vf.is_jet_lifted:
+            raise ValueError
+
         inits = tree.tree_map(np.asarray, inits)
 
         double = jetexpand_ode_coefficient_double()
@@ -294,11 +315,13 @@ def jetexpand_ode_coefficient_double() -> JetExpansionAlg[problems.JetOde]:
         """
         zeros = np.zeros_like(c[0])
 
+        def vf_wrapped(*u):
+            [vfx] = vf.vector_field(jet_coords=u, t=t)
+            return vfx
+
         coeffs_emb = [*c] + [zeros] * degree
         p, *s = coeffs_emb
-        p_new, s_new = func.jet(
-            lambda *u: vf.vector_field(jet_coords=u, t=t), (p,), (s,), is_tcoeff=True
-        )
+        p_new, s_new = func.jet(vf_wrapped, (p,), (s,), is_tcoeff=True)
         return np.stack([p_new, *s_new])
 
     return double

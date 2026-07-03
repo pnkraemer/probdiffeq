@@ -156,7 +156,8 @@ def case_factory_constraint_residual_ts1(ivp):
 
     @func.partial(probdiffeq.residual_velocity, jacobian=jacobian)
     def residual(u, du, /, *, t):
-        return tree.tree_map(lambda a, b: a - b, du, vf(u, t=t))
+        vfu = vf.vector_field(jet_coords=(u,), t=t)
+        return tree.tree_map(lambda a, b: a - b, [du], vfu)
 
     def constraint_fn(ssm, vf):
         try:

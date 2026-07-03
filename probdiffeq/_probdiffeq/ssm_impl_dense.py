@@ -245,16 +245,17 @@ class DenseOdeTs0(ssm_impl_api.AbstractOde):
 
         def derivative_selector(m: Array) -> Array:
             """Select the n-th derivative from the Taylor coefficient stack."""
-            m0 = rv.tree_flatten.unflatten_array(m)[self.ode.num_tcoeffs_in_args]
+            m_tree = rv.tree_flatten.unflatten_array(m)
+            m0 = [m_tree[i] for i in self.ode.tcoeff_indices_output]
             return tree.ravel_pytree(m0)[0]
 
-        Ms = rv.mean
-
-        fm = self.ode.vector_field(jet_coords=Ms[: self.ode.num_tcoeffs_in_args], t=t)
-        fx = tree.tree_map(lambda s: -s, [fm])
+        jet_coords = [rv.mean[i] for i in self.ode.tcoeff_indices_input]
+        fm = self.ode.vector_field(jet_coords=jet_coords, t=t)
+        fx = tree.tree_map(lambda s: -s, fm)
         linop = func.jacrev(derivative_selector)(rv.mean_flat)
         noise = DenseNormal.from_dirac(fx, damp=damp)
         cond = DenseLatentCond.from_linop_and_noise(linop, noise)
+
         return cond, None
 
 

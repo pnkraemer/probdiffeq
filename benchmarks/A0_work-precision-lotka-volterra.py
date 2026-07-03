@@ -2,7 +2,6 @@
 
 from collections.abc import Callable
 
-import diffrax
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -16,12 +15,12 @@ from probdiffeq.util import benchmark_util
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
 
+# High accuracy requires double precision
+jax.config.update("jax_enable_x64", True)
 
-def main(start=3.0, stop=12.0, step=1.0, repeats=2) -> None:
+
+def main(start=3.0, stop=12.0, step=1.0, repeats=1) -> None:
     """Run the script."""
-    # Set up all the configs
-    jax.config.update("jax_enable_x64", True)
-
     # Simulate once to plot the state
     ts, ys = solve_ivp_once()
 
@@ -39,16 +38,19 @@ def main(start=3.0, stop=12.0, step=1.0, repeats=2) -> None:
 
     # Assemble algorithms
     ts0_iso = solver_probdiffeq(5, constraint_order=0, implementation="isotropic")
+    ts0_iso_jet = solver_probdiffeq_jet(
+        5, constraint_order=0, implementation="isotropic"
+    )
     ts0_bd = solver_probdiffeq(5, constraint_order=0, implementation="blockdiag")
-    ts1_dense = solver_probdiffeq(8, constraint_order=1, implementation="dense")
+    ts0_bd_jet = solver_probdiffeq_jet(
+        5, constraint_order=0, implementation="blockdiag"
+    )
     algorithms = {
-        r"ProbDiffEq: TS0($5$, isotropic)": ts0_iso,
-        r"ProbDiffEq: TS0($5$, blockdiag)": ts0_bd,
-        r"ProbDiffEq: TS1($8$, dense)": ts1_dense,
-        "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
-        "Diffrax: Dopri8()": solver_diffrax(solver=diffrax.Dopri8()),
+        r"TS0(5, isotropic)": ts0_iso,
+        r"JetTS0(5, isotropic)": ts0_iso_jet,
+        r"TS0(5, blockdiag)": ts0_bd,
+        r"JetTS0(5, blockdiag)": ts0_bd_jet,
         "SciPy: 'RK45'": solver_scipy(method="RK45"),
-        "SciPy: 'DOP853'": solver_scipy(method="DOP853"),
     }
 
     # Compute a reference solution
@@ -57,23 +59,24 @@ def main(start=3.0, stop=12.0, step=1.0, repeats=2) -> None:
 
     # Compute all work-precision diagrams
     results = {}
-    for label, algo in tqdm.tqdm(algorithms.items()):
+    pbar = tqdm.tqdm(algorithms.items())
+    for label, algo in pbar:
+        pbar.set_description(label)
         param_to_wp = benchmark_util.workprec(
             algo, precision_fun=precision_fun, timeit_fun=timeit_fun
         )
         results[label] = param_to_wp(tolerances)
 
-    _fig, ax = plt.subplots(figsize=(7, 3))
+    _fig, ax = plt.subplots(figsize=(8, 5), dpi=120, constrained_layout=True)
     for label, wp in results.items():
         ax.loglog(wp["precision"], wp["work_mean"], label=label)
 
+    ax.set_ylabel("Work (avg. wall time)")
     ax.set_title("Work-precision diagram")
     ax.set_xlabel("Precision (relative RMSE)")
-    ax.set_ylabel("Work (avg. wall time)")
     ax.grid(linestyle="dotted", which="both")
-    ax.legend(fontsize="small", loc="center left", bbox_to_anchor=(1, 0.5))
+    ax.legend(fontsize="small")
 
-    plt.tight_layout()
     plt.show()
 
 
@@ -110,9 +113,10 @@ def solver_probdiffeq(
     u0 = jnp.asarray((20.0, 20.0))
     t0, t1 = (0.0, 50.0)
 
+    jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives)
+
     @jax.jit
     def param_to_solution(tol):
-        jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives)
         tcoeffs, _ = jetexpand(vf_probdiffeq, (u0,), t=t0)
 
         ssm = state_space_model(implementation)
@@ -122,17 +126,16 @@ def solver_probdiffeq(
             ts = ssm.constraint_ode_ts0(vf_probdiffeq)
         else:
             ts = ssm.constraint_ode_ts1(vf_probdiffeq)
-        solver = probdiffeq.solver_mle(strategy=strategy, constraint=ts)
-        error = probdiffeq.error_residual_std(constraint=ts)
+        solver = probdiffeq.solver(strategy=strategy, constraint=ts)
+        error = probdiffeq.error_state_std(constraint=ts)
 
         control = ivpsolve.control_proportional_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
             error=error, solver=solver, control=control
         )
-        dt0 = ivpsolve.dt0(vf_probdiffeq, (u0,), t=t0)
 
         # Build a solver
-        solution = solve(iwp, t0=t0, t1=t1, dt0=dt0, atol=1e-2 * tol, rtol=tol)
+        solution = solve(iwp, t0=t0, t1=t1, atol=1e-2 * tol, rtol=tol)
 
         # Return the terminal value
         return jax.block_until_ready(solution.u.mean[0])
@@ -149,12 +152,13 @@ def solver_probdiffeq(
     return param_to_solution
 
 
-def solver_diffrax(*, solver) -> Callable:
-    """Construct a solver that wraps Diffrax' solution routines."""
+def solver_probdiffeq_jet(
+    num_derivatives: int, implementation, constraint_order: int
+) -> Callable:
+    """Construct a solver that wraps ProbDiffEq's solution routines."""
 
-    @diffrax.ODETerm
-    @jax.jit
-    def vf_diffrax(_t, y, _args):
+    @probdiffeq.ode
+    def vf_probdiffeq(y, /, *, t):  # noqa: ARG001
         """Lotka--Volterra dynamics."""
         dy1 = 0.5 * y[0] - 0.05 * y[0] * y[1]
         dy2 = -0.5 * y[1] + 0.05 * y[0] * y[1]
@@ -163,22 +167,40 @@ def solver_diffrax(*, solver) -> Callable:
     u0 = jnp.asarray((20.0, 20.0))
     t0, t1 = (0.0, 50.0)
 
+    vf_probdiffeq = vf_probdiffeq.jet_lift(lift_by=num_derivatives - 1)
+
     @jax.jit
     def param_to_solution(tol):
-        controller = diffrax.PIDController(atol=1e-3 * tol, rtol=tol)
-        saveat = diffrax.SaveAt(t0=False, t1=True, ts=None)
-        solution = diffrax.diffeqsolve(
-            vf_diffrax,
-            y0=u0,
-            t0=t0,
-            t1=t1,
-            saveat=saveat,
-            stepsize_controller=controller,
-            dt0=None,
-            max_steps=10_000,
-            solver=solver,
+
+        ssm = state_space_model(implementation)
+        iwp = ssm.prior_wiener_integrated([u0], diffuse_derivatives=num_derivatives)
+        strategy = probdiffeq.strategy_filter()
+        if constraint_order == 0:
+            ts = ssm.constraint_ode_ts0(vf_probdiffeq)
+        else:
+            ts = ssm.constraint_ode_ts1(vf_probdiffeq)
+        solver = probdiffeq.solver(strategy=strategy, constraint=ts, constraint_init=ts)
+        error = probdiffeq.error_state_std(constraint=ts)
+
+        control = ivpsolve.control_proportional_integral()
+        solve = ivpsolve.solve_adaptive_terminal_values(
+            error=error, solver=solver, control=control
         )
-        return jax.block_until_ready(solution.ys[0, :])
+
+        # Build a solver
+        solution = solve(iwp, t0=t0, t1=t1, atol=1e-2 * tol, rtol=tol)
+
+        # Return the terminal value
+        return jax.block_until_ready(solution.u.mean[0])
+
+    def state_space_model(implementation):
+        match implementation:
+            case "blockdiag":
+                return probdiffeq.state_space_model_blockdiag()
+            case "dense":
+                return probdiffeq.state_space_model_dense()
+            case "isotropic":
+                return probdiffeq.state_space_model_isotropic()
 
     return param_to_solution
 

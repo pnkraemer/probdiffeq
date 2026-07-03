@@ -32,6 +32,9 @@ class IsotropicTreeFlatten(ssm_impl_api.AbstractTreeFlatten):
     # The below function exclusively reshapes arrays
     unravel_leaf: Any
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}(treedef={self.treedef})"
+
     def flatten_tree(self, x):
 
         def is_leaf(s):
@@ -194,17 +197,19 @@ class IsotropicNormal(ssm_impl_api.AbstractTreeNormal[IsotropicTreeFlatten]):
         return self.tree_flatten.unflatten_array_scalar(std_flat)
 
     def residual_whitened_rms_tree(self, u):
-        if self.cholesky_flat.size > 1:
-            raise ValueError
         u_latent = self.tree_flatten.flatten_tree(u)
         return self.residual_whitened_rms_flat(u_latent)
 
     def residual_whitened_rms_flat(self, u_latent, /):
-        residual_white = (self.mean_flat - u_latent) / self.cholesky_flat
-        residual_white_matrix = linalg.qr_r(residual_white.T)
-        return np.reshape(
-            np.abs(residual_white_matrix) / np.sqrt(self.mean_flat.size), ()
-        )
+
+        residual_white = self.mean_flat - u_latent
+        residual_white = linalg.solve_tril(self.cholesky_flat, residual_white)
+
+        residual_white = np.reshape(residual_white, (-1, 1))
+        residual_white_matrix = linalg.qr_r(residual_white)
+        residual_white_matrix = np.reshape(residual_white_matrix, ())
+
+        return np.abs(residual_white_matrix) / np.sqrt(self.mean_flat.size)
 
     def rescale_cholesky(self, factor, /):
         cholesky = factor[..., None, None] * self.cholesky_flat
@@ -301,20 +306,20 @@ class IsotropicOdeTs0(ssm_impl_api.AbstractOde):
     def init_linearization(self) -> None:
         return None
 
-    def linearize(self, rv, state: None, *, damp: float, t):
-        del state
-        Ms = rv.mean
-        jet_coords = Ms[: self.ode.num_tcoeffs_in_args]
+    def linearize(self, rv, state, *, damp: float, t):
+        jet_coords = rv.mean[: self.ode.num_tcoeffs_in_args]
         fx_tree = self.ode.vector_field(jet_coords=jet_coords, t=t)
+
         fx = tree.tree_map(lambda s: -s, fx_tree)
 
-        bias = IsotropicNormal.from_dirac([fx], damp=damp)
+        bias = IsotropicNormal.from_dirac(fx, damp=damp)
 
-        linop = func.jacrev(lambda s: s[[self.ode.num_tcoeffs_in_args], ...])(
-            rv.mean_flat[..., 0]
-        )
+        def derivative_selector(s):
+            return s[np.asarray(self.ode.tcoeff_indices_output)]
+
+        linop = func.jacrev(derivative_selector)(rv.mean_flat[..., 0])
         cond = IsotropicLatentCond.from_linop_and_noise(linop, bias)
-        return cond, None
+        return cond, state
 
 
 class IsotropicResidual(ssm_impl_api.AbstractResidual):
@@ -324,12 +329,19 @@ class IsotropicResidual(ssm_impl_api.AbstractResidual):
         return self.residual.jacobian.init_jacobian_handler()
 
     def linearize(self, rv, state, *, damp: float, t):
+        # Understand the output pytree structure
+        jet_coords = rv.mean[: self.residual.num_tcoeffs_in_args]
+        output_like = func.eval_shape(
+            self.residual.residual_function, jet_coords=jet_coords, t=t
+        )
+        output_like = tree.tree_map(np.zeros_like, output_like)
+        rv_output = IsotropicNormal.from_dirac(output_like, damp=0.0)
 
         def residual_flat(s_stack):
-            s_tree = rv.tree_flatten.unflatten_array(s_stack)
-            s_tree = s_tree[: self.residual.num_tcoeffs_in_args]
-            fs = self.residual.residual_function(jet_coords=s_tree, t=t)
-            return tree.ravel_pytree(fs)[0][None, :]
+            u_tree = rv.tree_flatten.unflatten_array(s_stack)
+            u_tree = u_tree[: self.residual.num_tcoeffs_in_args]
+            r_tree = self.residual.residual_function(jet_coords=u_tree, t=t)
+            return rv_output.tree_flatten.flatten_tree(r_tree)
 
         _n, d = rv.mean_flat.shape
 
@@ -341,9 +353,7 @@ class IsotropicResidual(ssm_impl_api.AbstractResidual):
         linop = J_trace
         fx = fx - linop @ rv.mean_flat
 
-        m0_tree = rv.mean[:1]
-        rv0 = IsotropicNormal.from_dirac(m0_tree, damp=0.0)
-        fx = rv0.tree_flatten.unflatten_array(fx)
+        fx = rv_output.tree_flatten.unflatten_array(fx)
 
         noise = IsotropicNormal.from_dirac(fx, damp=damp)
         cond = IsotropicLatentCond.from_linop_and_noise(linop, noise)

@@ -1,6 +1,5 @@
 """Walltime | Robertson DAE."""
 
-import functools
 import statistics
 from collections.abc import Callable
 
@@ -170,7 +169,6 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
 def solver_residual(*, num_derivatives: int, time_span) -> Callable:
     """Construct a method that solves Robertson as a DAE."""
 
-    @functools.partial(probdiffeq.residual_jet_lift, lift_by=num_derivatives - 1)
     @probdiffeq.residual_velocity
     def differential(u, du, /, *, t):
         del t
@@ -182,12 +180,13 @@ def solver_residual(*, num_derivatives: int, time_span) -> Callable:
         f1 = k1 * y[0] - k2 * y[1] ** 2 - k3 * y[1] * y[2]
         return jnp.stack([f0, f1])
 
-    @functools.partial(probdiffeq.residual_jet_lift, lift_by=num_derivatives)
     @probdiffeq.residual_position
     def algebraic(u, *, t):
         del t
         return u[0] + u[1] + u[2] - 1
 
+    differential = differential.jet_lift(lift_by=num_derivatives - 1)
+    algebraic = algebraic.jet_lift(lift_by=num_derivatives)
     residual = probdiffeq.residual_from_stack(differential, algebraic)
 
     @jax.jit
