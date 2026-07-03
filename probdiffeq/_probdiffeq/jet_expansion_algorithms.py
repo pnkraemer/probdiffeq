@@ -66,6 +66,9 @@ def jetexpand_ode_padded_scan(*, num: int) -> JetExpansionAlg[problems.JetOde]:
         if num == 0:
             return list(inits), {}
 
+        if vf.is_jet_extended:
+            raise ValueError
+
         # Number of positional arguments in f
         num_arguments = len(inits)
 
@@ -130,6 +133,9 @@ def jetexpand_ode_unroll(*, num: int) -> JetExpansionAlg[problems.JetOde]:
         if num == 0:
             return list(inits), {}
 
+        if vf.is_jet_extended:
+            raise ValueError
+
         # Number of positional arguments in f
         num_arguments = len(inits)
 
@@ -152,6 +158,10 @@ def jetexpand_ode_coefficient_increment(*, num_arguments):
     def increment(
         vf: problems.JetOde, taylor_coeffs: Sequence[T], *, t: float
     ) -> list[T]:
+
+        if vf.is_jet_extended:
+            raise ValueError
+
         def vf_with_kwargs(*u: *tuple[T, ...]) -> T:
             [output] = vf.vector_field(jet_coords=u, t=t)
             return output
@@ -181,8 +191,11 @@ def jetexpand_ode_via_jvp(*, num: int) -> JetExpansionAlg[problems.JetOde]:
         if num == 0:
             return list(inits), {}
 
+        if vf.is_jet_extended:
+            raise ValueError
+
         def vf_wrapped(*jet_coords):
-            [vfx] = vf(*jet_coords, t=t)
+            [vfx] = vf.vector_field(jet_coords=jet_coords, t=t)
             return vfx
 
         g_n, g_0 = vf_wrapped, vf_wrapped
@@ -231,6 +244,10 @@ def jetexpand_ode_doubling_unroll(
     def expand(
         vf: problems.JetOde, inits: Sequence[T], /, *, t: float
     ) -> tuple[list[T], dict]:
+
+        if vf.is_jet_extended:
+            raise ValueError
+
         inits = tree.tree_map(np.asarray, inits)
 
         double = jetexpand_ode_coefficient_double()

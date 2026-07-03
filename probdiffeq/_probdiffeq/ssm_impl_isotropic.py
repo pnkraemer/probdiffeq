@@ -32,6 +32,9 @@ class IsotropicTreeFlatten(ssm_impl_api.AbstractTreeFlatten):
     # The below function exclusively reshapes arrays
     unravel_leaf: Any
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}(treedef={self.treedef})"
+
     def flatten_tree(self, x):
 
         def is_leaf(s):
@@ -306,6 +309,7 @@ class IsotropicOdeTs0(ssm_impl_api.AbstractOde):
     def linearize(self, rv, state, *, damp: float, t):
         jet_coords = rv.mean[: self.ode.num_tcoeffs_in_args]
         fx_tree = self.ode.vector_field(jet_coords=jet_coords, t=t)
+
         fx = tree.tree_map(lambda s: -s, fx_tree)
 
         bias = IsotropicNormal.from_dirac(fx, damp=damp)

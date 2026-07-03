@@ -18,7 +18,7 @@ def odeint_and_save_at(vf, y0: tuple, /, save_at, *, atol, rtol):
     def vf_wrapped(y, t):
         # forward (sign=+1): s = t,  returns vf(y, t=s)
         # reversed (sign=-1): s = -t, returns -vf(y, t=-s)
-        vfx = vf(y, t=sign * t)
+        [vfx] = vf.vector_field(jet_coords=(y,), t=sign * t)
         return jax.tree_util.tree_map(lambda s: sign * s, vfx)
 
     sol = jax.experimental.ode.odeint(

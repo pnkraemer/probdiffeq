@@ -533,7 +533,12 @@ class StateSpaceModel(abc.ABC):
         """
         raise NotImplementedError
 
-    def constraint_ode_ts1(self, ode: problems.JetOde, /) -> AbstractResidual:
+    def constraint_ode_ts1(
+        self,
+        ode: problems.JetOde,
+        /,
+        taylor_point: "taylor_points.TaylorPoint | None" = None,
+    ) -> AbstractResidual:
         r"""Create an ODE constraint and linearise with a first-order Taylor approximation.
 
         This constraint handles ODEs of the form
@@ -550,7 +555,7 @@ class StateSpaceModel(abc.ABC):
             raise TypeError(ode)
 
         residual = problems.residual_from_ode(ode)
-        return self.constraint_residual(residual)
+        return self.constraint_residual(residual, taylor_point=taylor_point)
 
     @abc.abstractmethod
     def constraint_residual(

@@ -191,13 +191,19 @@ class _JetOdeCommon(JetAbstract, Generic[T]):
     def __repr__(self):
         return f"{self.__class__.__name__}(num_tcoeffs_in_args={self.num_tcoeffs_in_args}, jacobian={self.jacobian}, tcoeff_indices_output={self.tcoeff_indices_output})"
 
-    def __call__(self, *jet_coords: *tuple[T], t: Array) -> T:
-        # jet_coords = (u(t), u'(t), u''(t), ..., u^(K)(t))
-        return self.vector_field(jet_coords=jet_coords, t=t)
+    # TODO: call if self.is_jet_extended: raise ValueError in here once uncommenting
+    # def __call__(self, *jet_coords: *tuple[T], t: Array) -> T:
+    #     # jet_coords = (u(t), u'(t), u''(t), ..., u^(K)(t))
+    #     [fx] = self.vector_field(jet_coords=jet_coords, t=t)
+    #     return fx
 
     @property
     def tcoeff_indices_input(self) -> list[int]:
         return list(range(self.num_tcoeffs_in_args))
+
+    @property
+    def is_jet_extended(self):
+        return len(self.tcoeff_indices_output) > 1
 
 
 class JetOde(_JetOdeCommon, Generic[T]):
@@ -253,7 +259,7 @@ def ode(func: ProtocolODEFirstOrder, /, *, jacobian: jacobians.Jacobian | None =
     """Construct a description of an ODE u' = f(u, t)."""
 
     def jetfunc(*, jet_coords: Sequence[T], t: float) -> list[T]:
-        (y,) = jet_coords
+        [y] = jet_coords
         return [func(y, t=t)]
 
     if jacobian is None:

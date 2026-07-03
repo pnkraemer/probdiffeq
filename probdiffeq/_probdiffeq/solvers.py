@@ -979,7 +979,7 @@ class error_residual_std(ErrorEstimator):
         if self.error_per_unit_step:
             n += 1
 
-        if reference.shape != error.shape:
+        if error.shape not in [(1,), reference.shape]:
             msg = f"The error-estimate and reference have different shapes ({error.shape} vs {reference.shape})."
             msg += (
                 " This is typically caused by using the residual-based error estimator"
