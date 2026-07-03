@@ -6,7 +6,7 @@ __all__ = ["dt0", "dt0_adaptive"]
 
 def dt0(vf, initial_values: Sequence, /, scale=0.01, nugget=1e-5, **vf_kwargs):
     """Propose an initial time-step."""
-    if vf.is_jet_extended:
+    if vf.is_jet_lifted:
         raise ValueError
 
     [f0] = vf.vector_field(jet_coords=initial_values, **vf_kwargs)
@@ -36,7 +36,7 @@ def dt0_adaptive(
     if len(initial_values) > 1:
         raise ValueError
 
-    if vf.is_jet_extended:
+    if vf.is_jet_lifted:
         raise ValueError
 
     y0 = initial_values[0]

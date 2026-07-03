@@ -187,7 +187,7 @@ class _JetOdeCommon(JetAbstract, Generic[T]):
     def __call__(self, *jet_coords: *tuple[T], t: Array) -> T:
         # jet_coords = (u(t), u'(t), u''(t), ..., u^(K)(t))
 
-        if self.is_jet_extended:
+        if self.is_jet_lifted:
             raise ValueError
 
         [fx] = self.vector_field(jet_coords=jet_coords, t=t)
@@ -198,8 +198,8 @@ class _JetOdeCommon(JetAbstract, Generic[T]):
         return list(range(self.num_tcoeffs_in_args))
 
     @property
-    def is_jet_extended(self):
-        """Whether or not the ODE is the result of Jet-extension.
+    def is_jet_lifted(self):
+        """Whether or not the ODE is the result of Jet-lifting.
 
         If true, some functionality is no longer available.
         For example, jet initialisation or stepsize initialisation,
@@ -210,7 +210,7 @@ class _JetOdeCommon(JetAbstract, Generic[T]):
 
 class JetOde(_JetOdeCommon, Generic[T]):
     def jet_lift_max(self, *, num_tcoeffs: int) -> "JetOde":
-        if self.is_jet_extended:
+        if self.is_jet_lifted:
             raise ValueError
         [output_idx] = self.tcoeff_indices_output
         assert output_idx >= self.num_tcoeffs_in_args
