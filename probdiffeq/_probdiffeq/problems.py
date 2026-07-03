@@ -203,6 +203,12 @@ class _JetOdeCommon(JetAbstract, Generic[T]):
 
     @property
     def is_jet_extended(self):
+        """Whether or not the ODE is the result of Jet-extension.
+
+        If true, some functionality is no longer available.
+        For example, jet initialisation or stepsize initialisation,
+        both of which assume "traditional" vector field signatures.
+        """
         return len(self.tcoeff_indices_output) > 1
 
 
