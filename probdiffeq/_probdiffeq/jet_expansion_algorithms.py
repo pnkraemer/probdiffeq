@@ -1,6 +1,6 @@
 r"""Evaluate jet-recursions in differential equations."""
 
-from probdiffeq._probdiffeq import problems, ssm_impl_dense, taylor_points, utilities
+from probdiffeq._probdiffeq import problems, ssm_impl_dense, taylor_points
 from probdiffeq.backend import flow, func, np, tree
 from probdiffeq.backend.typing import Array, Protocol, Sequence, TypeVar
 
@@ -162,15 +162,17 @@ def jetexpand_ode_coefficient_increment(*, num_arguments):
         if vf.is_jet_lifted:
             raise ValueError
 
-        def vf_with_kwargs(*u: *tuple[T, ...]) -> T:
-            [output] = vf.vector_field(jet_coords=u, t=t)
+        def vf_with_kwargs(*u_and_t):
+            *u, t_ = u_and_t
+            [output] = vf.vector_field(jet_coords=u, t=t_)
             return output
 
-        primals, series = utilities.jet_coords_to_primals_and_series(
-            taylor_coeffs, num_arguments
+        # TODO: make this a method of the vf?
+        primals, series = problems.args_autonomous_and_jet_compatible(
+            taylor_coeffs, num_tcoeffs_in_args=num_arguments, t=t
         )
         p, s_new = func.jet(vf_with_kwargs, primals=primals, series=series)
-        return [*primals, p, *s_new]
+        return [*taylor_coeffs[:num_arguments], p, *s_new]
 
     return increment
 
