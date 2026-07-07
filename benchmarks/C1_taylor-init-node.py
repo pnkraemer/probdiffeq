@@ -13,12 +13,12 @@ from probdiffeq.util import benchmark_util
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
 
+# Set JAX config
+jax.config.update("jax_enable_x64", True)
 
-def main(max_time=0.55, repeats=2) -> None:
+
+def main(max_time=0.75, repeats=1) -> None:
     """Run the script."""
-    # Set JAX config
-    jax.config.update("jax_enable_x64", True)
-
     algorithms = {
         r"Forward-mode": odejet_via_jvp(),
         r"Taylor-mode (scan)": taylor_mode_scan(),
@@ -26,48 +26,40 @@ def main(max_time=0.55, repeats=2) -> None:
         r"Taylor-mode (doubling)": taylor_mode_doubling(),
     }
 
-    # Compute a reference solution
-    timeit_fun = benchmark_util.setup_timeit(repeats=repeats)
-
     # Compute all work-precision diagrams
-    results = {}
+    _fig, (axis_compile, axis_perform) = plt.subplots(
+        ncols=2, figsize=(8, 3), constrained_layout=True, dpi=120, sharex=True
+    )
+
+    list_of_args = list(range(1, 20))
     for label, algo in algorithms.items():
         print("\n")
         print(label)
-        results[label] = benchmark_util.adaptive_benchmark(
-            algo, timeit_fun=timeit_fun, max_time=max_time
+        workprec = benchmark_util.workprec(
+            algo, time_max_sec=max_time, print_progress=True, num_timing_calls=repeats
         )
-
-    _fig, (axis_perform, axis_compile) = plt.subplots(
-        ncols=2, figsize=(8, 3), dpi=150, sharex=True, sharey=True
-    )
-
-    for label, wp in results.items():
-        inputs = wp["arguments"]
-        work_compile = wp["work_compile"]
-        work_mean, work_std = wp["work_mean"], wp["work_std"]
+        wp = workprec(list_of_args)
+        inputs = wp.arg
+        work_compile = wp.work_first_run
+        work_mean = wp.work.mean(axis=-1)
 
         if "doubling" in label:
-            num_repeats = jnp.diff(jnp.concatenate((jnp.ones((1,)), inputs)))
-            inputs = jnp.arange(1, jnp.amax(inputs) * 1)
+            num_repeats = 2**inputs
             work_compile = benchmark_util.adaptive_repeat(work_compile, num_repeats)
             work_mean = benchmark_util.adaptive_repeat(work_mean, num_repeats)
-            work_std = benchmark_util.adaptive_repeat(work_std, num_repeats)
+            inputs = jnp.arange(1, 2 ** (jnp.amax(inputs) + 1) - 1)
 
         axis_compile.semilogy(inputs, work_compile, label=label)
         axis_perform.semilogy(inputs, work_mean, label=label)
 
     axis_compile.set_title("Compilation time")
     axis_perform.set_title("Evaluation time")
-    axis_perform.legend(fontsize="small")
-    axis_compile.legend(fontsize="small")
-    axis_compile.set_xlabel("Number of Derivatives")
-    axis_perform.set_xlabel("Number of Derivatives")
-    axis_perform.set_ylabel("Wall time (sec)")
-    axis_perform.grid(linestyle="dotted")
-    axis_compile.grid(linestyle="dotted")
+    axis_compile.set_ylabel("Wall time (sec)")
+    for ax in [axis_perform, axis_compile]:
+        ax.legend(fontsize="x-small")
+        ax.set_xlabel("Number of Derivatives")
+        ax.grid(linestyle="dotted")
 
-    plt.tight_layout()
     plt.show()
 
 
@@ -79,7 +71,7 @@ def taylor_mode_scan() -> Callable:
     def estimate(num):
         jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num)
         tcoeffs, _ = jetexpand(vf_auto, (u0,), t=0.0)
-        return jnp.asarray(tcoeffs)
+        return jnp.asarray(tcoeffs[-1])
 
     return estimate
 
@@ -92,7 +84,7 @@ def taylor_mode_unroll() -> Callable:
     def estimate(num):
         jetexpand = probdiffeq.jetexpand_ode_unroll(num=num)
         tcoeffs, _ = jetexpand(vf_auto, (u0,), t=0.0)
-        return jnp.asarray(tcoeffs)
+        return jnp.asarray(tcoeffs[-1])
 
     return estimate
 
@@ -105,7 +97,7 @@ def taylor_mode_doubling() -> Callable:
     def estimate(num):
         jetexpand = probdiffeq.jetexpand_ode_doubling_unroll(num_doublings=num)
         tcoeffs, _ = jetexpand(vf_auto, (u0,), t=0.0)
-        return jnp.asarray(tcoeffs)
+        return jnp.asarray(tcoeffs[-1])
 
     return estimate
 
@@ -118,7 +110,7 @@ def odejet_via_jvp() -> Callable:
     def estimate(num):
         jetexpand = probdiffeq.jetexpand_ode_via_jvp(num=num)
         tcoeffs, _ = jetexpand(vf_auto, (u0,), t=0.0)
-        return jnp.asarray(tcoeffs)
+        return jnp.asarray(tcoeffs[-1])
 
     return estimate
 

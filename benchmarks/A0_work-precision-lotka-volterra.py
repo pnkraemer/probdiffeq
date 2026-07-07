@@ -19,7 +19,7 @@ jax.config.update("jax_debug_nans", True)
 jax.config.update("jax_enable_x64", True)
 
 
-def main(start=3.0, stop=12.0, step=1.0, repeats=1) -> None:
+def main(start=3.0, stop=12.0, step=1.0, repeats=2) -> None:
     """Run the script."""
     # Simulate once to plot the state
     ts, ys = solve_ivp_once()
@@ -33,49 +33,47 @@ def main(start=3.0, stop=12.0, step=1.0, repeats=1) -> None:
     plt.show()
 
     # Read configuration from command line
-    tolerances = benchmark_util.setup_tolerances(start=start, stop=stop, step=step)
-    timeit_fun = benchmark_util.setup_timeit(repeats=repeats)
+    tolerances = 0.1 ** jnp.arange(start, stop, step=step)
+
+    # Compute a reference solution
+    reference = solver_scipy(method="BDF", precision_fun=lambda x: x)(1e-13)
+    precision_fun = benchmark_util.rmse_relative(reference)
 
     # Assemble algorithms
-    ts0_iso = solver_probdiffeq(5, constraint_order=0, implementation="isotropic")
-    ts0_iso_jet = solver_probdiffeq_jet(
-        5, constraint_order=0, implementation="isotropic"
+    ts0_iso = solver_probdiffeq(
+        5, constraint_order=0, implementation="isotropic", precision_fun=precision_fun
     )
-    ts0_bd = solver_probdiffeq(5, constraint_order=0, implementation="blockdiag")
+    ts0_iso_jet = solver_probdiffeq_jet(
+        5, constraint_order=0, implementation="isotropic", precision_fun=precision_fun
+    )
+    ts0_bd = solver_probdiffeq(
+        5, constraint_order=0, implementation="blockdiag", precision_fun=precision_fun
+    )
     ts0_bd_jet = solver_probdiffeq_jet(
-        5, constraint_order=0, implementation="blockdiag"
+        5, constraint_order=0, implementation="blockdiag", precision_fun=precision_fun
     )
     algorithms = {
         r"TS0(5, isotropic)": ts0_iso,
         r"JetTS0(5, isotropic)": ts0_iso_jet,
         r"TS0(5, blockdiag)": ts0_bd,
         r"JetTS0(5, blockdiag)": ts0_bd_jet,
-        "SciPy: 'RK45'": solver_scipy(method="RK45"),
+        "SciPy: 'RK45'": solver_scipy(method="RK45", precision_fun=precision_fun),
     }
 
-    # Compute a reference solution
-    reference = solver_scipy(method="BDF")(1e-13)
-    precision_fun = benchmark_util.rmse_relative(reference)
-
     # Compute all work-precision diagrams
-    results = {}
+    _fig, ax = plt.subplots(figsize=(8, 4), dpi=120, constrained_layout=True)
     pbar = tqdm.tqdm(algorithms.items())
     for label, algo in pbar:
         pbar.set_description(label)
-        param_to_wp = benchmark_util.workprec(
-            algo, precision_fun=precision_fun, timeit_fun=timeit_fun
-        )
-        results[label] = param_to_wp(tolerances)
-
-    _fig, ax = plt.subplots(figsize=(8, 5), dpi=120, constrained_layout=True)
-    for label, wp in results.items():
-        ax.loglog(wp["precision"], wp["work_mean"], label=label)
+        param_to_wp = benchmark_util.workprec(algo, num_timing_calls=repeats)
+        wp = param_to_wp(tolerances)
+        ax.loglog(wp.precision, wp.work.mean(axis=-1), ".-", label=label)
 
     ax.set_ylabel("Work (avg. wall time)")
     ax.set_title("Work-precision diagram")
     ax.set_xlabel("Precision (relative RMSE)")
     ax.grid(linestyle="dotted", which="both")
-    ax.legend(fontsize="small")
+    ax.legend(loc="center left", frameon=False, bbox_to_anchor=(1, 0.5))
 
     plt.show()
 
@@ -99,7 +97,7 @@ def solve_ivp_once():
 
 
 def solver_probdiffeq(
-    num_derivatives: int, implementation, constraint_order: int
+    num_derivatives: int, implementation, constraint_order: int, precision_fun
 ) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
@@ -138,7 +136,7 @@ def solver_probdiffeq(
         solution = solve(iwp, t0=t0, t1=t1, atol=1e-2 * tol, rtol=tol)
 
         # Return the terminal value
-        return jax.block_until_ready(solution.u.mean[0])
+        return precision_fun(solution.u.mean[0])
 
     def state_space_model(implementation):
         match implementation:
@@ -153,7 +151,7 @@ def solver_probdiffeq(
 
 
 def solver_probdiffeq_jet(
-    num_derivatives: int, implementation, constraint_order: int
+    num_derivatives: int, implementation, constraint_order: int, precision_fun
 ) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
@@ -191,7 +189,7 @@ def solver_probdiffeq_jet(
         solution = solve(iwp, t0=t0, t1=t1, atol=1e-2 * tol, rtol=tol)
 
         # Return the terminal value
-        return jax.block_until_ready(solution.u.mean[0])
+        return precision_fun(solution.u.mean[0])
 
     def state_space_model(implementation):
         match implementation:
@@ -205,7 +203,7 @@ def solver_probdiffeq_jet(
     return param_to_solution
 
 
-def solver_scipy(*, method: str) -> Callable:
+def solver_scipy(*, method: str, precision_fun) -> Callable:
     """Construct a solver that wraps SciPy's solution routines."""
 
     def vf_scipy(_t, y):
@@ -227,7 +225,7 @@ def solver_scipy(*, method: str) -> Callable:
             rtol=tol,
             method=method,
         )
-        return jnp.asarray(solution.y[:, -1])
+        return precision_fun(jnp.asarray(solution.y[:, -1]))
 
     return param_to_solution
 

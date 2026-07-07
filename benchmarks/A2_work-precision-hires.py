@@ -15,12 +15,12 @@ from probdiffeq.util import benchmark_util
 # Fail this notebook on NaN detection (to catch those in the CI)
 jax.config.update("jax_debug_nans", True)
 
+# Stiffness + high accuracy requires f64
+jax.config.update("jax_enable_x64", True)
 
-def main(start=3.0, stop=10.0, step=1.0, repeats=2) -> None:
+
+def main(start=3.0, stop=10.0, step=1.0, repeats=1) -> None:
     """Run the script."""
-    # Set up all the configs
-    jax.config.update("jax_enable_x64", True)
-
     # Simulate once to plot the state
     ts, ys = solve_ivp_once()
 
@@ -33,42 +33,44 @@ def main(start=3.0, stop=10.0, step=1.0, repeats=2) -> None:
     plt.show()
 
     # Read configuration from command line
-    tolerances = benchmark_util.setup_tolerances(start=start, stop=stop, step=step)
-    timeit_fun = benchmark_util.setup_timeit(repeats=repeats)
+    tolerances = 0.1 ** jnp.arange(start, stop, step=step)
+
+    # Compute a reference solution
+    reference = solver_scipy(method="BDF", precision_fun=lambda x: x)(1e-13)
+    precision_fun = benchmark_util.rmse_relative(reference)
 
     # Assemble algorithms
     algorithms = {
-        r"ProbDiffEq: TS1($3$, matfree)": solver_matfree(num_derivatives=3),
-        r"ProbDiffEq: TS1($5$, matfree)": solver_matfree(num_derivatives=5),
-        r"ProbDiffEq: TS1($5$, dense)": solver_dense(num_derivatives=5),
-        r"ProbDiffEq: TS1($7$, dense)": solver_dense(num_derivatives=7),
-        "SciPy: 'LSODA'": solver_scipy(method="LSODA"),
-        "SciPy: 'Radau'": solver_scipy(method="Radau"),
+        r"TS1($3$, matfree)": solver_matfree(
+            num_derivatives=3, precision_fun=precision_fun
+        ),
+        r"TS1($5$, matfree)": solver_matfree(
+            num_derivatives=5, precision_fun=precision_fun
+        ),
+        r"TS1($5$, dense)": solver_dense(
+            num_derivatives=5, precision_fun=precision_fun
+        ),
+        r"TS1($7$, dense)": solver_dense(
+            num_derivatives=7, precision_fun=precision_fun
+        ),
+        "SciPy: 'LSODA'": solver_scipy(method="LSODA", precision_fun=precision_fun),
+        "SciPy: 'Radau'": solver_scipy(method="Radau", precision_fun=precision_fun),
     }
 
-    # Compute a reference solution
-    reference = solver_scipy(method="BDF")(1e-13)
-    precision_fun = benchmark_util.rmse_relative(reference)
-
     # Compute all work-precision diagrams
-    results = {}
+    _fig, ax = plt.subplots(figsize=(8, 4))
     pbar = tqdm.tqdm(algorithms.items())
     for label, algo in pbar:
         pbar.set_description(label)
-        param_to_wp = benchmark_util.workprec(
-            algo, precision_fun=precision_fun, timeit_fun=timeit_fun
-        )
-        results[label] = param_to_wp(tolerances)
-
-    _fig, ax = plt.subplots(figsize=(5, 3))
-    for label, wp in results.items():
-        ax.loglog(wp["precision"], wp["work_mean"], label=label)
+        param_to_wp = benchmark_util.workprec(algo, num_timing_calls=repeats)
+        wp = param_to_wp(tolerances)
+        ax.loglog(wp.precision, wp.work.mean(axis=-1), ".-", label=label)
 
     ax.set_title("Work-precision diagram")
     ax.set_xlabel("Precision (relative RMSE)")
     ax.set_ylabel("Work (avg. wall time)")
     ax.grid(linestyle="dotted", which="both")
-    ax.legend(fontsize="small")
+    ax.legend(loc="center left", frameon=False, bbox_to_anchor=(1, 0.5))
 
     plt.tight_layout()
     plt.show()
@@ -101,7 +103,7 @@ def solve_ivp_once():
     return solution.t, solution.y.T
 
 
-def solver_matfree(*, num_derivatives: int) -> Callable:
+def solver_matfree(*, num_derivatives: int, precision_fun) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @probdiffeq.ode
@@ -144,12 +146,12 @@ def solver_matfree(*, num_derivatives: int) -> Callable:
         solution = solve(iwp, t0=t0, t1=t1, dt0=dt0, atol=1e-3 * tol, rtol=tol)
 
         # Return the terminal value
-        return jax.block_until_ready(solution.u.mean[0])
+        return precision_fun(solution.u.mean[0])
 
     return param_to_solution
 
 
-def solver_dense(*, num_derivatives: int) -> Callable:
+def solver_dense(*, num_derivatives: int, precision_fun) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @probdiffeq.ode
@@ -189,12 +191,12 @@ def solver_dense(*, num_derivatives: int) -> Callable:
         solution = solve(iwp, t0=t0, t1=t1, dt0=dt0, atol=1e-3 * tol, rtol=tol)
 
         # Return the terminal value
-        return jax.block_until_ready(solution.u.mean[0])
+        return precision_fun(solution.u.mean[0])
 
     return param_to_solution
 
 
-def solver_scipy(*, method: str) -> Callable:
+def solver_scipy(*, method: str, precision_fun) -> Callable:
     """Construct a solver that wraps SciPy's solution routines."""
 
     def vf_scipy(_t, u):
@@ -224,7 +226,7 @@ def solver_scipy(*, method: str) -> Callable:
             rtol=tol,
             method=method,
         )
-        return jnp.asarray(solution.y[:, -1])
+        return precision_fun(solution.y[:, -1])
 
     return param_to_solution
 

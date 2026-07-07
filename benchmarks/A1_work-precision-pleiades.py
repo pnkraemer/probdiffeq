@@ -18,7 +18,7 @@ from probdiffeq.util import benchmark_util
 jax.config.update("jax_debug_nans", True)
 
 
-def main(start=3.0, stop=11.0, step=0.5, repeats=2) -> None:
+def main(start=3.0, stop=11.0, step=1.0, repeats=1) -> None:
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
@@ -38,43 +38,52 @@ def main(start=3.0, stop=11.0, step=0.5, repeats=2) -> None:
     plt.show()
 
     # Read configuration from command line
-    tolerances = benchmark_util.setup_tolerances(start=start, stop=stop, step=step)
-    timeit_fun = benchmark_util.setup_timeit(repeats=repeats)
+    tolerances = 0.1 ** jnp.arange(start, stop, step=step)
+
+    # Compute a reference solution
+    reference = solver_scipy(
+        method="LSODA", use_numba=False, precision_fun=lambda x: x
+    )(1e-12)
+    precision_fun = benchmark_util.rmse_absolute(reference)
 
     # Assemble algorithms
     algorithms = {
-        r"ProbDiffEq: TS0($5$)": solver_probdiffeq(num_derivatives=5),
-        r"ProbDiffEq: TS0($8$)": solver_probdiffeq(num_derivatives=8),
-        "SciPy: 'RK45'": solver_scipy(method="RK45", use_numba=False),
-        "SciPy: 'DOP853'": solver_scipy(method="DOP853", use_numba=False),
-        "SciPy: 'RK45' (+numba)": solver_scipy(method="RK45", use_numba=True),
-        "SciPy: 'DOP853' (+numba)": solver_scipy(method="DOP853", use_numba=True),
-        "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
-        "Diffrax: Dopri8()": solver_diffrax(solver=diffrax.Dopri8()),
+        r"TS0($5$)": solver_probdiffeq(num_derivatives=5, precision_fun=precision_fun),
+        r"TS0($8$)": solver_probdiffeq(num_derivatives=8, precision_fun=precision_fun),
+        "SciPy: 'RK45'": solver_scipy(
+            method="RK45", use_numba=False, precision_fun=precision_fun
+        ),
+        "SciPy: 'DOP853'": solver_scipy(
+            method="DOP853", use_numba=False, precision_fun=precision_fun
+        ),
+        "SciPy: 'RK45' (+numba)": solver_scipy(
+            method="RK45", use_numba=True, precision_fun=precision_fun
+        ),
+        "SciPy: 'DOP853' (+numba)": solver_scipy(
+            method="DOP853", use_numba=True, precision_fun=precision_fun
+        ),
+        "Diffrax: Tsit5()": solver_diffrax(
+            solver=diffrax.Tsit5(), precision_fun=precision_fun
+        ),
+        "Diffrax: Dopri8()": solver_diffrax(
+            solver=diffrax.Dopri8(), precision_fun=precision_fun
+        ),
     }
 
-    # Compute a reference solution
-    reference = solver_scipy(method="LSODA", use_numba=False)(1e-14)
-    precision_fun = benchmark_util.rmse_absolute(reference)
-
     # Compute all work-precision diagrams
-    results = {}
+    _fig, ax = plt.subplots(figsize=(8, 4))
     pbar = tqdm.tqdm(algorithms.items())
     for label, algo in pbar:
         pbar.set_description(label)
-        param_to_wp = benchmark_util.workprec(
-            algo, precision_fun=precision_fun, timeit_fun=timeit_fun
-        )
-        results[label] = param_to_wp(tolerances)
-    _fig, ax = plt.subplots(figsize=(7, 3))
-    for label, wp in results.items():
-        ax.loglog(wp["precision"], wp["work_mean"], label=label)
+        param_to_wp = benchmark_util.workprec(algo, num_timing_calls=repeats)
+        wp = param_to_wp(tolerances)
+        ax.loglog(wp.precision, wp.work.mean(axis=-1), ".-", label=label)
 
     ax.set_title("Work-precision diagram")
     ax.set_xlabel("Precision (relative RMSE)")
     ax.set_ylabel("Work (avg. wall time)")
     ax.grid(linestyle="dotted", which="both")
-    ax.legend(fontsize="small", loc="center left", bbox_to_anchor=(1, 0.5))
+    ax.legend(loc="center left", frameon=False, bbox_to_anchor=(1, 0.5))
 
     plt.tight_layout()
     plt.show()
@@ -119,7 +128,7 @@ def solve_ivp_once():
     return solution.t, solution.y.T
 
 
-def solver_probdiffeq(*, num_derivatives: int) -> Callable:
+def solver_probdiffeq(*, num_derivatives: int, precision_fun) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
     # fmt: off
     u0 = jnp.asarray(
@@ -174,12 +183,12 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         solution = solve(iwp, t0=t0, t1=t1, dt0=dt0, atol=1e-3 * tol, rtol=tol)
 
         # Return the terminal value
-        return jax.block_until_ready(solution.u.mean[0])
+        return precision_fun(solution.u.mean[0])
 
     return param_to_solution
 
 
-def solver_diffrax(*, solver) -> Callable:
+def solver_diffrax(*, solver, precision_fun) -> Callable:
     """Construct a solver that wraps Diffrax' solution routines."""
     # fmt: off
     u0 = jnp.asarray(
@@ -223,12 +232,12 @@ def solver_diffrax(*, solver) -> Callable:
             max_steps=10_000,
             solver=solver,
         )
-        return jax.block_until_ready(solution.ys[0, :14])
+        return precision_fun(solution.ys[0, :14])
 
     return param_to_solution
 
 
-def solver_scipy(*, method: str, use_numba: bool) -> Callable:
+def solver_scipy(*, method: str, use_numba: bool, precision_fun) -> Callable:
     """Construct a solver that wraps SciPy's solution routines."""
     # fmt: off
     u0 = np.asarray(
@@ -272,7 +281,7 @@ def solver_scipy(*, method: str, use_numba: bool) -> Callable:
             rtol=tol,
             method=method,
         )
-        return jnp.asarray(solution.y[:14, -1])
+        return precision_fun(jnp.asarray(solution.y[:14, -1]))
 
     return param_to_solution
 

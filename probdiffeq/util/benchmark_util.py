@@ -1,47 +1,76 @@
 """Shared utilities for benchmark scripts."""
 
-from probdiffeq.backend import linalg, np, timing
+from probdiffeq.backend import linalg, np, structs, timing, tree
 from probdiffeq.backend.typing import Array, Callable
 
 
-def setup_tolerances(*, start: float, stop: float, step: float) -> Array:
-    """Choose a vector of tolerances."""
-    return 0.1 ** np.arange(start, stop, step=step)
+@tree.register_dataclass
+@structs.dataclass
+class WorkPrec:
+    """Data for work-precision diagrams."""
+
+    arg: Array
+    """The inputs for the work-precision diagrams."""
+
+    work_first_run: Array
+    """The time it took for the initial run (includes compilation time)."""
+
+    work: Array
+    """A set of runtimes."""
+
+    precision: Array
+    """The precision respectively target functions."""
 
 
-def setup_timeit(*, repeats: int) -> Callable:
-    """Construct a timing function."""
+def workprec(
+    target_fun: Callable,
+    /,
+    *,
+    num_timing_calls: int = 1,
+    time_max_sec=30,
+    print_progress: bool = False,
+) -> Callable[[list], WorkPrec]:
+    """Turn a parameter-to-precision function into a parameter-to-work-precision map."""
 
-    def timer(fun, /):
-        return timing.repeat(fun, repeats=repeats)
+    def parameter_list_to_workprecision(list_of_args: list, /) -> WorkPrec:
+        workprecs = []
+        time_start = timing.perf_counter()
 
-    return timer
-
-
-def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
-    """Turn a parameter-to-solution function into a parameter-to-work-precision map."""
-
-    def parameter_list_to_workprecision(list_of_args, /):
-        works_mean = []
-        works_std = []
-        precisions = []
         for arg in list_of_args:
-            # TODO: if we do timing and precision jointly (which means hardcoding timing), then
-            # we can cut runtimes of costlier benchmarks where we only afford repeat=1 in half.
-            precision = precision_fun(fun(arg).block_until_ready())
-            precisions.append(precision)
+            time_elapsed = timing.perf_counter() - time_start
+            if time_elapsed > time_max_sec:
+                break
 
-            times = timeit_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
-            mean = np.mean(np.asarray(times))
-            works_mean.append(mean)
-            if len(times) > 1:
-                std = np.std(np.asarray(times), ddof=1)
-                works_std.append(std)
-        return {
-            "work_mean": np.asarray(works_mean),
-            "work_std": np.asarray(works_std),
-            "precision": np.asarray(precisions),
-        }
+            if print_progress:
+                msg = f"arg = {arg} | elapsed: {time_elapsed:.2f} | time_max_sec = {time_max_sec}"
+                print(msg)  # noqa: T201
+
+            # Compile...
+            t0 = timing.perf_counter()
+            precision = target_fun(arg)
+            precision = tree.tree_map(lambda x: x.block_until_ready(), precision)
+            work_first_run = np.asarray(timing.perf_counter() - t0)
+
+            # Call many times to get a set of runtimes
+            works = []
+            for _ in range(num_timing_calls):
+                t0 = timing.perf_counter()
+                y = target_fun(arg)
+                _ = tree.tree_map(lambda x: x.block_until_ready(), y)
+                work = np.asarray(timing.perf_counter() - t0)
+                works.append(work)
+
+            arg = np.asarray(arg)
+            workprec = WorkPrec(
+                arg=arg,
+                work_first_run=work_first_run,
+                work=np.asarray(works),
+                precision=precision,
+            )
+            workprecs.append(workprec)
+
+        # Transpose workprec tree again to return a WorkPrec object
+        return tree.tree_array_stack(workprecs)
 
     return parameter_list_to_workprecision
 
@@ -69,45 +98,6 @@ def rmse_absolute(expected: Array) -> Callable:
         return linalg.vector_norm(error_absolute) / np.sqrt(error_absolute.size)
 
     return rmse
-
-
-def adaptive_benchmark(
-    fun, *, timeit_fun: Callable, max_time, print_progress: bool = True
-) -> dict:
-    """Benchmark a function iteratively until a max-time threshold is exceeded."""
-    work_compile = []
-    work_mean = []
-    work_std = []
-    arguments = []
-
-    t0 = timing.perf_counter()
-    arg = 1
-    while (elapsed := timing.perf_counter() - t0) < max_time:
-        if print_progress:
-            msg = f"num = {arg} | elapsed = {elapsed:.2f} | max_time = {max_time}"
-            print(msg)  # noqa: T201
-        t0 = timing.perf_counter()
-        tcoeffs = fun(arg).block_until_ready()
-        t1 = timing.perf_counter()
-        time_compile = t1 - t0
-
-        time_execute = timeit_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
-
-        arguments.append(len(tcoeffs))
-        work_compile.append(time_compile)
-        work_mean.append(np.mean(np.asarray(time_execute)))
-        work_std.append(np.std(np.asarray(time_execute), ddof=1))
-        arg += 1
-
-    if print_progress:
-        msg = f"num = {arg} | elapsed = {elapsed:.2f} | max_time = {max_time}"
-        print(msg)  # noqa: T201
-    return {
-        "work_mean": np.asarray(work_mean),
-        "work_std": np.asarray(work_std),
-        "work_compile": np.asarray(work_compile),
-        "arguments": np.asarray(arguments),
-    }
 
 
 def adaptive_repeat(xs, ys):
