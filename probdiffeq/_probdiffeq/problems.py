@@ -54,7 +54,7 @@ JetResidual(num_tcoeffs_in_args=2, jacobian=jacobian_monte_carlo_rev(seed=1, num
 
 """
 
-from probdiffeq._probdiffeq import jacobians, utilities
+from probdiffeq._probdiffeq import jacobians
 from probdiffeq.backend import func, np, tree
 from probdiffeq.backend.typing import Any, Array, Generic, Protocol, Sequence, TypeVar
 
@@ -63,6 +63,7 @@ __all__ = [
     "JetOde",
     "JetOdeAutonomous",
     "JetResidual",
+    "args_autonomous_and_jet_compatible",
     "ode",
     "ode_autonomous",
     "ode_autonomous_order_arbitrary",
@@ -128,19 +129,20 @@ class JetAbstract:
             _, unravel_inputs = tree.ravel_pytree(jet_coords[0])
             flat = [tree.ravel_pytree(s)[0] for s in tcoeffs]
 
-            def jet_call(*y):
+            def jet_call(*y_and_t):
+                *y, t_ = y_and_t
                 y_tree = [unravel_inputs(s) for s in y]
-                fx = fun(jet_coords=y_tree, t=t)
+                fx = fun(jet_coords=y_tree, t=t_)
                 return tree.ravel_pytree(fx)[0]
 
             # Process the Taylor-coefficient list into the primals/series combination
             # needed for jax.experimental.jet
-            ps, ss = utilities.jet_coords_to_primals_and_series(
-                flat, self.num_tcoeffs_in_args
+            ps, ss = args_autonomous_and_jet_compatible(
+                flat, num_tcoeffs_in_args=self.num_tcoeffs_in_args, t=t
             )
 
             # If there are no series, then we can just call the function directly and return the result.
-            if len(tree.tree_leaves(ss)) == 0:
+            if len(tree.tree_leaves(ss[0])) == 0:
                 fx = jet_call(*ps)
 
                 # Return a sequence to be compatible with Taylor-coeff logic,
@@ -528,3 +530,55 @@ def residual_from_ode(ode: JetOde) -> JetResidual:
     return JetResidual(
         jetfunc, jacobian=ode.jacobian, num_tcoeffs_in_args=ode.num_tcoeffs_in_args + 1
     )
+
+
+def args_autonomous_and_jet_compatible(taylor_series, /, *, num_tcoeffs_in_args, t):
+    """Make the arguments of a jet function autonomous and compatible with jax.experimental.jet.
+
+    This means that for a function f(u, du, ddu, *, t),
+    we construct a function g(z, dz, ddz) and reorder a set of existing Taylor coefficients
+    into "primals" and "series" argument that we can then plug into
+    jax.experimental.jet to propagate the Taylor series through f.
+
+    Arguments
+    ---------
+    taylor_series
+        A sequence of arrays to evaluate the Taylor series at.
+    num
+        The number of inputs to the residual
+        (2 for a first-order ODE, 3 for second-order, etc.)
+
+    Examples
+    --------
+    >>> a = (1.0, 2.0, 3.0, 4.0, 5.0)
+    >>> primals, series = args_autonomous_and_jet_compatible(
+    ...     a, num_tcoeffs_in_args=2, t=9.0
+    ... )
+    >>> print(primals)  # attach t to the first state args
+    [1.0, 2.0, 9.0]
+    >>> print(series)  # attach (1, 0, ..., 0) to the remaining ones
+    [[2.0, 3.0, 4.0], [3.0, 4.0, 5.0], [1.0, 0.0, 0.0]]
+
+    """
+    # TODO: include the vector-field wrapping in here?
+    #       (Needs a decision on whether the wrapped vf should flatten or not.)
+
+    # Split zeroth from remaining Taylor coefficients
+    primals_u, series = taylor_series[:num_tcoeffs_in_args], taylor_series[1:]
+
+    # Reorder the series arguments to comply with jax.experimental.jet
+
+    def mask(i):
+        return None if i == 0 else i
+
+    series_u = [
+        list(series[mask(k) : mask(k + 1 - num_tcoeffs_in_args)])
+        for k in range(num_tcoeffs_in_args)
+    ]
+
+    # Add the "t" variables (t, 1, 0, ..., 0) to the primals and series
+    # to make the signature autonomous
+    primals = [*primals_u, t]
+    series_t = [1.0, *[0.0 for _ in range(len(series_u[0]) - 1)]]
+    series = [*series_u, series_t]
+    return primals, series
