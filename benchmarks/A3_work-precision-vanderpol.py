@@ -64,7 +64,7 @@ def main(start=6.5, stop=10.0, step=0.25, repeats=2) -> None:
         param_to_wp = benchmark_util.workprec(algo, num_timing_calls=repeats)
         wp = param_to_wp(tolerances)
 
-        ax.loglog(wp.precision.mean(axis=-1), wp.work.mean(axis=-1), ".-", label=label)
+        ax.loglog(wp.precision, wp.work.mean(axis=-1), ".-", label=label)
 
     ax.set_title("Work-precision diagram")
     ax.set_xlabel("Precision (relative RMSE)")

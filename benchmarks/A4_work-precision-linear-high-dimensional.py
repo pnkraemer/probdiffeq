@@ -74,7 +74,7 @@ def main(start=3.0, stop=10.0, step=0.5, repeats=2) -> None:
             "dashed" if "iffrax" in label.lower() or "ipy" in label.lower() else "solid"
         )
         ax.loglog(
-            wp.precision.mean(axis=-1),
+            wp.precision,
             wp.work.mean(axis=-1),
             marker=".",
             label=label,

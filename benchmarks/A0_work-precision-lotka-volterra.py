@@ -67,7 +67,7 @@ def main(start=3.0, stop=12.0, step=1.0, repeats=2) -> None:
         pbar.set_description(label)
         param_to_wp = benchmark_util.workprec(algo, num_timing_calls=repeats)
         wp = param_to_wp(tolerances)
-        ax.loglog(wp.precision.mean(axis=-1), wp.work.mean(axis=-1), ".-", label=label)
+        ax.loglog(wp.precision, wp.work.mean(axis=-1), ".-", label=label)
 
     ax.set_ylabel("Work (avg. wall time)")
     ax.set_title("Work-precision diagram")

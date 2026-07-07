@@ -1,6 +1,5 @@
 """Walltime | Robertson DAE."""
 
-import statistics
 from collections.abc import Callable
 
 import jax
@@ -87,15 +86,8 @@ def main(start=3.0, stop=10.0, step=0.5, repeats=2, time_span=(1e-6, 1e5)) -> No
         param_to_wp = benchmark_util.workprec(algo, num_timing_calls=repeats)
         wp = param_to_wp(tolerances)
 
-        ax[0].loglog(
-            wp.precision["rmse"].mean(axis=-1), wp.work.mean(axis=-1), ".-", label=label
-        )
-        ax[1].loglog(
-            tolerances,
-            wp.precision["constraint_violation"].mean(axis=-1),
-            "-",
-            label=label,
-        )
+        ax[0].loglog(wp.precision["rmse"], wp.work.mean(axis=-1), ".-", label=label)
+        ax[1].loglog(tolerances, wp.precision["constraint_violation"], "-", label=label)
 
     ax[0].set_title("Work-precision diagram")
     ax[0].set_xlabel("Precision (relative RMSE)")
@@ -266,29 +258,6 @@ def solver_scipy(*, method: str, time_span, precision_fun) -> Callable:
         return precision_fun(jnp.asarray(solution.y[:, -1]))
 
     return param_to_solution
-
-
-def workprec(fun, *, precision_fun: Callable, work_fun: Callable) -> Callable:
-    """Turn a parameter-to-solution function into parameter-to-workprecision."""
-
-    def parameter_list_to_workprecision(list_of_args, /):
-        works_mean = []
-        works_std = []
-        precisions = []
-        for arg in list_of_args:
-            precision = precision_fun(fun(arg).block_until_ready())
-            work = work_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
-
-            precisions.append(precision)
-            works_mean.append(statistics.mean(work))
-            works_std.append(statistics.stdev(work))
-        return {
-            "work_mean": jnp.asarray(works_mean),
-            "work_std": jnp.asarray(works_std),
-            "precision": jnp.asarray(precisions),
-        }
-
-    return parameter_list_to_workprecision
 
 
 main()
