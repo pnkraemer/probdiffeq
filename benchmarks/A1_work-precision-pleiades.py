@@ -48,12 +48,8 @@ def main(start=3.0, stop=11.0, step=1.0, repeats=1) -> None:
 
     # Assemble algorithms
     algorithms = {
-        r"ProbDiffEq: TS0($5$)": solver_probdiffeq(
-            num_derivatives=5, precision_fun=precision_fun
-        ),
-        r"ProbDiffEq: TS0($8$)": solver_probdiffeq(
-            num_derivatives=8, precision_fun=precision_fun
-        ),
+        r"TS0($5$)": solver_probdiffeq(num_derivatives=5, precision_fun=precision_fun),
+        r"TS0($8$)": solver_probdiffeq(num_derivatives=8, precision_fun=precision_fun),
         "SciPy: 'RK45'": solver_scipy(
             method="RK45", use_numba=False, precision_fun=precision_fun
         ),
@@ -75,7 +71,7 @@ def main(start=3.0, stop=11.0, step=1.0, repeats=1) -> None:
     }
 
     # Compute all work-precision diagrams
-    _fig, ax = plt.subplots(figsize=(8, 3))
+    _fig, ax = plt.subplots(figsize=(8, 4))
     pbar = tqdm.tqdm(algorithms.items())
     for label, algo in pbar:
         pbar.set_description(label)
@@ -87,9 +83,7 @@ def main(start=3.0, stop=11.0, step=1.0, repeats=1) -> None:
     ax.set_xlabel("Precision (relative RMSE)")
     ax.set_ylabel("Work (avg. wall time)")
     ax.grid(linestyle="dotted", which="both")
-    ax.legend(
-        fontsize="small", loc="center left", frameon=False, bbox_to_anchor=(1, 0.5)
-    )
+    ax.legend(loc="center left", frameon=False, bbox_to_anchor=(1, 0.5))
 
     plt.tight_layout()
     plt.show()

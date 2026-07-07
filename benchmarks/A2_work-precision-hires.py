@@ -41,16 +41,16 @@ def main(start=3.0, stop=10.0, step=1.0, repeats=1) -> None:
 
     # Assemble algorithms
     algorithms = {
-        r"ProbDiffEq: TS1($3$, matfree)": solver_matfree(
+        r"TS1($3$, matfree)": solver_matfree(
             num_derivatives=3, precision_fun=precision_fun
         ),
-        r"ProbDiffEq: TS1($5$, matfree)": solver_matfree(
+        r"TS1($5$, matfree)": solver_matfree(
             num_derivatives=5, precision_fun=precision_fun
         ),
-        r"ProbDiffEq: TS1($5$, dense)": solver_dense(
+        r"TS1($5$, dense)": solver_dense(
             num_derivatives=5, precision_fun=precision_fun
         ),
-        r"ProbDiffEq: TS1($7$, dense)": solver_dense(
+        r"TS1($7$, dense)": solver_dense(
             num_derivatives=7, precision_fun=precision_fun
         ),
         "SciPy: 'LSODA'": solver_scipy(method="LSODA", precision_fun=precision_fun),
@@ -58,7 +58,7 @@ def main(start=3.0, stop=10.0, step=1.0, repeats=1) -> None:
     }
 
     # Compute all work-precision diagrams
-    _fig, ax = plt.subplots(figsize=(8, 3))
+    _fig, ax = plt.subplots(figsize=(8, 4))
     pbar = tqdm.tqdm(algorithms.items())
     for label, algo in pbar:
         pbar.set_description(label)
@@ -70,9 +70,7 @@ def main(start=3.0, stop=10.0, step=1.0, repeats=1) -> None:
     ax.set_xlabel("Precision (relative RMSE)")
     ax.set_ylabel("Work (avg. wall time)")
     ax.grid(linestyle="dotted", which="both")
-    ax.legend(
-        fontsize="small", loc="center left", frameon=False, bbox_to_anchor=(1, 0.5)
-    )
+    ax.legend(loc="center left", frameon=False, bbox_to_anchor=(1, 0.5))
 
     plt.tight_layout()
     plt.show()

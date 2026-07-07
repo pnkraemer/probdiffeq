@@ -17,7 +17,7 @@ from probdiffeq.util import benchmark_util
 jax.config.update("jax_debug_nans", True)
 
 
-def main(start=6.0, stop=10.0, step=0.25, repeats=2) -> None:
+def main(start=6.5, stop=10.0, step=0.25, repeats=2) -> None:
     """Run the script."""
     # Set up all the configs
     jax.config.update("jax_enable_x64", True)
@@ -36,47 +36,41 @@ def main(start=6.0, stop=10.0, step=0.25, repeats=2) -> None:
 
     # Read configuration from command line
     tolerances = benchmark_util.setup_tolerances(start=start, stop=stop, step=step)
-    timeit_fun = benchmark_util.setup_timeit(repeats=repeats)
+
+    # Compute a reference solution
+    reference = solver_scipy(method="LSODA", precision_fun=lambda x: x)(
+        0.1 * tolerances[-1]
+    )
+    precision_fun = benchmark_util.rmse_absolute(reference)
 
     # Assemble algorithms
     algorithms = {
-        "TS1(4)": solver_probdiffeq(num_derivatives=4),
-        "JetTS1(4)": solver_probdiffeq_jet(num_derivatives=4),
-        "TS1(6)": solver_probdiffeq(num_derivatives=6),
-        "JetTS1(6)": solver_probdiffeq_jet(num_derivatives=6),
-        "SciPy('LSODA')": solver_scipy(method="LSODA"),
+        "TS1(4)": solver_probdiffeq(num_derivatives=4, precision_fun=precision_fun),
+        "JetTS1(4)": solver_probdiffeq_jet(
+            num_derivatives=4, precision_fun=precision_fun
+        ),
+        "TS1(6)": solver_probdiffeq(num_derivatives=6, precision_fun=precision_fun),
+        "JetTS1(6)": solver_probdiffeq_jet(
+            num_derivatives=6, precision_fun=precision_fun
+        ),
+        "SciPy('LSODA')": solver_scipy(method="LSODA", precision_fun=precision_fun),
     }
 
-    # Compute a reference solution
-    reference = solver_scipy(method="LSODA")(0.1 * tolerances[-1])
-    precision_fun = benchmark_util.rmse_absolute(reference)
-
     # Compute all work-precision diagrams
-    results = {}
+    _fig, ax = plt.subplots(figsize=(8, 4), dpi=120, constrained_layout=True)
     pbar = tqdm.tqdm(algorithms.items())
     for label, algo in pbar:
         pbar.set_description(label)
-        param_to_wp = benchmark_util.workprec(
-            algo, precision_fun=precision_fun, timeit_fun=timeit_fun
-        )
-        results[label] = param_to_wp(tolerances)
+        param_to_wp = benchmark_util.workprec(algo, num_timing_calls=repeats)
+        wp = param_to_wp(tolerances)
 
-    _fig, ax = plt.subplots(figsize=(8, 5))
-
-    for label, wp in results.items():
-        wdw = 3  # window
-        x, y = wp["precision"], wp["work_mean"]
-        x = jnp.exp(jnp.convolve(jnp.log(x), jnp.ones((wdw,)) / wdw, mode="valid"))
-        y = jnp.exp(jnp.convolve(jnp.log(y), jnp.ones((wdw,)) / wdw, mode="valid"))
-        ax.loglog(x, y, label=label)
+        ax.loglog(wp.precision.mean(axis=-1), wp.work.mean(axis=-1), ".-", label=label)
 
     ax.set_title("Work-precision diagram")
     ax.set_xlabel("Precision (relative RMSE)")
     ax.set_ylabel("Work (avg. wall time)")
     ax.grid(linestyle="dotted", which="both")
-    ax.legend(fontsize="small")
-
-    plt.tight_layout()
+    ax.legend(loc="center left", frameon=False, bbox_to_anchor=(1, 0.5))
     plt.show()
 
 
@@ -98,7 +92,7 @@ def solve_ivp_once():
     return solution.t, solution.y.T
 
 
-def solver_probdiffeq(*, num_derivatives: int) -> Callable:
+def solver_probdiffeq(*, num_derivatives: int, precision_fun) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @probdiffeq.ode_order_two
@@ -124,17 +118,17 @@ def solver_probdiffeq(*, num_derivatives: int) -> Callable:
         solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=ts)
         error = probdiffeq.error_state_std(constraint=ts)
 
-        control = ivpsolve.control_proportional_integral()
+        control = ivpsolve.control_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
             solver=solver, error=error, control=control
         )
         solution = solve(iwp, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
-        return jax.block_until_ready(solution.u.mean[0])
+        return precision_fun(solution.u.mean[0])
 
     return param_to_solution
 
 
-def solver_probdiffeq_jet(*, num_derivatives: int) -> Callable:
+def solver_probdiffeq_jet(*, num_derivatives: int, precision_fun) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @probdiffeq.ode_order_two
@@ -161,17 +155,17 @@ def solver_probdiffeq_jet(*, num_derivatives: int) -> Callable:
         solver = probdiffeq.solver_dynamic(strategy=strategy, constraint=ts)
         error = probdiffeq.error_state_std(constraint=ts)
 
-        control = ivpsolve.control_proportional_integral()
+        control = ivpsolve.control_integral()
         solve = ivpsolve.solve_adaptive_terminal_values(
             solver=solver, error=error, control=control
         )
         solution = solve(iwp, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
-        return jax.block_until_ready(solution.u.mean[0])
+        return precision_fun(solution.u.mean[0])
 
     return param_to_solution
 
 
-def solver_scipy(method: str) -> Callable:
+def solver_scipy(method: str, precision_fun) -> Callable:
     """Construct a solver that wraps SciPy's solution routines."""
 
     @numba.jit(nopython=True)
@@ -192,7 +186,7 @@ def solver_scipy(method: str) -> Callable:
             rtol=tol,
             method=method,
         )
-        return jnp.asarray(solution.y[0, -1])
+        return precision_fun(jnp.asarray(solution.y[0, -1]))
 
     return param_to_solution
 

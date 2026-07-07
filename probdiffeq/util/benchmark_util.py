@@ -9,15 +9,6 @@ def setup_tolerances(*, start: float, stop: float, step: float) -> Array:
     return 0.1 ** np.arange(start, stop, step=step)
 
 
-def setup_timeit(*, repeats: int) -> Callable:
-    """Construct a timing function."""
-
-    def timer(fun, /):
-        return timing.repeat(fun, repeats=repeats)
-
-    return timer
-
-
 @tree.register_dataclass
 @structs.dataclass
 class WorkPrec:

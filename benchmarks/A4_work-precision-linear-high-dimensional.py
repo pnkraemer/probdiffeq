@@ -33,50 +33,60 @@ def main(start=3.0, stop=10.0, step=0.5, repeats=2) -> None:
 
     # Read configuration from command line
     tolerances = benchmark_util.setup_tolerances(start=start, stop=stop, step=step)
-    timeit_fun = benchmark_util.setup_timeit(repeats=repeats)
+
+    # Compute a reference solution
+    reference = solver_scipy(method="LSODA", precision_fun=lambda x: x)(1e-13)
+    precision_fun = benchmark_util.rmse_relative(reference)
 
     # Assemble algorithms
-    ts0_iso = solver_probdiffeq(4, constraint_order=0, implementation="isotropic")
-    ts0_bd = solver_probdiffeq(4, constraint_order=0, implementation="blockdiag")
-    ts1_bd = solver_probdiffeq(4, constraint_order=1, implementation="blockdiag")
-    ts1_mf = solver_probdiffeq(4, constraint_order=1, implementation="matfree")
+    ts0_iso = solver_probdiffeq(
+        4, constraint_order=0, implementation="isotropic", precision_fun=precision_fun
+    )
+    ts0_bd = solver_probdiffeq(
+        4, constraint_order=0, implementation="blockdiag", precision_fun=precision_fun
+    )
+    ts1_bd = solver_probdiffeq(
+        4, constraint_order=1, implementation="blockdiag", precision_fun=precision_fun
+    )
+    ts1_mf = solver_probdiffeq(
+        4, constraint_order=1, implementation="matfree", precision_fun=precision_fun
+    )
     algorithms = {
         r"TS1, matfree": ts1_mf,
         r"TS1, blockdiag": ts1_bd,
         r"TS0, blockdiag": ts0_bd,
         r"TS0, isotropic": ts0_iso,
-        "Diffrax: Tsit5()": solver_diffrax(solver=diffrax.Tsit5()),
-        "SciPy: 'RK45'": solver_scipy(method="RK45"),
+        "Diffrax: Tsit5()": solver_diffrax(
+            solver=diffrax.Tsit5(), precision_fun=precision_fun
+        ),
+        "SciPy: 'RK45'": solver_scipy(method="RK45", precision_fun=precision_fun),
     }
 
-    # Compute a reference solution
-    reference = solver_scipy(method="LSODA")(1e-13)
-    precision_fun = benchmark_util.rmse_relative(reference)
-
     # Compute all work-precision diagrams
-    results = {}
+    _fig, ax = plt.subplots(figsize=(8, 4), constrained_layout=True)
     pbar = tqdm.tqdm(algorithms.items())
     for label, algo in pbar:
         pbar.set_description(label)
-        param_to_wp = benchmark_util.workprec(
-            algo, precision_fun=precision_fun, timeit_fun=timeit_fun
-        )
-        results[label] = param_to_wp(tolerances)
+        param_to_wp = benchmark_util.workprec(algo, num_timing_calls=repeats)
+        wp = param_to_wp(tolerances)
 
-    _fig, ax = plt.subplots(figsize=(7, 3))
-    for label, wp in results.items():
         linestyle = (
             "dashed" if "iffrax" in label.lower() or "ipy" in label.lower() else "solid"
         )
-        ax.loglog(wp["precision"], wp["work_mean"], label=label, linestyle=linestyle)
+        ax.loglog(
+            wp.precision.mean(axis=-1),
+            wp.work.mean(axis=-1),
+            marker=".",
+            label=label,
+            linestyle=linestyle,
+        )
 
     ax.set_title("Work-precision diagram")
     ax.set_xlabel("Precision (relative RMSE)")
     ax.set_ylabel("Work (avg. wall time)")
     ax.grid(linestyle="dotted", which="both")
-    ax.legend(fontsize="small", loc="center left", bbox_to_anchor=(1, 0.5))
+    ax.legend(loc="center left", frameon=False, bbox_to_anchor=(1, 0.5))
 
-    plt.tight_layout()
     plt.show()
 
 
@@ -97,7 +107,7 @@ def solve_ivp_once():
 
 
 def solver_probdiffeq(
-    num_derivatives: int, implementation, constraint_order: int
+    num_derivatives: int, implementation, constraint_order: int, precision_fun
 ) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
@@ -134,7 +144,7 @@ def solver_probdiffeq(
         solution = solve(iwp, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
 
         # Return the terminal value
-        return jax.block_until_ready(solution.u.mean[0])
+        return precision_fun(solution.u.mean[0])
 
     def state_space_model(implementation):
         match implementation:
@@ -156,7 +166,7 @@ def solver_probdiffeq(
     return param_to_solution
 
 
-def solver_diffrax(*, solver) -> Callable:
+def solver_diffrax(*, solver, precision_fun) -> Callable:
     """Construct a solver that wraps Diffrax' solution routines."""
 
     @diffrax.ODETerm
@@ -183,12 +193,12 @@ def solver_diffrax(*, solver) -> Callable:
             max_steps=10_000,
             solver=solver,
         )
-        return jax.block_until_ready(solution.ys[0, :])
+        return precision_fun(solution.ys[0, :])
 
     return param_to_solution
 
 
-def solver_scipy(*, method: str) -> Callable:
+def solver_scipy(*, method: str, precision_fun) -> Callable:
     """Construct a solver that wraps SciPy's solution routines."""
 
     def vf_scipy(_t, y):
@@ -208,7 +218,7 @@ def solver_scipy(*, method: str) -> Callable:
             rtol=tol,
             method=method,
         )
-        return jnp.asarray(solution.y[:, -1])
+        return precision_fun(jnp.asarray(solution.y[:, -1]))
 
     return param_to_solution
 

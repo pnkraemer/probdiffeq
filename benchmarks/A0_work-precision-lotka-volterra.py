@@ -61,7 +61,7 @@ def main(start=3.0, stop=12.0, step=1.0, repeats=2) -> None:
     }
 
     # Compute all work-precision diagrams
-    _fig, ax = plt.subplots(figsize=(8, 3), dpi=120, constrained_layout=True)
+    _fig, ax = plt.subplots(figsize=(8, 4), dpi=120, constrained_layout=True)
     pbar = tqdm.tqdm(algorithms.items())
     for label, algo in pbar:
         pbar.set_description(label)
@@ -73,9 +73,7 @@ def main(start=3.0, stop=12.0, step=1.0, repeats=2) -> None:
     ax.set_title("Work-precision diagram")
     ax.set_xlabel("Precision (relative RMSE)")
     ax.grid(linestyle="dotted", which="both")
-    ax.legend(
-        fontsize="small", loc="center left", frameon=False, bbox_to_anchor=(1, 0.5)
-    )
+    ax.legend(loc="center left", frameon=False, bbox_to_anchor=(1, 0.5))
 
     plt.show()
 
