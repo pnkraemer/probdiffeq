@@ -35,7 +35,7 @@ def main(start=6.5, stop=10.0, step=0.25, repeats=2) -> None:
     plt.show()
 
     # Read configuration from command line
-    tolerances = benchmark_util.setup_tolerances(start=start, stop=stop, step=step)
+    tolerances = 0.1 ** jnp.arange(start, stop, step=step)
 
     # Compute a reference solution
     reference = solver_scipy(method="LSODA", precision_fun=lambda x: x)(

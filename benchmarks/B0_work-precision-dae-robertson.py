@@ -41,7 +41,7 @@ def main(start=3.0, stop=10.0, step=0.5, repeats=2, time_span=(1e-6, 1e5)) -> No
     plt.show()
 
     # Read configuration from command line
-    tolerances = benchmark_util.setup_tolerances(start=start, stop=stop, step=step)
+    tolerances = 0.1 ** jnp.arange(start, stop, step=step)
 
     # Compute a reference solution
     reference_solver = solver_scipy(

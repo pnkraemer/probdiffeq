@@ -25,7 +25,7 @@ def main() -> None:
 
     # Set up the benchmark (compute a reference etc.)
     reference = solver_scipy(method="LSODA")(1e-12)
-    tolerances = benchmark_util.setup_tolerances(start=2, stop=8, step=0.5)
+    tolerances = 0.1 ** jnp.arange(2, 8, step=0.5)
     precision_fun = benchmark_util.rmse_relative(reference)
 
     # Assemble algorithms

@@ -32,7 +32,7 @@ def main(start=3.0, stop=10.0, step=0.5, repeats=2) -> None:
     jax.config.update("jax_enable_x64", True)
 
     # Read configuration from command line
-    tolerances = benchmark_util.setup_tolerances(start=start, stop=stop, step=step)
+    tolerances = 0.1 ** jnp.arange(start, stop, step=step)
 
     # Compute a reference solution
     reference = solver_scipy(method="LSODA", precision_fun=lambda x: x)(1e-13)
