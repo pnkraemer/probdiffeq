@@ -54,41 +54,6 @@ class InterpResult(Generic[S]):
     """
 
 
-def jet_coords_to_primals_and_series(taylor_series, num, /):
-    """Compute Jet-compatible arguments from a Taylor series.
-
-    That is, for a function like f(u, u'), the present function
-    turns a Taylor series (u, u', u'', ...) into arguments
-    compatible with jax.experimental.jet.
-
-    Arguments
-    ---------
-    taylor_series
-        A sequence of arrays to evaluate the Taylor series at.
-    num
-        The number of inputs to the residual
-        (2 for a first-order ODE, 3 for second-order, etc.)
-
-    Examples
-    --------
-    >>> a = (1, 2, 3, 4, 5)
-    >>> print(jet_unpack_series(a, n=1))
-    [1], [(1, 2, 3, 4, 5)]
-    >>> print(jet_unpack_series(a, n=2))
-    [1, 2], [(1, 2, 3, 4), (2, 3, 4, 5)]
-    >>> print(jet_unpack_series(a, n=3))
-    [1, 2, 3], [(1, 2, 3), (2, 3, 4), (3, 4, 5)]
-
-    """
-    primals, series = taylor_series[:num], taylor_series[1:]
-
-    def mask(i):
-        return None if i == 0 else i
-
-    series_ = [series[mask(k) : mask(k + 1 - num)] for k in range(num)]
-    return primals, series_
-
-
 def system_matrices_1d_iwp(num_derivatives):
     """Construct the system matrices of the integrated Wiener process."""
     x = np.arange(0, num_derivatives + 1)
