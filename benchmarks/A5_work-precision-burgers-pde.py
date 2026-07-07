@@ -48,40 +48,39 @@ def main(start=3.0, stop=8.0, step=1.0, repeats=1) -> None:
 
     # Read configuration from command line
     tolerances = benchmark_util.setup_tolerances(start=start, stop=stop, step=step)
-    timeit_fun = benchmark_util.setup_timeit(repeats=repeats)
+
+    # Compute a reference solution
+    reference = solver_scipy(method="LSODA", precision_fun=lambda x: x)(1e-13)
+    precision_fun = benchmark_util.rmse_absolute(reference)
 
     # Assemble algorithms
     algorithms = {
-        r"TS1($3$, dense)": solver_dense(num_derivatives=3),
-        r"TS1($3$, blockdiag)": solver_blockdiag(num_derivatives=3),
-        r"TS1($3$, matfree)": solver_matfree(num_derivatives=3),
+        r"TS1($3$, dense)": solver_dense(
+            num_derivatives=3, precision_fun=precision_fun
+        ),
+        r"TS1($3$, blockdiag)": solver_blockdiag(
+            num_derivatives=3, precision_fun=precision_fun
+        ),
+        r"TS1($3$, matfree)": solver_matfree(
+            num_derivatives=3, precision_fun=precision_fun
+        ),
     }
 
-    # Compute a reference solution
-    reference = solver_scipy(method="LSODA")(1e-13)
-    precision_fun = benchmark_util.rmse_absolute(reference)
-
     # Compute all work-precision diagrams
-    results = {}
+    _fig, ax = plt.subplots(figsize=(8, 4), constrained_layout=True)
     pbar = tqdm.tqdm(algorithms.items())
     for label, algo in pbar:
         pbar.set_description(label)
-        param_to_wp = benchmark_util.workprec(
-            algo, precision_fun=precision_fun, timeit_fun=timeit_fun
-        )
-        results[label] = param_to_wp(tolerances)
+        param_to_wp = benchmark_util.workprec(algo, num_timing_calls=repeats)
+        wp = param_to_wp(tolerances)
 
-    _fig, ax = plt.subplots(figsize=(5, 3))
-    for i, (label, wp) in enumerate(results.items()):
-        ax.loglog(wp["precision"], wp["work_mean"], ".-", label=label, color=f"C{i}")
+        ax.loglog(wp.precision.mean(axis=-1), wp.work.mean(axis=-1), ".-", label=label)
 
     ax.set_title("Work-precision diagram")
     ax.set_xlabel("Precision (absolute RMSE)")
     ax.set_ylabel("Work (avg. wall time)")
     ax.grid(linestyle="dotted", which="both")
-    ax.legend(fontsize="small")
-
-    plt.tight_layout()
+    ax.legend(loc="center left", frameon=False, bbox_to_anchor=(1, 0.5))
     plt.show()
 
 
@@ -118,7 +117,7 @@ def solve_ivp_once():
     return solution.t, solution.y.T
 
 
-def solver_blockdiag(*, num_derivatives: int) -> Callable:
+def solver_blockdiag(*, num_derivatives: int, precision_fun) -> Callable:
     """Construct a solver that wraps ProbDiffEq's block-diagonal routines."""
 
     @probdiffeq.ode
@@ -156,12 +155,12 @@ def solver_blockdiag(*, num_derivatives: int) -> Callable:
         )
 
         solution = solve_fn(iwp, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
-        return jax.block_until_ready(solution.u.mean[0])
+        return precision_fun(solution.u.mean[0])
 
     return param_to_solution
 
 
-def solver_matfree(*, num_derivatives: int) -> Callable:
+def solver_matfree(*, num_derivatives: int, precision_fun) -> Callable:
     """Construct a solver that wraps ProbDiffEq's matrix-free routines."""
 
     @probdiffeq.ode
@@ -201,12 +200,12 @@ def solver_matfree(*, num_derivatives: int) -> Callable:
         )
 
         solution = solve_fn(iwp, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
-        return jax.block_until_ready(solution.u.mean[0])
+        return precision_fun(solution.u.mean[0])
 
     return param_to_solution
 
 
-def solver_dense(*, num_derivatives: int) -> Callable:
+def solver_dense(*, num_derivatives: int, precision_fun) -> Callable:
     """Construct a solver that wraps ProbDiffEq's matrix-free routines."""
 
     @probdiffeq.ode
@@ -245,12 +244,12 @@ def solver_dense(*, num_derivatives: int) -> Callable:
 
         solution = solve_fn(iwp, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
 
-        return jax.block_until_ready(solution.u.mean[0])
+        return precision_fun(solution.u.mean[0])
 
     return param_to_solution
 
 
-def solver_scipy(*, method: str) -> Callable:
+def solver_scipy(*, method: str, precision_fun) -> Callable:
     """Construct a solver that wraps SciPy's solution routines."""
 
     def vf_scipy(_t, u):
@@ -279,7 +278,7 @@ def solver_scipy(*, method: str) -> Callable:
             rtol=tol,
             method=method,
         )
-        return jnp.asarray(solution.y[:, -1])
+        return precision_fun(jnp.asarray(solution.y[:, -1]))
 
     return param_to_solution
 
