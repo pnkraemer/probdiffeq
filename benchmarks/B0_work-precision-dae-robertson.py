@@ -43,57 +43,72 @@ def main(start=3.0, stop=10.0, step=0.5, repeats=2, time_span=(1e-6, 1e5)) -> No
 
     # Read configuration from command line
     tolerances = benchmark_util.setup_tolerances(start=start, stop=stop, step=step)
-    timeit_fun = benchmark_util.setup_timeit(repeats=repeats)
+
+    # Compute a reference solution
+    reference_solver = solver_scipy(
+        method="Radau", time_span=time_span, precision_fun=lambda x: x
+    )
+    reference = reference_solver(0.1 * tolerances[-1])
+    rmse_fun = benchmark_util.rmse_relative(reference)
+
+    def precision_fun(received):
+        rmse = rmse_fun(received)
+        eps = jnp.finfo(received.dtype).eps
+        violation = eps + jnp.abs(np.sum(received) - 1.0)
+        return {"rmse": rmse, "constraint_violation": violation}
 
     # Assemble algorithms
     algorithms = {
-        "DAE | Jet(3)": solver_residual(num_derivatives=3, time_span=time_span),
-        "DAE | Jet(4)": solver_residual(num_derivatives=4, time_span=time_span),
-        "ODE | TS1(3)": solver_ode(num_derivatives=3, time_span=time_span),
-        "ODE | TS1(4)": solver_ode(num_derivatives=4, time_span=time_span),
-        "ODE | TS1(7)": solver_ode(num_derivatives=7, time_span=time_span),
-        "ODE | LSODA (Scipy)": solver_scipy(method="LSODA", time_span=time_span),
+        "DAE | Jet(3)": solver_residual(
+            num_derivatives=3, time_span=time_span, precision_fun=precision_fun
+        ),
+        "DAE | Jet(4)": solver_residual(
+            num_derivatives=4, time_span=time_span, precision_fun=precision_fun
+        ),
+        "ODE | TS1(3)": solver_ode(
+            num_derivatives=3, time_span=time_span, precision_fun=precision_fun
+        ),
+        "ODE | TS1(4)": solver_ode(
+            num_derivatives=4, time_span=time_span, precision_fun=precision_fun
+        ),
+        "ODE | TS1(7)": solver_ode(
+            num_derivatives=7, time_span=time_span, precision_fun=precision_fun
+        ),
+        "ODE | LSODA (Scipy)": solver_scipy(
+            method="LSODA", time_span=time_span, precision_fun=precision_fun
+        ),
     }
 
-    # Compute a reference solution
-    reference = solver_scipy(method="Radau", time_span=time_span)(0.1 * tolerances[-1])
-    rmse_fun = rmse_relative(reference)
-
     # Compute all work-precision diagrams
-    results = {}
+    _fig, ax = plt.subplots(ncols=2, figsize=(8, 3), constrained_layout=True)
     pbar = tqdm.tqdm(algorithms.items())
     for label, algo in pbar:
         pbar.set_description(label)
-        param_to_wp = workprec(algo, precision_fun=rmse_fun, work_fun=timeit_fun)
-        results[label] = param_to_wp(tolerances)
-    _fig, ax = plt.subplots(ncols=2, figsize=(13, 5))
+        param_to_wp = benchmark_util.workprec(algo, num_timing_calls=repeats)
+        wp = param_to_wp(tolerances)
 
-    for label, wp in results.items():
-        wdw = 3  # window
-
-        precision, y = wp["precision"], wp["work_mean"]
-        x, _ = precision.T
-        x = jnp.exp(jnp.convolve(jnp.log(x), jnp.ones((wdw,)) / wdw, mode="valid"))
-        y = jnp.exp(jnp.convolve(jnp.log(y), jnp.ones((wdw,)) / wdw, mode="valid"))
-        ax[0].loglog(x, y, label=label)
-
-        x, size = precision.T
-        eps = jnp.finfo(x.dtype).eps
-        ax[1].loglog(tolerances, eps + jnp.abs(size - 1.0), "-", label=label)
+        ax[0].loglog(
+            wp.precision["rmse"].mean(axis=-1), wp.work.mean(axis=-1), ".-", label=label
+        )
+        ax[1].loglog(
+            tolerances,
+            wp.precision["constraint_violation"].mean(axis=-1),
+            "-",
+            label=label,
+        )
 
     ax[0].set_title("Work-precision diagram")
     ax[0].set_xlabel("Precision (relative RMSE)")
     ax[0].set_ylabel("Work (avg. wall time)")
     ax[0].grid(linestyle="dotted", which="both")
-    ax[0].legend(fontsize="small")
+    ax[0].legend(fontsize="xx-small")
 
     ax[1].set_title("Constraint violation")
     ax[1].set_xlabel("Tolerance (user input)")
     ax[1].set_ylabel("Algebraic constraint violation")
     ax[1].grid(linestyle="dotted", which="both")
-    ax[1].legend(fontsize="small")
+    ax[1].legend(fontsize="xx-small")
 
-    plt.tight_layout()
     plt.show()
 
 
@@ -123,7 +138,7 @@ def solve_ivp_once(*, save_at, method, tol):
     return solution.t, solution.y.T
 
 
-def solver_ode(*, num_derivatives: int, time_span) -> Callable:
+def solver_ode(*, num_derivatives: int, time_span, precision_fun) -> Callable:
     """Construct a method that solves Robertson as an ODE."""
 
     @probdiffeq.residual_velocity
@@ -161,12 +176,12 @@ def solver_ode(*, num_derivatives: int, time_span) -> Callable:
         solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
         solution = solve(iwp, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
 
-        return jax.block_until_ready(solution.u.mean[0])
+        return precision_fun(solution.u.mean[0])
 
     return param_to_solution
 
 
-def solver_residual(*, num_derivatives: int, time_span) -> Callable:
+def solver_residual(*, num_derivatives: int, time_span, precision_fun) -> Callable:
     """Construct a method that solves Robertson as a DAE."""
 
     @probdiffeq.residual_velocity
@@ -220,12 +235,12 @@ def solver_residual(*, num_derivatives: int, time_span) -> Callable:
         solve = ivpsolve.solve_adaptive_terminal_values(solver=solver, error=error)
         solution = solve(iwp, t0=t0, t1=t1, atol=1e-3 * tol, rtol=tol)
 
-        return jax.block_until_ready(solution.u.mean[0])
+        return precision_fun(solution.u.mean[0])
 
     return param_to_solution
 
 
-def solver_scipy(*, method: str, time_span) -> Callable:
+def solver_scipy(*, method: str, time_span, precision_fun) -> Callable:
     """Construct a solver that wraps SciPy's solution routines."""
 
     def vf(t, y):
@@ -248,26 +263,9 @@ def solver_scipy(*, method: str, time_span) -> Callable:
             rtol=tol,
             method=method,
         )
-        return jnp.asarray(solution.y[:, -1])
+        return precision_fun(jnp.asarray(solution.y[:, -1]))
 
     return param_to_solution
-
-
-def rmse_relative(expected: jax.Array) -> Callable:
-    """Compute the absolute RMSE."""
-    expected = jnp.asarray(expected)
-
-    def rmse(received):
-        received = jnp.asarray(received)
-        error_absolute = jnp.abs(expected - received)
-
-        error_relative = error_absolute / (1e-5 + jnp.abs(expected))
-        rmse = jnp.linalg.norm(error_relative) / jnp.sqrt(error_relative.size)
-
-        algebraic = jnp.sum(received)
-        return rmse, algebraic
-
-    return rmse
 
 
 def workprec(fun, *, precision_fun: Callable, work_fun: Callable) -> Callable:

@@ -29,12 +29,14 @@ def workprec(
             workprec = []
 
             # Compile...
-            _ = precision_fun(arg).block_until_ready()
+            y = precision_fun(arg)
+            tree.tree_map(lambda x: x.block_until_ready(), y)
 
             # Loop
             for _ in range(num_timing_calls):
                 t0 = timing.perf_counter()
-                precision = precision_fun(arg).block_until_ready()
+                precision = precision_fun(arg)
+                tree.tree_map(lambda x: x.block_until_ready(), precision)
                 work = np.asarray(timing.perf_counter() - t0)
                 workprec.append(WorkPrec(work=work, precision=precision))
 
