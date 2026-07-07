@@ -1,6 +1,6 @@
 """Shared utilities for benchmark scripts."""
 
-from probdiffeq.backend import linalg, np, timing
+from probdiffeq.backend import linalg, np, structs, timing, tree
 from probdiffeq.backend.typing import Array, Callable
 
 
@@ -18,30 +18,41 @@ def setup_timeit(*, repeats: int) -> Callable:
     return timer
 
 
-def workprec(fun, *, precision_fun: Callable, timeit_fun: Callable) -> Callable:
-    """Turn a parameter-to-solution function into a parameter-to-work-precision map."""
+@tree.register_dataclass
+@structs.dataclass
+class WorkPrec:
+    """Data for work-precision diagrams."""
 
-    def parameter_list_to_workprecision(list_of_args, /):
-        works_mean = []
-        works_std = []
-        precisions = []
+    work: Array
+    precision: Array
+
+
+def workprec(
+    precision_fun: Callable, *, num_repeats: int = 0
+) -> Callable[[list], WorkPrec]:
+    """Turn a parameter-to-precision function into a parameter-to-work-precision map."""
+
+    def parameter_list_to_workprecision(list_of_args: list, /) -> WorkPrec:
+        workprecs = []
         for arg in list_of_args:
-            # TODO: if we do timing and precision jointly (which means hardcoding timing), then
-            # we can cut runtimes of costlier benchmarks where we only afford repeat=1 in half.
-            precision = precision_fun(fun(arg).block_until_ready())
-            precisions.append(precision)
+            workprec = []
 
-            times = timeit_fun(lambda: fun(arg).block_until_ready())  # noqa: B023
-            mean = np.mean(np.asarray(times))
-            works_mean.append(mean)
-            if len(times) > 1:
-                std = np.std(np.asarray(times), ddof=1)
-                works_std.append(std)
-        return {
-            "work_mean": np.asarray(works_mean),
-            "work_std": np.asarray(works_std),
-            "precision": np.asarray(precisions),
-        }
+            # Compile...
+            _ = precision_fun(arg).block_until_ready()
+
+            # Loop
+            for _ in range(1 + num_repeats):
+                t0 = timing.perf_counter()
+                precision = precision_fun(arg).block_until_ready()
+                work = np.asarray(timing.perf_counter() - t0)
+                workprec.append(WorkPrec(work=work, precision=precision))
+
+            # Transpose workprec tree
+            workprec = tree.tree_array_stack(workprec)
+            workprecs.append(workprec)
+
+        # Transpose workprec tree again to return a WorkPrec object
+        return tree.tree_array_stack(workprecs)
 
     return parameter_list_to_workprecision
 
