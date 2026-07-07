@@ -3,6 +3,8 @@
 from probdiffeq.backend import linalg, np, structs, timing, tree
 from probdiffeq.backend.typing import Array, Callable
 
+# TODO: this being a function in the src is a joke...
+
 
 def setup_tolerances(*, start: float, stop: float, step: float) -> Array:
     """Choose a vector of tolerances."""

@@ -23,39 +23,17 @@ def main() -> None:
     # High order solvers need double precision
     jax.config.update("jax_enable_x64", True)
 
-    # Assemble algorithms
-    algorithms = {
-        r"TS1(1)": solver_probdiffeq(1),
-        r"TS1(2)": solver_probdiffeq(2),
-        r"TS1(3)": solver_probdiffeq(3),
-        r"TS1(4)": solver_probdiffeq(4),
-        r"TS1(5)": solver_probdiffeq(5),
-        r"TS1(6)": solver_probdiffeq(6),
-        r"TS1(7)": solver_probdiffeq(7),
-        r"TS1(8)": solver_probdiffeq(8),
-        r"TS1(9)": solver_probdiffeq(9),
-        r"TS1(10)": solver_probdiffeq(10),
-        r"TS1(11)": solver_probdiffeq(11),
-        r"TS1(12)": solver_probdiffeq(12),
-        r"TS1(13)": solver_probdiffeq(13),
-        r"TS1(14)": solver_probdiffeq(14),
-        r"TS1(15)": solver_probdiffeq(15),
-        r"TS1(16)": solver_probdiffeq(16),
-        r"TS1(17)": solver_probdiffeq(17),
-    }
-
     # Set up the benchmark (compute a reference etc.)
     reference = solver_scipy(method="LSODA")(1e-12)
     tolerances = benchmark_util.setup_tolerances(start=2, stop=8, step=0.5)
     precision_fun = benchmark_util.rmse_relative(reference)
-    timeit_fun = benchmark_util.setup_timeit(repeats=1)
+
+    # Assemble algorithms
+    algorithms = {}
+    for n in range(1, 17):
+        algorithms[f"TS1({n})"] = solver_probdiffeq(n, precision_fun=precision_fun)
 
     # Compute all work-precision diagrams
-    results = {}
-    for label, algo in tqdm.tqdm(algorithms.items()):
-        param_to_wp = workprec(algo, precision_fun=precision_fun, timeit_fun=timeit_fun)
-        results[label] = param_to_wp(tolerances)
-
     layout = [["values", "trends"]]
     _fig, ax = plt.subplot_mosaic(
         layout,
@@ -65,19 +43,22 @@ def main() -> None:
         sharex=True,
         sharey=True,
     )
-    for i, (keys, values) in enumerate(results.items()):
+    pbar = tqdm.tqdm(algorithms.items())
+    for i, (label, algo) in enumerate(pbar):
+        pbar.set_description(label)
+        param_to_wp = benchmark_util.workprec(algo, num_timing_calls=0)
+        wp = param_to_wp(tolerances)
+
         cmap = mpl.colormaps["managua"]
-        i_clipped = i / len(results.keys())
+        i_clipped = i / len(algorithms.keys())
         color = mpl.colors.to_hex(cmap(i_clipped))
 
-        # Smooth curves
-        x, y = smooth(values["work_num_steps"], values["precision"])
-        (x_lin, y_lin), (scale, _) = linear_trend(
-            values["work_num_steps"], values["precision"]
-        )
+        # Compute linear trend
+        x, y = wp.precision["num_steps"], wp.precision["precision"]
+        (x_lin, y_lin), (scale, _) = linear_trend(x, y)
 
         # All curves start at (1, 1)
-        ax["values"].loglog(x / x.min(), y / y.max(), color=color, label=keys)
+        ax["values"].loglog(x / x.min(), y / y.max(), ".-", color=color, label=label)
         ax["trends"].loglog(
             x_lin / x_lin.min(),
             y_lin / y_lin.max(),
@@ -85,14 +66,14 @@ def main() -> None:
             label=f"Rate: {scale:.1f}",
         )
 
-    ax["values"].set_title("Values (slightly smoothed)")
-    ax["trends"].set_title("Decay rates (linear fit)")
-    ax["values"].set_ylabel("RMSE (normalised)")
+    ax["values"].set_title("True data", fontsize="medium")
+    ax["trends"].set_title("Linear fit", fontsize="medium")
+    ax["values"].set_ylabel("Relative RMSE (normalised)", fontsize="medium")
 
     for a in [ax["values"], ax["trends"]]:
         a.grid(which="minor", linestyle="dotted")
-        a.set_xlabel("Num steps (normalised)")
-        a.legend(fontsize="x-small", ncols=2)
+        a.set_xlabel("Step count (normalised)")
+        a.legend(fontsize="xx-small", ncols=2)
     plt.show()
 
 
@@ -123,7 +104,7 @@ def solver_scipy(*, method: str) -> Callable:
     return param_to_solution
 
 
-def solver_probdiffeq(num_derivatives: int) -> Callable:
+def solver_probdiffeq(num_derivatives: int, precision_fun) -> Callable:
     """Construct a solver that wraps ProbDiffEq's solution routines."""
 
     @probdiffeq.ode
@@ -160,7 +141,10 @@ def solver_probdiffeq(num_derivatives: int) -> Callable:
         solution = solve(iwp, t0=t0, t1=t1, dt0=dt0, atol=1e-2 * tol, rtol=tol)
 
         # Return the terminal value
-        return solution.u.mean[0], solution.num_steps
+        return {
+            "precision": precision_fun(solution.u.mean[0]),
+            "num_steps": solution.num_steps,
+        }
 
     return param_to_solution
 
