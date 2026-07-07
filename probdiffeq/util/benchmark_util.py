@@ -28,7 +28,7 @@ class WorkPrec:
 
 
 def workprec(
-    precision_fun: Callable, *, num_repeats: int = 0
+    precision_fun: Callable, *, num_timing_calls: int = 1
 ) -> Callable[[list], WorkPrec]:
     """Turn a parameter-to-precision function into a parameter-to-work-precision map."""
 
@@ -41,7 +41,7 @@ def workprec(
             _ = precision_fun(arg).block_until_ready()
 
             # Loop
-            for _ in range(1 + num_repeats):
+            for _ in range(num_timing_calls):
                 t0 = timing.perf_counter()
                 precision = precision_fun(arg).block_until_ready()
                 work = np.asarray(timing.perf_counter() - t0)

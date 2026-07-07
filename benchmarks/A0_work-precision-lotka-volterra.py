@@ -19,7 +19,7 @@ jax.config.update("jax_debug_nans", True)
 jax.config.update("jax_enable_x64", True)
 
 
-def main(start=3.0, stop=12.0, step=1.0, repeats=0) -> None:
+def main(start=3.0, stop=12.0, step=1.0, repeats=2) -> None:
     """Run the script."""
     # Simulate once to plot the state
     ts, ys = solve_ivp_once()
@@ -61,22 +61,21 @@ def main(start=3.0, stop=12.0, step=1.0, repeats=0) -> None:
     }
 
     # Compute all work-precision diagrams
-    results = {}
+    _fig, ax = plt.subplots(figsize=(8, 3), dpi=120, constrained_layout=True)
     pbar = tqdm.tqdm(algorithms.items())
     for label, algo in pbar:
         pbar.set_description(label)
-        param_to_wp = benchmark_util.workprec(algo, num_repeats=repeats)
-        results[label] = param_to_wp(tolerances)
-
-    _fig, ax = plt.subplots(figsize=(8, 5), dpi=120, constrained_layout=True)
-    for label, wp in results.items():
+        param_to_wp = benchmark_util.workprec(algo, num_timing_calls=repeats)
+        wp = param_to_wp(tolerances)
         ax.loglog(wp.precision.mean(axis=-1), wp.work.mean(axis=-1), ".-", label=label)
 
     ax.set_ylabel("Work (avg. wall time)")
     ax.set_title("Work-precision diagram")
     ax.set_xlabel("Precision (relative RMSE)")
     ax.grid(linestyle="dotted", which="both")
-    ax.legend(fontsize="small")
+    ax.legend(
+        fontsize="small", loc="center left", frameon=False, bbox_to_anchor=(1, 0.5)
+    )
 
     plt.show()
 
