@@ -155,9 +155,9 @@ class DenseNormal(ssm_impl_api.AbstractTreeNormal[DenseTreeFlatten]):
 
     def residual_whitened_rms_flat(self, u):
         dx = u - self.mean_flat
-        residual_white = linalg.solve_triu(self.cholesky_flat.T, dx, trans="T")
-        mahalanobis = linalg.qr_r(residual_white[:, None])
-        return np.reshape(np.abs(mahalanobis) / np.sqrt(self.mean_flat.size), ())
+        residual_white = linalg.solve_tril(self.cholesky_flat, dx)
+        norm = linalg.vector_norm(residual_white)
+        return norm / np.sqrt(self.mean_flat.size)
 
     def rescale_cholesky(self, factor, /):
         cholesky = factor[..., None, None] * self.cholesky_flat
