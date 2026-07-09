@@ -286,7 +286,6 @@ class BlockDiagNormal(ssm_impl_api.AbstractTreeNormal[BlockDiagTreeFlatten]):
 
         def rms_scalar(u, m, c):
             dx = u - m
-            c = linalg.qr_r(c.T).T
             w = linalg.solve_tril(c, dx)
             return linalg.vector_norm(w) / np.sqrt(m.size)
 

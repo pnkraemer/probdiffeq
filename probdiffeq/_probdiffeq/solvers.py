@@ -564,10 +564,7 @@ class solver_dynamic(ProbabilisticSolver):
         observed = fx.marginalise(u)
         zeros = tree.tree_map(np.zeros_like, fx.noise.mean)
         output_scale = observed.residual_whitened_rms_tree(zeros)
-        # import jax
 
-        # jax.debug.print("Output scale {}", output_scale, ordered=True)
-        # jax.debug.print("Output scale {}", output_scale.sum(), ordered=True)
         if self.stop_gradient_through_calibration:
             output_scale = func.stop_gradient(output_scale)
 
