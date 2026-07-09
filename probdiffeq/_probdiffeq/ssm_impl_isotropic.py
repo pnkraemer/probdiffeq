@@ -243,10 +243,10 @@ class IsotropicNormal(ssm_impl_api.AbstractTreeNormal[IsotropicTreeFlatten]):
         eye_d = np.eye(d)
 
         cov = self.cholesky_flat @ self.cholesky_flat.T
-
-        cov = np.kron(eye_d, cov)
+        cov_full = linalg.einsum("nm,dt->ndmt", cov, eye_d)
+        cov_full = cov_full.reshape((self.mean_flat.size, -1))
         mean = self.mean_flat.reshape((-1,))
-        return (mean, cov)
+        return (mean, cov_full)
 
     def sample_tree(self, key):
         sample_latent = self.sample_flat(key)

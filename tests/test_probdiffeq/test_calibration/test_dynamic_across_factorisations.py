@@ -8,14 +8,10 @@ from probdiffeq.backend import func, linalg, np, random, testing
 
 
 @testing.parametrize("num_derivatives", [2])
-@testing.parametrize("ode_shape", [(2,)])
+@testing.parametrize("ode_shape", [(5,)])
 def test_dense_vs_isotropic(num_derivatives, ode_shape):
     """Assert that for an isotropic ODE, dense solvers = isotropic solvers."""
     # Isotropic ODE
-
-    import jax.numpy as jnp
-
-    jnp.set_printoptions(2)
 
     key = random.prng_key(seed=1)
     key, subkey = random.split(key, num=2)
@@ -25,7 +21,7 @@ def test_dense_vs_isotropic(num_derivatives, ode_shape):
     u0 = random.normal(subkey, shape=ode_shape)
 
     t0 = 0.0
-    t1 = 5.0
+    t1 = 10.0
 
     @func.partial(probdiffeq.ode, jacobian=probdiffeq.jacobian_materialize())
     def vf(u, *, t):
@@ -63,11 +59,10 @@ def test_dense_vs_isotropic(num_derivatives, ode_shape):
     (m1, C1), (m2, C2) = sols
     assert testing.allclose(m1, m2)
 
-    print(C1 - C2)
     assert testing.allclose(C1, C2)
 
 
-@testing.parametrize("ode_shape", [(3,)])
+@testing.parametrize("ode_shape", [(5,)])
 def test_dense_vs_blockdiag(ode_shape):
     """Assert that solving (d,) scalar ODEs in parallel with dense solvers matches a single blockdiagonal solve.
 
@@ -85,7 +80,7 @@ def test_dense_vs_blockdiag(ode_shape):
     key, subkey = random.split(key, num=2)
     u0 = random.normal(subkey, shape=ode_shape)
 
-    t0, t1 = 0.0, 5.0
+    t0, t1 = 0.0, 10.0
     ts = np.linspace(t0, t1, num=10, endpoint=True)
 
     solve_dense, solve_blockdiag = _make_solvers(ts=ts)
