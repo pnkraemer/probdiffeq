@@ -28,7 +28,7 @@ def test_dense_vs_isotropic(num_derivatives, ode_shape):
         return scalar * u + t
 
     # Generate a solver (common elements)
-    ts = np.linspace(t0, t1, num=3, endpoint=True)
+    ts = np.linspace(t0, t1, num=7, endpoint=True)
     strategy = probdiffeq.strategy_smoother_fixedpoint()
     jetexpand = probdiffeq.jetexpand_ode_padded_scan(num=num_derivatives)
     tcoeffs, _ = jetexpand(vf, [u0], t=t0)
