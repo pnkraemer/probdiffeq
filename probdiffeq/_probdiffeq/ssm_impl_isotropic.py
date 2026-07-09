@@ -201,15 +201,10 @@ class IsotropicNormal(ssm_impl_api.AbstractTreeNormal[IsotropicTreeFlatten]):
         return self.residual_whitened_rms_flat(u_latent)
 
     def residual_whitened_rms_flat(self, u_latent, /):
-
         residual_white = self.mean_flat - u_latent
         residual_white = linalg.solve_tril(self.cholesky_flat, residual_white)
-
-        residual_white = np.reshape(residual_white, (-1, 1))
-        residual_white_matrix = linalg.qr_r(residual_white)
-        residual_white_matrix = np.reshape(residual_white_matrix, ())
-
-        return np.abs(residual_white_matrix) / np.sqrt(self.mean_flat.size)
+        norm = linalg.vector_norm(residual_white.reshape((-1,)))
+        return norm / np.sqrt(self.mean_flat.size)
 
     def rescale_cholesky(self, factor, /):
         cholesky = factor[..., None, None] * self.cholesky_flat
@@ -248,10 +243,10 @@ class IsotropicNormal(ssm_impl_api.AbstractTreeNormal[IsotropicTreeFlatten]):
         eye_d = np.eye(d)
 
         cov = self.cholesky_flat @ self.cholesky_flat.T
-
-        cov = np.kron(eye_d, cov)
-        mean = self.mean_flat.reshape((-1,), order="F")
-        return (mean, cov)
+        cov_full = linalg.einsum("nm,dt->ndmt", cov, eye_d)
+        cov_full = cov_full.reshape((self.mean_flat.size, -1))
+        mean = self.mean_flat.reshape((-1,))
+        return (mean, cov_full)
 
     def sample_tree(self, key):
         sample_latent = self.sample_flat(key)
