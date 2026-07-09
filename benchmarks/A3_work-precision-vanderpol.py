@@ -1,4 +1,4 @@
-"""Walltime | stiff van-der-Pol."""
+"""Walltime | Stiff van-der-Pol."""
 
 from collections.abc import Callable
 
