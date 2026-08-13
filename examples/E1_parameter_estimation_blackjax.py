@@ -60,7 +60,8 @@ def main():
     # Warmup
     print("\nRunning window adaptation...", end="")
     key, subkey = jax.random.split(key, num=2)
-    warmup = blackjax.window_adaptation(blackjax.nuts, log_M, progress_bar=False)
+
+    warmup = blackjax.window_adaptation(blackjax.nuts, log_M)
     warmup_results, _ = warmup.run(subkey, theta0, num_steps=150)
     print(" done.")
 
