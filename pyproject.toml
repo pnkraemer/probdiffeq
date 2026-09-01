@@ -29,9 +29,9 @@ cpu = [
     "jax[cpu]",
 ]
 test =[
-    "pytest < 9.0",  # pinned in June '26; revisit soon
+    "pytest < 10.0",  # pinned in June '26; revisit soon
     "pytest-xdist",
-    "pytest-cases < 3.10", # pinned in June '26; revisit soon
+    "pytest-cases < 3.11", # pinned in June '26; revisit soon
     "diffeqzoo",
     "diffrax",
     "equinox",
@@ -55,7 +55,7 @@ doc = [
     # and mkdocs-material stops supporting it.
     # Pin both to ensure functional docs (for now at least)
     "mkdocs<2.0.0",
-    "mkdocs-material<9.7.0",
+    "mkdocs-material<9.8.0",
     "mkdocs-exclude",
     "mkdocstrings-python",
     "mkdocstrings",
