@@ -72,6 +72,20 @@ def test_filter_and_smoother_have_similar_rmse(
     assert filter_rmse < 0.01
 
 
+def test_smoother_and_filter_agree_at_the_final_time_point(
+    filter_solution, smoother_solution
+) -> None:
+    """Assert that the smoothing and filtering marginals coincide at t1.
+
+    Both condition on the same data at the final time point.
+    """
+    last = func.partial(tree.tree_map, lambda s: s[-1])
+    assert testing.allclose(
+        last(filter_solution.u.mean), last(smoother_solution.u.mean)
+    )
+    assert testing.allclose(last(filter_solution.u.std), last(smoother_solution.u.std))
+
+
 def _reference_solution(ts):
     vf, (u0,), (_t0, _t1) = ode.ivp_lotka_volterra()
     vf = probdiffeq.ode(vf)

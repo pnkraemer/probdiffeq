@@ -94,7 +94,14 @@ def test_dense_vs_blockdiag(ode_shape):
     mean_blockdiag = sol_blockdiag.u.mean_flat
     cholesky_blockdiag = sol_blockdiag.u.cholesky_flat
     assert testing.allclose(mean_dense, mean_blockdiag)
-    assert testing.allclose(cholesky_dense, cholesky_blockdiag)
+
+    # Compare covariances rather than Cholesky factors: entries of the factors
+    # that are zero in exact arithmetic only agree up to rounding errors
+    # relative to the largest entry, which the elementwise tolerances do not allow.
+    def covariance(cholesky):
+        return cholesky @ linalg.einsum("...ij->...ji", cholesky)
+
+    assert testing.allclose(covariance(cholesky_dense), covariance(cholesky_blockdiag))
 
 
 def _make_solvers(*, ts):

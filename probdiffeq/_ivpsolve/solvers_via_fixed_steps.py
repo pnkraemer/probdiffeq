@@ -27,8 +27,14 @@ def solve_fixed_grid(
         state0 = solver.init(t=t0, u=u, damp=damp)
         s_new, result = flow.scan(body_fn, init=state0, xs=np.diff(grid))
 
+        # The last step lands exactly on grid[-1]. Treat it like the adaptive
+        # solvers treat a step that lands exactly on a checkpoint, so that the
+        # final state does not carry a backward model to the previous step.
+        _, interp_res = solver.interpolate_fwd_at_t1(
+            t=grid[-1], interp_from=s_new, interp_to=s_new
+        )
         return solver.userfriendly_output(
-            solution0=state0, solution=result, solution1=s_new
+            solution0=state0, solution=result, solution1=interp_res.step_from
         )
 
     return solve
