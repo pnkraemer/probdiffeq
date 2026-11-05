@@ -245,8 +245,26 @@ def dtype(arr_or_dtype, /):
     return jnp.dtype(arr_or_dtype)
 
 
+@jax.custom_jvp
 def hypot(x1, x2, /):
     return jnp.hypot(x1, x2)
+
+
+@hypot.defjvp
+def _hypot_jvp(primals, tangents):
+    """Evaluate the JVP of hypot, with right-sided derivatives at the origin.
+
+    At the origin, each partial derivative is 1, like grad(abs)(0) == 1.
+    Elsewhere, the partial derivatives are x_i / hypot(x1, x2).
+    """
+    x1, x2 = primals
+    dx1, dx2 = tangents
+    r = jnp.hypot(x1, x2)
+    is_positive = r > 0
+    r_safe = jnp.where(is_positive, r, 1.0)
+    u1 = jnp.where(is_positive, x1 / r_safe, 1.0)
+    u2 = jnp.where(is_positive, x2 / r_safe, 1.0)
+    return r, u1 * dx1 + u2 * dx2
 
 
 def cos(x, /):

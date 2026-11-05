@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.12']
+        python-version: ['3.14']
         os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v7
@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.12', '3.13', '3.14', '3.15']
         os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v7
@@ -47,7 +47,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          pip install --upgrade pip 
+          pip install --upgrade pip
           pip install .[cpu]
       - name: Run tests
         run: make quickstart  # explanation for this workflow -> makefile
@@ -58,7 +58,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.12', '3.13', '3.14', '3.15']
         os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v7
@@ -68,7 +68,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          pip install --upgrade pip 
+          pip install --upgrade pip
           pip install .[cpu,test]
       - name: Run tests
         run: make test
@@ -80,7 +80,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.12', '3.13', '3.14', '3.15']
         os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v7
