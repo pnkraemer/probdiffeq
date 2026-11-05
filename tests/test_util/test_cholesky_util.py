@@ -68,27 +68,34 @@ def test_sum_of_sqrtm_factors_jacrev_zero_matrix() -> None:
     assert is_not_nan
 
 
-def test_hypot_derivative_well_defined_at_origin() -> None:
-    """Ensure that np.hypot is well-defined at the origin.
+@testing.parametrize(
+    "x, expected",
+    [
+        ((0.0, 0.0), (1.0, 1.0)),
+        ((3.0, 4.0), (0.6, 0.8)),
+        ((1e-6, 0.0), (1.0, 0.0)),
+        ((0.0, 1e-6), (0.0, 1.0)),
+    ],
+)
+def test_hypot_derivative_well_defined_at_origin(x, expected) -> None:
+    """Ensure that the derivative of np.hypot is well-defined at the origin.
 
-    This ensures that the QR decomposition is differentiable at the origin,
-    which is not the case unless we use custom JVPs.
+    The output-scale calibration evaluates hypot at (0, 0): the running
+    output scale starts at zero, and the residual term can be zero, too.
+    Reverse-mode derivatives through the solver must not be NaN then (#668).
+
+    Since JAX v0.12, the derivative of jnp.hypot is NaN at the origin
+    (before, it was finite). We therefore use a custom JVP, which matches
+    the derivative of abs() at zero: it is 1 by convention in JAX, grad(abs)(0) == 1.
+    So at the origin, both partial derivatives are 1 (the right-sided limits).
     """
 
-    # Use square of triu to ensure that the reference is differentiable
-    # (np.sqrt is not differentiable at zero)
     @func.grad
-    def triu_via_naive_arithmetic_and_autograd(x, y):
-        return x**2 + y**2
+    def grad_hypot(z):
+        return np.hypot(z[0], z[1])
 
-    @func.grad
-    def triu_via_qr_r(x, y):
-        return np.hypot(x, y) ** 2
-
-    a, b = 0.0, 0.0
-    expected = triu_via_naive_arithmetic_and_autograd(a, b)
-    received = triu_via_qr_r(a, b)
-    assert testing.allclose(expected, received)
+    received = grad_hypot(np.asarray(x))
+    assert testing.allclose(received, np.asarray(expected))
 
 
 def _tree_is_free_of_nans(pytree):
