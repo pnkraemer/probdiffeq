@@ -1,11 +1,11 @@
 # Probabilistic solvers in JAX
 
-[![PyPI version](https://img.shields.io/pypi/v/probdiffeq.svg)](https://pypi.python.org/pypi/probdiffeq)
-[![License](https://img.shields.io/pypi/l/probdiffeq.svg)](https://pypi.python.org/pypi/probdiffeq)
-[![Python versions](https://img.shields.io/pypi/pyversions/probdiffeq.svg)](https://pypi.python.org/pypi/probdiffeq)
-
-
-
+[![PyPI version](https://img.shields.io/pypi/v/probdiffeq?style=flat-square&color=3776AB&logo=pypi&logoColor=white)](https://pypi.org/project/probdiffeq/)
+[![Python versions](https://img.shields.io/pypi/pyversions/probdiffeq?style=flat-square&color=3776AB&logo=python&logoColor=white)](https://pypi.org/project/probdiffeq/)
+[![License](https://img.shields.io/pypi/l/probdiffeq?style=flat-square&color=3776AB)](https://github.com/pnkraemer/probdiffeq/blob/main/LICENSE)
+[![Docs](https://img.shields.io/badge/docs-online-3776AB?style=flat-square&logo=readthedocs&logoColor=white)](https://pnkraemer.github.io/probdiffeq/)
+[![Downloads](https://img.shields.io/pypi/dm/probdiffeq?style=flat-square&color=3776AB&logo=python&logoColor=white)](https://pypistats.org/packages/probdiffeq)
+[![GitHub stars](https://img.shields.io/github/stars/pnkraemer/probdiffeq?style=flat-square&color=3776AB&logo=github&logoColor=white)](https://github.com/pnkraemer/probdiffeq)
 
 **Probdiffeq** implements adaptive probabilistic numerical solvers for differential equations (ODEs). It builds on [JAX](https://jax.readthedocs.io/en/latest/), thus inheriting **automatic differentiation**, **vectorisation**, and **GPU acceleration**.
 
@@ -516,4 +516,4 @@ A (subjective, probdiffeq-centric) list of relevant work includes the following 
 
 
 
-Anything missing? Reach out! 
+Anything missing? Reach out!
