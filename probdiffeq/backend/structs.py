@@ -2,10 +2,12 @@
 
 import dataclasses
 from enum import Enum  # noqa: F401
-from typing import NamedTuple  # noqa: F401
+from typing import (
+    NamedTuple,  # noqa: F401
+    dataclass_transform,  # new in Python 3.11
+)
 
 from jax import ShapeDtypeStruct  # noqa: F401
-from typing_extensions import dataclass_transform  # new in Python 3.11
 
 
 @dataclass_transform()
