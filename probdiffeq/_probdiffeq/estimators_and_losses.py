@@ -711,7 +711,17 @@ class strategy_smoother_fixedinterval(Smoother):
     def interpolate_fwd_at_t1(self, posterior_t1):
         marginals = posterior_t1.marginal
 
+        # The solution at t1 keeps its backward model (to the previous step).
+        # The state to resume from must not: finalize() marginalises the
+        # conditional of the final state, which has to be the identity when
+        # the final state is the solution at t1 itself.
+        cond_identity = posterior_t1.marginal.identity_conditional()
+        resume_from = MarkovSequence(
+            posterior_t1.marginal,
+            conditional=cond_identity,
+            reverse=posterior_t1.reverse,
+        )
         interp_res = utilities.InterpResult(
-            step_from=posterior_t1, interp_from=posterior_t1
+            step_from=resume_from, interp_from=posterior_t1
         )
         return (marginals, posterior_t1), interp_res
